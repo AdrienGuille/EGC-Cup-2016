@@ -3,14 +3,16 @@ __author__ = "Adrien Guille"
 __email__ = "adrien.guille@univ-lyon2.fr"
 
 from gensim import corpora, models
-from nltk.corpus import stopwords
 from nltk import wordpunct_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import SnowballStemmer
 from collections import defaultdict
 import networkx as nx
+import codecs
 
 
 def load_corpus(file_path, year_a=2004, year_b=2014):
-    input_file = open(file_path, 'r')
+    input_file = codecs.open(file_path, 'r', encoding='latin-1')
     count = 0
     article_list = []
     for line in input_file:
@@ -18,7 +20,7 @@ def load_corpus(file_path, year_a=2004, year_b=2014):
         if len(article) == 8 and article[1] == 'EGC' and int(article[2]) in range(year_a,year_b):
             count += 1
             authors = article[5].split(',')
-            for i in range(0,len(authors)):
+            for i in range(0, len(authors)):
                 authors[i] = authors[i].strip()
             article_list.append({'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4]})
     print count, 'articles'
@@ -62,7 +64,10 @@ def analyze_collaboration_graph(graph):
 
 def train_lda(abstracts, num_topics=10):
     stop_word_list = stopwords.words('french')
-    formatted_abstracts = [[word for word in wordpunct_tokenize(abstract.lower()) if word not in stop_word_list] for abstract in abstracts]
+    stop_word_list.extend(stopwords.words('english'))
+    stop_word_list.extend([',', '.', '\'', '"', '(', ')', '-', ').'])
+    snowball_stemmer = SnowballStemmer('french')
+    formatted_abstracts = [[snowball_stemmer.stem(word) for word in wordpunct_tokenize(abstract.lower()) if word not in stop_word_list] for abstract in abstracts]
     frequency = defaultdict(int)
     for formatted_abstract in formatted_abstracts:
         for word in formatted_abstract:
@@ -72,7 +77,7 @@ def train_lda(abstracts, num_topics=10):
     formatted_corpus = [dictionary.doc2bow(formatted_abstract) for formatted_abstract in formatted_abstracts]
     tfidf = models.TfidfModel(formatted_corpus)
     corpus_tfidf = tfidf[formatted_corpus]
-    lda = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, iterations=3000, num_topics=num_topics)
+    lda = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, iterations=10000, num_topics=num_topics)
     return lda.show_topics(num_topics=num_topics, num_words=10, formatted=False)
 
 def print_topics(topics):
@@ -81,13 +86,15 @@ def print_topics(topics):
         word_list = []
         for weighted_word in topic:
             word_list.append(weighted_word[1])
-        print('topic',count,': ',' '.join(word_list))
+        print 'topic', count, ': ', ' '.join(word_list)
         count += 1
 
-article_corpus = load_corpus('input/RNTI_articles_export_utf-8.txt', 2004, 2005)
+article_corpus = load_corpus('input/RNTI_articles_export.txt', 2004, 2015)
+print article_corpus[1]
+print article_corpus[1].get('abstract')
 print len(author_set(article_corpus)), 'distinct authors'
 collaboration_graph = create_collaboration_graph(article_corpus)
-export_collaboration_graph(collaboration_graph)
+# export_collaboration_graph(collaboration_graph)
 analyze_collaboration_graph(collaboration_graph)
 print 'degree(Adrien Guille): ', collaboration_graph.degree('Adrien Guille')
 latent_topics = train_lda(abstract_list(article_corpus), 20)
