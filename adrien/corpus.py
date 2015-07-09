@@ -22,7 +22,6 @@ def load(file_path, year_a=2004, year_b=2014, enforce_language=None):
                 for i in range(0, len(authors)):
                     authors[i] = authors[i].strip()
                 article_list.append({'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4], 'language': language})
-    print count, 'articles (', enforce_language, ')'
     return article_list
 
 def serialize(corpus, file_path):
@@ -42,7 +41,6 @@ def author_set(corpus):
     for article in corpus:
         for author in article.get('authors'):
             authors.add(author)
-    print len(authors), 'distinct authors'
     return authors
 
 def collaboration_graph(corpus, name=''):
@@ -53,5 +51,4 @@ def collaboration_graph(corpus, name=''):
         for i in range(0, len(authors)):
             for j in range(i+1, len(authors)):
                 graph.add_edge(authors[i], authors[j])
-    print graph.number_of_edges(), 'distinct collaborations'
     return graph
