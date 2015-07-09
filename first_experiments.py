@@ -9,13 +9,13 @@ from collections import defaultdict
 import networkx as nx
 
 
-def load_corpus(file_path):
+def load_corpus(file_path, year_a=2004, year_b=2014):
     input_file = open(file_path, 'r')
     count = 0
     article_list = []
     for line in input_file:
         article = line.split('\t')
-        if len(article) == 8 and article[1] == 'EGC':
+        if len(article) == 8 and article[1] == 'EGC' and int(article[2]) in range(year_a,year_b):
             count += 1
             authors = article[5].split(',')
             for i in range(0,len(authors)):
@@ -48,8 +48,8 @@ def create_collaboration_graph(corpus):
     print graph.number_of_edges(), 'distinct collaborations'
     return graph
 
-def export_collaboration_graph(graph):
-    graph.write_gml(graph, 'collaboration.gml')
+def export_collaboration_graph(graph, file_path='output/collaboration_graph.gml'):
+    nx.write_gml(graph, file_path)
 
 def analyze_collaboration_graph(graph):
     if nx.is_connected(graph):
@@ -60,9 +60,9 @@ def analyze_collaboration_graph(graph):
     print 'k-core decomposition: ', sorted(k_core.items(), key=lambda x: x[1], reverse=True)
 
 
-def train_lda(abstracts, num_topics):
-    stopword_list = stopwords.words('french')
-    formatted_abstracts = [[word for word in wordpunct_tokenize(abstract.lower()) if word not in stopword_list] for abstract in abstracts]
+def train_lda(abstracts, num_topics=10):
+    stop_word_list = stopwords.words('french')
+    formatted_abstracts = [[word for word in wordpunct_tokenize(abstract.lower()) if word not in stop_word_list] for abstract in abstracts]
     frequency = defaultdict(int)
     for formatted_abstract in formatted_abstracts:
         for word in formatted_abstract:
@@ -84,10 +84,11 @@ def print_topics(topics):
         print('topic',count,': ',' '.join(word_list))
         count += 1
 
-article_corpus = load_corpus('RNTI_articles_export_utf-8.txt')
+article_corpus = load_corpus('input/RNTI_articles_export_utf-8.txt', 2004, 2005)
+print len(author_set(article_corpus)), 'distinct authors'
 collaboration_graph = create_collaboration_graph(article_corpus)
-# export_collaboration_graph(collaboration_graph)
+export_collaboration_graph(collaboration_graph)
 analyze_collaboration_graph(collaboration_graph)
 print 'degree(Adrien Guille): ', collaboration_graph.degree('Adrien Guille')
-# latent_topics = train_lda(abstract_list(article_corpus), 20)
-# print_topics(latent_topics)
+latent_topics = train_lda(abstract_list(article_corpus), 20)
+print_topics(latent_topics)
