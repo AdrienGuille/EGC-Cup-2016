@@ -5,6 +5,14 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 import networkx as nx
 import plotting
 
+def merge(graph1, graph2):
+    return nx.compose(graph1, graph2)
+
+def print_basic_properties(graph):
+    print nx.number_of_nodes(graph), 'distinct authors'
+    print nx.number_of_edges(graph), 'distinct collaborations'
+    print 2*nx.number_of_edges(graph)/nx.number_of_nodes(graph), 'average degree'
+
 def degree_analysis(graph):
     degree_sequence = sorted(nx.degree(graph).values(), reverse=True)
     plotting.scatter_plot(data_y=degree_sequence,
@@ -13,7 +21,7 @@ def degree_analysis(graph):
                           ymax=100,
                           xmax=1000,
                           loglog=True)
-    return degree_sequence
+    return [degree_sequence, nx.density(graph)]
 
 def average_clustering_coefficient(graph):
     return nx.average_clustering(graph)
