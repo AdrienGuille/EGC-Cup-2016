@@ -45,8 +45,8 @@ def author_set(corpus):
     print len(authors), 'distinct authors'
     return authors
 
-def collaboration_graph(corpus):
-    graph = nx.Graph()
+def collaboration_graph(corpus, name=''):
+    graph = nx.Graph(name=name)
     graph.add_nodes_from(author_set(corpus))
     for article in corpus:
         authors = article.get('authors')

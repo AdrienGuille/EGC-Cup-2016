@@ -19,10 +19,22 @@ french_article_corpus = corpus.deserialize('output/french_articles.pickle')
 english_article_corpus = corpus.deserialize('output/english_articles.pickle')
 complete_article_corpus = corpus.deserialize('output/all_articles.pickle')
 
+"""
 # Get French abstracts and train LDA for k = 20
+print '## Text Mining'
+print ' - French article corpus'
 latent_topics = text_mining.train_lda(corpus.abstract_list(french_article_corpus), 20)
 text_mining.print_topics(latent_topics)
+print ' - English article corpus'
+latent_topics = text_mining.train_lda(corpus.abstract_list(english_article_corpus), 20)
+text_mining.print_topics(latent_topics)
+"""
 
 # Extract the collaboration graph for all the articles and compute the k-core decomposition
-collaboration_graph = corpus.collaboration_graph(complete_article_corpus)
-graph_mining.analyze_collaboration_graph(collaboration_graph)
+print '## Graph Mining'
+print ' - Global collaboration graph'
+global_collaboration_graph = corpus.collaboration_graph(complete_article_corpus, 'global_collaboration_graph')
+graph_mining.analyze_collaboration_graph(global_collaboration_graph)
+print ' - French collaboration graph'
+french_collaboration_graph = corpus.collaboration_graph(french_article_corpus, 'french_collaboration_graph')
+graph_mining.analyze_collaboration_graph(french_collaboration_graph)
