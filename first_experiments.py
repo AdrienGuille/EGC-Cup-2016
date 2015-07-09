@@ -19,10 +19,10 @@ def load_corpus(file_path, year_a=2004, year_b=2014, enforce_language=None):
     for line in input_file:
         article = line.split('\t')
         if len(article) == 8 and article[1] == 'EGC' and int(article[2]) in range(year_a, year_b):
-            count += 1
             authors = article[5].split(',')
             language = detect(article[3])
             if enforce_language is None or language == enforce_language:
+                count += 1
                 for i in range(0, len(authors)):
                     authors[i] = authors[i].strip()
                 article_list.append({'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4], 'language': language})
