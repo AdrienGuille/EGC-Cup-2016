@@ -7,23 +7,26 @@ from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 from collections import defaultdict
+from langdetect import detect
 import networkx as nx
 import codecs
 
 
-def load_corpus(file_path, year_a=2004, year_b=2014):
+def load_corpus(file_path, year_a=2004, year_b=2014, enforce_language=None):
     input_file = codecs.open(file_path, 'r', encoding='latin-1')
     count = 0
     article_list = []
     for line in input_file:
         article = line.split('\t')
-        if len(article) == 8 and article[1] == 'EGC' and int(article[2]) in range(year_a,year_b):
+        if len(article) == 8 and article[1] == 'EGC' and int(article[2]) in range(year_a, year_b):
             count += 1
             authors = article[5].split(',')
-            for i in range(0, len(authors)):
-                authors[i] = authors[i].strip()
-            article_list.append({'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4]})
-    print count, 'articles'
+            language = detect(article[3])
+            if enforce_language is None or language == enforce_language:
+                for i in range(0, len(authors)):
+                    authors[i] = authors[i].strip()
+                article_list.append({'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4], 'language': language})
+    print count, 'articles (', enforce_language, ')'
     return article_list
 
 def abstract_list(corpus):
@@ -62,12 +65,15 @@ def analyze_collaboration_graph(graph):
     print 'k-core decomposition: ', sorted(k_core.items(), key=lambda x: x[1], reverse=True)
 
 
-def train_lda(abstracts, num_topics=10):
+def train_lda(abstracts, num_topics=10, stemming=False):
     stop_word_list = stopwords.words('french')
     stop_word_list.extend(stopwords.words('english'))
     stop_word_list.extend([',', '.', '\'', '"', '(', ')', '-', ').'])
     snowball_stemmer = SnowballStemmer('french')
-    formatted_abstracts = [[snowball_stemmer.stem(word) for word in wordpunct_tokenize(abstract.lower()) if word not in stop_word_list] for abstract in abstracts]
+    if stemming:
+        formatted_abstracts = [[snowball_stemmer.stem(word) for word in wordpunct_tokenize(abstract.lower()) if word not in stop_word_list] for abstract in abstracts]
+    else:
+        formatted_abstracts = [[word for word in wordpunct_tokenize(abstract.lower()) if word not in stop_word_list] for abstract in abstracts]
     frequency = defaultdict(int)
     for formatted_abstract in formatted_abstracts:
         for word in formatted_abstract:
@@ -89,13 +95,13 @@ def print_topics(topics):
         print 'topic', count, ': ', ' '.join(word_list)
         count += 1
 
-article_corpus = load_corpus('input/RNTI_articles_export.txt', 2004, 2015)
-print article_corpus[1]
-print article_corpus[1].get('abstract')
-print len(author_set(article_corpus)), 'distinct authors'
-collaboration_graph = create_collaboration_graph(article_corpus)
+french_article_corpus = load_corpus('input/RNTI_articles_export.txt', 2004, 2015, 'fr')
+english_article_corpus = load_corpus('input/RNTI_articles_export.txt', 2004, 2015, 'en')
+complete_article_corpus = load_corpus('input/RNTI_articles_export.txt', 2004, 2015)
+print len(author_set(french_article_corpus)), 'distinct authors'
+collaboration_graph = create_collaboration_graph(complete_article_corpus)
 # export_collaboration_graph(collaboration_graph)
 analyze_collaboration_graph(collaboration_graph)
 print 'degree(Adrien Guille): ', collaboration_graph.degree('Adrien Guille')
-latent_topics = train_lda(abstract_list(article_corpus), 20)
+latent_topics = train_lda(abstract_list(french_article_corpus), 20)
 print_topics(latent_topics)
