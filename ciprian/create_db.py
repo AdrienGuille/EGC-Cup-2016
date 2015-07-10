@@ -95,10 +95,11 @@ class CreateDB_EGC:
         return document
 """
 ct = CleanText()
-def insert_data(dbname, corpus):
+def insert_data(dbname, corpus, remove=False):
     client = pymongo.MongoClient()
     db = client[dbname]
-    db.documents.remove({})
+    if remove:
+        db.documents.remove({})
     documents = []
     no_threads = cpu_count()
     with ProcessPoolExecutor(max_workers=no_threads) as worker:
