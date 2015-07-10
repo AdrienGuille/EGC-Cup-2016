@@ -1,0 +1,495 @@
+Annotation d’Entite´s Nomme´es par Extraction de
+Re`gles de Transduction
+Damien Nouvel ∗,∗∗ Arnaud Soulet ∗,∗∗∗
+∗Universite´ Franc¸ois Rabelais Tours, Laboratoire d’Informatique
+∗∗ damien.nouvel@univ-tours.fr,
+∗∗ arnaud.soulet@univ-tours.fr,
+Re´sume´. La reconnaissance d’entite´s nomme´es est une proble´matique
+majoritairement traite´e par des mode`les spe´cifie´s a` l’aide de re`gles ou par
+apprentissage nume´rique. Les premiers ont le de´savantage d’eˆtre couˆteux
+a` de´velopper pour obtenir une couverture satisfaisante, les seconds sont
+souvent difficiles a` interpre´ter par des experts (linguistes). Dans cet article,
+nous pre´sentons une approche, dont l’objectif est d’extraire des re`gles
+symboliques discriminantes qu’un humain puisse consulter. A partir d’un
+corpus de re´fe´rence, nous extrayons des re`gles de transduction, dont seules
+les plus informatives sont retenues. Elles sont ensuite applique´es pour
+effectuer une annotation : a` cet effet, un algorithme recherche parmi les
+annotations possibles celles de meilleure qualite´ en termes de couverture et
+de probabilite´. Nous pre´sentons les re´sultats expe´rimentaux et discutons
+de l’inte´reˆt et des perspectives de notre approche.
+1 Introduction
+Parmi les taˆches d’extraction d’information, la Reconnaissance d’Entite´s Nomme´es
+(REN) consiste a` reconnaˆıtre (rechercher et cate´goriser) toutes les Entite´s Nomme´es
+(EN) d’un texte : les expressions univoques et re´fe´rentiellement autonomes (Ehrmann,
+2008). Par simplification, ces unite´s correspondent intuitivement aux noms propres :
+personnes, lieux et organisations. En pratique seront aussi recherche´es les expressions
+nume´riques et les expressions de temps, conside´re´es comme “descriptions de´finies”.
+La REN est une taˆche e´tudie´e depuis une quinzaine d’anne´es. Initialement sym-
+boliques, les approches sont aujourd’hui majoritairement tourne´es vers des mode`les
+nume´riques par recherche de traits discriminants a` l’aide d’apprentissage automatique
+(e.g., Chaˆınes de Markov, CRF, SVM). Cependant, ces me´thodes permettent difficile-
+ment de capitaliser la connaissance mode´lise´e.
+Malgre´ ces re´cents de´veloppements, les dernie`res campagnes d’e´valuation en fran-
+c¸ais montrent que les syste`mes symboliques demeurent plus performants, a` condition
+d’utiliser des bases de connaissances suffisamment riches. Ces dernie`res sont ge´ne´ra-
+lement constitue´es de lexiques (recensant les formes connues de noms propres) et de
+re`gles pour reconnaˆıtre des entite´s nomme´es (spe´cifie´es par des grammaires). Entre
+autres, les transducteurs sont des expressions re´gulie`res permettant d’inse´rer dans un
+Annotation d’Entite´s Nomme´es par Extraction de Re`gles de Transduction
+texte des balises qui de´limitent et cate´gorisent les EN. Alors, le de´fi est d’e´nume´rer les
+transducteurs afin d’obtenir un bon rappel (eˆtre aussi couvrant que possible) tout en
+restant pre´cis (ne pas ge´ne´rer de faux positifs) a` travers les cate´gories d’EN.
+Cet article focalise sur la de´couverte de transducteurs a` partir d’un corpus (d’ap-
+prentissage) annote´ en entite´s nomme´es, pour enrichir notre base de re`gles. Plus pre´ci-
+se´ment, notre premie`re contribution est une formalisation de l’extraction de re`gles de
+transduction base´es sur des motifs morpho-syntaxiques. Ces derniers s’appuient sur une
+analyse linguistique de surface du corpus (e´tiquetage grammatical et lemmatisation),
+ce qui permet de de´couvrir des re`gles par ge´ne´ralisation. Pour e´viter de ge´ne´rer trop de
+re`gles, nous ne retenons que les re`gles de transduction informatives. Ensuite, l’objectif
+est d’exploiter cette base de re`gles afin d’e´valuer les annotations EN qu’elles peuvent
+produire. Dans ce contexte, notre contribution est la proposition d’un algorithme qui
+effectue une annotation couvrante a` partir de l’inte´gralite´ des re`gles (dont celles qui ne
+de´tectent qu’une borne d’EN) meilleure qu’une annotation par application des re`gles
+consistantes (qui de´tectent les deux bornes d’une cate´gorie d’EN), selon leur confiance.
+La section 2 situe notre approche par rapport a` la litte´rature. Nous pre´sentons a` la
+section 3 le formalisme qui de´finit la notion de re`gle morpho-syntaxique de transduction
+informative. Dans la section 4, nous pre´sentons deux strate´gies qui exploitent la base
+de re`gles pour re´aliser une annotation. Puis nous pre´sentons des re´sultats chiffre´s pour
+l’extraction des re`gles et pour l’e´valuation des annotations produites en section 5.
+2 Etat de l’art
+La the´orie des EN et la taˆche de REN sont pre´sente´es extensivement dans Ehrmann
+(2008) ou Nadeau (2007). L’application de me´thodes d’apprentissage automatiques a` la
+REN a e´te´ expe´rimente´e a` l’aide de mode`les a` maximum d’entropie (Borthwick et al.,
+1998), de HMM (Favre et al., 2005) de CRF (McCallum, 2003; Zidouni et al., 2009), de
+SVM (Bunescu et Pasca, 2006; Nadeau, 2007). Ces mode`les sont assez performants et
+assez peu couˆteux a` e´laborer, a` partir du moment ou` l’on dispose de corpus d’appren-
+tissage. Ne´anmoins, ils permettent difficilement d’enrichir une base de connaissances.
+Les approches en fouille de donne´e sont originellement axe´es sur l’extraction de
+motifs fre´quents (Mannila et Toivonen, 1997) et se´quentiels (Agrawal et Srikant, 1995)
+au sein d’une base de donne´es. Nous nous inspirons e´galement des approches a` base
+de chaˆınes (Fischer et al., 2005). L’extraction de motifs morpho-syntaxique est exploi-
+te´e par Cellier et Charnois (2010) pour la recherche d’expressions qualificatives. De
+manie`re ge´ne´rale et the´orique, la relation de la fouille de textes avec les grammaires,
+automates et expression re´gulie`re est pre´sente´e dans Mendes et Antunes (2009) et Pa-
+rekh et Honavar (2000).
+La fouille de donne´es pour la REN a notamment e´te´ expe´rimente´e par Plantevit
+et al. (2009), qui appliquent la recherche de se´quences fre´quentes a` la de´tection d’enti-
+te´s dans le domaine biome´dical, ainsi que par Budi et Bressan (2007) qui recherchent
+ce type d’entite´ (en indone´sien) par extraction de re`gles d’association. Nous nous ins-
+crivons dans cette approche, tout en autorisant la ge´ne´ralisation des motifs (graˆce a`
+une hie´rarchie morpho-syntaxique) et en extrayant de surcroˆıt des re`gles partielles qui
+peuvent de´tecter une ou plusieurs bornes d’EN.
+D. Nouvel et A. Soulet
+3 Re`gles morpho-syntaxiques de transduction
+3.1 Du langage du corpus au langage morpho-syntaxique
+Langages de motifs Dans le but d’utiliser des me´thodes de fouille de donne´es pour
+le traitement du langage, nous repre´sentons le jeu de donne´es comme ensemble de
+transactions, chaque transaction correspondant a` une phrase. Ceci nous permet de ne
+pas extraire de motifs qui chevaucheraient plusieurs phrases, ce qui a peu de sens d’un
+point de vue linguistique.
+Nous conside´rons des motifs fonde´s sur la notion de chaˆıne (Fischer et al., 2005).
+Soit un alphabet A, le langage LA de´signe l’ensemble des chaˆınes a1a2 . . . an ou` ai ∈ A
+pour tout i ∈ {1, . . . , n}. Dans la suite, nous utilisons deux alphabets : celui des to-
+ken (ou mots) du corpus W et celui des marques M. Ainsi, le corpus annote´, de´-
+note´ par D, correspond a` un multi-ensemble de motifs de LI ou` I = W ∪ M. Le
+tableau 1 donne un exemple d’un tel corpus ou` W = {Le,nouveau,pre´sident, . . .}
+et M = {<pers>, </pers>, <loc>, . . .}. Dans cette section, nous ne formulons pas de
+contrainte pre´alable sur la bonne formation des marques : cette proble´matique sera
+aborde´e dans la section 4 dans le cadre de l’annotation.
+D
+Trans. Motifs de LI
+t1 Le nouveau <pers> pre´sident Barack Obama </pers> est arrive´ a` <loc> Moscou
+</loc>.
+t2 Il y a vu l’ancienne <pers> chancelie`re Michelle Bachelet </pers>.
+t3 Le <pers> pre´sident Dimitri Medvedev </pers> n’e´tait pas sur la belle <loc>
+place Vladimir Lenine </loc>.
+Tab. 1 – Exemple jouet de corpus annote´
+Afin de prendre en compte les cate´gories morpho-syntaxiques, nous souhaitons ex-
+traire des motifs fonde´s sur une extension du langage LW . Plus pre´cise´ment, l’alphabet
+W∗ comple`te les mots W avec un ensemble de descripteurs correspondant a` des cate´-
+gories (et des sous-cate´gories) morpho-syntaxiques et a` des lemmes. Cet alphabet W∗
+est muni d’une hie´rarchie ≤ i.e., une relation d’ordre partiel ou` pour tout x ≤ w et
+y ≤ w, alors x ≤ y ou y ≤ x. Ainsi, w ≤ w′ signifie que w est plus ge´ne´ral que w′. Typi-
+quement, avec le corpus du tableau 1, on a W∗ =W ∪ {DET,ART,ADJ,NOM, . . .} ou`
+DET < ART < le. Au final, le langage morpho-syntaxique LI∗ correspond a` toutes les
+chaˆınes reposant sur les items avec hie´rarchiesW∗ et des marquesM i.e., I∗ =W∗∪M.
+Spe´cialisation et support Intuitivement, le motif  <pers> NOM  est plus ge´ne´ral
+que le motif  <pers> NOM NAM  car il est plus court (ou`  NOM  correspond a` un
+nom commun et  NAM  a` ce qui est de´tecte´ par l’e´tiqueteur comme un nom propre).
+De meˆme, le motif  <pers> NOM  est plus ge´ne´ral que le motif  <pers> pre´sident 
+car la cate´gorie  NOM  est plus ge´ne´rale que le mot  pre´sident . Afin de formaliser
+cette notion de spe´cialisation, nous introduisons une forme standard pour comparer les
+motifs morpho-syntaxiques entre eux. Pour cela, nous de´finissons la marque vide ∅M
+Annotation d’Entite´s Nomme´es par Extraction de Re`gles de Transduction
+qui est incluse dans n’importe quel ensemble de marques i.e., ∅M ⊆ M ou` M ∈ LM.
+Nous pouvons alors de´finir la notion de chaˆıne alterne´e :
+De´finition 1 (Chaˆıne alterne´e) La chaˆıne alterne´e B0w1B1w2 . . . Bn−1wnBn du mo-
+tif morpho-syntaxique S ∈ LI∗ est l’unique de´composition de S telle que :
+– wi ∈ W∗ pour tout i ∈ {1, . . . , n},
+– Bi ∈ LM ∪ ∅M pour tout i ∈ {0, . . . , n} et
+– la chaˆıne B0w1B1w2 . . . Bn−1wnBn est e´gale a` S si on omet les Bi = ∅M.
+Par exemple, les chaˆınes alterne´es de  <pers> NOM  et  <pers> NOM NAM 
+sont respectivement  <pers> NOM ∅M  et  <pers> NOM ∅M NAM ∅M  . Nous
+pouvons comparer ces deux chaˆınes alterne´es de la manie`re suivante :
+De´finition 2 (Spe´cialisation) Un motif morpho-syntaxique S est plus ge´ne´ral qu’un
+motif morpho-syntaxique S′, note´ S  S′, ssi il existe k ∈ {0, ..,m − n} tel que
+wi ≤ w′i+k pour tout i ∈ {1, . . . , n} et Bi ⊆ B′i+k pour tout i ∈ {0, . . . , n} ou`
+B0w1B1w2 . . . Bn−1wnBn est la chaˆıne alterne´e de S et B′0w
+′
+1B1w
+′
+2 . . . B
+′
+m−1w
+′
+mB
+′
+m
+est la chaˆıne alterne´e de S′.
+La de´finition 2 stipule qu’un motif S est plus ge´ne´ral qu’un motif S′ lorsque chaque
+mot et chaque ensemble de marques de la chaˆıne alterne´e de S sont plus ge´ne´raux que
+ceux d’une sous-chaˆıne alterne´e de S′. Nous pouvons ve´rifier que  <pers> NOM 
+<pers> NOM NAM  et  <pers> NOM  <pers> pre´sident .
+Comme le langage LI∗ englobe tous les langages LW , LM, LI et LW∗ , la relation
+de spe´cialisation  de´finie sur LI∗ est utilise´e pour comparer entre eux n’importe quels
+motifs de ces langages. Nous pouvons ainsi compter le nombre de fois ou` un motif
+morpho-syntaxique est observe´ dans une phrase du corpus :
+De´finition 3 (Support avec marques) Le support (avec marques) d’un motif S ∈
+LI∗ dans un jeu de donne´es D, de´note´ par Supp(S,D), est son nombre d’occurrences.
+Par exemple, les motifs  <pers> NOM  et  <pers> pre´sident  posse`dent respecti-
+vement un support de 3 et de 2 dans le jeu de donne´es D. Le support des motifs de´croˆıt
+suivant leur spe´cialisation, i.e. pour tout motif S  S′, on a Supp(S,D) ≥ Supp(S′,D).
+Cette proprie´te´ est utilise´e pour extraire les motifs morpho-syntaxiques fre´quents en
+utilisant un algorithme par niveaux (Mannila et Toivonen, 1997).
+3.2 Re`gles de transduction
+Une re`gle morpho-syntaxique de transduction est un motif qui contient a` la fois au
+moins un e´le´ment de W∗ et au moins une marque deM :
+De´finition 4 (Re`gle morpho-syntaxique de transduction) Une re`gle
+morpho-syntaxique de transduction est un motif de R = LI∗\(LW∗ ∪ LM).
+Par exemple, le motif  <pers> pre´sident  est une re`gle de transduction : l’utilisation
+de cette re`gle dans un corpus non-annote´ permettra d’ajouter la marque <pers> lorsque
+D. Nouvel et A. Soulet
+le mot  pre´sident  sera observe´ (cf. la section 4). Plus ge´ne´ralement, la re`gle de
+transduction r peut s’appliquer la` ou` les tokens (ou les cate´gories) sont observe´(e)s
+dans le corpus. Cette partie de la re`gle est appele´e le motif sans marques. Le motif sans
+marques de S ∈ LI∗ , de´note´ par S˜, est le motif le plus spe´cifique de LW∗ qui soit plus
+ge´ne´ral que S : S˜ = max{W ∈ LW∗ |W  S}. Cela correspond au motif S˜ dont on a
+supprime´ les marques, pour lequel nous de´finissons le support sans marques :
+De´finition 5 (Support sans marques) Le support sans marques d’un motif S ∈
+LI∗ dans un jeu de donne´es D est S˜upp(S,D) = Supp(S˜, D˜) ou` D˜ = {d˜|d ∈ D}.
+Par exemple, la re`gle  <pers> NOM  a un support sans marques de 4 : c’est le
+nombre d’occurrences du motif  NOM  (ante´ce´dent) dont celle qui se trouve dans
+t3 (mais qui ne contient pas le conse´quent). Ces deux notions combine´es permettent
+d’estimer la fiabilite´ de la re`gle par sa confiance, la probabilite´ conditionnelle d’observer
+les marques au sein d’une phrase lorsqu’elle contient le motif morpho-syntaxique :
+De´finition 6 (Confiance) La confiance d’une re`gle morpho-syntaxique r ∈ R est :
+Conf(r,D) = Supp(r,D)
+S˜upp(r,D)
+Par exemple, la confiance des re`gles  <pers> NOM  et  <pers> pre´sident  sont
+respectivement de 3/4 et 2/2. La section 5 reviendra sur le roˆle du support et de la
+confiance pour controˆler respectivement le rappel et la pre´cision de notre approche.
+3.3 Re`gles de transduction informatives
+Meˆme en fixant des seuils de support et confiance se´lectifs, les re`gles morpho-
+syntaxiques de transduction peuvent eˆtre trop nombreuses. Par exemple, 39 re`gles
+re´sultent de l’extraction des re`gles de support supe´rieur a` 2 et de confiance supe´rieure
+a` 2/3 avec le corpus du tableau 1. Cette profusion de re`gles de´coule des combinaisons
+possibles au travers de la hie´rarchie. Le tableau 2 (a) illustre cette proble´matique en
+de´taillant un ensemble de re`gles qui diffe`rent les unes des autres par l’ajout d’un item.
+R IR
+r1 <pers> pre´sident ×
+r2 <pers> pre´sident NAM
+r3 <pers> pre´sident NAM NAM
+r4 <pers> pre´sident NAM NAM </pers> ×
+Supp. Conf. |R| |IR|
+2 1 5 2
+3 3/4 6 3
+2 2/3 24 2
+2 2/3 4 1
+Total : 39 8
+(a) De´tail d’un groupe avec Supp = 2 et Conf = 1 (b) Re`gles regroupe´es
+Tab. 2 – Impact des re`gles de transduction informatives
+Afin de contenir cette abondance de re`gles, nous proposons de grouper les re`gles,
+puis d’e´liminer celles qui ne sont pas informatives, a` l’instar de Bastide et al. (2000).
+Annotation d’Entite´s Nomme´es par Extraction de Re`gles de Transduction
+Par exemple, la re`gle r2 du tableau 2 n’apporte aucune information par rapport a` r1
+car son motif sans marques n’est pas plus couvrant et son marquage n’est pas plus
+important. A l’inverse, la re`gle r4 est informative car son application permet l’ajout
+d’une marque supple´mentaire par rapport a` r1. Nous ge´ne´ralisons maintenant cette
+intuition avec la de´finition suivante :
+De´finition 7 (Re`gle morpho-syntaxique de transduction informative) Une
+re`gle morpho-syntaxique de transduction r est informative ssi il n’existe pas de re`gle r′
+de meˆme support et confiance telle que r˜′ ≺ r˜ et |r′|M = |r|M ou r˜′ = r˜ et |r′|M > |r|M.
+La de´finition 7 signifie qu’une re`gle est informative si aucune re`gle de meˆme support
+et de meˆme confiance ne posse`de (i) un motif sans marques plus ge´ne´ral conduisant a` un
+marquage similaire ou (ii) un motif sans marques identique conduisant a` un marquage
+plus important. Par exemple, r2 n’est pas informative car elle enfreint (i) a` cause de
+r1. La re`gle r3 n’est pas informative car elle enfreint (ii) a` cause de r4. Le tableau 2 (b)
+illustre l’apport significatif des re`gles de transduction informatives sur notre exemple.
+On constate que l’ensemble des re`gles informatives, de´note´ par IR, se limite a` 8 re`gles
+contre 39 avec la collection comple`te. Ce re´sultat s’observe a` plus grande e´chelle avec
+les expe´rimentations sur les donne´es re´elles de la section 5.
+4 Application des re`gles pour l’annotation
+4.1 Crite`res pour une solution d’annotation
+Une fois les re`gles de transduction extraites, nous les exploitons, comme re`gles
+d’annotation, en les appliquant sur des textes. Pour ce faire, nous nous basons sur
+la meˆme repre´sentation que lors de la phase d’extraction : un texte est segmente´ en
+transactions (phrases), dont les items sont des tokens : c’est un multi-ensemble de LW∗ .
+Pour appliquer les re`gles de transduction R, diverses strate´gies peuvent eˆtre mises
+en œuvre. L’extraction, exhaustive, nous fournit de nombreuses re`gles qui inse`rent une
+ou plusieurs marques d’entite´s nomme´es. Pour notre proble´matique REN, l’objectif du
+marquage est d’obtenir une annotation, qui soit consistante : chaque marque (ou ba-
+lise) ouvrante (suivie de tokens) doit ne´cessairement eˆtre suivie d’une marque fermante
+de meˆme cate´gorie (e.g. apre`s <loc>, la prochaine marque doˆıt eˆtre </loc>).
+Par ailleurs, nous souhaitons mettre l’accent sur deux crite`res de qualite´ :
+– couverture : choisir l’annotation qui apporte un maximum d’information,
+– confiance / pre´cision : choisir l’annotation qui soit la plus probable possible.
+Le premier crite`re peut-eˆtre comptabilise´ par le nombre de marques introduites.
+Pour le second, nous conside´rons en premie`re approximation que la vraisemblance d’une
+annotation correspond au produit des confiances des marques inse´re´es.
+4.2 Application des re`gles d’annotation
+Re`gles comple`tes, par ordre de confiance Une premie`re strate´gie, intuitive,
+consiste a` ne se´lectionner que les re`gles qui cre´ent une annotation consistante (avec
+une marque de de´but et de fin d’EN de meˆme cate´gorie), appele´es re`gles d’annotations
+D. Nouvel et A. Soulet
+comple`tes, a` les trier selon leur confiance, puis a` les appliquer tant que la portion de
+texte qu’elles annotent n’a pas de´ja` e´te´ annote´e. L’application ordonne´e des re`gles nous
+conduit alors a` une solution qui est toujours consistante et donne priorite´ a` la confiance
+(par ordre d’application des re`gles) puis a` la couverture (ajouter des annotations tant
+que c’est possible). Nous conside´rons cet algorithme comme notre “baseline”.
+Re`gles comple`tes et re`gles partielles Lorsque l’on conside`re toutes les re`gles
+pour effectuer l’annotation, alors la consistance n’est plus garantie : nous disposons
+de beaucoup de re`gles partielles, qui n’apportent qu’une partie d’information (de´but
+ou fin d’EN), mais dont l’annotation pourra eˆtre rendue consistante par un marquage
+ulte´rieur. Notre ide´e est donc d’inse´rer toutes les marques possibles sur une se´quence
+donne´e, en notant leur confiance, puis de se´lectionner celles qui apporteront la meilleure
+annotation en termes de couverture, puis de confiance.
+Algorithm 1 Se´lection de l’annotation la plus couvrante puis la plus confiance
+Entre´e: une se´quence S = s1 . . . sn ∈ LI∗ : des tokens si ∈ LW∗ et des marques si ∈ LM dont
+nous connaissons le type si.type = {Ouvrante, Fermante}, la cate´gorie EN si.cate´gorie et
+la confiance a priori si.confiance
+Sortie: une se´quence S ∈ LI∗ : qui maximise la couverture, puis la confiance
+// HypCons est l’hypothese consistante, HypPart sont les hypothe`ses partielles
+// L’ope´rateur  compare deux hypothe`ses en termes de couverture et de confiance
+tant que si faire
+tant que si ∈ LW∗ faire
+∀Hypothe`se ∈ HypCons ∪HypPart : Hypothe`se← Hypothe`se+ si
+fait
+Marques← ∅
+tant que si ∈ LM faire
+si Marques[si.type][si.cate´gorie].confiance < si.confiance alors
+Marques[si.type][si.cate´gorie]← si
+fin si
+fait
+pour chaque Marque ∈Marques[Fermante] telle que
+HypPart[Marque.cate´gorie] +Marque HypCons faire
+HypCons← HypPart[Marque.cate´gorie] +Marque
+fin pour
+pour chaque Marque ∈Marques[Ouvrante] telle que
+HypCons+Marque HypPart[Marque.cate´gorie] faire
+HypPart[Marque.cate´gorie]← HypCons+Marque
+fin pour
+fait
+renvoyerHypCons
+Nous pouvons proce´der par phrase (se´quence). Malgre´ tout, l’espace de recherche
+pour une se´quence donne´e est exponentielle pour le nombre de marques inse´re´es. Ceci
+peut-eˆtre proble´matique dans des contextes ou` les phrases sont difficilement de´limite´es,
+notamment a` l’oral (dans notre cas, des e´missions radio). Nous re´solvons ceci graˆce a`
+un algorithme de programmation dynamique qui parcourt les solutions possibles en lar-
+Annotation d’Entite´s Nomme´es par Extraction de Re`gles de Transduction
+geur et ne maintient en me´moire que les hypothe`ses qui pourront devenir des solutions
+optimales. A cet effet, nous subordonnons le crite`re de confiance a` celui de couverture :
+l’objectif est d’obtenir une annotation qui contienne le plus de marques possibles, tout
+en restant consistante. Avec cette contrainte, l’algorithme peut maintenir n + 1 hy-
+pothe`ses distinctes lorsqu’il y a n cate´gories distinctes a` conside´rer : une hypothe`se
+non-consistante (“ouverte”) pour chaque cate´gorie et une hypothe`se consistante.
+Pour l’algorithme 1 pre´sente´ ci-dessus, nous conside´rons une se´quence sur laquelle
+tous les transducteurs ont e´te´ applique´s sur toutes les portions de textes possibles : les
+marques sont toutes inse´re´es et me´lange´es a` la se´quence. Nous introduisons l’ope´rateur
++, qui permet d’ajouter un token ou une marque a` une hypothe`se, tout en mettant a`
+jour son nombre de marques et sa confiance ; l’ope´rateur  qui compare deux hypo-
+the`ses et se´lectionne celle qui dispose du plus grand nombre de marques, ou la plus
+confiante en cas d’e´galite´.
+L’algorithme fonctionne par lots : il parcourt la se´quence et accumule les tokens,
+jusqu’a` tomber sur une ou plusieurs marque(s). Pour une se´rie de marques rencontre´es,
+il enregistre alors, pour chaque type (ouvrante / fermante) et pour chaque cate´gorie,
+la meilleure probabilite´. Puis il conside`re chaque marque fermante : si elle permet de
+comple´ter une hypothe`se ouverte (non-consistante) et si l’hypothe`se (ferme´e) obtenue
+par ajout de cette marque est meilleure que l’hypothe`se consistante courante il la met
+a` jour. Puis il re´alise la meˆme ope´ration pour chaque marque ouvrante, mettant alors
+a` jour les hypothe`se non-consistantes (ouvertes) s’il en trouve des meilleures.
+5 Cas d’e´tude : reconnaissance d’entite´s nomme´es
+sur le corpus Ester2 et re´sultats expe´rimentaux
+5.1 Pre´paration des donne´es
+Le corpus Ester2 a e´te´ constitue´ lors d’une campagne d’e´valuation organise´e par
+l’AFCP 1 et la DGA 2, qui a porte´ sur la transcription, la segmentation et l’extraction
+d’informations de flux de parole franc¸ais radiodiffuse´s (Galliano et al., 2009). L’ex-
+traction d’information portait sur la REN dans les transcriptions de ces flux. Les EN
+de´tecte´es e´taient a` cate´goriser en : personnes, lieux, organisations, produits, montants,
+temps ou fonctions. Nous disposons du corpus de re´fe´rence, re´alise´ par des annotateurs
+humains. Notre syste`me symbolique, CasEN, a participe´ a` cette campagne, nous en
+avons analyse´ en de´tail les re´sultats (Nouvel et al., 2010).
+Nous disposons e´galement du corpus Eslo (Maurel et al., 2009), transcription de
+conversations lors d’enqueˆtes sociologiques mene´es dans la re´gion d’Orle´ans. Celles-ci
+ont e´te´ annote´es en EN selon les meˆmes cate´gories que lors de la campagne Ester2. Pour
+une sous-partie du corpus, l’annotation a e´te´ re´alise´e manuellement (Eslo - man) et pour
+le reste, le corpus a e´te´ pre´annote´ par un syste`me REN, puis corrige´ manuellement (Eslo
+- pre). Ce corpus comporte une proportion plus faible d’EN qu’Ester2.
+Pour e´tablir la hie´rarchie des cate´gories morpho-syntaxiques, nous utilisons Tree-
+Tagger (Schmid, 1994) qui re´alise un e´tiquetage robuste et rapide, et lemmatise les
+1. Association Francophone de la Communication Parle´e
+2. Direction Ge´ne´rale de l’Armement
+D. Nouvel et A. Soulet
+mots (le lemme est la forme normale, sans de´clinaisons). Cet e´tiqueteur donne des re´-
+sultats supe´rieurs, en f-mesure, a` 90 sur du texte e´crit. L’analyse morpho-syntaxique
+du TreeTagger de´termine le lemme pour chaque token (item), puis lui attribue une
+cate´gorie morpho-syntaxique au sein d’un ensemble d’arbres (foreˆt). Les noms propres
+sont distingue´s des noms communs (notamment a` l’aide de lexiques) en tant que NAM.
+Comme nous ne souhaitons pas extraire de motifs reposant sur des e´le´ments lexicaux,
+nous ne conservons pour ces items que la cate´gorie morpho-syntaxique.
+5.2 Extraction des re`gles de transduction
+Nous cherchons dans ces corpus des motifs selon la me´thode expose´e en section 3.
+L’extraction des re`gles informatives utilise une structure de donne´es sous forme de
+trie (arbre de pre´fixes) et un algorithme par niveaux (qui extrait des motifs de taille
+croissante). Le groupement de motifs et leur se´lection sous forme de re`gles est re´alise´e
+en fin de traitement. Le tableau 3 pre´sente les caracte´ristiques de la fouille re´alise´e sur
+ces corpus, sur une machine cadence´e a` 2.4GHz disposant de 4Go de RAM.
+Corpus Tokens EN F. C. Motifs Groupes Re`gles Temps
+Ester2 40 167 2 798
+10 0.5 2 270 975 1 119 0’ 4”
+5 0.5 28 047 2 747 3 673 0’ 5”
+3 0.3 458 875 7 448 12 653 0’ 19”
+Eslo - man 165 987 2 303
+10 0.5 3 167 1 111 1 287 0’ 27”
+7 0.3 51 339 2 424 3 682 0’ 52”
+Eslo - pre 894 564 14 402
+30 0.5 36 236 3 672 4 887 5’ 35”
+20 0.3 5 489 632 7 906 11 937 7’ 10”
+Tab. 3 – Extraction sur les corpus, a` seuils de fre´quence (F.) et confiance (C.)
+Nous remarquons que lorsque nous diminuons le seuil de fre´quence (sur Ester2, de
+10 a` 3), le nombre de motifs augmente tre`s largement (multiplie´ par 200), cependant
+la me´thode de groupement nous permet de conserver une base de re`gles de taille rai-
+sonnable (multiplie´e par 10). Par ailleurs, effectuer la fouille sur un corpus de re´fe´rence
+plus large ne nous apporte par une grande quantite´ de nouveaux motifs : nous suppo-
+sons que l’utilisation de motifs morpho-syntaxiques produit effectivement des re`gles de
+transduction ge´ne´ralise´es qui capturent la redondance au sein du corpus.
+5.3 Annotation a` partir des re`gles extraites
+Pour tester nos algorithmes d’annotation, nous utilisons le corpus Ester2, pour le-
+quel nous disposons d’un outil d’e´valuation qui fournit le SER (Makhoul et al., 1999)
+(nombre d’erreurs par entite´, a` minimiser), la pre´cision, le rappel et la f-mesure (calcule´s
+sur les cate´gories des tokens). L’e´valuation est re´alise´e sur douze fichiers, des enregis-
+trements d’approximativement meˆme dure´e. Nous effectuons une validation croise´e a`
+douze plis : l’extraction est re´alise´e sur onze fichiers, l’application des re`gles d’annota-
+tion et l’e´valuation sont effectue´es sur le douzie`me fichier, ceci douze fois de suite. En
+premier lieu, nous faisons cette expe´rimentation en annotant avec les re`gles comple`tes
+a` divers seuil de fre´quence et de confiance, afin de de´terminer les parame`tre optimaux.
+Annotation d’Entite´s Nomme´es par Extraction de Re`gles de Transduction
+Fig. 1 – Evaluation sur Ester2, Re`gles comple`tes
+La figure 1 pre´sente les re´sultats en SER selon la fre´quence et la confiance. De
+manie`re ge´ne´rale, lorsque l’on diminue le seuil de fre´quence, la performance s’ame´liore.
+Nous voyons qu’un optimum est atteint pour un seuil de fre´quence de 3 et un seuil
+de confiance compris entre 40% et 60%. Notons e´galement que plus la fre´quence est
+basse, plus il faut augmenter la confiance pour atteindre l’optimum local. Ces re´sultats
+montrent qu’une annotation peut eˆtre re´alise´e a` partir de motifs morpho-syntaxiques
+extraits d’un corpus et que certaines re`gles de transduction sont de bonne qualite´.
+Parame`tres Re`gles comple`tes Re`gles partielles
+Freq. Conf. P.. R. F. SER P.. R. F. SER
+3 40 67,66 50,19 0,58 55,14 62,91 57,29 0,6 52,96
+3 45 70,66 48,37 0,57 54,82 65,91 54,76 0,6 51,99
+3 60 76,61 45,52 0,57 55,66 72,53 50,62 0,6 53,66
+5 40 69,63 45,87 0,55 56,75 65,41 52,08 0,58 54,09
+5 45 72,01 44,39 0,55 56,91 67,52 49,91 0,57 54,45
+5 60 78,9 41,49 0,54 57,72 76,73 45,05 0,57 56,42
+9 40 73,9 40,89 0,53 57,78 69,78 46,41 0,56 54,9
+9 45 76,14 40,4 0,53 57,58 73,62 44,92 0,56 55,42
+9 60 81,49 37,41 0,51 60,92 80,04 40,72 0,54 58,62
+Tab. 4 – Evaluation sur Ester2, (Pre´cision P., Rappel R., F-mesure F.)
+Le tableau 4 pre´sente les re´sultats pour l’application des re`gles comple`tes et par-
+tielles. Le SER et la F-mesure sont proches, avec une diffe´rence relativement constante
+en faveur de la version utilisant les re`gles partielles. La pre´cision est meilleure avec
+les re`gles comple`tes : consistantes, elles introduisent moins de faux positifs. Les re`gles
+partielles donnent un meilleur rappel : de nombreuses EN, non-de´tecte´es par des re`gles
+consistantes peuvent l’eˆtre par combinaison de re`gles partielles. Le fait de rechercher
+se´pare´ment des annotations de de´but ou de fin d’EN a du sens, il devient envisageable
+D. Nouvel et A. Soulet
+de re´aliser une extraction de motifs morpho-syntaxique qui ne repe`re pas syste´mati-
+quement une EN entie`re, mais uniquement sa frontie`re gauche ou droite.
+Si notre e´valuation vise a` de´terminer si les re`gles extraites pourront potentiellement
+venir enrichir un syste`me symbolique (et sous quel format), nous remarquons cependant
+que les performances sont assez e´loigne´es des meilleurs syste`mes de REN. Les syste`mes
+e´value´s lors de la campagne Ester2, se situent en SER de 9 a` 37 (f-mesure de 94 a`
+65). La comparaison est cependant difficile : notre syste`me se veut minimal et utilise
+tre`s peu de ressources et de traitements linguistiques (lexique, analyse syntaxique,
+parenthe´sage...). Nous cherchons avant tout a` de´terminer comment extraire des re`gles
+(grammaires) pertinentes pour la reconnaissance d’entite´s nomme´es.
+6 Conclusion et perspectives
+Cet article pre´sente une approche en reconnaissance d’entite´s nomme´es, qui consiste
+a` de´couvrir par fouille de donne´es des motifs morpho-syntaxiques fortement corre´le´s
+aux annotations les de´limitant, dont nous ne conservons que les plus informatifs sous
+forme de re`gles. Cet apprentissage nous permet d’extraire des re`gles de transduction
+informatives, que nous sommes en mesure d’appliquer a` d’autres textes.
+Nous apportons quelques e´le´ments a` travers cette recherche a` des proble´matiques
+lie´es a` l’extraction de connaissances et a` la reconnaissance d’entite´s nomme´es. Nous
+montrons qu’il est possible d’extraire des motifs morpho-syntaxique sous forme de
+re`gles, dont la qualite´ semble suffisamment bonne pour venir enrichir un syste`me sym-
+bolique. Par ailleurs, nous montrons que la taˆche d’annotation peut-eˆtre conside´re´
+comme une recherche inde´pendante des bornes gauches ou droites d’une entite´.
+Ces re´sultats nous encouragent a` poursuivre notre travail dans plusieurs directions.
+D’une part, afin d’enrichir la base de connaissances, nous souhaitons obtenir des re`gles
+plus denses (avec des alternatives et e´le´ments optionnels), qui pourraient eˆtre plus
+couvrantes, en restant pre´cises. D’autre part, la strate´gie d’annotation a` partir de re`gles
+partielles faisant de nombreuses simplifications, nous chercherons a` mieux tirer parti de
+l’ade´quation entre la se´quence observe´e et la base de re`gles pour re´aliser l’annotation.
+Enfin, nous envisageons d’expe´rimenter cette approche a` d’autres langues.
+Re´fe´rences
+Agrawal, R. et R. Srikant (1995). Mining sequential patterns. In 9th International Conference
+on Data Engineering (ICDE’95), pp. 3–14.
+Bastide, Y., N. Pasquier, R. Taouil, G. Stumme, et L. Lakhal (2000). Mining minimal non-
+redundant association rules using frequent closed itemsets. In Comp. Logic, pp. 972–986.
+Borthwick, A., J. Sterling, E. Agichtein, et R. Grishman (1998). Exploiting diverse knowledge
+sources via maximum entropy in named entity recognition. InWork. on Very Large Corpora.
+Budi, I. et S. Bressan (2007). Application of association rules mining to named entity recog-
+nition and co-reference resolution for the indonesian language. In IJBIDM’07, Volume 2.
+Bunescu, R. C. et M. Pasca (2006). Using encyclopedic knowledge for named entity disambi-
+guation. In Conference of the European Chapter of the Ass. for Comp. Ling. (EACL’06).
+Annotation d’Entite´s Nomme´es par Extraction de Re`gles de Transduction
+Cellier, P. et T. Charnois (2010). Fouille de donne´es se´quentielles d’itemsets pour l’apprentis-
+sage de patrons linguistiques. In Traitement Automatique du Langage Naturel (TALN’10).
+Ehrmann, M. (2008). Les entite´s nomme´es, de la linguistique au TAL : statut the´orique et
+me´thodes de de´sambigu¨ısation. Ph. D. thesis, Universite´ Paris VII, France.
+Favre, B., F. Be´chet, et P. Nocera (2005). Robust named entity extraction from large spoken
+archives. In HLT/EMNLP’05.
+Fischer, J., V. Heun, et S. Kramer (2005). Fast frequent string mining using suffix arrays. In
+5th IEEE International Conference on Data Mining (ICDM’05), pp. 609–612.
+Galliano, S., G. Gravier, et L. Chaubard (2009). The ester 2 evaluation campaign for the rich
+transcription of french radio broadcasts. In INTERSPEECH’09.
+Makhoul, J., F. Kubala, R. Schwartz, et R. Weischedel (1999). Performance measures for
+information extraction. In DARPA Broadcast News Workshop, pp. 249–252.
+Mannila, H. et H. Toivonen (1997). Levelwise search and borders of theories in knowledge
+discovery. Data Mining and Knowledge Discovery 1 (3), 241–258.
+Maurel, D., N. Friburger, et I. Eshkol (2009). Who are you, you who speak ? In Language &
+Technology Conference (LTC’09).
+McCallum, A. (2003). Efficiently inducing features of conditional random fields. In Conference
+on Uncertainty in Artificial Intelligence (UAI’03), pp. 403–410.
+Mendes, A. C. et C. Antunes (2009). Pattern mining with natural language processing : An
+exploratory approach. In MDLM’09, pp. 266–279.
+Nadeau, D. (2007). Semi-Supervised Named Entity Recognition : Learning to Recognize 100
+Entity Types with Little Supervision. Ph. D. thesis, University of Ottawa, Canada.
+Nouvel, D., J.-Y. Antoine, N. Friburger, et D. Maurel (2010). An analysis of the perfor-
+mances of the casen named entities recognition system in the ester2 evaluation campaign.
+In International Language Resources and Evaluation (LREC’2010).
+Parekh, R. et V. Honavar (2000). Grammar Inference, Automata Induction, and Language
+Acquisition, Chapter 29, pp. 727–764.
+Plantevit, M., T. Charnois, J. Klema, C. Rigotti, et B. Cremilleux (2009). Combining sequence
+and itemset mining to discover named entities in biomedical texts : a new type of pattern.
+International Journal of Data Mining, Modelling and Management 1, 119–148.
+Schmid, H. (1994). Probabilistic part-of-speech tagging using decision trees. In International
+Conference in New Methods for Language Processing (NEMLP’94), pp. 44–49.
+Zidouni, A., H. Glotin, et M. Quafafou (2009). Recherche d’entite´s nomme´es dans les journaux
+radiophoniques par contextes hie´rarchique et syntaxique. In CORIA’09, pp. 421–432.
+Summary
+Recognizing named entities is a task that is mainly processed by systems that are
+specified using rules or that are learned. In this paper, we introduce an approach aim-
+ing at extracting symbolic and discriminative rules that may be reviewed by humans.
+We are given a reference corpus, from which we extract informative transducer rules.
+Then an algorithm searches covering and probable solutions for annotating. We report
+experimental results and discuss advantages and perspectives of this approach.

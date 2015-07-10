@@ -1,0 +1,568 @@
+OKM : une extension des k-moyennes pour la recherche de
+classes recouvrantes
+Guillaume Cleuziou
+Laboratoire d'Informatique Fondamentale d'Orléans (LIFO)
+Université d'Orléans
+Rue Léonard de Vinci - 45067 ORLEANS Cedex 2
+guillaume.cleuziou@univ-orleans.fr
+Résumé. Dans cet article nous abordons le problème de la classication (ou
+clustering) dans le but de découvrir des classes avec recouvrements. Malgré
+quelques avancées récentes dans ce domaines, motivées par des besoins applica-
+tifs importants (traitements des données multimédia par exemple), nous consta-
+tons l'absence de solutions théoriques à ce problème. Notre étude consiste alors
+à proposer une nouvelle formulation du problème de classication par parti-
+tionnement, adaptée à la recherche d'un recouvrement des données en classes
+d'objets similaires. Cette approche se fonde sur la dénition d'un critère ob-
+jectif de qualité d'un recouvrement et d'une solution algorithmique visant à
+optimiser ce critère. Nous proposons deux évaluations de ce travail permettant
+d'une part d'appréhender le fonctionnement global de l'algorithme sur des don-
+nées simples (vitesse de convergence, visualisation des résultats) et d'autre part
+d'évaluer quantitativement le bénéce d'une telle approche sur une application
+de classication de documents textuels.
+1 Introduction
+La classication automatique (ou clustering) est un domaine d'étude situé à l'intersection
+de deux thématiques de recherches majeures que sont l'analyse de données et l'apprentissage
+automatique. Ce domaine est en perpétuelle évolution du fait de l'apparition constante de nou-
+veaux besoins portant à la fois sur la quantité ou la nature des données à traiter (numériques,
+symboliques, spatiales, histogrammes, etc.) que sur le type de classication attendue (partition,
+hiérarchie, schéma ou, etc.).
+Nombreuses sont les approches proposées an d'organiser, de résumer ou de simplier un
+ensemble de données à l'aide d'une structure de laquelle il est possible de faire émerger des
+classes d'objets similaires au sens d'un critère de proximité déni ou plus généralement au re-
+gard des propriétés que ces objets partagent. Il est de coutume de structurer ces approches
+en différentes catégories mutuellement non-exclusives (voir Jain et al. (1999)) comme par
+exemple, pour ne citer que les principales, les approches hiérarchiques, par partitionnement
+ou encore les modèles de mélanges.
+Les approches par partitionnement, dont l'algorithme des k-moyennes (MacQueen, 1967)
+en est l'un des plus célèbre représentant, consiste le plus souvent à construire une collection
+de classes disjointes formant une partition des données par optimisation d'un critère objectif.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+Ce critère étant généralement choisi de façon à minimiser la variance intra-classe (les objets à
+l'intérieur d'une classe doivent tous être assez similaires) et/ou à maximiser la variance inter-
+classes (les classes doivent être séparées les unes des autres).
+Les approches hiérarchiques aboutissent en revanche à une collection de classes emboîtées,
+que l'on peut représenter par un arbre ou plus généralement un graphe dont les arêtes modé-
+lisent une relation d'inclusion. Généralement agglomératifs (parfois divisifs) les algorithmes
+proposés procèdent par fusions successives de classes similaires et les plus utilisés restent sans
+nul doutes les méthodes agglomératives hiérarchiques (liens simple, complet, moyen ou critère
+de Ward) présentées dans Sneath et Sokal (1973).
+Enn, pour les approches de classication par mélange de lois, le problème est posé de
+façon à maximiser la vraisemblance d'un modèle faisant l'hypothèse que les données sont des
+observations d'un mélange de densités. Le modèle est caractérisé par le nombre de lois sup-
+posées et leurs paramètres. La méthode EM par exemple, proposée par Dempster et al. (1977)
+constitue une solution algorithmique incontournable à ce genre de problème d'optimisation.
+Si la plupart des domaines d'application trouvent dans cette pluralité d'approches des ré-
+ponses satisfaisantes aux besoins exprimés, des domaines récents nécessitent d'adapter voire
+de reposer la problématique de la classication et d'y adjoindre une solution algorithmique
+efcace. Nous nous intéressons ici au problème de la classication de données en classes non-
+disjointes (également dites empiétantes ou recouvrantes)1. Ce type d'approche vise à structurer
+les données en une collection de classes telle que chaque objet puisse appartenir à plusieurs
+classes, correspondant alors à une organisation naturelle pour des données par exemple multi-
+média (texte, image et/ou vidéo) ou encore biologiques (gènes) (Banerjee et al., 2005).
+Nous présenterons tout d'abord en Section 2 un ensemble de pistes proposées (approches
+pyramidales, classication oue, etc.) pour répondre plus ou moins directement aux besoins
+exprimés par les domaines d'application mentionnés ci-dessus. Nous montrerons alors qu'au-
+cune de ces approches ne constitue une solution globale pour le problème posé. Nous tenterons
+en Section 3 d'en proposer une nouvelle formalisation et d'y adjoindre une première solution
+algorithmique en nous inspirant de l'algorithme simple et efcace des k-moyennes. L'approche
+ainsi présentée sera ensuite observée dans son fonctionnement puis évaluée sur deux jeux de
+données réelles dont la collection de textes Reuters (Section 4). Enn nous proposerons en
+guise de conclusion, un ensemble de perspectives à cette étude, visant à positionner le pro-
+blème de classication avec recouvrements comme sous-domaine à part entière des recherches
+menées en classication automatique.
+2 ProblØmatique de la classication avec recouvrements
+2.1 Des solutions partielles
+Une première voie de recherches conduisant à une structuration des données en classes
+empiétantes réside dans les techniques de classication pyramidales initiées par Diday (1984).
+Cependant, l'ensemble des recouvrements envisageables par une telle structure se limite aux
+collections de classes telles que chaque classe s'intersecte avec au plus deux autres classes.
+Plusieurs autres structures hiérarchiques ont été proposées par la suite an d'étendre les
+schémas atteignables de façon à approcher l'ensemble de tous les recouvrements possibles ; en
+1En Anglais : Overlapping clustering.
+G. Cleuziou
+particulier les hiérarchies faibles puis les k-hiérarchies faibles (Bertrand et Janowitz, 2003).
+Cependant deux points restent à déplorer : d'une part il n'existe pas aujourd'hui de méthode
+algorithmique permettant de construire de telles structures hiérarchiques, et d'autre part l'en-
+semble des recouvrements atteints - bien que très largement étendu - reste limité aux collections
+de classes vériant la propriété suivante : l'intersection de (k+1) classes arbitraires peut être
+réduite à l'intersection de k de ces classes.
+Un second axe de recherches a été assez fortement étudié ces dernières années et consiste
+soit à adapter des algorithmes existants (k-moyennes et sa variante oue ou encore EM) ou à
+développer de nouvelles méthodologies spéciées pour la recherche d'un bon recouvrement
+des données en classes d'objets similaires. Dans cette dernière classe de méthodes on peut
+citer les algorithmes des k-moyennes axiales (Lelu, 1994) et CBC (Clustering By Commit-
+tee) développé par Pantel (2003) tous deux motivés par l'application aux données textuelles
+(mots ou documents) ou encore l'algorithme plus général POBOC (Pole-Based Overlapping
+Clustering) proposé par Cleuziou et al. (2004).
+De façon globale, qu'il s'agisse d'algorithmes nouveaux ou simplement adaptés, toutes
+ces méthodes consistent, en une ou plusieurs itérations, à rechercher des centres auxquels sont
+affectés les objets. Ces centres peuvent être des points de l'espace (k-moyennes mais aussi
+EM2), des axes (k-moyennes axiales) ou encore des petits ensembles d'objets appelés commit-
+tee dans CBC et Pole dans POBOC. Quelque soit la forme prise par ces centres, l'algorithme
+permettant de les obtenir ne prend pas en considération le fait que les classes nales formeront
+un recouvrement et pourront ainsi contenir des objets communs. Par exemple les méthodes
+d'agrégation autour des centres mobiles (k-moyennes et k-moyennes axiales) déterminent un
+centre après affectation de chaque objet à un seul de ces centres ; à l'inverse les variantes oues
+de ce type de méthodes considèrent systématiquement que tous les objets doivent participer à
+la dénition de chaque centre ; l'une des hypothèses utilisées dans l'algorithme EM vise à
+considérer que chaque objet est une observation de l'une (et une seule) des lois du mélange ;
+enn les algorithmes CBC et POBOC dénissent les centres indépendamment de tout critère
+objectif de qualité du recouvrement induit par ces centres.
+Ainsi dénis, les centres sont déterminants pour la dernière étape d'affectation qui conduira
+au schéma nal de classication. L'affectation est le plus souvent réalisée au moyen d'un
+seuil3, difcile à déterminer, quitte à violer les fondements théoriques sur lesquels l'algorithme
+repose, par exemple la minimisation d'un critère objectif. Finalement, l'hypothèse sous-jacente
+formulée par ces approches vise à considérer qu'un recouvrement de qualitØ correspond nØ-
+cessairement à l’extension d’une "bonne" partition.
+2.2 Recouvrements et partitions étendues
+L'hypothèse précédemment formulée ne semble pas incohérente de prime abord. En théo-
+rie tout recouvrement R = fR1; : : : ; Rkg d'un ensemble d'objets X peut être obtenu par
+l'extension d'au moins une partition P = fP1; : : : ; Pkg telle que 8i 2 1; : : : ; k ; Pi  Ri.
+En revanche, partant d'une partition P , l'ensemble des recouvrements possibles par extension
+2Les approches de classication par mélange de lois consistent à rechercher les paramètres de ces lois ; l'un d'entre
+eux correspond à la moyenne, identiable à un point de l'espace.
+3Un objet est affecté à tous les centres pour lesquels sa distance au centre ou sa probabilité d'appartenance à cette
+classe est supérieure au seuil.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+correspond à une classe de recouvrements (notée CP ), qui n'est qu'un sous ensemble de tous
+les recouvrements possibles. Ainsi, considérer qu'un "bon" recouvrement (selon un critère
+W (:)) correspond nécessairement à l'extension d'une "bonne" partition (selon un critère V (:))
+supposerait que : si P optimise le critŁre V (:) etR optimise le critŁreW (:) alorsR 2 CP
+Cette dernière propriété dépend bien sûr des critères V (:) etW (:) choisis. Nous montrons
+alors sur un exemple que l'on peut choisir des critères cohérents pour lesquels cette propriété
+n'est pas vériée.
+Soit X = fx1; : : : ; x6g un ensemble d'objets dénis dans R2, présentés en gure 1 et que
+l'on souhaite organiser en deux classes (k=2). On pose V (:) etW (:) les critères objectifs pour
+l'évaluation respectivement d'une partition et d'un recouvrement et on les déni de la manière
+suivante :
+V (P) =
+X
+Pj2P
+X
+xi2Pj
+d(xi; cj) et W (R) =
+X
+xi2X
+d(xi; xi)
+avec d la distance de Manhattan, cj de centre de gravité des objets d'une classe Pj ouRj selon
+le modèle, et xi le centre de gravité de l'ensemble fcj jxi 2 Rjg.
+FIG. 1  Partition (à gauche) et recouvrement (à droite) optimaux selon les critŁres V (:) et
+W (:) respectivement.
+On peut calculer que la partition P = ffx1; x2; x3g; fx4; x5; x6gg minimise le critère
+V (:) (V (P) = 12:0) et queR = ffx1; x2; x4; x5g; fx2; x3; x5; x6ggminimise le critèreW (:)
+(W (R) = 12:0 également). PourtantR n'est pas une extension de la partitionP et n'appartient
+donc pas à la classe des recouvrements CP .
+Nous venons donc de montrer par un exemple simple que la classication avec recouvre-
+ments ne se résume pas à étendre une partition par des affectations supplémentaires. Faire
+cette hypothèse consisterait à ne considérer qu'un sous-espace de l'espace de recherche d'une
+solution, ce dernier étant déni par l'ensemble des recouvrements possibles.
+3 À la recherche d’un "bon" recouvrement
+3.1 Dénition du problème
+Rechercher une partition P d'un ensemble X = fx1; : : : ; xng en k classes P1; : : : ; Pk
+selon un critère V (:) déni sur l'ensemble des partitions possibles est un problème NP-difcile
+dans la mesure où l'espace de recherche est de taille exponentielle (kn partitions possibles).
+L'algorithme bien connu des k-moyennes (MacQueen, 1967) propose une solution partielle
+G. Cleuziou
+au problème d'optimisation du critère des moindres carrés (aussi appelé critère de variance
+intra-classe) : V (P) =PPj2PPxi2Pj d2(xi; cj).
+Ce critère favorise les partitions dont les classes présentent une faible variance, autrement
+dit telles que les objets à l'intérieur d'une même classe sont faiblement dispersés. Cet algo-
+rithme procède par itérations de deux étapes (calcul des centres de classes puis affectation de
+chaque objet à son centre le plus proche) assurant la décroissance du critère et par la même, la
+convergence de la méthode vers une partition stable. La solution ainsi obtenue correspond à un
+minimum seulement local du critère et dépend de l'initialisation (tirage aléatoires de k centres)
+de l'algorithme.
+Le problème de recherche d'un recouvrement minimisant un critèreW (:) ne peut pas être
+considéré comme plus facile que le précédent puisque l'espace de recherche est de taille beau-
+coup plus importante (2k:n recouvrements possibles). Par ailleurs le critère V (:) permettant
+d'évaluer la qualité d'une partition n'est plus adapté dans le cas des recouvrements car si R
+est un recouvrement deX en k classes on peut montrer que 8P; R 2 CP ) V (P)  V (R) ;
+un bon recouvrement selon V (:) ne pouvant alors être qu'une partition.
+Dans cette étude, notre proposition porte ainsi sur la dénition d'un nouveau critère de
+qualité d'un recouvrement d'une part et d'une solution algorithmique permettant d'approcher
+un recouvrement optimal selon ce critère d'autre part. Pour y parvenir nous nous inspirons de
+l'algorithme simple et efcace des k-moyennes.
+3.2 Critère objectif pour les recouvrements
+Pour dénir un critère de qualité d'un recouvrement il est indispensable de se reporter aux
+motivations premières qui nous conduisent à rechercher ce type d'organisation. Dans le cas
+d'un document par exemple, choisir une classe thématique et une seule pour ce document peut
+réduire considérablement la représentation que l'on conservera de ce document dans la clas-
+sication. En revanche, autoriser ce document à s'afcher selon plusieurs thèmes rendra une
+image certainement plus juste de son contenu. La qualité d'un recouvrement pourra alors être
+mesurée relativement à l'écart entre le contenu réel des objets et l'"image" que la classication
+(ici le recouvrement) établie renvoie d'eux. Nous formalisons cette intuition dans le critère
+suivant :
+W (R) =
+X
+xi2X
+d2(xi; xi)
+L'image d'un objet dans un recouvrement R est notée xi dans ce critère et correspond
+à un compromis entre les différentes classes auxquelles cet objet appartient. Ainsi pour un
+recouvrement R en k classes fR1; : : : ; Rkg de centres respectifs fc1; : : : ; ckg, xi est déni
+par le centre de gravité de l'ensemble fcj jxi 2 Rjg.
+3.3 L'algorithme OKM
+L'algorithme OKM (Overlapping k-means) que nous détaillons dans cette section présente
+un squelette (gure 2) similaire à l'algorithme des k-moyennes. L'initialisation qui consiste à
+tirer aléatoirement k centres puis à dériver un premier recouvrement est suivie par l'itération
+de deux étapes : (1) la mise à jour des centres de classes puis (2) l'affectation des objets à ces
+centres.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+Initialisation : t=0
+choisir aléatoirement k centres C t = fct1; ct2; : : : ; ctkg dansX ,
+Pour chaque xi 2 X : Affecter(xi,Ct),
+en déduire un recouvrement initialRt = fRt1; Rt2; : : : ; Rtkg.
+Faire
+t=t+1
+Mettre_à_jour(C(t 1),R(t 1)) (en dØduire Ct),
+ Pour chaque xi 2 X : Affecter(xi,Ct) (en dØduireRt),
+Tant que Rt 6= Rt 1
+FIG. 2  Squelette de l’algorithme OKM.
+L'intérêt de l'algorithme OKM réside dans la méthode employée pour Mettre_à_jour les
+centres et pour Affecter chaque objet à un ou plusieurs centres. Ces deux opérations doivent
+d'une part assurer la cohérence des classes en regroupant ensemble des objets similaires et
+d'autre part permettre la convergence de la méthode par décroissance du critèreW (:).
+Étant donné un ensemble C = fc1; c2; : : : ; ckg correspondant aux centres des k classes
+respectivesR1; R2; : : : ; Rk d'un recouvrementR, la méthode d'affectation d'un objet xi, pré-
+sentée en gure 3 consiste à parcourir l'ensemble des centres de classes du plus proche au plus
+éloigné (suivant une métrique d) et à affecter xi tant que son image est améliorée (d(xi; xi)
+diminue). La nouvelle affectation de l'objet xi ne sera nalement conservée que si l'image de
+xi s'en trouve améliorée par rapport à l'ancienne affectation. Cette dernière précaution permet
+d'assurer la décroissance du critèreW (:) lors de l'étape d'affectation.
+Affecter(xi,C) :
+Initialisation : Soit c le centre de C le plus proche de xi (8cj 2 C; d(xi; c)  d(xi; cj)),
+A = fcg (liste des affectations),
+C = C n fcg.
+Faire
+Soit c le centre de C le plus proche de xi et xiA le centre de gravité des éléments de A,
+Si d(xi; xiA[fc
+g) < d(xi; xiA) alors A fcg et C = C n fcg,
+Sinon STOP
+Tant que C 6= ;
+Soit A0 l'ancienne affectation de xi,
+Si d(xi; xiA) < d(xi; xiA
+0
+) alors affecter xi aux centres de A,
+Sinon conserver l'ancienne affectation A0.
+FIG. 3  MØthode d’affectation utilisØe dans l’algorithme OKM.
+Enn, la mise à jour du centre cj de la classe Rj est dénie dans l'algorithme OKM par :
+cj;v =
+1X
+xi2Rj
+1
+2i
+
+X
+xi2Rj
+1
+2i
+:x^i
+j
+v (1)
+G. Cleuziou
+Dans cette expression, cj;v désigne la vième composante du vecteur cj , i correspond au
+nombre de classes de R auxquelles xi appartient et x^ijv symbolise la vième composante du
+centre cj "idéal" pour l'objet xi, c'est à dire le centre cj tel que d(xi; xi) = 0. De façon plus
+précise on a x^ijv = i:xi;v (i 1):xivAnfcjg oùA désigne l'ensemble des centres des classes
+auxquelles xi appartient. Il découle de ce qui précède une dénition plus intuitive du nouveau
+centre cj qui correspond nalement au centre de gravité du nuage de points f(x^ij ; pi)jxi 2 Rjg
+où chaque x^ij est pondéré par pi = 12i .
+On montre que chaque mise à jour d'un centre dans OKM permet d'assurer la décroissance
+du critèreW (:)mais également que le nouveau centre calculé est celui qui minimise ce critère.
+Preuve
+Soient X un ensemble d'objets dénis dans (Rp; d) où d est la distance euclidienne, et R
+un recouvrement de X en k classes de centres c1; : : : ; ck. L'étape de mise à jour dans OKM
+consistant à recalculer chaque centre un par un, il suft alors de montrer que le recalcul d'un
+nouveau centre cj quelconque minimise le critère
+W (R) =
+X
+xi2X
+d2(xi; xi) =
+X
+xi2X
+pX
+v=1
+(xi;v   xiv)2
+Par réécriture du terme xi et décomposition de la somme sur les objets de X on obtient :
+W (R) =
+X
+xi =2Rj
+d2(xi; xi) +
+X
+xi2Rj
+pX
+v=1
+
+xi;v   1
+i
+(cj;v + (i   1):xiAnfcjgv )
+2
+Pour les objets n'appartenant pas à la classe Rj , leur image xi est indépendante de cj , le
+premier terme est donc constant relativement à cj . Le second terme constitue une fonction
+quadratique de cj qui sera alors minimisée pour une dérivée égale à 0.
+@W (R)
+@cj
+= 0()
+X
+xi2Rj
+1
+2i
+pX
+v=1
+h
+cj;v   i:xi;v + (i   1):xiAnfcjgv
+i
+= 0
+d'où le résultat
+cj;v =
+1X
+xi2Rj
+1
+2i
+
+X
+xi2Rj
+1
+2i
+h
+i:xi;v   (i   1):xiAnfcjgv
+i
+.
+Notons pour conclure sur la présentation de l'algorithme, que la méthode des k-moyennes
+peut être considérée comme un cas particulier de OKM. En effet si on restreint dans OKM
+chaque objet à n'appartenir qu'à une seule classe (i=1) on retrouve exactement le processus
+de classication utilisé dans l'algorithme k-moyennes. Il s'agit donc d'un algorithme non-
+déterministe puisque le résultat dépendra de l'initialisation ; de plus, chaque classe n'étant plus
+indépendante l'une de l'autre dans un recouvrement, l'algorithme OKM dépendra également
+de l'ordre de parcours des classes lors de l'étape de mise à jour des centres.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+4 Évaluations et applications
+L'évaluation des méthodes de classication non-supervisée reste un problème entier dans
+ce domaine de recherches. Une piste possible pour évaluer (au moins partiellement) une telle
+méthode est de mesurer sa capacité à retrouver un schéma de classication préétabli ; nous
+l'utiliserons pour évaluer l'algorithme OKM en insistant toutefois sur les précautions qu'il
+s'impose de prendre lors de l'interprétation des résultats quantitatifs, notamment du fait de
+l'hypothèse non vériée que l'ensemble de descripteurs est pertinent pour établir la classica-
+tion attendue.
+4.1 Observation du fonctionnement de l'algorithme
+Nous proposons ici une première évaluation de l'algorithme OKM permettant au lecteur
+d'en appréhender le fonctionnement global en terme de : vitesse de convergence, importance et
+pertinence des recouvrements entre les classes et capacité à retrouver des classes attendues. La
+base de données Iris (D.J. Newman et Merz, 1998) est largement utilisée dans la communauté
+apprentissage et constitue un jeu d'évaluation simple constitué de 150 individus (Iris) décrits
+selon 4 descripteurs numériques (longueur et largeur des pétales et des sépales) et organisés en
+trois classes de 50 individus chacune (iris Setosa, Versicolour, Virginica).
+Sans tenir compte de l'étiquette de classe assignée à chaque individu, nous effectuons une
+classication en trois classes (k=3) en utilisant la distance euclidienne dans l'espace de repré-
+sentation des données (R4), préalablement centrées et réduites. Nous présentons sur les gures
+4, 6 et 5. le résultat d'une exécution4 des algorithmes k-moyennes et OKM dans des conditions
+initiales identiques.
+60
+80
+100
+120
+140
+160
+180
+200
+2 4 6 8 10 12 14 16 18
+Cr
+itè
+re
+sW
+(:
+)
+et
+V
+(:
+)
+Itérations
+OKMW (:)
+ 
+
+
+
+	
+
+    
+   ff fifl ffi  ! "# $%
+&'
+k-moyennes V (:)
++
++
++
++
++
++
++
++
++
++ +
++
+FIG. 4  Convergence des algorithmes. FIG. 5  Visualisation des classes par projection
+sur les deux premiers vecteurs propres.
+4L'exécution choisie correspond au meilleur résultat obtenu relativement au critèreW (:) nal, sur un total de 50
+exécutions.
+G. Cleuziou
+Les courbes de la gure 4 mettent en évidence un phénomène prévisible : la convergence
+plus lente pour l'algorithme OKM vers un recouvrement stable des données (19 itérations), par
+rapport à k-moyennes qui obtient une partition stable en seulement 12 itérations. On retiendra
+cependant que dès la cinquième itération, les deux méthodes ont généré un résultat de qualité
+qui évoluera peu par la suite.
+XXXXXXXXXXÉtiquettes
+Classes 1 2 3
+Iris Setosa 50 (50)
+Iris Versicolour 26 (3) 50 (47) 9 (0)
+Iris Virginica 49 (36) 27 (14)
+FIG. 6  Matrice de confusion pour OKM (et k-moyennes).
+La gure 6 présente la matrice de confusion et nous révèle que les deux méthodes identi-
+ent correctement les trois catégories d'iris puisque chacune des classes contient majoritaire-
+ment l'une de ces trois catégories. Il est reconnu que, sur cette base de données Iris, la catégorie
+des Iris Setosa est plutôt facile à identier tandis que les deux autres catégories sont répu-
+tées difcilement séparables, ce que l'on observe sur la gure 5. Ces phénomènes se vérient
+également sur notre expérimentation :
+ les 50 individus de la catégorie Iris Setosa se retrouvent exclusivement dans la classe
+n	3 avec les deuxméthodes. Dans le recouvrement obtenu avec OKM, cette classe contient
+9 individus de la catégorie Iris Versicolour en supplément, qu'elle partage avec les
+autres classes5 (faible intersection) ;
+ la séparation difcile des deux autres classes se manifeste par des erreurs de classi-
+cation si l'on cherche à partitionner les données (k-moyennes) et par une intersection
+importante entre les deux classes lorsque ces données sont organisées en classes recou-
+vrantes (OKM).
+Sur cette première expérimentation, nous avons d'une part observé un comportement sa-
+tisfaisant de l'algorithme OKM et d'autre part noté que la structuration en classes recouvrantes
+fournit un résultat informationnel plus riche qu'une simple partition, notamment en ce qui
+concerne l'organisation des classes entre elles.
+4.2 Classication de documents multi-thématiques
+Comme nous l'avons mentionné en introduction, les recherches menées autour de la clas-
+sication avec recouvrements des classes sont motivées par des besoins apparaissant dans des
+domaines d'application où des données peuvent appartenir à plusieurs catégories prédénies.
+Dans cette seconde expérimentation, nous évaluons l'impact de notre contribution dans le do-
+maine de la Recherche d'Information et plus précisément pour la classication de documents
+multi-thématiques.
+L'expérimentation est conduite sur la collection de documents Reuters6 initialement com-
+posée de 21578 articles journalistiques en langue anglaise. Chaque document peut être étiqueté
+par une ou plusieurs étiquettes parmi un ensemble de 114 catégories. Après ltrage, nous avons
+5On observe visuellement (gure 5) que ces objets sont parmi les plus proches des objets propres à la classe n	3.
+6http ://www.research.att.com/lewis/reuters21578.html
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+retenu 2739 documents, en ne choisissant que ceux pour lesquels au moins une catégorie est
+proposée, dont le corps de l'article n'est pas vide et appartenant au sous-ensemble "TEST"
+selon la répartition suggérée dans Apté et al. (1994).
+FIG. 7  Classication de documents issus de la collection Reuters.
+La représentation des documents est l'aboutissement d'une chaîne de traitements usuelle
+en Recherche d'Information : chaque document est représenté par un vecteur de dimensionm
+dans lequel chaque composante xi;v correspond à l'information mutuelle du mot7 wv pour le
+document xi. Une étape préalable de ltrage des descripteurs consiste à ne sélectionner que
+lesm mots d'information mutuelle supérieure à un seuil  xé. Enn, la similarité entre deux
+documents est évaluée au moyen du cosinus de Salton (Salton et McGill, 1983) :
+sim(xi; xj) =
+P
+v xi;v:xj;vqP
+v x
+2
+i;v 
+P
+v x
+2
+j;v
+L'évaluation que nous proposons consiste en des séries de 10 exécutions des algorithmes
+OKM et k-moyennes dans des conditions initiales identiques, sur un sous-ensemble de 300 do-
+cuments pour un nombre de classes variant de 5 à 30. On appelle association issue de R, une
+paire d'objets appartenant à une même classe de R ; on dira de plus que cette association est
+correcte si ces deux objets contiennent au moins une étiquette de catégorie en commun dans la
+classication préétablie. Chaque partition ou recouvrementR est alors évalué relativement au
+nombre d'associations deR (noté na), qui sont correctes (nb) par rapport au nombre total d'as-
+sociations correctes attendues (nc). Nous recourons aux indicateurs traditionnels en Recherche
+d'Information : la précision, le rappel et l'indice de Fscore (avec =1).
+précision = nb
+na
+; rappel = nb
+nc
+; Fscore() =
+(2 + 1) précision rappel
+2  précision+ rappel
+7Un mot désigne en fait un radical : chaîne de caractères résultant d'un processus de segmentation puis de radica-
+lisation (Porter, 1980).
+G. Cleuziou
+Nous présentons en gure 7 les moyennes comparatives des mesures de Fscore obtenues
+sur les recouvrements générés par OKM d'une part et les partitions obtenues avec k-moyennes
+d'autre part. La diminution observée du Fscore s'explique dans les deux méthodes par la ré-
+duction logique du nombre d'associations (et donc du rappel) lorsque le nombre de classes
+augmente. Pourtant, si dans le cas des partitions, l'augmentation en précision ne permet pas de
+compenser la diminution importante du rappel, cette compensation est possible lorsqu'il s'agit
+de recouvrements du fait d'une perte de rappel atténuée sous l'effet des intersections.
+5 Conclusion et Perspectives
+Cette étude part du constat suivant : les méthodes de classication actuelles ne sont pas
+adaptées à la recherche d'une organisation des données en classes recouvrantes ; ce type de
+schéma de classication devient pourtant indispensable pour appréhender les domaines d'ap-
+plication actuels tels que les documents multimédia ou les données biologiques.
+Nous avons alors proposé une première solution visant à rechercher dans l'ensemble des re-
+couvrements possibles des données, un schéma correspondant au mieux à l'organisation de ces
+données. Cette proposition s'appuie d'une part sur la dénition d'un critère objectif permettant
+d'évaluer les recouvrements, et d'autre part sur une méthode d'exploration de cet espace des
+possibilités (l'algorithme OKM).
+Des expérimentations menées sur deux ensembles de données ont mis en évidence la cohé-
+rence globale de la méthode proposée (sur les données Iris) et justié de l'intérêt d'organiser
+les données en classes recouvrantes an d'en conserver une synthèse riche en informations (sur
+les données Reuters). Cependant cette première contribution suggère plusieurs améliorations
+et perspectives importantes à mener.
+Tout d'abord on peut noter que, an d'assurer la convergence du critère objectif, la méthode
+d'affectation proposée dans OKM favorise mais ne garantie pas que chaque objet soit affecté
+uniquement à ses centres les plus proches (cf. gure 3). Si cette situation est en pratique suf-
+samment rare pour ne pas remettre en cause la cohérence globale du schéma, il conviendra de
+proposer une solution théorique à ce problème.
+Nous serons également amené à conrmer la justication de cette approche en montrant sur
+des études comparatives plus larges son intérêt par rapport à d'autres méthodes mentionnées
+dans ce papier, en particulier les algorithmes CBC, POBOC ou encore des algorithmes de
+classication oue complétés par une étape supplémentaire d'affectation.
+Enn, nous envisageons d'étudier l'intégration d'une pondération différente des descrip-
+teurs pour chaque classe en construction (Modha et Spangler, 2003). Cette perspective s'appuie
+sur l'hypothèse qu'un objet multi-classé doit l'être sur la base de critères différents.
+RØfØrences
+Apté, C., F. Damerau, et S. M. Weiss (1994). Automated learning of decision rules for text
+categorization. ACM Trans. Inf. Syst. 12(3), 233251.
+Banerjee, A., C. Krumpelman, J. Ghosh, S. Basu, et R. J. Mooney (2005). Model-based over-
+lapping clustering. In KDD ’05 : Proceeding of the eleventh ACM SIGKDD international
+conference on Knowledge discovery in data mining, New York, NY, USA, pp. 532537.
+ACM Press.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+Bertrand, P. et M. F. Janowitz (2003). The k-weak hierarchical representations : An extension
+of the indexed closed weak hierarchies. Discrete Applied Mathematics 127(2), 199220.
+Cleuziou, G., L. Martin, et C. Vrain (2004). PoBOC : an Overlapping Clustering Algorithm.
+Application to Rule-Based Classication and Textual Data. In R. López de Mántaras and L.
+Saitta, IOS Press (Ed.), Proceedings of ECAI’04, Valencia, Spain, pp. 440444.
+Dempster, A., N. Laird, et D. Rubin (1977). Maximum Likelihood from Incomplete Data via
+the EM Algorithm. Journal of Royal Statistical Society B 39, 138.
+Diday, E. (1984). Une représentation visuelle des classes empiétantes : Les pyramides. Tech-
+nical report, INRIA num.291, Rocquencourt 78150, France.
+D.J. Newman, S. Hettich, C. B. et C. Merz (1998). UCI repository of machine learning data-
+bases. University of California, Irvine, Dept. of Information and Computer Sciences.
+Jain, A. K., M. N. Murty, et P. J. Flynn (1999). Data clustering : a review. ACM Computing
+Surveys 31(3), 264323.
+Lelu, A. (1994). Clusters and factors : neural algorithms for a novel representation of huge and
+highly multidimensional data sets. In E. D. Y. L. . al. (Ed.),New Approaches in Classication
+and Data Analysis, Berlin, pp. 241248. Springer-Verlag.
+MacQueen, J. (1967). Some methods for classication and analysis of multivariate obser-
+vations. In Proceedings of the Fifth Berkeley Symposium on Mathematical statistics and
+probability, Volume 1, Berkeley, pp. 281297. University of California Press.
+Modha, D. S. et W. S. Spangler (2003). Feature weighting in k-means clustering. Mach.
+Learn. 52(3), 217237.
+Pantel, P. (2003). Clustering by Committee. Ph.d. dissertation, Department of Computing
+Science, University of Alberta.
+Porter, M. F. (1980). An algorithm for sufx stripping. Program 14, 130137.
+Salton, G. et M. J. McGill (1983). Introduction to Modern Information Retrieval. McGraw-
+Hill, Inc.
+Sneath, P. H. A. et R. R. Sokal (1973). Numerical Taxonomy - The Principles and Practice of
+Numerical Classication. San Francisco, W. H. Freeman and Compagny.
+Summary
+This paper deals with overlapping clustering, a trade off between crisp and fuzzy cluster-
+ing. This kind of clustering is motivated by recent applications such as clustering multimedia
+documents. Even if several contributions have been proposed in this eld of research, we
+observe that no theoretical solution exists.
+Our study consists in reformulating the partitioning problem for clustering in order to dis-
+cover a coverage of the data with overlapping clusters of similar objects. The proposed ap-
+proach combines an objective criterion that evaluates the quality of a coverage with an algo-
+rithmic solution that optimizes this criterion.
+A rst experimentation on a simple well known dataset helps in understanding the global
+process of the algorithm ; a second evaluation gives a quantitative point of view of the approach
+on the task of text clustering.

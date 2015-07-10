@@ -1,0 +1,566 @@
+Semi-Supervised Incremental Clustering of
+Categorical Data
+Dan Simovici∗
+Namita Singla∗∗
+∗University of Massachusetts Boston
+Department of Computer Science, Boston, MA 02125, USA
+dsim@cs.umb.edu
+∗∗University of Massachusetts Boston
+Department of Computer Science, Boston, MA 02125, USA
+namita@cs.umb.edu
+Re´sume´. Le clustering semi-supervise´ combine l’apprentissage supervise´
+and non-supervise´ pour produire meilleurs clusterings. Dans la phase ini-
+tiale supervise´e de l’algorithme, un e´chantillon d’apprentissage est pro-
+duit par selection ale´atoire. On suppose que les exemples de l’e´chantillon
+d’apprentissage sont e´tiquete´s par un attribut de classe. Puis, un algo-
+rithme incre´mentiel de´veloppe´ pour les donne´es cate´goriques est utilise´
+pour produire un ensemble de clusters pur (tels que les exemple de chaque
+cluster ont la meˆme e´tiquette), qui servent de “seeding clusters” pour la
+deuxie´me phase non-supervise´e de l’algorithme. Dans cette phase, l’al-
+gorithme incre´mentiel est applique´ aux donne´es non e´tiquete´es. La qua-
+lite´ du clustering est e´value´e par l’index de Gini moyen des clusters. Les
+expe´riences de´montrent que des tre`s bons clusterings peuvent eˆtre obtenus
+avec des petits e´chantillons d’apprentissage.
+1 Introduction
+Clustering is a process that aims to partition data into groups that consists of similar
+objects. Similarity among objects is measured using some metric defined on the set of
+objects or, whenever possible, using pre-existing classifications of objects. In general,
+clustering is an unsupervised activity. In other words, clustering takes place without
+any intervention of an exterior operator that assigns objects to classes. Assuming that
+the class of an object is determined by the other characteristics of the object, a good
+clustering algorithm should generate clusters that are as homogeneous as possible.
+The core of the clustering algorithm is the incremental construction of a clustering
+partition of the set of objects such that that the total distance from this partition to
+the partitions determined by the attributes is minimal. A special challenge of clustering
+categorical data stems from the fact that no natural ordering exists on the domains of
+attributes of objects. This leaves only the Hamming distance as a dissimilarity measure,
+a poor choice for discriminating among multi-valued attributes of objects.
+Semi-supervised clustering of categorical data entails two phases : the first phase
+consists of a supervised process that is applied to a training set obtained randomly
+sampling the data set. Clusters are formed using an incremental clustering algorithm
+RNTI-E-3189
+Semi-Supervised Clustering
+that is appropriate for categorical data. Then, these clusters are split into homogeneous
+clusters that form the seeding clusters for the second phase of the algorithm. In the
+second unsupervised phase, objects are incrementally added to the existing clusters
+without using any class label. Finally, clusterings are evaluated using the average Gini
+index.
+Incremental clustering can be traced to (Hartigan 1975) and (Carpenter et al.,
+1990). This was followed by a seminal paper by Fisher (Fisher 1987) who created
+COBWEB, an incremental clustering algorithm that involved restructurings of the
+clusters in addition to the incremental additions of objects. Incremental clustering
+related to dynamic aspects of databases were discussed in (Can 1993) and (Can et
+al., 1995). It is also notable that incremental clustering has been used in a variety of
+applications (Langford et al., 2001), (Lin et al., 2004), (Charikar et al., 2997), (Ester
+et al.,1998).
+The other main paradigm applied here, semi-supervised clustering, has recently
+received lots of attention (Cheung and Yeung 2004), (Bilenko et al., 2004), (Cohn et
+al.,2003), (Zhu et al., 2002), mostly related to numerical data. Our focus here is on
+categorical data which requires a specific approach.
+Incremental clustering insures that the main memory usage is minimal since there
+is no need to keep in memory the mutual distances between objects ; therefore, the
+algorithms are very scalable with respect to the size of the set of objects and the
+number of attributes. Semi-supervised clustering, acting as a wrapper for the underlying
+incremental clustering improves the quality of the clustering.
+2 Partitions and Clusterings
+Let S be a set. A partition on S is a non-empty collection of non-empty subsets
+of S indexed by a set I, pi = {Bi | i ∈ I} such that
+⋃
+i∈I Bi = S and i 6= j implies
+Bi ∩ Bj = ∅. The sets Bi are the blocks of the partition pi. The set of partitions on S
+is denoted by PART(S).
+For pi, σ ∈ PART(S) we write pi ≤ σ if every block B of pi is included in a block of σ,
+or equivalently, if every block of σ is an exact union of blocks of pi. This partial order
+generates a lattice structure on PART(S) ; this means that for every two partitions
+pi, pi′ ∈ PART(S) there is a least partition pi1 such that pi ≤ pi1 and pi′ ≤ pi1 and there
+is a largest partition pi2 such that pi2 ≤ pi and pi2 ≤ pi′. The first partition is denoted
+by pi ∨ pi′, while the second is denoted by pi ∧ pi′.
+To introduce a metric on the set of partitions of a finite set we define the mapping
+v : PART(S) −→ R by v(pi) =∑ni=1 |Bi|2, where pi = {B1, . . . , Bn}.
+The mapping v is a lower valuation on PART(S), that is,
+v(pi ∨ σ) + v(pi ∧ σ) ≥ v(pi) + v(σ) (1)
+for pi, σ ∈ PART(S) (see Appendix 5 for a proof).
+For every lower valuation v the mapping d : (PART(S))2 −→ R defined by d(pi, σ) =
+v(pi) + v(σ) − 2v(pi ∧ σ) is a metric on PART(S) (see (J.P. Barthe´lemy et B. Leclerc,
+1995), (J.P. Barthe´lemy, 1978), (Monjardet, 1981). A special property of this metric
+RNTI - 1
+RNTI-E-3 190
+Dan Simovici and Namita Singla
+allows the formulation of an incremental clustering algorithm which is used as a part
+of the semi-supervised clustering.
+An object system is a pair S = (S,H), where S is set called the set of objects of S,
+H = {A1, . . . , Am} is a set of mappings defined on S. For each mapping Ai (referred to
+as an attribute of S) there exists a nonempty set Ei called the domain of Ai such that
+Ai : S −→ Ei for 1 ≤ i ≤ m. The value of an attribute Ai on an object t is denoted
+by t[Ai]. This is consistent with the terminology used in relational databases, where
+a table can be regarded as an object system ; however, the notion of object system is
+more general because objects have an identity as members of the set S, instead of being
+regarded as just m-tuples of values. In this spirit, we shall refer to t[Ai] as projection
+of t on Ai.
+An attribute A of an object system S = (S,H) generates a partition piA of the set
+of objects S, where two objects belong to the same block of piA if they have the same
+projection on A. We denote by BAa the block of pi
+A that consists of all tuples of S
+whose A-component is a. Note that for relational databases, piA is the partition of the
+set of rows of a table that is obtained by using the group by A option of select in
+standard SQL.
+A clustering of an object system S = (S,H) is defined as a partition κ of S. The
+blocks of the partition κ are the clusters of κ.
+3 A Semi-Supervised Incremental Clustering Algo-
+rithm
+A semi-supervised clustering of an object system S = (S,H) begins with the as-
+sumption that an oracle provides the value of a special attribute K of objects referred
+to as the class of the object for a subset T of the object set S.
+In the first phase of the algorithm an incremental clustering algorithm A is applied
+to the object set T which yields an initial clustering σ of this set. In general, these
+clusters are not pure relative to the class K, that is, we may find in the same class
+objects that have distinct values of the attribute K. Then, each of the clusters of T
+is split into pure clusters. The partition κ0 of T obtained in the manner contains the
+seeding clusters for the clustering of the full set of objects.
+The second, unsupervised phase of the algorithm starts with the partition κ0 of
+the set T . Using the incremental clustering algorithm, objects from the set S − T are
+added to existing clusters or form new clusters. The class attribute (if existent) plays
+no role in this phase. The final clustering extends the partition κ0 of T to a clustering
+partition κ of the entire set of objects.
+We begin by discussing our incremental clustering algorithm. For an object system
+S = (S,H) we seek a clustering κ = {C1, . . . , Cn} ∈ PART(S) such that the total
+distance from κ to the partitions of the attributes :
+D(κ) =
+n∑
+i=1
+d(κ, piAi)
+RNTI - 1
+RNTI-E-3191
+Semi-Supervised Clustering
+has a local minimum. The definition of d allows us to write :
+D(κ) =
+n∑
+i=1
+|Ci|2 +
+mA∑
+j=1
+|BAaj |2 − 2
+n∑
+i=1
+mA∑
+j=1
+|Ci ∩BAaj |2,
+Let t be a new object, t 6∈ S, and let let Z = S ∪ {t}. To form a clustering of the set
+Z the object t may added to an existing cluster Ck, or a new cluster Cn+1, may be
+created that consists only of t.
+If t is added to an existing cluster Ck, the new clustering is
+κ(k) = {C1, . . . , Ck−1, Ck ∪ {t}, Ck+1, . . . , Cn},
+and the new attribute partition is
+piA
+′
+= {BAa1 , . . . , BAt[A] ∪ {t}, . . . , BAamA }
+Now, we have :
+d(κ(k), piA
+′
+)− d(κ, piA)
+= (|Ck|+ 1)2 − |Ck|2 + (|BAt[A]|+ 1)2 − |BAt[A]|2 − 2(2|Ck ∩BAt[A]|+ 1)
+= 2|Ck|+ 1 + 2|BAt[A]|+ 1− 4|Ck ∩BAt[A]| − 2
+= 2|Ck ⊕BAt[A]|,
+where ⊕ is the symmetric difference of sets given by X ⊕ Y = (X ∪ Y )− (X ∩ Y ) for
+every sets X,Y .
+When t is forming a new cluster we have the partitions
+κ′ = {C1, . . . , . . . , Cn, {t}}
+piA
+′
+= {BAa1 , . . . , BAt[A] ∪ {t}, . . . , BAamA}
+which yield
+d(κ′, piA
+′
+)− d(κ, piA) = 2|BAt[A]|.
+Consequently,
+D(κ′)−D(κ) =
+{∑
+A 2 · |Ck ⊕BAt[A]| in Case 1∑
+A 2 · |BAt[A]| in Case 2.
+Thus, the choice between adding an object to an existing cluster and creating a new
+cluster is based on comparing the numbers
+min
+k
+∑
+A
+|Ck ⊕BAt[A]| and
+∑
+A
+|BAt[A]|.
+If the first number is smaller, we add t to a cluster Ck for which
+∑
+A |Ck ⊕ BAt[A]| is
+minimal ; otherwise, we create a new one-object cluster.
+RNTI - 1
+RNTI-E-3 192
+Dan Simovici and Namita Singla
+Input : data set S,
+fraction of supervised set p,
+‘‘not-yet’’ threshold α
+Output : clustering C1, . . . , Cn
+Method :obtain a random sample of objects T from
+the set of objects S such that |T ||S| = p ;
+compute the seed clustering of the set T
+κ0 = {D1, . . . , D`} = A(T, α)
+compute the final clustering
+κ = C(S, T, κ0, α)
+Fig. 1 – Pseudocode of the semi-supervised clustering algorithm
+For incremental clustering algorithms certain object orderings may result in rather
+poor clusterings. To diminish the ordering effect problem we expand the initial algo-
+rithm by adopting the “not-yet” technique introduced in (Roure and Talavera, 1998).
+A new cluster is created only when the effect of adding the object t on the total distance
+is significant enough. This is the case when
+∑
+A |BAt[A]|
+mink
+∑
+A |Ck⊕BAt[A]|
+< α, where α ≤ 1 is a
+parameter provided by the user. Otherwise, the object t in placed in a NOT-YET buffer.
+All experiments described in Section 4 used α = 0.95.
+When
+∑
+A |BAt[A]|
+mink
+∑
+A |Ck⊕BAt[A]|
+> 1, the object t is placed in an existing cluster Ck that
+minimizes
+∑
+A |Ck ⊕BAt[A]|. This approach limits the number of new singleton clusters
+that would be otherwise created. After all objects of the set S have been examined, the
+objects contained by the NOT-YET buffer are processed with α = 1. This prevents new
+insertions in the buffer and results in either placing these objects in existing clusters
+or in creating new clusters.
+Thus, the construction of the final clustering κ of S starts with an initial clustering
+partition κ0 of a subset T and with a parameter α. We denote the final clustering κ by
+C(S, T, κ0, α).
+The partition created on the initial set of objects T is denoted by κ0 = A(T, α) and
+it uses the same algorithm as above.
+The algorithm is given next :
+4 Experimental Results
+We applied the semi-supervised clustering to several categorical databases obtained
+from the UCI data set (C. L. Blake et C. J. Merz, 1998). Each experiment was applied
+using a series of increasing percentages for the semi-supervised data set, averaged over
+five random samples.
+The quality of the clustering for categorical data requires a specialized treatmet
+RNTI - 1
+RNTI-E-3193
+Semi-Supervised Clustering
+since distances between objects cannot be defined naturally. We evaluated clusterings
+using the averaged Gini index of the clusters (Demiriz et al., 1999).
+Let K the class attribute and let {BKk1 , . . . , BKkp} be the partition of the object set
+S. The class-impurity of a set of objects U is defined as the Gini index of the “trace
+partition” {U ∩BKkj | 1 ≤ j ≤ p} :
+giniK(U) = 1−
+p∑
+j=1
+( |U ∩BKkj |
+|U |
+)2
+.
+Note that if a cluster U is pure, that is, it contains objects that belong to only one
+class, then giniK(U) = 0.
+For a clustering κ = {U1, . . . , U`} of the set of objects S the average Gini index is
+given by
+impK(κ) =
+∑`
+i=1
+|Ui|
+|S| giniK(Ui).
+Clearly, low values of impK(κ) indicate good clusterings.
+The algorithm was applied to the MUSHROOM data set. This data set contains 8124
+mushroom records and is typically used as test set for classification algorithms, where
+the task is to construct a classifier that is able to predict the poisonous/edible character
+of the mushrooms based on the values of the attributes of the mushrooms. The clusters
+show quite a remarkable degree of purity. For example, for a semi-supervised portion
+of 10% we obtained the following clusters :
+Cluster Instances edib./pois. Percent of
+number dominant group
+1 4225 3575/650 84.615
+2 165 0/165 100
+3 3055 0/3055 100
+4 394 393/1 99.746
+5 2 0/2 100
+6 55 48/7 87.273
+7 36 0/36 100
+8 192 192/0 100
+It is quite remarkable that five of the eight clusters obtained in this manner are pure
+and the remaining clusters have a high degree of purity. For other sizes of the supervised
+sample we obtained the following results :
+RNTI - 1
+RNTI-E-3 194
+Dan Simovici and Namita Singla
+0.08
+0.09
+0.1
+0.11
+0.12
+0.13
+0.14
+0.15
+0.16
+5 10 15 20 25 30
+impurity
+percentage of sample
+Impurity vs. Sample Size
+Mushroom data?
+?
+?
+?
+?
+?
+?
+Fig. 2 – Impurity Decrease with Sample Size for MUSHROOMS
+Mushroom database
+Percent Number of Impurity Time
+supervised clusters (ms)
+5% 8 0.15362536 2443
+10% 8 0.1371508 2454
+15% 8 0.12705285 2444
+20% 8 0.10735634 2374
+25% 9 0.09911141 3545
+30% 9 0.0816238 3415
+The dependency of the impurity measure on the fraction of the supervised sample is
+shown in Figure 2.
+A similar, albeit slower improvement of the quality of clustering can be observed
+for ZOO, another categorical data set from UCI (C. L. Blake et C. J. Merz, 1998) :
+RNTI - 1
+RNTI-E-3195
+Semi-Supervised Clustering
+0.105
+0.11
+0.115
+0.12
+0.125
+0.13
+0.135
+0.14
+0.145
+0.15
+5 10 15 20 25 30
+impurity
+percentage of sample
+Impurity vs. Sample Size
+Solar Flares
+?
+?
+? ?
+?
+?
+?
+Fig. 3 – Impurity Decrease with Sample Size for SOLAR FLARES
+Zoo database
+Percent Number of Impurity Time
+supervised clusters (ms)
+5% 3 0.39802246 110
+10% 4 0.37841779 90
+15% 4 0.37841779 110
+20% 6 0.28431165 130
+25% 7 0.33374854 141
+30% 7 0.33981398 114
+The variation of the average impurities for five experiments with each sample size for
+the SOLAR_FLARES database is shown in Figure 3.
+5 Conclusion and Future Work
+Semi-supervised incremental clustering is an efficient clustering algorithm for ca-
+tegorical data that generates almost homogeneous clusters relative to classifications
+based on attribute values.
+A natural idea for development of the semi-supervised approach would be to use
+a boosted model (Freund, 1995) of the semi-supervised incremental clustering where
+several small training samples would be used to generate clusterings ; an object would
+then be classified according to its positions relative to the ensemble of clusters.
+RNTI - 1
+RNTI-E-3 196
+Dan Simovici and Namita Singla
+We will explore the semi-supervised incremental clustering in the context of clus-
+tering streams of objects, which is an important type of data in internet mining and
+network security. The ordering of objects is irrelevant in this realm since objects must
+be dealt with as they arrive.
+References
+J.P. Barthe´lemy et B. Leclerc, The median procedure for partitions, in Partitioning
+Data Sets, pages 3–34, Providence, 1995, American Mathematical Society.
+J.P. Barthe´lemy, Remarques sur les proprie´te´s metriques des ensembles ordonne´s,
+Math. Sci. hum., 61 :39–60, 1978.
+M. Bilenko, S. Basu, et R. J. Mooney, Integrating constraints and metric learning
+in semi-supervised clustering, in International Conference on Machine Learning,
+Banff, Canada, 2004.
+G. Birkhoff, Lattice Theory, American Mathematical Society, Providence, 1973.
+C. L. Blake et C. J. Merz, UCI Repository of machine learning databases, University
+of California, Irvine, Dept. of Information and Computer Sciences,
+http ://www.ics.uci.edu/∼mlearn/MLRepository.html, 1998.
+F. Can, E. A. Fox, C. D. Snavely, et R. K. France, Incremental clustering for very large
+document databases : Initial MARIAN experience, Inf. Sci., 84 :101–114, 1995.
+F. Can, Incremental clustering for dynamic information processing, ACM Transaction
+for Information Systems, 11 :143–164, 1993.
+G. Carpenter et S. Grossberg, Art3 : Hierarchical search using chemical transmitters
+in self-organizing pattern recognition architectures, Neural Networks, 3 :129–152,
+1990.
+M. Charikar, C. Chekuri, T. Feder, et R. Motwani, Incremental clustering and dynamic
+information retrieval, in STOC, pages 626–635, 1997.
+H. Cheung et D. Y. Yeung, Locally linear metric adaptation for semi-supervised clus-
+tering, in International Conference on Machine Learning, Banff, Canada, 2004.
+D. Cohn, R. Caruana, et A. McCallum, Semi-supervised clustering with user feedback,
+Technical report, 2003.
+A. Demiriz, K. P. Bennett, et M. E. Embrechts, Semi-supervised clustering using ge-
+netic algorithms, Technical Report Math 9901, Rensselaer Polytechnical Institute,
+Troy, New York, 1999.
+M. Ester, H. P. Kriegel, J. Sander, M. Wimmer, et X. Xu, Incremental clustering for
+mining in a data warehousing environment, in VLDB, pages 323–333, 1998.
+D. Fisher, Knowledge acquisition via incremental conceptual clustering,Machine Lear-
+ning, 2 :139–172, 1987.
+Y. Freund, Boosting a weak learning algorithm by majority, Information and Compu-
+tation, 121 :256–285, 1995.
+J. A. Hartigan, Clustering Algorithms, John Wiley, New York, 1975.
+RNTI - 1
+RNTI-E-3197
+Semi-Supervised Clustering
+T. Langford, C. G. Giraud-Carrier, et J. Magee, Detection of infectious outbreaks in
+hospitals through incremental clustering, in Proceedings of the 8th Conference on
+AI in Medicine (AIME), pages 30–39. Springer, 2001.
+J. Lin, M. Vlachos, E. J. Keogh, et D. Gunopulos, Iterative incremental clustering of
+time series, in EDBT, pages 106–122, 2004.
+B. Monjardet, Metrics on partially ordered sets – a survey, Discrete Mathematics,
+35 :173–184, 1981.
+J. Roure et Luis Talavera, Robust incremental clustering with bad instance orderings :
+A new strategy, in IBERAMIA, pages 136–147, 1998.
+Z. Zhu, Y. Pilpel, et G.M. Church, Computational identification of transcription factor
+binding sites via a transcription-factor-centric clustering (tfcc) algorithm, Journal
+of Molecular Biology, 318 :71–81, 2002.
+A proof of inequality (1)
+Let pi, σ be two partitions of the finite set S, such that pi = {B1, . . . , Bm} and
+σ = {C1, . . . , Cn}. It is known (see (Birkhoff 1973), for example) that pi ∧ σ consists
+of all sets of the form Bi ∩ Cj such that Bi ∩ Cj 6= ∅. On another hand, pi ∨ σ has a
+more complicated description ; namely, x, y ∈ S belong to the same block D of pi ∨ σ
+if there exists a sequence of elements of S, z0, . . . , zk such that x = z0, zk = y and for
+each pair (zp, zp+1) there is a block Bi of pi or a block Cj of σ such that both zp and
+zp+1 belong to Bi or to Cj for 1 ≤ p ≤ k − 1.
+Consider the bipartite graph Gpi,σ whose set of vertices consists of the blocks of pi
+and the blocks of σ. An edge (Bi, Cj) exists only if Bi ∩ Cj 6= ∅. If K is a connected
+component of this graph it is easy to see that
+⋃{Bi ∈ pi | Bi ∈ K} = ⋃{Cj ∈ σ |
+Cj ∈ K}. Further, each block D of pi ∨ σ equals the union of the blocks of pi (or the
+blocks of σ) that belong to a connected component K of Gpi,σ.
+Example 5.1 Let S = {ai | 1 ≤ i ≤ 12} and let pi = {Bi | 1 ≤ i ≤ 5} and
+σ = {Cj | 1 ≤ j ≤ 4}, where
+B1 = {a1, a2}, C1 = {a2, a4},
+B2 = {a3, a4, a5}, C2 = {a1, a3, a5, a6, a7},
+B3 = {a6, a7}, C3 = {a8, a11},
+B4 = {a8, a9, a10}, C4 = {a9, a10, a12},
+B5 = {a11, a12}.
+The graph Gpi,σ shown in Figure 4 has two connected components that correspond to
+the blocks
+D1 = {a1, a2, a3, a4, a5, a6, a7}
+= B1 ∪B2 ∪B3
+= C1 ∪ C2,
+D2 = {a8, a9, a10, a11, a12}
+= B4 ∪B5
+= C3 ∪ C4.
+RNTI - 1
+RNTI-E-3 198
+Dan Simovici and Namita Singla
+a11, a12
+a8, a9, a10
+a6, a7
+a3, a4, a5
+a1, a2
+a9, a10, a12
+a8, a11
+a1, a3, a5, a6, a7
+a2, a4
+B1
+B2
+B3
+B4
+B5
+C1
+C2
+C3
+C4
+Fig. 4 – The graph Gpi,σ
+of the partition pi ∨ σ.
+The partition pi ∧ σ consists of 9 blocks that correspond to the edges of the graph :
+B1 ∩ C1 = {a2}, B1 ∩ C2 = {a1}, B2 ∩ C1 = {a4},
+B2 ∩ C2 = {a3, a5}, B3 ∩ C2 = {a6, a7}, B4 ∩ C3 = {a8},
+B4 ∩ C4 = {a9, a10}, B5 ∩ C3 = {a11}, B5 ∩ C4 = {a12}.
+Let D1, . . . , Dr be the blocks of the partition pi ∨ σ. For a block Dk define the sets
+Ik ⊆ {1, . . . ,m} and Jk ⊆ {1, . . . , n} where Ik = {i | Bi ∩ Dk 6= ∅} and Jk = {j |
+RNTI - 1
+RNTI-E-3199
+Semi-Supervised Clustering
+Bi ∩Dk 6= ∅}. Note that
+v(pi ∨ σ) =
+r∑
+k=1
+|Dk|2,
+v(pi ∧ σ) =
+r∑
+k=1
+∑
+i∈Ik
+∑
+j∈Jk
+|Bi ∩ Cj |2,
+v(pi) =
+r∑
+k=1
+∑
+i∈Ik
+|Bi|2
+=
+r∑
+k=1
+∑
+i∈Ik
+∑
+j∈Jk
+|Bi ∩ Cj |
+2 ,
+v(σ) =
+r∑
+k=1
+∑
+j∈Jk
+|Cj |2
+=
+r∑
+k=1
+∑
+j∈Jk
+(∑
+i∈Ik
+|Bi ∩ Cj |
+)2
+.
+It is immediate to verify the inequality :(∑
+i∈Ik
+∑
+j∈Jk |Bi ∩ Cj |
+)2
++
+∑
+i∈Ik
+∑
+j∈Jk |Bi ∩ Cj |2
+≥∑i∈Ik (∑j∈Jk |Bi ∩ Cj |)2 +∑j∈Jk (∑i∈Ik |Bi ∩ Cj |)2
+This is equivalent to :
+|Dk|2 +
+∑
+i∈Ik
+∑
+j∈Jk |Bi ∩ Cj |2
+≥∑i∈Ik (∑j∈Jk |Bi ∩ Cj |)2 +∑j∈Jk (∑i∈Ik |Bi ∩ Cj |)2
+Adding up the similar inequalities for 1 ≤ k ≤ r we have the desired inequality :
+v(pi ∨ σ) + v(pi ∧ σ) ≥ v(pi) + v(σ).,
+Summary
+Semi-supervised clustering combines supervised and unsupervised learning to pro-
+duce better clusterings. In the initial supervised phase of the proposed algorithm a
+training set is generated by sampling. It is assumed that the examples of the training
+set are labelled by a class attribute. Then, an incremental algorithm developed for
+categorical data is used to produce a set of pure clusters (such that the instances of
+each cluster have the same label) that serve as “seeding clusters” for the second, unsu-
+pervised phase. In this phase the incremental algorithm is applied to unlabelled data.
+The quality of the clustering is evaluated by the average Gini index of the clusters.
+Experiments demonstrate that very good clusterings can be obtained with relatively
+small training sets.
+RNTI - 1
+RNTI-E-3 200

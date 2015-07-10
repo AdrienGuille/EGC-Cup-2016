@@ -1,0 +1,687 @@
+An approach for handling risk and uncertainty in
+multiarmed bandit problems
+Stefano Perabò∗, Fabrice Clerot∗
+∗France Télécom Division Recherche & Développement
+2, avenue Pierre Marzin, 22307 Lannion Cedex
+stefano.perabo@orange.fr, fabrice.clerot@orange-ftgroup.com
+Abstract. An approach is presented to deal with risk in multiarmed bandit prob-
+lems. Specifically, the well known exploration-exploitation dilemma is solved
+from the point of view of maximizing an utility function which measures the
+decision maker’s attitude towards risk and uncertain outcomes. A link with
+the preference theory is thus established. Simulations results are provided for
+in order to support the main ideas and to compare the approach with existing
+methods, with emphasis on the short term (small sample size) behavior of the
+proposed method.
+1 Introduction
+A “multiarmed bandit problem” can be formulated as follows: given for t = 1, 2 . . . T
+a sequence of K-dimensional random vectors r(t) = [r1(t) . . . rK(t)], called rewards and
+whose probability distribution is not known a priori, the objective is to determine on line a se-
+quence of actions a(t) (also called strategy or policy) where each a(t) is a discrete random vari-
+able defined on the set {1, 2, . . . ,K}, that maximizes the expectation of the cumulative gain,
+G(T ) = E[
+∑T
+t=1 ra(t)(t)], by observing for each t one (and only one) realization ra(t)(t)
+1.
+The main difficulty of the problem consists in the fact that the objective function is not known
+in advance. In fact, if the means µa(t) = E[ra(t)] were available, the best strategy would be
+obviously to play the action a∗(t) = argmaxa µa(t). Hence, at each time instant t, the choice
+of an action is the result of a compromise trying to estimate (learn) the objective function (by
+exploring the actions whose mean rewards have not yet been determined with enough confi-
+dence) and, at the same time, to maximize it (by exploiting those which, based on the preceding
+observations, are estimated to provide for the best rewards).
+This represents a prototype decision problem where the decision maker is faced to the so called
+exploration/exploitation dilemma: while pursuing the second objective (exploitation) by using,
+unavoidably, a suboptimal strategy, he might incur losses that could be avoided if better esti-
+mates of the rewards means were available; on the contrary, while pursuing the first objective
+(exploration) by using some other suboptimal strategy, he might renounce to play the supposed
+1. Italic characters like r and a represent realizations of the corresponding random variables which are denoted by
+using roman characters like r and a.
+Handling risk in bandit problems
+best action found so far.
+This is a problem that, along with many variants, can model basic decision tasks commonly
+encountered in resources allocation and marketing. A very popular example is borrowed from
+the internet advertising community: the decision maker must periodically display one ad on a
+web page (the action) by choosing it from a known set of ads, the objective being the maximiza-
+tion of the number of visitors clicks on the displayed ad (the rewards), which in turn translates
+into the maximization of the decision maker’s revenues. The exploration-exploitation dilemma
+comes from the fact that users interests are not known in advance and thus, in order to judge
+which ad attracts the largest number of clicks, each ad must be displayed (tested) a certain
+number of times.
+In more realistic scenarios, before taking a decision the decision maker could have access to
+some kind of side information (often called context) such as, in the above example, a profile
+of the user currently visiting the web page, or a list of keywords extracted from the web page.
+How this information could be used in order to better choose the ad to display represents an
+extension of the bandit problem which is usually called a “contextual bandit problem”. It can
+be formalized by introducing an additional sequence of random quantities, the contexts x(t),
+and by assuming that a correlation exists between the contexts and the rewards r(t). The ex-
+ploration issue consists thus in estimating this correlation in order to better predict which is the
+best action to perform conditionally on a given context.
+In this paper an approach is proposed to deal with the exploration-exploitation dilemma in
+multiarmed bandit problems. Its extension to the more interesting contextual bandit problems
+is not pursued. However, it should be clear to the readers interested in such an extension that
+the same line of reasoning could be applied without changes also in the presence of a context,
+the main difficulties being more of technical rather than conceptual nature (these difficulties
+arise, in particular, when dealing with huge data sets requiring simultaneously the application
+of classification techniques).
+Moreover, here the focus is on the classic framework, in which the rewards r(t) are modeled as
+independent and identically distributed (IID) random variables, independent from the decision
+maker strategy a(t). Besides these assumptions, only bounded rewards are considered, that is
+on the case ra(t) ∈ [0, 1] without loss of generality (this assumption is not really necessary for
+the method to work, but it is stated for the sake of comparing it with two other existing ones).
+2 Relation to the state of the art
+The literature on bandit problems since the seminal work of Robbins (1952) is abundant.
+The main recent contributions to the solution of multiarmed bandit problem with IID and
+bounded rewards, notably the strategies UCB1 (Auer et al., 2002) and UCB-V (Audibert et al.,
+2007), guarantee that the expected cumulative gain G(T ) is lower bounded by a function of
+the form G∗(T ) − c log T , where c is some constant and G∗(T ) is the maximum value of the
+objective function. As shown in Lai and Robbins (1985), the logarithmic term c log T (called
+regret) cannot be improved further in the following sense: any possible strategy suffers a re-
+gret which is lower bounded by a function O(log T ). From another point of view, the strategy
+SUCCESSIVEELIMINATION (Even-Dar et al., 2006) has been proved to find the optimal action
+S. Perabò et F. Clerot
+10
+1
+10
+2
+10
+3
+10
+4
+10
+5
+0
+0.2
+0.4
+0.6
+T
+a
+v
+. 
+e
+x
+p
+e
+c
+te
+d
+ c
+u
+m
+. 
+g
+a
+in
+FIG. 1 – An example of lower bounds on the average expected cumulative gain for the algo-
+rithms UCB1 (solid line) and UCB-V (dashed line). These bounds apply to the case where
+rewards are distributed as described in section §4 (the second example with K = 5, the re-
+wards have support [0, 1] and G∗(T )/T = 0.6).
+a∗ with an arbitrary prespecified probability in a finite number of steps.
+All these strategies have been derived by handling (with considerable mathematical insight)
+concentration inequalities for sums of random variables. More precisely, such inequalities
+state the following: if at time t the action a has been played na(t) times, then its empirical
+mean, defined by µˆa(t) =
+∑t
+τ=1 1(a(τ) = a)ra(τ)/na(t), is within a distance ε from the true
+mean µa with a probability greater or equal than a certain threshold value 1−α. The functional
+form of ε and α, depends on the kind of inequality used; however it is generally true that if α
+is kept fixed, then ε decreases for increasing na, while if ε is kept fixed, then α increases for
+increasing na. Hence, by playing action a once more one is sure to increase the confidence
+with which the true mean µa is known. The art of strategy design consists thus in finding the
+best trade off between two competing objectives: sampling in order to maximize the gain and
+sampling in order to increase the confidence on rewards means.
+The regret of the strategies mentioned above has been proved to be very close to the opti-
+mal for arbitrary rewards distributions, because they rely on concentration inequalities that
+are valid for arbitrary probability distributions. This is, however, also the main drawback of
+these approaches, because the confidence regions derived from such inequalities may be, in
+some practical case, very conservative, resulting in large constants in front of the log T fac-
+tor of the regret term. As a consequence, the lower bounds on the gain become useful only
+in the long term, that is the quantity G∗(T ) − c log T is positive only for a sufficiently large
+time horizon T . As an example, Figure 1 plots the average lower bounds (that is the quantity
+(G∗(T )−c log T )/T ) for the algorithms UCB1 and UCB-V in the particular case whenK = 5
+and the rewards are distributed as described in section §4, where the results of some numerical
+simulations will be presented. Clearly, for T < 200 nothing can be said.
+The main criticism that can be addressed to the current approaches to solve bandit problems
+is to concentrate all the effort in upper bounding the regret of an algorithm as tightly as possi-
+ble, which in fact leaves no room to account for user’s preferences and constraints. Consider, in
+Handling risk in bandit problems
+particular, what happens during the first period following the start of a bandit algorithm, where
+exploration is the predominant activity. The question becomes when and how to switch from
+exploration to exploitation given the information provided by only a finite number of samples.
+The answer clearly depends on many factors, the most influential, maybe, being: the available
+time horizon (that is how many more samples can be drawn) and the decision maker’s attitude
+towards uncertainty and risky choices.
+The objective of this paper is thus to propose a strategy design procedure that allows such pref-
+erences and constraints to have an impact on algorithm behaviour and to be taken into account
+somehow automatically. In particular the exploration-exploitation dilemma will be reformu-
+lated as the problem of maximizing an utility function which quantifies the decision maker’s
+preferences over a set of appropriate confidence intervals. More precisely, each alternative
+confidence interval is associated to an estimation of the future gain that could be obtained by
+playing a certain strategy. The role of the utility function is thus tomeasure the attitude towards
+risk and uncertainty, attitude that drives the choice of one confidence interval. A specific utility
+function which is designed to express aversion to risky strategies is provided for. The related
+algorithm will be called LCB1. The results of some numerical simulations are presented in
+order to compare the short term (small time horizon T ) performance of this new algorithm
+with that of the algorithms UCB1 and UCB-V cited above.
+3 Description of the approach
+Pretend for a while that the rewards probability distributions are known. It is possible
+to view the problem of maximizing the gain G(T ) as a finite horizon planning problem in a
+degenerate markov decision process (MDP), that is the problem of determining the optimal
+strategy (often called policy) in a MDP consisting of only one deterministic state 2. It is known
+(Puterman, 1987) that the optimal strategy can be found by a backward induction algorithm.
+If it is applied here, under the independence assumptions stated in the introduction, it simply
+amounts to find for each time instant t the functions Q∗(a, t) (called optimal action-value
+functions in the MDP jargon) that solve
+Q∗(a, t) = E[ra(t)(t) + max
+b
+Q∗(b, t+ 1) ‖ a(t) = a] Q∗(a, T + 1) = 0 (1)
+The optimal action-value functionQ∗(a, t) equals the maximum expected gain that can be ob-
+tained in the interval [t, T ], conditioned on the fact that at time t action a is played. The above
+formula can thus be read as follows: in order to maximize the future gain on the interval [t, T ],
+it is sufficient to play at time t the action maximizing the expected reward E[ra(t)] and then to
+follow the best strategy in the interval [t + 1, T ]. In other words, the best strategy is to play
+with probability one the action a∗(t) = argmaxaQ
+∗(a, t), for all t ∈ [1, T ]. In this case,
+the solution of the backward induction gives obviously Q∗(a, t) = µa + (T − t)µ∗, where
+µ∗ = maxa µa, and confirms the above interpretation.
+2. In a MDP there is a stochastic process x(t) defined by the transition probabilities P[x(t + 1) = w‖x(t) =
+z, a(t) = a] (giving the probability of reaching one possible next state given the current state and action) and the
+vector of rewards depend on the current state through the conditional probability P[r(t) = r‖x(t) = z]. The IID
+framework considered here is thus obtained when the only allowed transition is form one deterministic state x(t) ≡ z
+to itself, irrespective of which action is taken.
+S. Perabò et F. Clerot
+Now, assume that the decision maker is allowed to play a randomized strategy, that is the
+action a(t) is drawn from a random variable taking values in the set {1, 2, . . . ,K}. Define
+pa(t) = P[a(t) = a] to be the probability of taking action a at time t, and the quantity
+V ∗(t, p(t)) =
+∑
+a
+Q∗(a, t)P[a(t) = a] =
+∑
+a
+µapa(t) + (T − t)µ∗ (2)
+where p(t) = [p1(t) . . . pK(t)]. Clearly V
+∗(t, p(t)) represents the maximum expected gain
+that can be obtained in the interval [t, T ] whenever a randomized strategy is played at time
+t. Moreover, V ∗(t, p(t)) ≤ maxaQ
+∗(a, t) for any choice of p(t), the equality holding when
+pa∗(t)(t) = 1 (case in which V
+∗(t, p(t)) = Q∗(a∗(t), t), quantity that it is often called optimal
+value function). Hence, in a planning problem (that is when rewards distribution are known)
+there is no advantage in adopting a randomized strategy with respect to the optimal determin-
+istic one obtained by the backward induction outlined above.
+Consider then the case of no prior knowledge about the rewards distribution. Neither the
+functions Q∗(a, t) nor V ∗(t, p(t)) can be evaluated because the means µa are not known.
+However, suppose that for a given α > 0, and for each t, a 100(1 − α)% confidence interval
+for V ∗(t, p(t)), say
+C(t, p(t)) =
+[
+V ∗lo(t, p(t)), V
+∗
+up(t, p(t))
+]
+(3)
+can be computed based on the set of observation {ra(s)(s)} on the interval [1, t − 1]. Re-
+call the meaning of a confidence interval: it is an interval whose extremes are functions of
+the empirical data and that contains with probability (1 − α) the true value. By varying p(t),
+different confidence intervals are obtained. Hence it is reasonable to define the optimal strat-
+egy p∗(t) as the strategy such that the confidence interval C(t, p∗(t)) is preferred over all the
+intervals C(t, p(t)) obtained for p(t) 6= p∗(t). For example, an interval [a + ∆a, b + ∆b]
+should be preferred over [a, b] whenever ∆a,∆b > 0 because the maximum expected gain of
+the corresponding strategy is likely to be larger. It is thus necessary to show how these inter-
+vals can be constructed in practice and to define a preference relation over confidence intervals.
+Concerning the first issue, here an heuristic approach is adopted. It is known that, as
+na(t) → ∞, the empirical means µˆa(t) =
+∑t
+τ=1 1(a(τ) = a)ra(τ)/na(t) tend to be dis-
+tributed as a N (µa, σ
+2
+a/na(t)) random variable, that is a gaussian whose mean and variance
+are respectively the true mean µa and the true variance σ
+2
+a divided by the number of sam-
+ples. The true variance can also be replaced by the unbiased empirical variance σˆ2a(t) =∑t
+τ=1 1(a(τ) = a)(ra(τ) − µˆa(t))
+2/(na(t) − 1). Even though these are asymptotic re-
+sults, pretend that they represent acceptable approximations also for a finite number of samples
+na(t). Hence, V
+∗(t, p(t)) in (2) is approximately distributed as N (µˆ(t), σˆ2(t)) with
+µˆ(t) =
+∑
+a
+µˆa(t)pa(t) + (T − t)µˆ∗(t) σˆ
+2(t) =
+∑
+a
+σˆ2a(t)
+na(t)
+pa(t)
+2 + (T − t)
+σˆ2
+∗
+(t)
+n∗(t)
+(4)
+and where µˆ∗(t) is the largest empirical mean, and σˆ
+2
+∗
+(t) and n∗(t) are the empirical variance
+and number of samples of the corresponding action. For a numerical example see Figure 2.
+The extremes of a 100(1− α)% confidence interval are thus
+V ∗lo(t, p(t)) = µˆ(t)− fσˆ(t) V
+∗
+up(t, p(t)) = µˆ(t) + fσˆ(t) (5)
+Handling risk in bandit problems
+50.3 50.4 50.5
+20.1
+20.15
+20.2
+mean
+s
+td
+. 
+d
+e
+v
+.
+FIG. 2 – In the plot, the crosses indicate the couples (µˆ(t)), σˆ(t)) obtained by varying
+each action selection probability pa(t) in the range [0, 1] in steps of 0.1 under the con-
+straint
+∑
+a pa(t) = 1 and by using the following data: K = 3, [µˆa(t)] = [0.5, 0.4, 0.3],
+[σˆa(t)/
+√
+na(t)] = [0.2, 0.15, 0.1] and (T − t) = 100. The circles represent the values ob-
+tained when pa(t) = 1 for some a ∈ {1, 2, 3}.
+where σˆ(t) =
+√
+σˆ2(t) and f is the 100(1− α)% quantile of a standard gaussian.
+Next, a preference relation is needed that is able to represent the decision maker’s attitude
+towards the uncertainty represented by the fact that, for a given strategy, the corresponding gain
+can not be evaluated exactly. A preference relation is a binary relation that will be denoted by
+, so that if interval D is preferred over interval C, one writes D  C. The classical result is
+that, under appropriate assumptions, there exists a quantitative representation of a preference
+relation in terms of a real utility function u defined on the set of intervals, say I, such that
+D  C ⇐⇒ u(D) > u(C) (6)
+Besides the technical assumptions which are necessary to account for the fact that I is un-
+countable (see for example Fishburn (1999) for details), it can be proved that the above rep-
+resentation holds if and only if the relation  on I is a weak order. This means that  is
+transitive (E  D and D  C ⇒ E  C), irreflexive (C  C never holds) and that the
+relation ∼ (defined by C ∼ D if neither C  D nor D  C) is also transitive.
+In the so called normative approach to preference modelling (Tsoukiàs, 2008), that will be
+followed here, the existence of a preference relation with the above properties is postulated (a
+decision maker adhering to such a relation is termed rational). This amounts, in practice, to set
+the utility function to an appropriate form, depending on the application at hand, by choosing
+perhaps in a set of many possible good choices. In other words, the existence of an optimal
+utility function is not stated here: different forms might be reasonable and behave equally well
+in practice. In this paper, the following very simple utility function is proposed and tested by
+numerical simulation:
+u(t, p(t)) = exp
+(
+µˆ(t)− σˆ(t)
+T − t+ 1
+)
+(7)
+S. Perabò et F. Clerot
+a α β µa σa
+1 0.333 0.222 0.600 0.393
+2 1.200 0.800 0.600 0.283
+3 17.000 12.000 0.586 0.090
+4 0.222 0.333 0.400 0.393
+5 2.000 18.000 0.100 0.066
+TAB. 1 – The parameters of the beta distributions that have been used to model the rewards
+outcomes in the numerical simulations, along with the corresponding expectations and stan-
+dard deviations
+Note that it is a parametric function of the confidence intervals for V ∗(t, p(t)) through µˆ(t)
+and σˆ(t) which are the quantities used to define the interval itself.
+The rationale behind this choice is the following. The tangent at a point on a level curve of u is
+equal to 1 everywhere in the plane (µˆ, σˆ). Hence, the decision maker is indifferent between a
+confidence interval specified by the couple (µˆ, σˆ) and another specified by (µˆ+∆µˆ, σˆ+∆σˆ),
+where ∆µˆ and ∆σˆ are two increments related by ∆σˆ = ∆µˆ. Since the lower bounds of the
+corresponding confidence intervals are equal, µˆ− σˆ = (µˆ+∆µˆ)− (σˆ+∆σˆ), this means that
+the decision maker accepts to trade one strategy with another (in other words, they have the
+same utility) only if the confidence intervals share the same lower bound. Higher lower bounds
+are preferred while upper bounds are ignored, thus indicating aversion to risky strategies.
+In conclusion, the proposed strategy, that will be called LCB1 (for “Lower Confidence
+Bound”), is the following:
+1. for 1 ≤ t ≤ 2K sample twice each action, so that the unbiased empirical variances can
+be set to their initial value;
+2. for each time t > 2K choose the action a with probability p∗a(t), where p
+∗(t) =
+argmaxp u(t, p), and u(t, p) is the utility function in (7).
+4 Some numerical simulations
+In this section the results of two numerical simulations are provided for. Five rewards
+distributions are considered, that belong to the family of beta distributions Be(α, β). The
+parameters and plots of the corresponding probability densities are shown in Table 1 and Figure
+3 respectively. The time horizon is T = 200 in both tests and f = 1.96 (which gives a 95%
+confidence interval for a standard gaussian random variable).
+In the first test K = 3, corresponding to the rewards distributions 1 to 3. Figure 4 show plots
+of the probability distribution FG(t)(g) = P[G(t) ≤ g] of the gain obtained after t = 50, 100,
+150 and 200 steps by the algorithms UCB1 (blue line), UCB-V (black line) and the proposed
+algorithm LCB1 (red line). These distributions have been obtained by running these algorithms
+over 1000 different realizations of the rewards sequences. There are no remarkable differences
+between the three algorithms. In fact reward means are comparable and the risk reduction that
+could be obtained by sampling action 3 more often is counterbalanced by a reduction of the
+Handling risk in bandit problems
+0 0.2 0.4 0.6 0.8 1
+0
+2
+4
+6
+0 0.2 0.4 0.6 0.8 1
+0
+2
+4
+6
+8
+FIG. 3 – Plots of the rewards probability densities, on the left for a = 1, 2, 3 (blue, green and
+red lines respectively) and on the right for a = 4, 5 (cyan and magenta lines respectively).
+expected gain.
+In the second testK = 5 and actions 4 and 5 have been added to actions 1, 2 and 3 of the first
+test. The test has been conducted in the same way as described above. Plots of the probability
+distribution of the gain are shown in Figure 5. Contrary to the case considered in the first test,
+here the performance of LCB1 is superior. In fact, as it can be checked in Figure 6, LCB1 gets
+rid of the inferior actions 4 and 5 faster than the other two algorithms.
+5 Discussion
+An approach for the solution of the multiarmed bandit problem in the IID framework has
+been proposed. Contrary to well known existing methods, the approach is somewhat heuristic
+in that it is not based on rigorous convergence proofs. However, the numerical simulations
+show a very good performance on the short term, at least in the cases considered, thus motivat-
+ing further analyses. In practical applications, the short term behavior is particular important
+because the assumption of identical distribution in time might be violated in the long term.
+Two margins of improvements is worth indicating. On one hand, the way confidence intervals
+are computed: better established finite sample statistical techniques such as the bootstrap, for
+example, might provide for more correct and even asymmetric intervals. On the other, utility
+functions might exist that would represent different balances between risk avoiding and risk
+seeking behaviors, that is different ways of managing the exploration-exploitation dilemma.
+The main contribution of this paper, however, is the link established with the theory of
+preferences which has been and currently is a large research subfield in economics. In fact, the
+approach presented here shares many similarities with very basic portfolio selection methods
+(Markowitz, 1952) and the possibility of introducing more advanced techniques (the so called
+risk-sensitive or risk-averse) in the context of bandit problems should be considered for future
+investigations.
+It is also worth mentioning the possibility of extending the IID framework to allow discounted
+rewards, that is to solve an exploration-exploitation dilemma where, at each time t, a time de-
+S. Perabò et F. Clerot
+25 30 35
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 50 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+55 60 65 70
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 100 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+80 85 90 95 100
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 150 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+110 120 130
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 200 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+FIG. 4 – The results of the first test (K = 3, rewards distributions 1 to 3): distribution of the
+gain obtained by the algorithm UCB1 (blue line), UCB-V (black line) and LCB1 (red line),
+after 50, 100, 150 and 200 time steps.
+pendent objective function of the formG(t) = E[
+∑T (t)
+s=t w(t, s) ·ra(s)(s)] has to be maximized,
+where T (t) ≥ t and the real numbers w(t, s) are given weights (only the case T (t) ≡ T and
+w(t, s) ≡ 1 has been discussed in this paper). In fact, decisions involve very often tradeoffs
+among uncertain costs and benefits occurring at different points in time under the constraint of
+different time horizons. In such cases, it is known (Frederick et al., 2002) that the choice of a
+weighting sequence is related to the decision maker’s time preferences: different preferences
+demand different forms of weighting. It should be clear that, whenever these preferences are
+known (along with the utility function over confidence intervals), the presented approach can
+be applied quite straightforwardly.
+References
+Audibert, J.-Y., R. Munos, and C. Szepesvári (2007). Variance estimates and exploration
+function in multi-armed bandit. Technical Report 07-31, CERTIS, France.
+Auer, P., N. Cesa-Bianchi, and P. Fischer (2002). Finite-time analysis of the multiarmed bandit
+problem. Machine Learning 47, 235–256.
+Handling risk in bandit problems
+20 25 30
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 50 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+40 50 60
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 100 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+70 80 90
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 150 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+90 100 110 120
+0.2
+0.4
+0.6
+0.8
+1
+Gain G after 200 steps
+P
+ro
+b
+a
+b
+ili
+ty
+ d
+is
+tr
+ib
+u
+ti
+o
+n
+ F
+G
+FIG. 5 – The results of the second test (K = 5, rewards distributions 1 to 5): distribution of
+the gain obtained by the algorithm UCB1 (blue line), UCB-V (black line) and LCB1 (red line),
+after 50, 100, 150 and 200 time steps.
+Even-Dar, E., S. Mannor, and Y. Mansour (2006). Action elimination and stopping condi-
+tions for the multi-armed bandit and reinforcement learning problems. Journal of Machine
+Learning Research 7, 1079–1105.
+Fishburn, P. (1999). Preference structures and their numerical representation. Theoretical
+Computer Science (217), 359–383.
+Frederick, S., G. Loewenstein, and T. O’donoghue (2002). Time discounting and time prefer-
+ence: A critical review. Journal of Economic Literature 40(2), 351–401.
+Lai, T. and H. Robbins (1985). Asymptotically efficient adaptive allocation rules. Adv. Appl.
+Math. 6, 4–22.
+Markowitz, H. (1952). Portfolio selection. Journal of Finance 7(1), 77–91.
+Puterman, M. (1987). Dynamic programming. In R. Meyers (Ed.), Encyclopedia of Physical
+Science and Technology, Volume 4, pp. 438–463. Academic Press.
+Robbins, H. (1952). Some aspects of the sequential design of experiments. Bull. Amer. Math.
+Soc. 58(5), 527–535.
+Tsoukiàs, A. (2008). From decision theory to decision aiding methodology. European Journal
+of Operational Research 187, 138–161.
+S. Perabò et F. Clerot
+20 40 60 80 100 120 140 160 180 200
+1
+2
+3
+4
+5
+A
+c
+ti
+o
+n
+ a
+UCB1
+20 40 60 80 100 120 140 160 180 200
+1
+2
+3
+4
+5
+A
+c
+ti
+o
+n
+ a
+UCB−V
+20 40 60 80 100 120 140 160 180 200
+1
+2
+3
+4
+5
+Time t
+A
+c
+ti
+o
+n
+ a
+LCB1
+FIG. 6 – Typical behaviours of algorithms UCB1, UCB-V and LCB1 (from top to bottom)
+obtained in the second test (K = 5, rewards distributions 1 to 5). A “+” symbol indicates that
+the corresponding action has been selected at time t.
+Résumé
+Une approche est présentée pour la prise en considération du risque dans le problème du
+“bandit manchot”. Plus précisément, le dilemme dit d’exploration-exploitation est reformulée
+comme un problème de maximisation d’une fonction d’utilité qui mesure l’attitude du décideur
+envers le risque et l’incertitude. Un lien avec la théorie de la préférence est donc établi. La
+méthode proposée est testée et comparée par simulation numérique avec d’autres bien connues
+dans la littérature, avec un intérêt particulier pour le comportement à court terme (petit nombre
+d’échantillons).

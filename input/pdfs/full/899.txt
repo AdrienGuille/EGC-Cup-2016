@@ -1,0 +1,729 @@
+Evaluation de l’efficacite´ des imple´mentations de
+l’he´ritage multiple en typage statique
+Flore´al Morandat∗, Roland Ducournau∗, Jean Privat∗∗
+∗LIRMM – CNRS et Universite´ Montpellier II
+161 rue Ada Montpellier – 34392 Cedex 5 France
+{morandat,ducour}@lirmm.fr,
+http://www.lirmm.fr/∼{morandat,ducour}/
+∗∗Universite´ du Que´bec a` Montre´al
+privat.jean@uqam.ca
+http://www.info2.uqam.ca/∼privat/
+Re´sume´. La programmation par objets pre´sente une apparente incom-
+patibilite´ entre trois termes : l’he´ritage multiple, l’efficacite´ et l’hypothe`se
+du monde ouvert — en particulier, le chargement dynamique. Cet article
+pre´sente des re´sultats d’expe´rimentations exhaustives comparant l’effica-
+cite´ de diffe´rentes techniques d’imple´mentation (coloration, BTD, hachage
+parfait, ...) dans le contexte de diffe´rents sche´mas de compilation (de la
+compilation se´pare´e avec chargement dynamique a` la compilation pure-
+ment globale). Les tests sont effectue´s avec et sur le compilateur du lan-
+gage Prm. Ils confirment pour l’essentiel les re´sultats the´oriques ante´rieurs
+tout en montrant une sur-additivite´ marque´e des surcouˆts. Les sche´mas
+d’optimisation globale de´montrent un gain significatif par rapport a` la
+coloration qui fait fonction de re´fe´rence. Des techniques comme la simu-
+lation des accesseurs ou le hachage parfait entraˆınent un surcouˆt limite´,
+mais la combinaison des deux double le surcouˆt total.
+1 Introduction
+L’hypothe`se du monde ouvert (OWA pour Open World Assumption) repre´sente cer-
+tainement le contexte le plus favorable pour obtenir la re´utilisabilite´ proˆne´e par le ge´nie
+logiciel. Une classe doit pouvoir eˆtre conc¸ue, programme´e, compile´e et imple´mente´e in-
+de´pendamment de ses usages futurs et en particulier de ses sous-classes. C’est ce qui
+permet d’assurer la compilation se´pare´e et le chargement dynamique.
+Cependant l’he´ritage multiple — ou ses variantes comme le sous-typage multiple
+d’interfaces a` la Java— s’est re´ve´le´ difficile a` imple´menter sous l’hypothe`se du monde
+ouvert. En typage statique, seule l’hypothe`se du monde clos (CWA) permet d’obtenir
+la meˆme efficacite´ qu’en he´ritage simple, c’est-a`-dire avec une imple´mentation en temps
+constant ne´cessitant un espace line´aire dans la taille de la relation de spe´cialisation.
+Les deux langages les plus utilise´s actuellement illustrent bien ce point. C++, avec
+Evaluation des imple´mentations de l’he´ritage multiple
+le mot-clef virtual pour l’he´ritage, procure une imple´mentation pleinement re´utili-
+sable, en temps constant — bien que pleine d’ajustements de pointeurs — mais qui
+ne´cessite un espace cubique dans le nombre de classes (dans le pire des cas). En Java,
+ou` l’he´ritage multiple est restreint aux interfaces, il n’existe pas a` notre connaissance
+d’imple´mentation des interfaces en temps constant (Alpern et al., 2001; Ducournau,
+2008). En typage dynamique, meˆme l’he´ritage simple pose des proble`mes et nous nous
+restreindrons ici au typage statique.
+Dans cet article, nous distinguons l’imple´mentation qui concerne la repre´sentation
+des objets et la compilation qui calcule cette repre´sentation. Au total, l’exe´cution des
+programmes a` objets met en jeu une ou plusieurs techniques d’imple´mentation dans
+le contexte de diffe´rents sche´mas de compilation. L’imple´mentation est concerne´e par
+les trois me´canismes de base des langages objets — acce`s aux attributs, invocation
+de me´thodes et test de sous-typage. Le sche´ma de compilation constitue la chaˆıne de
+production de l’exe´cutable : ge´ne´ration de code, e´dition de liens, chargement.
+L’objectif de ce travail est d’e´valuer de manie`re re´aliste et objective l’impact effectif
+des sche´mas de compilation et des techniques d’imple´mentation sur l’efficacite´ d’un
+programme objet significatif en comparant deux a` deux les techniques ou les sche´mas,
+toutes choses e´gales par ailleurs. Ces expe´rimentations sont re´alise´es sur le compilateur
+de Prm, un langage objet qui supporte l’he´ritage multiple et qui propose une notion de
+module et de raffinement de classe (Privat et Ducournau, 2005b). Graˆce a` cela, PrmC
+son compilateur autoge`ne (e´crit en Prm) est un programme modulaire et remplacer une
+technique par une autre peut se faire a` moindre couˆt. Les premie`res expe´rimentations
+de´crites ici pre´sentent le temps d’exe´cution de la compilation d’une version de PrmC
+par diffe´rentes versions du meˆme compilateur obtenues en faisant varier techniques
+d’imple´mentation et sche´mas de compilation.
+Cet article de´crit d’abord des techniques d’imple´mentation des me´canismes objet,
+puis des sche´mas de compilation — de la compilation se´pare´e qui permet de compiler
+le code modulairement a` la compilation globale qui permet d’effectuer de nombreuses
+optimisations, ainsi que certains sche´mas interme´diaires qui ont e´te´ peu e´tudie´s. Une
+premie`re se´rie de comparaisons et d’e´valuation a priori est pre´sente´e. Nous pre´sentons
+ensuite une se´rie de tests re´alise´s sur PrmC , afin de mesurer l’impact re´el des diffe´rents
+sche´mas et techniques sur de vrais programmes — en l’occurrence PrmC lui-meˆme.
+Enfin nous commenterons ces re´sultats avant de parler des travaux connexes, puis nous
+conclurons en de´taillant les perspectives de ce travail.
+2 Imple´mentation et compilation
+Cette section pre´sente les diffe´rentes techniques d’imple´mentation et les sche´mas de
+compilation que nous conside´rons dans cet article. Le lecteur inte´resse´ est renvoye´ a`
+(Ducournau, 2002) pour une synthe`se plus ge´ne´rale.
+2.1 Techniques d’imple´mentation
+Nous pre´sentons d’abord la technique de re´fe´rence de l’he´ritage simple puis les
+diffe´rentes techniques d’imple´mentation de l’he´ritage multiple que nous conside´rons
+F. Morandat et al.
+ici. Nous parlerons principalement de l’appel de me´thode, l’imple´mentation des deux
+autres me´canismes pouvant ge´ne´ralement se de´duire de celui-ci.
+2.1.1 Technique de base : he´ritage simple et typage statique
+Dans le cas de l’he´ritage simple, le graphe de spe´cialisation d’un programme est une
+arborescence. Il n’existe donc qu’un chemin reliant une classe (sommet dans le graphe)
+a` la classe racine. En typage statique, cette proprie´te´ donne lieu a` une imple´mentation
+simple et efficace de l’he´ritage simple. Il suffit pour cela de concate´ner les me´thodes
+introduites par chacune des classes dans l’ordre de spe´cialisation pour construire les
+tables de me´thodes. L’ope´ration similaire applique´e aux attributs permet de repre´senter
+les instances (Figure 1-a). Le test de sous-typage de Cohen (1991) s’inte`gre dans la table
+de me´thodes suivant le meˆme principe.
+Nous conside´rons cette imple´mentation comme celle de re´fe´rence car elle rajoute
+le minimum d’information ne´cessaire a` l’exe´cution d’un programme dans les diverses
+tables. De plus, elle ve´rifie deux invariants : de position, chaque me´thode (resp. attribut)
+a une position dans la table des me´thodes (resp. l’objet) invariante par spe´cialisation,
+donc inde´pendante du type dynamique du receveur ; de re´fe´rence, la re´fe´rence a` un
+objet est inde´pendante du type statique de la re´fe´rence.
+En he´ritage simple, il suffit de connaˆıtre la super-classe pour calculer l’imple´men-
+tation d’une classe (OWA). La taille totale des tables est line´aire dans le cardinal de
+la relation de spe´cialisation, donc, dans le pire des cas, quadratique dans le nombre de
+classes.
+2.1.2 Sous-objets (SO)
+Dans le cas de l’he´ritage multiple, ces invariants sont trop forts car deux classes
+incomparables, peuvent avoir une sous-classe commune (par exemple B et C dans la
+figure 1-b). La technique de base ne peut donc plus eˆtre utilise´e.
+L’imple´mentation de C++ de´taille´e dans Ellis et Stroustrup (1990) repose entie`re-
+ment sur les types statiques des re´fe´rences. La repre´sentation d’un objet est faite par
+concate´nation des sous-objets de toutes les super-classes de sa classe (elle-meˆme com-
+prise). Pour une classe donne´e, un sous-objet est un pointeur sur sa table de me´thodes
+suivi des attributs introduits par cette classe. Chaque table de me´thodes contient l’en-
+semble des me´thodes connues par le type statique du sous-objet. Une re´fe´rence a` un
+objet pointe sur le sous-objet correspondant au type statique de la re´fe´rence et toutes
+les ope´rations polymorphes sur un objet ne´cessitent un ajustement de pointeur. Cet
+ajustement est de´pendant du type dynamique de l’instance pointe´e, donc la table des
+me´thodes doit contenir aussi les de´calages a` utiliser. Dans le pire des cas, la taille to-
+tale des tables est ainsi cubique dans le nombre de classes. Cette imple´mentation reste
+compatible avec le chargement dynamique (OWA).
+En C++, cette imple´mentation suppose que le mot-clef virtual annote chaque
+super-classe. L’absence de virtual dans les clauses d’he´ritage se traduit par une im-
+ple´mentation simplifie´e qui entraˆıne un risque d’he´ritage re´pe´te´. La majorite´ des pro-
+grammes utilisent peu ce mot-clef et ils ne souffrent donc pas du surcouˆt entraˆıne´ par
+Evaluation des imple´mentations de l’he´ritage multiple
+A
+B
+C
+b
+c
+a AA
+A C
+AB A B
+AC B B
+-a Imple´mentation en he´ritage simple
+d
+C
+A
+B
+D
+A
+C A
+B A
+ABCD
+A B C D
+subobjects
+-b Imple´mentation par sous-objets
+d
+C
+A
+B
+D
+a
+b c
+A
+A B
+A C
+A B C D
+A
+B A
+ACD B
+AC
+Holes
+-c Imple´mentation par coloration
+A chaque exemple de hie´rarchie de classes (A,B,C, ..) est associe´e l’imple´mentation correspondante
+d’instances (a, b, c, ..). Les objets sont a` droite, les tables de me´thodes a` gauche, inverse´es pour e´viter
+les croisements. Dans les tables, les e´tiquettes de classe de´signent le groupe de me´thodes ou d’attributs
+introduits par la classe.
+Fig. 1 – Diffe´rentes techniques d’imple´mentation
+l’he´ritage multiple et le chargement dynamique, mais c’est au prix d’une re´utilisabilite´
+limite´e (CWA).
+2.1.3 Coloration (CM/CA)
+La coloration a e´te´ initialement propose´e par Dixon et al. (1989), Pugh et Weddell
+(1990) et Vitek et al. (1997) pour chacun des trois me´canismes de base. Ducournau
+(2006) montre l’identite´ des trois techniques et fait la synthe`se de l’approche. L’ide´e
+principale est de maintenir en he´ritage multiple les invariants de l’he´ritage simple,
+mais sous l’hypothe`se du monde clos. Comme les e´le´ments doivent avoir une position
+invariante par spe´cialisation, il faut laisser certains trous dans les tables, par exemple
+dans celle de C (Figure 1-c). Pour obtenir un re´sultat efficace, il faut minimiser la taille
+des tables (ou le nombre de trous).
+La technique de la coloration peut eˆtre utilise´e pour les trois me´canismes objet et
+le code ge´ne´re´ pour chacun de ces me´canismes ne de´pend que de la couleur de l’entite´
+acce´de´. Seul le calcul des couleurs ne´cessite de connaˆıtre la hie´rarchie de classes (CWA).
+Dans la suite, CM de´signe l’application de la coloration aux me´thodes et au test de
+sous-typage et CA l’application a` la repre´sentation des instances. D’autres techniques
+F. Morandat et al.
+h
+method tablehashtable
+Id
+interface
+offset
+method
+table
+method
+iOffset
+ioffset
+L’objet pointe (par table) a` l’indice 0 de la table de me´thodes. Les indices positifs contiennent les
+adresses des me´thodes dans l’imple´mentation de l’he´ritage simple, ou` les me´thodes sont groupe´es par
+interface d’introduction. Les indices ne´gatifs contiennent la table de hachage dont le parame`tre h est
+aussi dans la table. Une entre´e de la table est forme´e de l’identifiant de l’interface (interfaceId)
+pour le test de sous-typage et de la position relative (iOffset) du groupe de me´thodes introduites par
+l’interface.
+Fig. 2 – Hachage parfait en Java
+de compression de tables existent, par exemple row displacement (Driesen, 2001), mais
+elles ne s’appliquent pas a` la repre´sentation des objets.
+2.1.4 Simulation des accesseurs (SA)
+La simulation des accesseurs, propose´e par Myers (1995) et Ducournau (2002), per-
+met de re´duire l’acce`s aux attributs a` l’envoi de message, en rajoutant une indirection
+par la table des me´thodes. Les attributs sont groupe´s par classe d’introduction et la
+position de chaque groupe est incluse dans la table des me´thodes comme si cela en e´tait
+une. La simulation des accesseurs s’applique a` n’importe quelle technique d’imple´men-
+tation des me´thodes — elle suppose juste qu’un attribut soit introduit par une classe
+unique, comme en typage statique. Nous la conside´rons ici couple´e a` la coloration de
+me´thodes comme alternative a` la coloration d’attributs qui peut engendrer un nombre
+de trous trop important dans certaines classes, voir (Ducournau, 2006).
+2.1.5 Arbres binaires d’envoi de messages (BTD)
+Toutes les techniques pre´sente´es jusqu’a` pre´sent utilisent des tables pour invoquer
+les me´thodes. L’ide´e des binary tree dispatch (BTD), propose´e par Zendra et al. (1997),
+est de remplacer les tables par une se´rie de tests d’e´galite´ de types qui de´terminent la
+me´thode a` appeler. L’appel de me´thode lui-meˆme est imple´mente´ comme un arbre bi-
+naire e´quilibre´ de comparaison de types dont les feuilles sont les appels statiques de
+me´thodes. En pratique, graˆce au cache d’instructions et aux pre´dictions de branche-
+ments des processeurs modernes, si la profondeur de l’arbre n’exce`de pas trois niveaux
+— donc avec huit feuilles au maximum — le nombre moyen de cycles pris pour ces
+comparaisons est infe´rieur au temps d’acce`s par l’indirection d’une table de me´thodes.
+On notera par la suite BTDi un BTD de profondeur i. Les BTD0 correspondent aux
+appels statiques.
+Evaluation des imple´mentations de l’he´ritage multiple
+2.1.6 Hachage parfait (PH)
+Le hachage parfait est une optimisation en temps constant des tables de hachage
+pour des ensembles immutables (Czech et al., 1997). Ducournau (2008) propose de
+l’utiliser pour le test de sous-typage et l’envoi de message, dans le cas particulier des
+interfaces en Java (Figure 2). Cette technique ne´cessite une indirection supple´mentaire
+avant l’appel de la me´thode. Elle peut eˆtre aussi applique´e aux attributs avec la simu-
+lation des accesseurs. A notre connaissance, cette technique est la seule alternative a`
+l’imple´mentation par sous-objets de C++ qui soit en temps constant et incre´mentale
+(OWA). Cependant sa constante de temps pour l’appel de me´thode est a` peu pre`s le
+double de celle de l’he´ritage simple. Deux fonctions de hachage ont e´te´ e´tudie´es : mo-
+dulo, le reste de la division entie`re (note´e mod) et la conjonction bit-a`-bit (note´e and).
+Les deux ne ne´cessitent qu’une instruction machine mais, alors que and prend un seul
+cycle d’horloge, la latence de la division entie`re peut attendre 20 ou 25 cycles, en par-
+ticulier sur les processeurs comme le Pentium ou` la division entie`re est prise en charge
+par l’unite´ de calcul flottant. Par ailleurs, les expe´rimentations effectue´es sur PH-and
+et PH-mod montre que le premier ne´cessite des tables beaucoup plus grandes que le
+second. Le hachage parfait semble donc conduire a` un choix espace-temps difficile.
+2.2 Sche´mas de compilation
+Les sche´mas de compilation constituent la chaˆıne de production d’un exe´cutable.
+Elle est compose´e de plusieurs phases distinctes qui incluent de fac¸on non limitative la
+compilation et le chargement des unite´s de code ainsi que l’e´dition de liens. La com-
+pilation ne´cessite au minimum le code source de l’unite´ conside´re´e et des informations
+sur toutes les classes qu’elle utilise (super-classes par exemple). Ces informations sont
+contenues dans le mode`le externe, qui est l’e´quivalent des fichiers d’en-teˆtes (.h) en C
+et peut eˆtre extrait automatiquement comme en Java. La distinction entre tous ces
+sche´mas n’est pas toujours tre`s tranche´e. En particulier les compilateurs adaptatifs
+(Arnold et al., 2005) font appel a` des techniques globales (cf. 2.2.2) dans un cadre
+de chargement dynamique (cf. 2.2.1) au prix d’une recompilation dynamique quand
+les hypothe`ses initiales se trouvent infirme´es. Dans cet article nous nous inte´ressons
+seulement aux sche´mas sans recompilation a` l’exe´cution.
+2.2.1 Compilation se´pare´e et chargement dynamique (D)
+La compilation se´pare´e, associe´e au chargement dynamique, est un sche´ma de com-
+pilation classique illustre´ par les langages Lisp, Smalltalk, C++, Java. Chaque
+unite´ de code est compile´e se´pare´ment, donc inde´pendamment des autres unite´s, puis
+l’e´dition de liens rassemble les morceaux de fac¸on incre´mentale au cours du charge-
+ment (OWA). Ce sche´ma permet de distribuer des modules de´ja` compile´s sous forme
+de boites noires. De plus, comme les unite´s sont traite´es de manie`re inde´pendante, la
+recompilation des programmes peut se restreindre aux unite´s modifie´es directement
+ou indirectement. Malheureusement, si l’on exclut des recompilations dynamiques, ce
+sche´ma ne permet aucune optimisation des me´canismes objet sur le code produit —
+librairies, programmes — et ne permet d’utiliser que peu d’imple´mentations pour l’he´-
+F. Morandat et al.
+ritage multiple — seuls les sous-objets de C++ et le hachage parfait sont compatibles.
+La coloration a e´te´ essaye´e, dans le cas particulier du test de sous-typage (Palacz et
+Vitek, 2003), mais le chargement dynamique impose un recalcul et des indirections qui
+sont couˆteuses, aussi bien au chargement qu’a` l’exe´cution.
+2.2.2 Compilation globale (G)
+Ce sche´ma de compilation est utilise´ par Eiffel1 et constitue le cadre de toute la
+litte´rature sur l’optimisation des programmes objet autour des langages Self, Cecil,
+Eiffel (Zendra et al., 1997; Collin et al., 1997). Il suppose que toutes les unite´s de code
+soient connues a` la compilation (CWA) y compris le point d’entre´e du programme. Il est
+donc possible d’effectuer une analyse de types (Grove et Chambers, 2001), de de´terminer
+l’ensemble des classes vivantes (effectivement instancie´es par le programme). Graˆce a`
+cela, on peut re´duire la taille des exe´cutables en e´liminant le code mort et compiler
+les envois de messages par des BTD — en effet le nombre de types a` examiner pour
+chaque appel devient raisonnable — voire des appels statiques. La coloration peut alors
+s’utiliser en comple´ment, pour les sites d’appels dont le degre´ de polymorphisme reste
+grand. Bien que ce sche´ma permette de ge´ne´rer le code le plus efficace il pre´sente de
+nombreux inconve´nients. L’ensemble des sources doit eˆtre disponible, ce qui empeˆche la
+distribution de modules pre´-compile´s. De plus, chaque modification sur le code, meˆme
+mineure, entraˆıne une recompilation globale. Inversement, si la modification porte sur
+le code mort, elle peut ne meˆme pas eˆtre ve´rifie´e.
+2.2.3 Compilation hybride
+Il est possible de combiner la compilation se´pare´e (OWA) avec une e´dition de liens
+globale (CWA). C’est ainsi que la majorite´ des programmes utilisent C++. Dans le cas
+de C++, l’e´diteur de liens n’a besoin d’aucune spe´cificite´, mais les approches suivantes
+ne´cessitent un calcul spe´cifique avant l’e´dition de liens proprement dite. Une alternative
+que nous ne conside´rons pas plus serait que la compilation ge´ne`re le code idoine qui
+effectuerait ce calcul lors du lancement du programme.
+Compilation se´pare´e et e´dition de liens globale (S). Pugh et Weddell (1990)
+proposaient initialement la coloration dans un cadre de compilation se´pare´e, ou` le
+calcul des couleurs serait fait a` l’e´dition de liens : seuls les mode`les externes de toute
+la hie´rarchie sont ne´cessaires. Comme la coloration est une technique intrinse`quement
+globale, une fois l’e´dition de liens effectue´e, aucune nouvelle classe ni aucune nouvelle
+me´thode ne peuvent eˆtre ajoute´es sans recalculer tout ou partie de la coloration. Cette
+version de la compilation se´pare´e est donc incompatible avec le chargement dynamique
+mais elle permet d’en conserver de nombreuses qualite´s — distribution du code compile´,
+recompilation partielle. En revanche, ce sche´ma ne s’applique pas aux BTD, car le code
+du BTD doit eˆtre ge´ne´re´ a` la compilation en connaissant la totalite´ des classes.
+1Bien que les spe´cifications des langages de programmation soient en principe inde´pendantes de
+leur imple´mentation, de nombreux langages sont en fait indissociables de celle-ci. Par exemple, la
+covariance non contrainte d’Eiffel n’est pas imple´mentable efficacement sans compilation globale et
+la re`gle des catcalls n’est meˆme pas ve´rifiable en compilation se´pare´e (Meyer, 1997). Il en va de meˆme
+pour C++ et son imple´mentation par sous-objets ainsi que pour Java et le chargement dynamique.
+Evaluation des imple´mentations de l’he´ritage multiple
+Compilation se´pare´e avec optimisations globales (O). Privat et Ducournau
+(2004, 2005a) proposent un sche´ma de compilation se´pare´e, permettant l’utilisation
+d’optimisations globales a` l’e´dition de liens. C’est une ge´ne´ralisation du sche´ma pre´ce´-
+dent, qui ne´cessite certains artifices supple´mentaires. Lorsqu’une unite´ de code est com-
+pile´e, le compilateur produit, en plus du code compile´ et du mode`le externe, un mode`le
+interne qui contient l’information relative a` la circulation des types dans l’unite´ com-
+pile´e. La phase d’e´dition de liens ne´cessite l’ensemble des unite´s compile´es, y compris
+le point d’entre´e du programme, ainsi que l’ensemble des mode`les internes et externes.
+Graˆce a` ces mode`les, on peut proce´der a` des analyses de types en se servant du flux de
+types contenu dans les mode`les internes. La majorite´ des optimisations propose´es dans
+un cadre de compilation globale (analyses de types, BTD, ...) deviennent possibles dans
+ce sche´ma hybride. A la compilation, chaque site d’appel est lui-meˆme compile´ comme
+un appel a` un symbole unique. Lors de l’e´dition de liens, le code correspondant est ge´-
+ne´re´ suivant les spe´cificite´s du site d’appel : appels statiques (site monomorphe), BTD
+(site oligomorphe), coloration (site me´gamorphe) — on appelle cela un thunk comme
+dans l’imple´mentation de C++ (Ellis et Stroustrup, 1990). Mais la phase d’e´dition de
+liens travaille toujours suivant l’hypothe`se du monde clos, et le chargement dynamique
+reste exclu. Un sche´ma voisin avait e´te´ propose´ par Boucher (2000) dans un cadre de
+programmation fonctionnelle.
+Compilation se´pare´e des bibliothe`ques et globale du programme (H). Une
+dernie`re approche consiste a` compiler les bibliothe`ques de manie`re se´pare´e comme
+dans le sche´ma pre´ce´dent. Le programme lui-meˆme est compile´ de manie`re globale en
+effectuant toutes les optimisations possibles : sche´ma global (G) sur le programme et
+sche´ma se´pare´ avec optimisations globales (O) sur les bibliothe`ques.
+2.3 Comparaisons et compatibilite´s
+La tableau 1 de´crit la compatibilite´ des sche´mas de compilation avec les techniques
+d’imple´mentation (colonnes de gauche). Le reste du tableau de´crit l’efficacite´ a priori
+des techniques en se basant sur les e´tudes ante´rieures (Ducournau, 2002). L’espace est
+conside´re´ suivant trois aspects : le code, les tables statiques, la me´moire dynamique
+(objets). Le temps est conside´re´ a` l’exe´cution, a` la compilation et au chargement. La
+notation va de « – – » a` « +++ », « ++ » repre´sentant l’efficacite´ de la technique de
+re´fe´rence en he´ritage simple. Le cas des BTD est particulier : pour la taille du code
+et le temps d’exe´cution, la technique va du meilleur (appel statique) au pire (arbre de
+taille 100 ou 1000) et est note´e « ∗∗∗ ». L’objectif des expe´rimentations qui suivent est
+de ve´rifier empiriquement les e´valuation the´oriques.
+Le tableau 2 classe les sche´mas de compilation en fonction des crite`res impose´s
+par le ge´nie logiciel. La capacite´ a` re´utiliser et assembler des unite´s de code conc¸ues
+inde´pendamment est pre´sente´e dans la ligne re´utilisation. La distribution repre´sente
+la capacite´ a` distribuer les unite´s de code inde´pendamment les unes des autres tout
+en prote´geant le contenu de l’unite´ conside´re´e (boˆıte noire). La ve´rification modulaire
+permet de tester les unite´s de code de manie`re atomique, elle permet de limiter le
+nombre de bouchons d’inte´gration (Traon et Baudry, 2006) lors des tests unitaires.
+F. Morandat et al.
+Tab. 1 – Compatibilite´ avec les sche´mas et efficacite´ des techniques d’imple´mentation
+Sche´ma Espace Temps
+D S O H G Code Sta. Dyn. Exe´. Compil. Chargement
+SO ∗ ∗ ∗ ∗ ∗ – – – – – ++ ++
+PH • ∗ ∗ ∗ ∗ – – ++ – ++ +
+CM × • • • • ++ ++ ++ +
+CA × • • • • ++ – ++ +
+SA ∗ ∗ • ∗ ∗ + + ++ – +
+BTD × × • • • ∗ ∗ ∗ +++ ++ ∗ ∗ ∗ ++
+• : Compatible, ∗ : Compatible mais non teste´, × : Incompatible
+Tab. 2 – Qualite´s et de´fauts des sche´mas de compilation
+D S O H G
+Re´utilisation ++ + + + – –
+Distribution ++ ++ ++ ++ – –
+Ve´rification modulaire ++ ++ ++ ++ – –
+Imple´mentation efficace – – + + ++ +++
+3 Expe´rimentations et discussion
+Les expe´rimentations ont e´te´ re´alise´es avec le langagePrm, un langage expe´rimental
+modulaire (Privat et Ducournau, 2005b) qui a e´te´ conc¸u en grande partie dans ce but.
+Les divers sche´mas et techniques pre´sente´s plus haut ont e´te´ teste´s avec les restrictions
+suivantes :
+– les spe´cifications de Prm, en particulier le raffinement de classes, le rendent abso-
+lument incompatible avec le chargement dynamique ; le hachage parfait a donc e´te´
+imple´mente´ en compilation se´pare´e avec e´dition de liens globale (S) mais le code
+ge´ne´re´ est exactement celui qui aurait e´te´ ge´ne´re´ avec chargement dynamique
+(D).
+– pour les BTD, l’ide´e est de baser les tests sur l’adresse des tables de me´thodes. La
+disposition en me´moire des tables doit donc eˆtre connue lors de la ge´ne´ration des
+BTD. Comme il se trouve que gcc prend des liberte´s en re´ordonnant les tables,
+seules les BTD0 (appels monomorphes) ont e´te´ teste´es.
+3.1 Expe´rimentations
+Le dispositif d’expe´rimentation (Figure 3) est constitue´ d’un programme de test P ,
+qui est compile´ par une varie´te´ de compilateurs Ci, i ∈ [1..k] (ou par le meˆme compi-
+lateur avec une varie´te´ d’options). Le temps d’exe´cution de chacun des exe´cutables Pi
+obtenus est ensuite mesure´ sur une donne´e commune D. Les Ci repre´sentent diffe´rentes
+versions de PrmC . Comme le compilateur est le seul programme significatif disponible
+en Prm, le programme de test P est lui aussi le compilateur, tout comme la donne´e D.
+Les mesures temporelles sont effectue´es avec la fonction Unix times(2) qui comp-
+tabilise le temps utilise´ par un processus inde´pendamment de l’ordonnanceur syste`me
+(obligatoire a` cause des processeurs multi-cœur). Les mesures du temps et les statis-
+Evaluation des imple´mentations de l’he´ritage multiple
+compiler
+v1
+executable
+compiler
+executable
+v2
+compiler
+executable
+v3
+compiler
+executable
+vn
+compiler
+executable
+compiler
+source
+compiler
+source
+compiler
+executable
+Ci
+P2
+P1
+P3
+Pn
+P
+D
+Fig. 3 – Protocole d’expe´rimentation
+tiques dynamiques sont effectue´es dans des passes diffe´rentes afin de ne pas les influencer
+re´ciproquement.
+Ces tests ont e´te´ re´alise´s sous Ubuntu 8.4 et gcc 4.2.4 sur des processeurs de la
+famille des Pentium d’Intel. Chaque test est la moyenne de dix exe´cutions au moins. Un
+compilateur Pi est ge´ne´re´ pour chaque exe´cution pour tenir des e´ventuelles variations
+dans l’implantation me´moire. Malgre´ cela, les variations observe´es ne de´passent pas 1
+a` 2%. Un test complet repre´sente donc plusieurs heures de calcul. Les tests ont e´te´
+faits sur diffe´rents processeurs de meˆme architecture pour confirmer la re´gularite´ du
+comportement observe´.
+La table 3 donne des statistiques sur le programme de test (P ), d’un point de vue
+statique (nombre d’e´le´ments du programme) et dynamique (nombre d’acce`s), lorsqu’il
+est applique´ a` la donne´e D.
+Tab. 3 – Statistiques sur le programme de test P
+Statique Dynamique (sur D)
+Modules 75
+Classes 511
+Me´thodes 2518
+Me´thodes de´finies 4262
+Attributs 609
+Appels de me´thodes 14551 2600 M
+Appels monomorphes 3969 1657 M
+Appels megamorphes 1264 940 M
+Lecture d’attributs 3114 287 M
+Affectation d’attributs 1192 13 M
+Instanciations 6091 34 M
+3.2 Re´sultats
+La table 4 pre´sente les temps d’exe´cution de diffe´rents couples technique-sche´ma,
+sous la forme du rapport (tT−tref)/tref , ou` tT est le temps de la version T conside´re´e, et
+tref est le temps de la version de re´fe´rence, c’est-a`-dire le sche´ma S avec coloration (CM-
+F. Morandat et al.
+processeur Pentium Xeon Pentium Duo Pentium Xeon
+fre´quence 1.8 GHz 2.8 GHz 2.8 GHz
+cache 512 K 1024 K 2048 K
+temps de re´fe´rence 109.1s 55.7s 52.8s
+technique sche´ma
+CM-BTD0 G
+CM-BTD0 O
+CM S
+PH-and D
+PH-mod D
+ca sa sa/ca
+-9 -1.8 7.9
+-2.9 2.3 5.4
+0 5 5
+7.3 21.4 13.2
+46.2 194.8 101.6
+ca sa sa/ca
+-14.1 -7.4 7.7
+-3.1 2.6 5.9
+0 6.1 6.1
+4.7 25.1 19.5
+63.2 226.8 100.3
+ca sa sa/ca
+-15.4 -1 17
+-3.4 3.6 7.3
+0 10 10
+5.8 30.5 23.3
+70.9 246.3 102.6
+Chaque sous-table de´taille les re´sultats pour un processeur particulier, en donnant d’abord ses ca-
+racte´ristiques et le temps de compilation de re´fe´rence (en secondes). Tous les autres chiffres sont des
+pourcentages. Chaque ligne de´crit une technique d’invocation de me´thode et de test de sous-typage
+dans un sche´ma particulier. La re´fe´rence est la coloration de me´thodes et d’attributs (CM-CA) dans
+le sche´ma se´pare´ (S). Les deux premie`res colonnes repre´sentent le surcouˆt vis-a`-vis de la re´fe´rence,
+respectivement avec la coloration d’attributs (CA) ou la simulation des accesseurs (SA). La troisie`me
+colonne donne le surcouˆt de SA par rapport a` CA.
+Tab. 4 – Temps de compilation suivant les techniques, sche´mas et processeurs.
+CA). La signification de ces re´sultats de´pend e´troitement de la signification de ce temps
+de re´fe´rence, qui pourrait eˆtre grossie`rement sure´value´, re´duisant ainsi artificiellement
+les diffe´rences observe´es.
+Il faut donc e´valuer le niveau ge´ne´ral d’efficacite´ de PrmC , ce qui re´clame une re´fe´-
+rence externe. Nous avons pris SmartEiffel : les deux langages ont des fonctionnalite´s
+e´quivalentes et SmartEiffel est conside´re´ comme tre`s efficace (BTD/G). Sur le Pen-
+tium Duo, le temps d’une compilation de SmartEiffel vers C sur la machine de test
+est d’environ 1 minute, soit le meˆme ordre de grandeur que PrmC — une comparaison
+plus fine ne serait pas significative. Pour les deux compilateurs, qui compilent vers C, il
+faut rajouter le temps de gcc, y compris l’e´dition de liens : 76s pour PrmC et 140s pour
+SmartEiffel. Comme les deux compilateurs ne font pas appel au meˆme niveau d’op-
+timisation, ces re´sultats ne sont pas non plus strictement comparables et la principale
+conclusion a` en tirer est que, au total, les ordres de grandeur sont similaires. On peut
+donc affirmer que PrmC est suffisamment efficace pour que les re´sultats pre´sente´s ici
+soient conside´re´s comme significatifs : dans le rapport diffe´rence sur re´fe´rence que nous
+analysons ci-dessous, le de´nominateur n’est pas exage´re´ment sure´value´. Il l’est cepen-
+dant un peu, par exemple par l’utilisation de garbage collector conservatif de Boehm,
+qui n’est pas aussi efficace que le serait un garbage collector de´die´ au mode`le objet
+simple de Prm. La gestion me´moire n’utilisant pas de me´canismes objet, son surcouˆt
+ne pe`se que sur le de´nominateur.
+3.3 Discussion
+On conside´rera d’abord les re´sultats du Pentium Duo. La premie`re conclusion a`
+tirer de ces re´sultats concerne les sche´mas de compilation. Malgre´ la limitation des
+optimisations globales effectivement imple´mente´es dans ces tests, le sche´ma G produit
+un code nettement plus efficace — ce n’est pas une surprise. En revanche, le sche´ma O
+ne semble eˆtre qu’une le´ge`re ame´lioration du sche´ma S. Il s’agit cependant d’un re´sul-
+Evaluation des imple´mentations de l’he´ritage multiple
+tat tre`s positif : meˆme avec une faible optimisation, les sauts rajoute´s par les thunks
+sont compense´s par les gains sur les appels monomorphes. C’est une confirmation de
+l’analyse abstraite des processeurs modernes dont l’architecture de pipe-line est effec-
+tivement cense´e annuler le couˆt des sauts statiques, modulo les de´fauts de cache bien
+entendu (Driesen, 2001). Dans les deux cas, la diffe´rence devrait se creuser avec des
+optimisations plus importantes comme les BTDi, avec i ≥ 1, et une analyse de types
+plus sophistique´e que la simple CHA (Dean et al., 1995) utilise´e pour ces tests.
+Du point de vue des techniques d’imple´mentation, les conclusions sont multiples.
+Le surcouˆt de la simulation des accesseurs (SA) est re´el mais il est suffisamment faible
+avec la coloration de me´thodes (CM) pour que ce ne soit pas un handicap si les trous
+de la coloration des attributs en sont un. Une analyse a priori de la simulation des
+accesseurs conclut a` un surcouˆt d’une dizaine de cycles par acce`s (Ducournau, 2002),
+soit un total de 2,5 G-cycles d’apre`s les chiffres de la table 3. La diffe´rence constate´e
+entre CM-CA et CM-SA est d’un ordre de grandeur le´ge`rement supe´rieur mais cela
+s’explique certainement par l’accroissement des de´fauts de cache et la re´duction du
+paralle´lisme.
+Les re´sultats des tests sur le hachage parfait sont tre`s inte´ressants par leur carac-
+te`re marque´. PH-and apparaˆıt tre`s efficace, de´passant presque nos espe´rances, quand il
+est couple´ avec la coloration d’attributs. Il faut donc vraiment l’envisager pour imple´-
+menter les interfaces de Java, d’autant qu’il serait utilise´ beaucoup moins intense´ment
+dans ce cadre. En revanche, la simulation des accesseurs le de´grade de fac¸on non ad-
+ditive : le surcouˆt PH-SA/CM-CA est largement supe´rieur a` la somme des surcouˆts
+PH-CA/CM-CA et CM-SA/CM-CA. De son coˆte´, PH-mod entraˆıne un surcouˆt qui le
+met vraisemblablement hors jeu sur ce type de processeur et sa combinaison avec la
+simulation des accesseurs est absolument inefficace. La non additivite´ marque´e qui ap-
+paraˆıt avec la simulation des accesseurs vient sans doute du fait que, avec la coloration
+d’attribut, l’acce`s se fait par une unique instruction qui est aise´ment paralle´lisable. La
+simulation des accesseurs implique une se´quence plus longue qui re´duit le paralle´lisme.
+PH-mod aggrave la situation car le passage a` l’unite´ de calcul flottant pre´sente en plus
+l’inconve´nient de vider le pipeline.
+Ces conclusions s’appliquent peu ou prou aux trois processeurs conside´re´s ici. Si
+l’on compare les processeurs, qui sont, dans la table 4, classe´s de gauche a` droite dans
+l’ordre chronologique, on constate que l’avantage du sche´ma global s’accroit avec le
+temps, alors que la simulation des accesseurs et PH-mod au contraire se de´gradent.
+L’absence de points de comparaison “toutes choses e´gales par ailleurs” ne permet pas
+de juger de l’effet de l’augmentation paralle`le de la taille du cache.
+4 Travaux connexes, conclusion et perspectives
+Dans nos travaux pre´ce´dents, nous avons re´alise´ des e´valuations abstraites (Du-
+cournau, 2002, 2006, 2008) ou des e´valuations concre`tes reposant sur des programmes
+artificiels (Privat et Ducournau, 2005a). Cet article pre´sente les premiers re´sultats d’ex-
+pe´rimentation permettant de comparer des techniques d’imple´mentation et des sche´mas
+de compilation, de fac¸on a` la fois syste´matique et aussi e´quitable que possible. Le pro-
+tocole d’expe´rimentation, base´ sur le bootstrap du compilateur n’est pas nouveau — il
+F. Morandat et al.
+avait e´te´ utilise´, entre autres, pour SmartEiffel. Cependant, SmartEiffel impo-
+sait pour l’essentiel un sche´ma de compilation (G) et une technique d’imple´mentation
+(BTD) et ne les comparait qu’avec un compilateur Eiffel existant. Des travaux ana-
+logues ont aussi e´te´ mene´s autour des langages Self et Cecil (Dean et al., 1996), mais
+ils concernent a` la fois la compilation globale (G) et le typage dynamique, dans un
+cadre adaptatif. En typage statique, le compilateur Polyglot (Nystrom et al., 2006)
+posse`de une architecture modulaire analogue a` celle de PrmC mais nous ne connais-
+sons pas d’expe´rimentations comparatives re´alise´es avec ce compilateur de´die´ a Java.
+Dans le cadre de Java, toute une litte´rature s’inte´resse a` l’invocation de message et
+au test de sous-typage lorsqu’ils s’appliquent a` des interfaces (Alpern et al., 2001).
+Cependant, le sche´ma de compilation de Java (D) autorise peu d’imple´mentations
+en temps constant — les sous-objets (SO) sont vraisemblablement incompatibles avec
+les machines virtuelles et le hachage parfait (PH) n’a pas encore e´te´ expe´rimente´. Les
+autres expe´rimentations que nous connaissons comparent des techniques en temps non-
+constant, a` base de cache et de recherche plus ou moins na¨ıve, a` des techniques, soit non
+incre´mentales — la coloration pour Palacz et Vitek (2003) qui pose de gros proble`mes
+de recalcul au chargement — soit gue`re plus sophistique´es.
+Les expe´rimentations pre´sente´es ici sont donc, a` notre connaissance, les premie`res
+a` comparer diffe´rentes techniques d’imple´mentation ou sche´mas de compilation toutes
+choses e´gales par ailleurs. La plate-forme de compilation dePrm produit un code globa-
+lement efficace — si l’on compare les temps de compilation avec ceux de SmartEiffel—
+meˆme si l’optimum est loin d’eˆtre atteint. Les diffe´rences que l’on observe devraient
+donc rester significatives dans des versions plus e´volue´es. On peut tirer deux conclu-
+sions assez robustes de ces expe´rimentations : (i) meˆme avec une optimisation globale
+limite´e, le sche´ma global (G) reste nettement meilleur que le sche´ma se´pare´ (S) ; (ii)
+le sche´ma optimise´ (O) est prometteur : le surcouˆt des thunks est bien compense´ par
+les optimisations. S’il ne sera vraisemblablement jamais aussi bon que le global, des
+optimisations plus pousse´es devraient en faire un bon interme´diaire entre S et G. Ce-
+pendant, des expe´rimentations comple´mentaires sont ne´cessaires pour valider comple`te-
+ment le sche´ma O : pour des raisons techniques (l’inefficacite´ de l’analyseur syntaxique
+de PrmC), nous n’avons utilise´ ici qu’une analyse de types tre`s primitive, CHA, qui
+ne ne´cessite pas d’employer des mode`les internes. Une analyse plus sophistique´e pour-
+rait rendre la compilation trop lente : notez que nous n’avons pas mesure´ ici le temps
+de compilation des diffe´rents compilateurs Ci, mais uniquement celui des diffe´rentes
+versions Pi du meˆme compilateur. On peut enfin ajouter a` ces conclusions techniques
+particulie`res une conclusion me´thodologique ge´ne´rale : ces expe´rimentations confirment
+pour l’essentiel les analyses abstraites qui ont e´te´ mene´es depuis une dizaine d’anne´es
+autour d’un mode`le de processeur simplifie´ (Driesen, 2001), meˆme si la sur-additivite´
+des surcouˆts exce`de nos pre´visions.
+Du coˆte´ des techniques d’imple´mentation, deux conclusions se de´gagent : le surcouˆt
+de la simulation des accesseurs (SA) est faible quand elle est base´e sur la coloration
+de me´thodes (CM). En revanche, sa combinaison avec des techniques plus couˆteuses
+augmente le surcouˆt de fac¸on non additive. Par ailleurs, cette premie`re imple´mentation
+du hachage parfait confirme les analyses abstraites ante´rieures en se´parant nettement
+PH-and et PH-mod. Cela confirme l’inte´reˆt de PH-and pour les interfaces de Java,
+Evaluation des imple´mentations de l’he´ritage multiple
+d’autant que des re´sultats re´cents de´montrent que son couˆt spatial n’est pas si e´leve´
+que cela (Ducournau et Morandat, 2009).
+Ces tests pre´sentent une limitation e´vidente. Un seul programme a e´te´ mesure´, dans
+des conditions de compilation diffe´rentes. Cette limitation est d’abord inhe´rente a` l’ex-
+pe´rimentation elle-meˆme — bien que ces techniques de compilation soient applicables
+a` tout langage (modulo les spe´cificite´s discute´es par ailleurs a` propos de C++ et Eif-
+fel), le langage Prm a e´te´ conc¸u d’abord pour cette expe´rimentation. C’est ce qui la
+rend possible mais explique le fait que le compilateur Prm soit le seul programme Prm
+significatif. Cela dit, le compilateur Prm est un programme objet repre´sentatif, par
+son nombre de classes et le nombre d’appels de me´canisme objet. On retrouve aussi
+un taux d’appels monomorphes comparable a` ceux qui sont cite´s dans la litte´rature.
+En revanche, d’autres programmes pourraient diffe´rer sur le taux d’acce`s aux attributs
+par rapport aux appels de me´thodes, ce qui pourrait changer les conclusions vis-a`-vis
+de la simulation des accesseurs.
+Les perspectives de ce travail sont de deux ordres. Les comparaisons syste´matiques
+ne sont pas encore comple`tes — il nous reste par exemple a` inte´grer l’imple´mentation
+de C++ (SO), les BTD de profondeur quelconque et a` analyser le temps de compilation
+(par Ci), les de´fauts de cache et l’espace me´moire consomme´ (par Pi). Des expe´rimen-
+tations sur d’autres familles ou architectures de processeurs sont aussi indispensables.
+Nos expe´riences sur des Pentiums de diverses ge´ne´rations donnent des re´sultats assez
+similaires meˆme si les diffe´rences peuvent varier de fac¸on marque´e. Il est tre`s possible
+que des architectures vraiment diffe´rentes, RISC par exemple, changent les conclusions.
+Par exemple, PH-mod pourrait tre`s bien revenir dans la course sur un processeur dote´
+d’une division entie`re native. Le sche´ma de compilation original de Prm doit eˆtre en-
+core ame´liore´. Il reste des difficulte´s, par exemple l’e´limination du code mort dans un
+module vivant. Le sche´ma hybride de compilation se´pare´e des bibliothe`ques et globale
+du programme (H), qui repre´sente sans doute un compromis pratique pour le pro-
+grammeur, reste aussi a` tester. Certaines techniques peuvent aussi eˆtre ame´liore´es :
+ainsi la simulation des accesseurs ne´cessiterait un traitement particulier pour les vrais
+accesseurs, afin qu’ils ne soient pas doublement pe´nalise´s. Enfin, l’adoption d’un gar-
+bage collector plus adapte´ a` Prm pourrait augmenter l’efficacite´ globale et la part des
+me´canismes objet dans la mesure totale, donc les diffe´rences relatives.
+Depuis le de´but de cette recherche, notre de´marche vise a` de´velopper des optimisa-
+tions globales a` l’e´dition de liens. Dans une perspective a` plus long terme, les techniques
+qui ont e´te´ mises au point doivent aussi pouvoir s’appliquer aux compilateurs adapta-
+tifs des machines virtuelles (Arnold et al., 2005). Le thunk ge´ne´re´ au chargement d’une
+classe pourrait eˆtre recalcule´ lors du chargement d’une nouvelle classe qui infirme les
+hypothe`ses ante´rieures. La plate-forme Prm peut fournir des premie`res indications : on
+pourrait par exemple utiliser des thunks avec hachage parfait pour tous les appels po-
+lymorphes et des appels statiques pour les appels monomorphes. Cela permettrait une
+premie`re validation de l’utilisation des thunks dans un cadre de compilation adaptative
+mais seule l’expe´rimentation dans un cadre de chargement dynamique permettrait de
+mesurer l’effet des recompilations, en particulier sur la localite´ des acce`s me´moire. Dans
+une moindre mesure, cette limitation de la plate-forme d’expe´rimentations vaut aussi
+pour les tests sur le hachage parfait pre´sente´s ici.
+F. Morandat et al.
+Re´fe´rences
+Alpern, B., A. Cocchi, S. Fink, et D. Grove (2001). Efficient implementation of Java
+interfaces : Invokeinterface considered harmless. In Proc. OOPSLA’01, SIGPLAN
+Notices, 36(10), pp. 108–124. ACM Press.
+Arnold, M., S. Fink, D. Grove, M. Hind, et P. Sweeney (2005). A survey of adaptive
+optimization in virtual machines. Proceedings of the IEEE 93 (2), 449–466.
+Boucher, D. (2000). GOld : a link-time optimizer for Scheme. In M. Felleisen (Ed.),
+Proc. Workshop on Scheme and Functional Programming. Rice Technical Report 00-
+368, pp. 1–12.
+Cohen, N. (1991). Type-extension type tests can be performed in constant time. ACM
+Trans. Program. Lang. Syst. 13 (4), 626–629.
+Collin, S., D. Colnet, et O. Zendra (1997). Type inference for late binding. the Small-
+Eiffel compiler. In Proc. Joint Modular Languages Conf., LNCS 1204, pp. 67–81.
+Springer.
+Czech, Z. J., G. Havas, et B. S. Majewski (1997). Perfect hashing. Theor. Comput.
+Sci. 182 (1-2), 1–143.
+Dean, J., G. Defouw, D. Grove, V. Litvinov, et C. Chambers (1996). Vortex : An
+optimizing compiler for object-oriented languages. In Proc. OOPSLA’96, SIGPLAN
+Notices, 31(10), pp. 83–100. ACM Press.
+Dean, J., D. Grove, et C. Chambers (1995). Optimization of object-oriented programs
+using static class hierarchy analysis. In W. Olthoff (Ed.), Proc. ECOOP’95, LNCS
+952, pp. 77–101. Springer.
+Dixon, R., T. McKee, P. Schweitzer, et M. Vaughan (1989). A fast method dispatcher
+for compiled languages with multiple inheritance. In Proc. OOPSLA’89, pp. 211–214.
+ACM Press.
+Driesen, K. (2001). Efficient Polymorphic Calls. Kluwer Academic Publisher.
+Ducournau, R. (2002). Implementing statically typed object-oriented programming
+languages. Technical Report 02-174, LIRMM, Universite´ Montpellier 2.
+Ducournau, R. (2006). Coloring, a versatile technique for implementing object-oriented
+languages. Technical Report 06-001, LIRMM, Universite´ Montpellier 2.
+Ducournau, R. (2008). Perfect hashing as an almost perfect subtype test. ACM Trans.
+Program. Lang. Syst. 30 (5), 52.
+Ducournau, R. et F. Morandat (2009). More results on perfect hashing for implemen-
+ting object-oriented languages. Rapport de recherche 09-001, LIRMM, Universite´
+Montpellier 2, Montpellier.
+Ellis, M. et B. Stroustrup (1990). The annotated C++ reference manual. Reading,
+MA, US : Addison-Wesley.
+Grove, D. et C. Chambers (2001). A framework for call graph construction algorithms.
+ACM Trans. Program. Lang. Syst. 23 (6), 685–746.
+Meyer, B. (1997). Eiffel - The language. Prentice-Hall.
+Evaluation des imple´mentations de l’he´ritage multiple
+Myers, A. (1995). Bidirectional object layout for separate compilation. In Proc. OOPS-
+LA’95, SIGPLAN Notices, 30(10), pp. 124–139. ACM Press.
+Nystrom, N., X. Qi, et A. C. Myers (2006). J E : Nested intersection for scalable
+software composition. In P. L. Tarr et W. R. Cook (Eds.), Proc. OOPSLA’06,
+SIGPLAN Notices, 41(10), pp. 21–35. ACM Press.
+OOPSLA (1997). Proc. 12th ACM Conference on Object-Oriented Programming, Lan-
+guages and Applications, OOPSLA’97, SIGPLAN Notices, 32(10). ACM Press.
+Palacz, K. et J. Vitek (2003). Java subtype tests in real-time. In L. Cardelli (Ed.),
+Proc. ECOOP’2003, LNCS 2743, pp. 378–404. Springer.
+Privat, J. et R. Ducournau (2004). Inte´gration d’optimisations globales en compilation
+se´pare´e des langages a` objets. In J. Euzenat et B. Carre´ (Eds.), Actes LMO’2004 in
+L’Objet vol. 10, pp. 61–74. Lavoisier.
+Privat, J. et R. Ducournau (2005a). Link-time static analysis for efficient separate
+compilation of object-oriented languages. In ACM Workshop on Prog. Anal. Soft.
+Tools Engin. (PASTE’05), pp. 20–27.
+Privat, J. et R. Ducournau (2005b). Raffinement de classes dans les langages a` ob-
+jets statiquement type´s. In M. Huchard, S. Ducasse, et O. Nierstrasz (Eds.), Actes
+LMO’2005 in L’Objet vol. 11, pp. 17–32. Lavoisier.
+Pugh, W. et G. Weddell (1990). Two-directional record layout for multiple inheritance.
+In Proc. PLDI’90, ACM SIGPLAN Notices, 25(6), pp. 85–91.
+Traon, Y. L. et B. Baudry (2006). Test d’inte´gration d’un syste`me a` objets — plani-
+fication de l’ordre d’inte´gration. In R. Rousseau, C. Urtado, et S. Vauttier (Eds.),
+Actes LMO’06, pp. 217–230. Herme`s Lavoisier.
+Vitek, J., R. Horspool, et A. Krall (1997). Efficient type inclusion tests. In (OOPSLA,
+1997), pp. 142–157.
+Zendra, O., D. Colnet, et S. Collin (1997). Efficient dynamic dispatch without virtual
+function tables : The SmallEiffel compiler. In (OOPSLA, 1997), pp. 125–141.
+Summary
+Object-oriented programming involves a trade-off between three aspects, namely
+multiple inheritance, efficiency and open world assumption—especially with dynamic
+loading. This paper presents experiment results comparing the efficiency of different
+implementation techniques (coloring, BTD, perfect hashing, ...) in the context of dif-
+ferent compilation schemes (from separate compilation with dynamic loading to purely
+global compilation). These tests are performed with the Prm compiler and applied to
+it. They mostly confirm previous theoretical results, while showing that overheads are
+not additive. Global optimization schemes markedly improve upon coloring, that serves
+as a reference. Accessor simulation and perfect hashing, each considered in isolation,
+yield limited overhead but their combination doubles the total overhead.

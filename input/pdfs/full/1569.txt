@@ -1,0 +1,1069 @@
+Une approche de construction d’espaces
+de repre´sentation multidimensionnels de´die´s a` la
+visualisation
+Riadh Ben Messaoud, Kamel Aouiche, Ce´cile Favre
+Laboratoire ERIC, Universite´ Lumie`re Lyon 2
+5 avenue Pierre Mende`s-France
+69676 Bron Cedex
+{rbenmessaoud | kaouiche | cfavre}@eric.univ-lyon2.fr
+Re´sume´. Dans un syste`me de´cisionnel, la composante visuelle est im-
+portante pour l’analyse en ligne OLAP. Dans cet article, nous proposons
+une nouvelle approche qui permet d’apporter une solution au proble`me
+de visualisation des donne´es engendre´ par l’e´parsite´. En se basant sur les
+re´sultats d’une analyse des correspondances multiples (ACM), nous ten-
+tons d’atte´nuer l’effet ne´gatif de l’e´parsite´ en organisant diffe´remment les
+cellules d’un cube de donne´es. Notre me´thode ne cherche pas a` re´duire
+l’e´parsite´ mais plutoˆt a` construire un espace de repre´sentation se preˆtant
+mieux a` l’analyse et dans lequel les faits du cube sont regroupe´s. Pour
+e´valuer l’apport de cette nouvelle repre´sentation des donne´es, nous pro-
+posons un indice d’homoge´ne´ite´ base´ sur le voisinage ge´ome´trique des
+cellules d’un cube. Les diffe´rents tests mene´s nous ont montre´ l’efficacite´
+de notre me´thode.
+1 Introduction
+Dans un contexte concurrentiel de´veloppe´, les entreprises telles que les banques1
+doivent aujourd’hui eˆtre capables de prendre des de´cisions pertinentes, de fac¸on re´active.
+La mise en place d’un processus de´cisionnel est alors ne´cessaire pour ge´rer une masse
+de donne´es de plus en plus conse´quente. Le stockage et la centralisation de ces donne´es
+dans un entrepoˆt constitue un support efficace pour l’analyse de ces dernie`res. En ef-
+fet, a` partir d’un entrepoˆt de donne´es, on dispose d’outils permettant de construire
+des contextes d’analyse multidimensionnels cible´s, appele´s commune´ment cubes de
+donne´es. Ces cubes de donne´es re´pondent a` des besoins d’analyse pre´de´finis en amont.
+L’analyse en ligne OLAP (On Line Analytical Processing) est un outil base´ sur
+la visualisation permettant la navigation, l’exploration dans ces cubes de donne´es.
+L’objectif est d’observer des faits, a` travers une ou plusieurs mesures, en fonction de
+diffe´rentes dimensions. Il s’agit par exemple d’observer les niveaux de ventes en fonction
+des produits, des pe´rime`tres commerciaux (localisations ge´ographiques) et de la pe´riode
+d’achat.
+De cette visualisation de´pend la qualite´ d’exploitation des donne´es. Or, diffe´rents
+facteurs peuvent de´grader cette visualisation. D’une part, la repre´sentation multidi-
+1Nous remercions Michel Rougie´, repre´sentant du Cre´dit Lyonnais, pour les donne´es fournies afin
+de valider ce travail.
+- 34 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+mensionnelle engendre une e´parsite´, puisqu’a` l’intersection de diffe´rentes modalite´s de
+dimensions, il n’existe pas force´ment de faits correspondants. Cette e´parsite´ peut eˆtre
+accentue´e par la conside´ration d’un grand nombre de dimensions (forte dimensionna-
+lite´) et/ou d’un grand nombre de modalite´s dans chacune des dimensions. D’autre part,
+les modalite´s des dimensions sont ge´ne´ralement repre´sente´es selon un ordre pre´-e´tabli
+(ordre naturel) : ordre chronologique pour les dates, alphabe´tique pour les libelle´s. Dans
+la plupart des cas, cet ordre entraˆıne une distribution ale´atoire des points repre´sentant
+les faits observe´s (les cellules pleines) dans l’espace des dimensions.
+Dans cet article, nous proposons d’ame´liorer la visualisation des donne´es dans les
+cubes. Nous ne diminuons pas l’e´parsite´ du cube comme dans [Niemi et al., 2003], mais
+a` atte´nuer son effet ne´gatif sur la visualisation, en regroupant les cellules pleines. Pour
+ce faire, nous proposons d’arranger l’ordre des modalite´s e´tant donne´ que l’ordre initial
+n’engendre pas force´ment une bonne visualisation. Cet arrangement tient compte des
+corre´lations existant entre les faits pre´sents dans l’espace de repre´sentation d’un cube de
+donne´es. Les corre´lations sont fournies par le re´sultat d’une analyse des correspondances
+multiples (ACM) applique´e sur les faits du cube.
+Ce travail s’inscrit dans une approche ge´ne´rale de couplage entre fouille de donne´es
+et analyse en ligne. Dans [Messaoud et al., 2005], une re´flexion sur l’usage de l’analyse
+factorielle dans un contexte OLAP a e´te´ amorce´e. A` pre´sent, nous exploitons l’ACM
+comme un outil d’aide a` la construction de cubes de donne´es ayant de meilleures
+caracte´ristiques pour la visualisation. En effet, l’ACM construit des axes factoriels
+qui offrent de meilleurs points de vue du nuage de points des individus.
+L’article est organise´ comme suit. Dans la section 2, nous repositionnons plus en
+de´tail le contexte et les motivations de notre travail. Nous de´taillons les diffe´rentes
+e´tapes de notre approche dans la section 3. Nous pre´sentons dans la section 4 une
+e´tude de cas sur un jeu de donne´es bancaires. Dans la section 5, nous donnons un
+aperc¸u des travaux connexes au noˆtre. Enfin, dans la section 6, nous dressons une
+conclusion et proposons des perspectives de recherche.
+2 Contexte et motivations
+Dans un syste`me de´cisionnel, les donne´es sont organise´es selon un mode`le, en
+“e´toile” ou en “flocon de neige”, de´die´ a` l’analyse et traduisant un contexte d’e´tude
+cible´ [Inmon, 1996, Kimball, 1996]. Autour d’une table de faits centrale contenant une
+ou plusieurs mesures a` observer, existent plusieurs tables de dimensions comprenant des
+descripteurs. Une dimension peut comporter plusieurs hie´rarchies impliquant diffe´rents
+niveaux de granularite´s possibles dans la description de chaque fait. Cette organisation
+est particulie`rement adapte´e pour cre´er des structures multidimensionnelles, appele´es
+“cubes” de donne´es, destine´es a` l’analyse OLAP. Dans un cube de donne´es, un fait est
+ainsi identifie´ par un ensemble de modalite´s prises par les diffe´rentes dimensions. Le
+fait est observe´ par une ou plusieurs mesures ayant des proprie´te´s d’additivite´ plus ou
+moins fortes.
+La vocation de l’OLAP est de fournir a` l’utilisateur un outil visuel pour consulter,
+explorer et naviguer dans les donne´es d’un cube afin d’y de´couvrir rapidement et faci-
+lement des informations pertinentes. Toutefois, dans le cas de donne´es volumineuses,
+RNTI - E -
+- 35 - RNTI-B-1
+Ben Messaoud et al.
+telles que les donne´es bancaires conside´re´es dans notre e´tude, l’analyse en ligne n’est
+pas une taˆche facile pour l’utilisateur. En effet, un cube a` forte dimensionnalite´ com-
+portant un grand nombre de modalite´s, pre´sente souvent une structure e´parse difficile
+a` exploiter visuellement. De plus, l’e´parsite´, souvent re´partie de fac¸on ale´atoire dans le
+cube, alte`re davantage la qualite´ de la visualisation et de la navigation dans les donne´es.
+Prenons l’exemple de la figure 1 qui pre´sente un cube de donne´es bancaires a` deux
+dimensions : les localite´s ge´ographiques des agences (L1, . . . , L8) et les produits de la
+banque (P1, . . . , P12). Les cellules grise´es sur la figure sont pleines et repre´sentent la me-
+sure de faits existants (chiffres d’affaires, par exemple) alors que les cellules blanches
+sont vides et correspondent a` des faits inexistants (pas de mesures pour ces croise-
+ments de modalite´s). D’apre`s la figure 1, la re´partition des cellules pleines dans la
+repre´sentation (a) ne se preˆte pas facilement a` l’interpre´tation. En effet, visuellement,
+l’information est e´parpille´e (d’une fac¸on ale´atoire) dans l’espace de repre´sentation des
+donne´es. En revanche, dans la repre´sentation (b), les cellules pleines sont concentre´es
+dans la zone centrale du cube. Cette repre´sentation offre des possibilite´s de comparai-
+son et d’analyse des valeurs des cellules pleines (les mesures des faits) plus aise´es et
+plus rapides pour l’utilisateur.
+L1
+L2
+L3
+L4
+L5
+L6
+L7
+L8
+P1 P2 P3 P4 P5 P6 P7 P8 P9 P10 P11 P12
+(a)
+L2
+L6
+L3
+L1
+L7
+L5
+L4
+L8
+P1 P3 P5 P7 P8 P4 P2 P11 P12 P10 P9 P6
+(b)
+Fig. 1 – Exemple de deux repre´sentations d’un espace de donne´es
+Notons que les deux repre´sentations de la figure 1 correspondent au meˆme cube
+de donne´es. La repre´sentation (b) est obtenue par simples permutations de lignes et
+de colonnes de la repre´sentation (a). Dans la plupart des serveurs OLAP, les moda-
+lite´s d’une dimension sont pre´sente´es selon un ordre arbitraire. En ge´ne´ral, cet ordre
+est alphabe´tique pour les libelle´s des modalite´s et chronologique pour les dimensions
+temporelles. Malheureusement, dans le cas des cubes e´parses et volumineux, ce choix
+entraˆıne des repre´sentations de donne´es inadapte´es a` l’analyse, voire meˆme difficilement
+exploitables, comme c’est le cas de la repre´sentation (a) de la figure 1.
+La composante visuelle de l’OLAP est primordiale dans un processus de´cisionnel.
+En effet, de la qualite´ et de la clarte´ de celle-ci de´pendent les orientations de l’utilisateur
+dans son exploration du cube. Ceci de´termine la qualite´ des re´sultats finaux de l’analyse
+en ligne. En se basant sur notre ide´e de l’arrangement des modalite´s des dimensions
+illustre´e dans l’exemple pre´ce´dent, nous proposons une me´thode permettant a` l’utili-
+RNTI - E -
+- 36 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+sateur d’ame´liorer automatiquement la qualite´ de la repre´sentation des donne´es. Nous
+souhaitons produire une meilleure visualisation homoge´ne´isant au mieux le nuage des
+faits (cellules pleines) et mettant en avant des points de vue inte´ressants pour l’analyse.
+Notre ide´e d’arrangement consiste a` rassembler ge´ome´triquement les cellules pleines
+dans l’espace de repre´sentation des donne´es. Dans ce travail, nous ne cherchons pas a`
+diminuer l’e´parsite´ du cube, mais a` l’organiser de manie`re intelligente pour atte´nuer
+l’impact ne´gatif sur la visualisation qu’elle engendre. Nous e´valuons l’organisation des
+donne´es de notre me´thode par un indice de qualite´ de la repre´sentation des donne´es
+que nous de´finissons dans la section suivante.
+Pour des raisons de complexite´ de traitements, nous avons exclu la recherche d’un
+optimum global, voire meˆme local, de l’indice de qualite´ selon une exploration exhaus-
+tive des configurations possibles du cube ; c’est a` dire, toutes les combinaisons des
+arrangements possibles des modalite´s des dimensions du cube. En effet, conside´rons le
+cas d’un cube a` trois dimensions ou` chaque dimension comporte seulement 10 moda-
+lite´s. Le nombre de configurations possibles pour ce cube est e´gal a` A1010×A
+10
+10×A
+10
+10 =
+10!× 10!× 10! ≃ 4, 7 · 1019.
+Afin de parvenir a` un arrangement convenable des modalite´s du cube, sans pas-
+ser par une recherche exhaustive d’un optimum, nous choisissons d’utiliser les re´sultats
+d’une analyse en correspondances multiples (ACM) [Benze´cri, 1969, Lebart et al., 2000].
+L’ACM est alors conside´re´e comme une heuristique applique´e a` la vole´e aux donne´es
+du cube que l’utilisateur cherche a` visualiser. Les individus et les variables de l’ACM
+correspondent respectivement aux faits et aux dimensions du cube. En construisant
+des axes factoriels, l’ACM fournit une repre´sentation d’associations entre individus et
+entre variables dans un espace re´duit. Ces axes factoriels permettent d’ajuster au mieux
+le nuage de points des individus et des variables. Dans le cas de notre approche, afin
+de mieux repre´senter les donne´es dans un cube, nous proposons d’exploiter les coor-
+donne´es de ses modalite´s sur les axes factoriels. Ces coordonne´es de´terminent l’ordre
+d’arrangement des modalite´s dans les dimensions. Cependant, l’ACM s’applique sur un
+tableau disjonctif complet obtenu en remplac¸ant dans le tableau initial chaque variable
+qualitative par l’ensemble des variables indicatrices des diffe´rentes modalite´s de cette
+variable.
+Dans la section suivante, nous formalisons les e´tapes de notre approche. Cette for-
+malisation pre´sente la construction du tableau disjonctif complet a` partir du cube de
+donne´es, l’ACM, l’arrangement des modalite´s des dimensions et l’indice de qualite´ de
+la repre´sentation des donne´es.
+3 Formalisation
+3.1 Notations
+Dans la suite de l’article, nous conside´rons C un cube de donne´es a` d dimen-
+sions, m mesures et n faits (d,m, n ∈ N∗). Nous adoptons les notations suivantes :
+D1, . . . ,Dt, . . . ,Dd repre´sentent les d dimensions de C.
+Pour la clarte´ de l’expose´, nous supposons que les dimensions ne comportent pas
+de hie´rarchies. Nous conside´rons que la dimension Dt (t ∈ {1, . . . , d}) est un ensemble
+RNTI - E -
+- 37 - RNTI-B-1
+Ben Messaoud et al.
+de pt modalite´s qualitatives. On note a
+t
+j la j
+ie`me modalite´ de la dimension Dt. Ainsi,
+l’ensemble des modalite´s d’une dimension Dt est {a
+t
+1, . . . , a
+t
+j , . . . , a
+t
+pt
+}. Soit p =
+∑d
+t=1 pt
+le nombre total de toutes les modalite´s des d dimensions du cube C.
+Une cellule A dans un cube C est dite pleine (respectivement, vide) si elle contient
+une mesure d’un fait existant (respectivement, ne contient pas de faits).
+3.2 Aplatissement du cube de donne´es
+Pour aplatir le cube C, nous le repre´sentons sous forme bi-dimensionnelle par un
+tableau disjonctif complet. Pour chaque dimension Dt (t ∈ {1, . . . , d}), nous ge´ne´rons
+une matrice Zt a` n lignes et pt colonnes. Zt est telle que sa i
+ie`me ligne contenant (pt−1)
+fois la valeur 0 et une fois la valeur 1 dans la colonne correspondant a` la modalite´ que
+prend le fait i (i ∈ {1, . . . , n}). Le terme ge´ne´ral de la matrice Zt s’e´crit :
+ztij =
+{
+1 si le fait i prend la modalite´ atj de la dimension Dt
+0 sinon
+En juxtaposant les d matrices Zt, nous construisons la matrice Z a` n lignes et p
+colonnes. Z = [Z1, Z2, . . . , Zt, . . . , Zd] est un tableau disjonctif complet qui de´crit les d
+positions des n faits du cube C par un codage binaire.
+3.3 Application de l’ACM
+A` partir du tableau disjonctif complet Z, nous construisons le tableau syme´trique
+B = Z ′Z (Z ′ de´signe la transpose´e de Z) d’ordre (p, p), qui rassemble les croisements
+deux a` deux de toutes les dimensions du cube C. B est appele´ tableau de contingence
+de “Burt” associe´ a` Z.
+Soit X la matrice diagonale, d’ordre (p, p), ayant les meˆmes e´le´ments diagonaux que
+B et des ze´ros ailleurs. Pour trouver les axes factoriels, nous diagonalisons la matrice
+S = 1
+d
+Z ′ZX−1 dont le terme ge´ne´ral est :
+sjj′ =
+1
+dz.j′
+n∑
+i=1
+zijzij′
+Apre`s diagonalisation, nous obtenons (p − d) valeurs propres de S note´es λα (α ∈
+{1, . . . , (p−d)}). Chaque valeur propre λα correspond a` un axe factoriel Fα, de vecteur
+directeur uα et ve´rifiant dans R
+p l’e´quation :
+Suα = λαuα
+Les modalite´s de la dimension Dt sont projete´es sur les (p − d) axes factoriels.
+Soit ϕtα le vecteur des projections des pt modalite´s de Dt sur Fα. Notons que ϕ
+t
+α
+′
+=
+[ϕtα1, . . . , ϕ
+t
+αj , . . . , ϕ
+t
+αpt
+].
+De´signons par ϕα le vecteur des p projections des modalite´s de toutes les dimensions
+sur l’axe factoriel α. Notons que ϕ
+′
+α = [ϕ
+1
+α, . . . , ϕ
+t
+α, . . . , ϕ
+p
+α] et que ϕα ve´rifie l’e´quation :
+1
+d
+X−1Z ′Zϕα = λαϕα
+RNTI - E -
+- 38 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+La contribution d’une modalite´ atj dans la construction de l’axe α est e´value´e par :
+Crα(a
+t
+j) =
+zt.jϕ
+t
+αj
+2
+ndλα
+Ou` zt.j =
+∑n
+i=1 z
+t
+ij correspond au nombre de faits dans le cube C ayant la modalite´
+atj (poids de la modalite´ a
+t
+j dans le cube).
+La contribution d’une dimension Dt dans la construction du facteur α est la somme
+des contributions des modalite´s de cette dimension, soit :
+Crα(Dt) =
+pt∑
+j=1
+Crα(a
+t
+j) =
+1
+ndλα
+pt∑
+j=1
+zt.jϕ
+t
+αj
+2
+3.4 Arrangement des modalite´s du cube
+Notre ide´e consiste a` associer chaque dimension initiale Dt a` un axe factoriel Fα.
+Pour cela, nous exploitons les contributions relatives des dimensions dans la construc-
+tion des axes factoriels.
+Pour une dimension Dt donne´e, nous cherchons, parmi les axes factoriels Fα, celui
+qui a e´te´ le mieux explique´ par les modalite´s de cette dimension. Nous cherchons a`
+maximiser la valeur de λαCrα(Dt). Il s’agit donc de chercher l’axe Fα∗ pour lequel
+la somme des carre´s des projections ponde´re´es des modalite´s de la dimension Dt est
+maximale. Nous cherchons l’indice α∗ ve´rifiant l’e´quation suivante :
+λα∗Crα∗(Dt) = max
+α∈{1,...,p−d}
+(λαCrα(Dt))
+A` partir des coordonne´es des pt projections ϕ
+t
+α∗j des modalite´s a
+t
+j sur l’axe Fα∗ ,
+nous appliquons un tri croissant de ces coordonne´es. Ce tri fournit un ordre des indices
+j selon lequel nous arrangeons les modalite´s atj de la dimension Dt.
+L’inte´reˆt de cet arrangement est de converger vers une re´partition des modalite´s
+de la dimension suivant l’axe factoriel. Cet arrangement a pour effet de concentrer les
+cases pleines au centre du cube et d’e´loigner les cases vides vers les extre´mite´s. Sans
+diminuer l’e´parsite´, cette me´thode nous permet ne´anmoins d’ame´liorer la re´partition
+des donne´es dans le cube. Pour estimer la qualite´ de cet arrangement, nous proposons
+un indice pour e´valuer l’homoge´ne´ite´ du cube.
+3.5 Indice d’homoge´ne´ite´
+Dans cette section, nous proposons un indice permettant de mesurer l’homoge´ne´ite´
+de la re´partition ge´ome´trique des cellules dans un cube. Graˆce a` cet indice, nous
+pouvons e´valuer le gain induit par l’arrangement des modalite´s des dimensions. Nous
+conside´rons que plus les cellules pleines (ou bien vides) sont concentre´es, plus le cube
+est dit “homoge`ne”.
+Une cellule dans un cube repre´sente une ou plusieurs mesures agre´ge´es des faits.
+Les modalite´s des dimensions constituent les coordonne´es des cellules dans le cube.
+RNTI - E -
+- 39 - RNTI-B-1
+Ben Messaoud et al.
+D2
+D1aj
+1
+1aj
+1
+-1
+1 aj
+1
++1
+1
+aj
+2
+2
+aj
+2
+-1
+2
+aj
+2
++1
+2
+A
+ES
+aj
+1
++2
+1
+aj
+2
++2
+2
+B
+R
+Y
+F K L
+T
+H
+Fig. 2 – Exemple en 2 dimensions de la notion de voisinage des cellules d’un cube de
+donne´es
+Soit A = (a1j1 , . . . , a
+t
+jt
+, . . . , adjd) une cellule dans le cube C, avec t ∈ {1, . . . , d} et jt ∈
+{1, . . . , pt}. jt est l’indice de la modalite´ que prend la cellule A pour la dimension Dt.
+Nous conside´rons que toutes les modalite´s des dimensions Dt sont ge´ome´triquement
+ordonne´es dans l’espace de repre´sentation des donne´es selon l’ordre des indices jt. C’est
+a` dire, la modalite´ atjt−1 pre´ce`de a
+t
+jt
+, qui, a` son tour, pre´ce`de atjt+1 (voir l’exemple de
+la figure 2). L’ordre des indices jt correspond a` l’ordre dans lequel sont arrange´es dans
+l’espace les modalite´s de la dimension Dt. Nous de´finissons a` pre´sent la notion de
+voisinage pour les cellules d’un cube.
+De´finition 1 (Cellules voisines) Soit A = (a1j1 , . . . , a
+t
+jt
+, . . . , adjd) une cellule dans un
+cube C. La cellule B = (b1j1 , . . . , b
+t
+jt
+, . . . , bdjd) est dite voisine de A, note´e B ⊣ A, si ∀t ∈
+{1, . . . , d}, les coordonne´es de B ve´rifient : btjt = a
+t
+jt−1
+ou btjt = a
+t
+jt
+ou btjt = a
+t
+jt+1
+.
+Exception faite du cas ou` ∀t ∈ {1, . . . , d} btjt = a
+t
+jt
+, B n’est pas conside´re´e comme une
+cellule voisine de A car B = A.
+Dans l’exemple de la figure 2, la cellule B est voisine de A (B ⊣ A). Y est aussi
+voisine de A (Y ⊣ A). En revanche, les cellules S et R ne sont pas voisines de A. Ceci
+nous rame`ne a` de´finir le voisinage d’une cellule.
+De´finition 2 (Voisinage d’une cellule) Soit A une cellule du cube C, nous de´finissons
+le voisinage de A, note´ V(A), par l’ensemble de toutes les cellules B de C qui sont voi-
+sines de A.
+V(A) = {B ∈ C tel que B ⊣ A}
+Par exemple, dans la figure 2, le voisinage de la cellule A correspond a` l’ensemble
+V(A) = {F,K,L, Y, T,B,H,E}.
+De´finition 3 (Fonction ∆) Nous de´finissons une fonction ∆ de C dans N tel que :
+∀A ∈ C, ∆(A) =
+∑
+B∈V(A)
+δ(A,B)
+RNTI - E -
+- 40 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+Avec δ est une fonction de´finie comme suit :
+δ : C × C −→ N
+δ(A,B) 7−→
+{
+1 si A et B sont pleines
+0 sinon
+∆(A) correspond au nombre de cellules pleines et voisines de A.
+En supposant que les cellules grises repre´sentent les cellules pleines dans la figure 2,
+∆(A) = 4 puisque F , K, B et E sont les seules cellules qui sont a` la fois pleines et
+voisines de A.
+De´finition 4 (Indice d’homoge´ne´ite´ brut) Nous de´finissons l’indice d’homoge´ne´ite´
+brut d’un cube C, note´ IHB(C), par la somme de tous les couples de ses cellules qui
+sont a` la fois pleines et voisines.
+IHB(C) =
+∑
+A∈C
+∆(A)
+Par exemple, l’indice d’homoge´ne´ite´ brut du cube de la figure 2 se calcule comme
+suit :
+IHB(C) = ∆(F ) +∆(K) +∆(A) +∆(S) +∆(B) +∆(E) = 2+ 2+ 4+ 1+ 2+ 1 = 12
+La meilleure repre´sentation d’un cube de donne´es correspond au cas ou` ce dernier
+est comple`tement non vide. C’est a` dire, toutes ses cellules sont pleines. Dans ce cas,
+l’indice d’homoge´ne´ite´ brut est maximal :
+IHBmax(C) =
+∑
+A∈C
+∑
+B∈V(A)
+1
+De´finition 5 (Indice d’homoge´ne´ite´) Nous de´finissons, l’indice d’homoge´ne´ite´ d’un
+cube C, note´ IH(C), par le rapport de l’indice de l’homoge´ne´ite´ brut sur celui de l’ho-
+moge´ne´ite´ maximale.
+IH(C) =
+IHB(C)
+IHBmax(C)
+=
+∑
+A∈C
+∆(A)
+∑
+A∈C
+∑
+B∈V(A)
+1
+Apre`s calcul, l’homoge´ne´ite´ maximale du cube exemple de la figure 2 e´tant e´gale a`
+48, l’indice d’homoge´ne´ite´ de ce dernier est donc IH(C) = 1248 ≃ 14, 28%
+Pour mesurer l’apport de l’arrangement des modalite´s sur la repre´sentation du cube
+de donne´es, nous calculons le gain en homoge´ne´ite´ note´ g selon la formule :
+g =
+IH(Carr)− IH(Cini)
+IH(Cini)
+ou` IH(Cini) est l’indice d’homoge´ne´ite´ de la repre´sentation du cube initial et IH(Carr)
+est celui de la repre´sentation arrange´e selon notre me´thode. Notons que quelle que soit
+la repre´sentation initiale du cube, l’arrangement fourni en sortie par notre me´thode est
+identique puisque l’ACM n’est pas sensible a` l’ordre des variables donne´es en entre´e.
+RNTI - E -
+- 41 - RNTI-B-1
+Ben Messaoud et al.
+Dimension Nombre de
+modalite´s
+Description
+D1 : cate´gorie
+socio-
+professionnelle
+p1 = 58 profil professionnel du client
+D2 : produit p2 = 25 de´tention de formule(s) qui sont des offres combine´es de
+produits bancaires
+D3 : unite´
+commerciale
+p3 = 65 localisations ge´ographiques de vente
+D4 : segment p4 = 15 potentiel commercial du client
+D5 : aˆge p5 = 12 variable discre´tise´e selon des tranches d’aˆge de dix ans
+([0-10], [11-20], [21-30], etc.)
+D6 : situation
+familiale
+p6 = 6 exemple : marie´, divorce´, etc.
+D7 : type
+client
+p7 = 4 origine du client (par exemple, client membre du person-
+nel du Cre´dit Lyonnais)
+D8 : marche´ p8 = 4 une vente re´alise´e aupre`s d’un client est faite sur le
+marche´ “particulier des professionnels ” si le client est
+artisan ou exerce une profession libe´rale, etc., ou sur le
+marche´ “particulier” sinon
+Tab. 1 – Description des dimensions du cube exemple
+4 E´tude de cas
+Pour tester et valider l’approche que nous proposons, nous utilisons un jeu de
+donne´es bancaires extrait du syste`me d’information du Cre´dit Lyonnais. A` partir de
+ces donne´es, nous avons construit un contexte d’analyse (cube de donne´es). Un fait du
+cube correspond au comportement d’achat d’un client. Nous disposons dans ce cube de
+n = 311 959 comportements de clients mesure´s par le produit net bancaire (M1) et le
+montant des avoirs (M2). Le tableau 1 de´taille la description des dimensions conside´re´es
+pour observer ces mesures.
+Pour rendre plus claire la suite de notre expose´, notre e´tude de cas porte sur un
+cube a` deux dimensions (d = 2) : la dimension “cate´gorie socio-professionnelle” (D1)
+et la dimension “produit” (D2). La mesure observe´e est “le montant des avoirs”. Nous
+ge´ne´rons les matrices Z1 et Z2 selon un codage binaire disjonctif des modalite´s des
+deux dimensions. Le tableau disjonctif complet Z = [Z1, Z2] a n = 311 959 lignes et
+p = p1 + p2 = 83 colonnes.
+En appliquant l’ACM sur le tableau Z, on obtient p − d = 81 axes factoriels Fα.
+Chaque axe est caracte´rise´ par sa valeur propre λα et les contributions apporte´es par
+les dimensions : Crα(D1) et Crα(D2). Nous cherchons, pour chaque dimension, l’axe
+qui est le mieux contribue´ par cette dernie`re. Nous obtenons les re´sultats suivants :
+– Pour la dimension D1, λ45Cr45(D1) = maxα∈{1,...,81}(λαCrα(D1)), avec λ45 =
+0.5 et Cr45(D1) = 99.9%
+– Pour la dimension D2, λ1Cr1(D2) = maxα∈{1,...,81}(λαCrα(D2)), avec λ1 = 0.83
+et Cr1(D2) = 50%.
+RNTI - E -
+- 42 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+22 15 17 16 21 18 20 14 23 19 9 24 6 11 5 7 3 4 8 12 1 13 2 25 10
+40
+27
+43
+20
+10
+53
+22
+24
+47
+3
+19
+4
+41
+42
+31
+49
+50
+37
+52
+57
+56
+9
+54
+14
+44
+29
+33
+15
+28
+32
+55
+12
+34
+51
+38
+16
+35
+26
+30
+46
+18
+23
+21
+7
+48
+17
+8
+58
+45
+39
+25
+11
+2
+36
+6
+5
+1
+13
+(a) Cube initial (b) Cube arrangé
+Fig. 3 – Le cube de donne´es avant et apre`s arrangement des modalite´s
+Ainsi, la dimension D1 est associe´e a` l’axe F45 et D2 a` l’axe F1. Les modalite´s de
+D1 (respectivement, D2) sont arrange´es suivant l’ordre croissant de leur projections
+sur F45 (respectivement, F1). Dans la figure 3, nous pre´sentons le re´sultat de cet arran-
+gement. La repre´sentation (a) correspond a` l’arrangement initial du cube selon l’ordre
+alphabe´tique des libelle´s des modalite´s. La repre´sentation (b) correspond a` l’arrange-
+ment obtenu par l’ordre croissant des projections des modalite´s sur les axes factoriels
+suscite´s. Pour des raisons de confidentialite´, nous masquons les libelle´s des modalite´s
+de chaque dimension ainsi que les valeurs des mesures. Nous remplac¸ons les libelle´s par
+des codes chiffre´s et les mesures existantes par des cases noires. Les cases blanches du
+cube repre´sentent les creux correspondant a` des croisements vides. Sur cet exemple, le
+taux d’e´parsite´ du cube 2 est e´gal a` 64%. La valeur de l’indice d’homoge´ne´ite´ est de
+17, 75% pour la repre´sentation (a) et de 20, 60% pour la repre´sentation (b). Nous obte-
+2Le taux d’e´parsite´ est e´gal au rapport entre le nombre de cases vides et le nombre total des cases
+du cube.
+RNTI - E -
+- 43 - RNTI-B-1
+Ben Messaoud et al.
+nons donc un gain en homoge´ne´ite´ de 16, 38% par rapport a` la repre´sentation initiale
+du cube.
+Nous avons e´galement applique´ notre me´thode sur un cube a` trois dimensions :
+“cate´gorie socio-professionnelle” (D1), “produit” (D2) et “aˆge” (D5). Ce cube, dont
+le taux d’e´parsite´ est e´gal a` 87, 94%, contient plus de cellules vides compare´ au cube
+pre´ce´dent. L’arrangement des modalite´s correspond a` l’ordre alphabe´tique pour D1 et
+D2, et a` l’ordre croissant des tranches d’aˆge pour D5. Le cube initial a un indice d’ho-
+moge´ne´ite´ de 5, 12%. Le cube arrange´, selon notre me´thode, a un indice d’homoge´ne´ite´
+de 6, 11%. Nous obtenons ainsi un gain de 19, 33%.
+64
+0
+5
+10
+15
+20
+25
+67
+,3
+1
+70
+,2
+8
+71
+,7
+9
+75
+,7
+9
+76
+,9
+78
+,4
+8
+85
+,3
+8
+87
+,8
+6
+89
+,1
+I
+n
+di
+ce
+ d
+'h
+om
+og
+én
+éi
+té
+ (
+%)
+Eparsité (%)
+Cube arrangé
+Cube initial
+(a)
+0
+20
+10
+30
+40
+50
+60
+70
+80
+90
+100
+G
+a
+in
+ e
+n 
+ho
+mo
+gé
+né
+it
+é 
+(%
+)
+Eparsité (%)
+64 67
+,3
+1
+70
+,2
+8
+71
+,7
+9
+75
+,7
+9
+76
+,9
+78
+,4
+8
+85
+,3
+8
+87
+,8
+6
+89
+,1
+(b)
+fléchissement
+Fig. 4 – E´volutions de l’indice d’homoge´ne´ite´ et du gain en fonction de l’e´parsite´
+Nous avons re´alise´ une se´rie d’expe´rimentations de notre me´thode sur le premier
+cube (le cube a` deux dimension D1 et D2), pour diffe´rentes valeurs du taux d’e´parsite´.
+Afin de mesurer l’impact de l’e´parsite´ sur notre me´thode, nous avons tire´ plusieurs
+e´chantillons ale´atoires a` partir de la population du cube initial (les n faits du cube).
+En variant le taux d’e´chantillonnage, nous parvenons a` faire varier l’e´parsite´ du cube.
+La figure 4 (a) montre l’e´volution de l’indice d’homoge´ne´ite´ du cube initial et du
+cube arrange´ en fonction de l’e´parsite´. Nous remarquons que les valeurs de l’indice
+sont de´croissantes en fonction de l’e´parsite´ du cube. Ceci est naturellement duˆ a` la
+construction de cet indice qui de´pend fortement du nombre de cellules pleines dans le
+cube. Notons aussi que, quelle que soit l’e´parsite´, le cube obtenu par arrangement selon
+notre me´thode est toujours de meilleure qualite´ que le cube initial au sens de notre
+indice d’homoge´ne´ite´. Dans tous les cas, nous re´alisons un gain en homoge´ne´ite´ lors de
+l’arrangement du cube.
+D’apre`s la figure 4 (b), le gain en homoge´ne´ite´ a une tendance ge´ne´rale croissante
+en fonction de l’e´parsite´ du cube. En effet, plus le cube est e´parse, plus nous avons une
+meilleure marge de manœuvre pour concentrer les donne´es et les regrouper ensemble
+autour des axes factoriels de l’ACM.
+Notons aussi que le gain en homoge´ne´ite´, qui est toujours positif, peut fle´chir locale-
+ment (voir figure 4 (b)). Ceci est inhe´rent a` la structure des donne´es. C’est a` dire, si les
+RNTI - E -
+- 44 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+donne´es du cube initial sont de´ja` dans une repre´sentation homoge`ne, l’application de
+notre me´thode n’apportera pas de gain conside´rable. En effet, dans ce cas, la me´thode
+n’aura qu’un effet de translation du nuage des fait vers les zones centrales des axes
+factoriels.
+5 Travaux connexes
+L’ame´lioration de l’espace de repre´sentation des donne´es multidimensionnelles dans
+l’OLAP a fait l’objet de plusieurs travaux de recherche. Rappelons que, dans notre cas,
+cette ame´lioration se traduit par la concentration des donne´es autour des axes factoriels
+d’une ACM. Cela a pour effet de produire une meilleure visualisation homoge´ne´isant
+au mieux le nuage des faits et mettant en avant des points de vue inte´ressants pour
+l’analyse.
+Les travaux de recherche qui se sont inte´resse´s a` l’e´tude de l’espace de repre´sentation
+ont e´te´ mene´s suite a` des motivations diffe´rentes. Tandis que certains se sont penche´s
+sur des aspects d’optimisation technique (stockage, temps de re´ponse, etc.), d’autres
+s’inte´ressent plutoˆt a` l’aspect de l’analyse en ligne, et particulie`rement a` la visuali-
+sation. Notre travail s’articule davantage autour des seconds travaux. Tout d’abord,
+nous pre´sentons les travaux ayant traite´ l’approximation des cubes de donne´es, leur
+compression et l’optimisation des calculs d’agre´gats.
+En se basant sur le principe d’approximation par ondelettes (wavelets), Vitter et
+al. [Vitter et Wang, 1999] proposent un algorithme pour construire un cube de donne´es
+compact. L’algorithme propose´ fournit des re´sultats meilleurs que ceux de l’approxi-
+mation par histogrammes ou par e´chantillonnage ale´atoire [Vitter et al., 1998]. Dans le
+meˆme ordre d’ide´es, Barbara et Sullivan [Barbara´ et Sullivan, 1997] ont propose´ l’ap-
+proche Quasi-Cube qui, au lieu de mate´rialiser la totalite´ d’un cube, mate´rialise une
+partie de ce dernier en se basant sur une description incomple`te mais suffisante de ses
+donne´es. Les donne´es non mate´rialise´es sont ensuite approxime´es par une re´gression
+line´aire.
+Une technique de compression base´e sur la mode´lisation statistique de la struc-
+ture des donne´es d’un cube a e´te´ propose´e dans [Shanmugasundaram et al., 1999].
+Apre`s estimation de la densite´ de probabilite´ des donne´es, les auteurs construisent une
+repre´sentation compacte des donne´es capable de supporter des requeˆtes d’agre´gation.
+Cette technique n’a de sens que dans le cas de cubes pre´sentant des dimensions conti-
+nues.
+La me´thode de compression Dwarf propose´e dans [Sismanis et al., 2002], re´duit l’es-
+pace de stockage d’un cube de donne´es. Cette me´thode consiste a` identifier les n-uplets
+redondants dans la table de faits. Les redondances de donne´es sont ensuite remplace´es
+par un seul enregistrement. Wang et al. [Wang et al., 2002] proposent de factoriser ces
+redondances par un seul n-uplet de base appele´ BST (Base Single Tuple). A` partir du
+BST, les auteurs construisent un cube de donne´es de moindre taille MinCube (Minimal
+condensed BST Cube). Cette approche requiert des temps de traitement relativement
+longs. En vue de reme´dier a` cette limite, Feng et al. [Feng et al., 2004a] ont repris l’ap-
+proche en introduisant une nouvelle structure de donne´es PrefixCube. Ils sugge`rent de
+ne plus utiliser tous les BST dans la construction du cube mais plutoˆt de se contenter
+RNTI - E -
+- 45 - RNTI-B-1
+Ben Messaoud et al.
+d’un seul BST par dimension. En contre partie, ils proposent l’algorithme BU-BST pour
+la construction d’un cube compresse´ (Bottom Up BST algorithm). Cet algorithme est
+une version ame´liore´e de l’algorithme BUC (Bottom Up Computation algorithm) propose´
+a` l’origine dans [Beyer et Ramakrishnan, 1999].
+Lakshmanan et al. [Lakashmanan et al., 2002] proposent la me´thode Quotient Cube
+pour la compression d’un cube de donne´es en re´sumant son contenu se´mantique et en
+le structurant sous forme de partitions de classes. La meilleure partition n’est pas
+seulement celle qui permet de re´duire la taille du cube mais aussi celle qui permet de
+conserver une structure de treillis valide donnant la possibilite´ de naviguer avec les
+ope´rations d’agre´gation (Roll-Up) et de spe´cification (Drill-Down) dans le cube re´duit.
+Malheureusement, la technique des Quotient Cube fournit des structures peu com-
+pactes. De plus, ces structures ne sont pas adapte´es aux mises a` jours des donne´es.
+Dans [Lakshmanan et al., 2003], Lakshmanan et al. proposent une nouvelle version
+ame´liore´e QC-Tree (Quotient Cube Tree) qui pallie les limites de la technique des
+Quotient Cube. QC-Tree permet de rechercher les structures compactes de donne´es
+dans un cube, d’extraire et de construire les cubes inte´ressants a` partir des donne´es
+mises a` jour.
+Feng et al. [Feng et al., 2004b] proposent la me´thode Range CUBE pour la compres-
+sion des cubes en se basant sur les corre´lations entre les cellules du cube. Cette approche
+consiste a` cre´er un arrangement des cellules d’un cube selon un certain formalisme
+d’appartenance introduit dans les nœuds du treillis du cube original. Cet arrangement
+permet de produire une nouvelle structure du cube plus compacte et moins couˆteuse
+en stockage et en temps de re´ponse.
+Ross et Srivastava [Ross et Srivastava, 1997] traitent le proble`me de l’optimisation
+du calcul d’agre´gats dans les cubes de donne´es e´parses. Les auteurs proposent l’algo-
+rithme Partitioned-Cube qui partitionnent les relations entre les donne´es d’un cube
+en plusieurs fragments de fac¸on a` ce qu’ils tiennent en me´moire centrale. Cette mesure
+permet de re´duire le couˆt des entre´es/sorties. Les fragments de donne´es sont ensuite
+traite´s inde´pendamment, un par un, afin de calculer les agre´gats possibles et de ge´ne´rer
+des sous-cubes de donne´es. Cette notion de fragment est reprise dans les travaux de Li et
+al. [Li et al., 2004]. Leur me´thode, appele´e Shell Fragment, partitionne un ensemble
+de donne´es de forte dimensionnalite´ en sous-ensembles disjoints de donne´es de dimen-
+sionnalite´s moins importantes appele´s “fragments”. Pour chaque fragment est calcule´
+un cube de donne´es local. Les identifiants des n-uplets participant a` la construction
+de cellules non vides dans un fragment sont enregistre´s. Ces identifiants sont utilise´s
+pour lier diffe´rents fragments et reconstruire de petits cubes (cubo¨ıdes) ne´cessaires a`
+l’e´valuation d’une requeˆte. Le cube de donne´es de de´part est assemble´ via ces fragments.
+Enfin, citons les travaux de Choong et al. [Choong et al., 2004, Choong et al., 2003]
+qui ont une motivation similaire a` la noˆtre. Les auteurs utilisent les re`gles floues (com-
+binaison d’un algorithme de re`gles d’association et de la the´orie des sous-ensembles
+flous) afin de faciliter la visualisation et la navigation dans l’espace de repre´sentation
+des cubes de donne´es. Leur approche, consiste a` identifier et a` construire des blocs de
+donne´es similaires au sens de la mesure du cube. Cependant, cette approche ne prend
+pas en compte le proble`me d’e´parsite´ du cube. De plus, elle se base sur le comptage
+du nombre d’occurrences des mesures ou` ces dernie`res sont conside´re´es comme des
+RNTI - E -
+- 46 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+nombres entiers.
+6 Conclusion et perspectives
+Dans cet article, nous avons propose´ une nouvelle approche apportant une solution
+au proble`me de la visualisation des donne´es dans un cube e´parse. Sans re´duire l’e´parsite´,
+nous cherchons a` organiser l’espace multidimensionnel des donne´es afin de regrouper
+ge´ome´triquement les cellules pleines dans un cube. La recherche d’un arrangement
+optimal du cube est un proble`me complexe et couˆteux en temps de calcul. Nous avons
+choisi d’utiliser les re´sultats de l’ACM comme heuristique pour re´duire cette complexite´.
+Notre approche consiste a` arranger les modalite´s des dimensions d’un cube, selon les
+besoins d’analyse de l’utilisateur, en fonction des re´sultats fournis par l’ACM. Pour
+e´valuer l’apport de cette nouvelle repre´sentation de donne´es, nous avons propose´ un
+indice d’homoge´ne´ite´ base´ sur le voisinage. La comparaison des valeurs de l’indice entre
+les repre´sentations initiale et arrange´e du cube nous permet d’e´valuer l’efficacite´ de
+notre approche. Les diffe´rents tests sur notre jeu de donne´es bancaires nous ont montre´,
+que quelle que soit l’e´parsite´, notre approche est pertinente. Le gain en homoge´ne´ite´
+est croissant en fonction de l’e´parsite´ et son amplitude est e´galement inhe´rente a` la
+structure des donne´es.
+Suite a` ce travail, plusieurs perspectives sont a` pre´voir. Tout d’abord, nous devons
+e´tudier la complexite´ de notre me´thode. Cette e´tude doit prendre en compte aussi bien
+les proprie´te´s du cube (taille, e´parsite´, cardinalite´s, etc.) que l’impact de l’e´volution
+des donne´es (rafraˆıchissement de l’entrepoˆt de donne´es).
+Ensuite, a` ce stade de nos travaux, pour appliquer l’ACM, nous tenons seulement
+compte de la pre´sence/absence des faits du cube dans la construction des axes factoriels.
+Nous envisageons alors d’introduire les valeurs des mesures comme ponde´rations des
+faits (poids des individus de l’ACM). Ceci permettra de construire des axes factoriels
+qui traduisent mieux la repre´sentation des faits du cube selon leur ordre de grandeur.
+Dans ce cas, il serait e´galement inte´ressant d’introduire la notion de distance entre
+cellules voisines en fonction des valeurs des mesures qu’elles contiennent.
+Dans le meˆme ordre d’ide´es de la pre´sente me´thode, nous souhaitons utiliser les
+re´sultats de l’ACM afin de faire e´merger des re´gions inte´ressantes a` l’analyse a` partir
+d’un cube de donne´es initial. En effet, l’ACM permet de concentrer dans les zones
+centrales des axes factoriels les individus ayant un comportement normal, et d’e´loigner
+ceux ayant des comportements atypiques vers les zones extreˆmes. Nous pouvons de´ja`
+exploiter les re´sultats de l’arrangement des modalite´s du cube dans le cadre de la
+distinction de re´gions correspondant a` ces comportements caracte´ristiques.
+Nous voulons aussi comparer la visualisation obtenue par notre approche avec celle
+propose´e dans [Chauchat et Risson, 1998]. Cette dernie`re repre´sente les re´sultats d’une
+analyse factorielle sous forme d’un diagramme de Bertin [Bertin, 1981] qui est plus facile
+a` interpre´ter. L’objectif de cette me´thode est de proposer une visualisation optimise´e
+d’un tableau de contingence. Cependant, elle se limite a` des tableaux a` deux dimensions
+sans donne´es manquantes et ne peut pas s’appliquer a` des cubes a` forte dimensionnalite´.
+Notre approche peut eˆtre conside´re´e comme une extension de cette me´thode concernant
+la dimensionnalite´ du cube et de l’e´parsite´ de ses donne´es.
+RNTI - E -
+- 47 - RNTI-B-1
+Ben Messaoud et al.
+Par ailleurs, la mate´rialisation des cubes de donne´es permet le pre´-calcul et le
+stockage des agre´gats multidimentionnels de manie`re a` rendre l’analyse OLAP perfor-
+mante. Cela requiert un temps de calcul important et ge´ne`re un volume de donne´es
+e´leve´ lorsque le cube mate´rialise´ est a` forte dimentionnalite´. Au lieu de calculer la tota-
+lite´ du cube, il serait judicieux de calculer et de mate´rialiser que les parties inte´ressantes
+du cube (fragments contenant l’information utile). Comme l’information re´side dans les
+cellules pleines, le cube arrange´ obtenu par l’application de l’ACM serait un point de
+de´part pour de´terminer ces fragments. Ainsi, comme dans [Barbara´ et Sullivan, 1997],
+chaque fragment donnera lieu a` un cube local. Les liens entre ces cubes permettront
+de reconstruire le cube initial.
+Enfin, dans ce travail, nous avons de´libe´re´ment omis de pre´ciser l’origine de ces
+donne´es. Classiquement, ces donne´es peuvent eˆtre issues d’un entrepoˆt de donne´es. Mais
+nous envisageons d’appliquer cette approche dans un contexte d’entreposage virtuel.
+Nous entendons par entreposage virtuel la construction de cube a` la vole´e a` partir de
+donne´es fournies par un syste`me de me´diation. Un enjeu prometteur de notre me´thode
+est donc de pouvoir soumettre a` l’utilisateur, dans le contexte de l’entreposage vir-
+tuel, des repre´sentations visuellement inte´ressantes des cubes de donne´es. Selon cette
+de´marche, l’utilisateur est de plus en plus implique´ dans le processus de´cisionnel. D’une
+part, il est a` l’origine des donne´es qu’il veut e´tudier dans la mesure ou` il interroge le
+me´diateur. D’autre part, il de´finit les mesures et les dimensions pour la construction de
+son contexte d’analyse. Notre me´thode se charge alors de lui fournir automatiquement
+une repre´sentation inte´ressante en arrangeant les modalite´s des dimensions qu’il choisit
+d’observer.
+Re´fe´rences
+[Barbara´ et Sullivan, 1997] Daniel Barbara´ et Mark Sullivan. Quasi-Cubes : Exploiting
+Approximations in Multidimensional Databases. SIGMOD Record, 26(3) :12–17,
+1997.
+[Benze´cri, 1969] Jean Paul Benze´cri. Statistical analysis as a tool to make patterns
+emerge from data. In ed.) Academic Press (S. Watanabe, editor, Methodologies of
+Pattern Recognition, pages 35–60, New York, 1969.
+[Bertin, 1981] Jacques Bertin. Graphics and Graphic Information Processing. de Gruy-
+ter, New York, 1981.
+[Beyer et Ramakrishnan, 1999] Kevin Beyer et Raghu Ramakrishnan. Bottom-Up
+Computation of Sparse and Iceberg CUBEs. In Proceedings of ACM SIGMOD Re-
+cord, pages 359–370, 1999.
+[Chauchat et Risson, 1998] Jean Hugues Chauchat et Alban Risson. BERTIN’s Gra-
+phics and Multidimensional Data Analysis, pages 37–45. Visualization of Categorical
+Data. Academic Press., 1998.
+[Choong et al., 2003] Yeow Wei Choong, Dominique Laurent, et Patrick Marcel. Com-
+puting Appropriate Representations for Multidimensional Data. Data & knowledge
+Engineering Journal, 45(2) :181–203, 2003.
+RNTI - E -
+- 48 -RNTI-B-1
+Espaces de repre´sentation multidimensionnels de´die´s a` la visualisation
+[Choong et al., 2004] Yeow Wei Choong, Anne Laurent, Dominique Laurent, et Pierre
+Maussion. Re´sume´ de cube de donne´es multidimensionnelles a` l’aide de re`gles floues.
+In Revue des Nouvelles Technologies de l’Information, editor, 4e`mes Journe´es Fran-
+cophones d’Extraction et de Gestion des Connaissances (EGC 04), volume 1, pages
+95–106, Clermont-Ferrand, France, Janvier 2004.
+[Feng et al., 2004a] Jianlin Feng, Qiong Fang, et Hulin Ding. PrefixCube : Prefix-
+sharing Condensed Data Cube. In Proceedings of the 7th ACM international work-
+shop on Data warehousing and OLAP (DOLAP 04), pages 38–47, Washington D.C.,
+U.S.A., November 2004.
+[Feng et al., 2004b] Ying Feng, Divyakant Agrawal, Amr El Abbadi, et Ahmed Met-
+wally. Range CUBE : Efficient Cube Computation by Exploiting Data Correlation.
+In Proceedings of the 20th International Conference on Data Engineering, pages 658–
+670, 2004.
+[Inmon, 1996] W. H. Inmon. Building the Data Warehouse. John Wiley & Sons, 1996.
+[Kimball, 1996] Ralph Kimball. The Data Warehouse toolkit. John Wiley & Sons,
+1996.
+[Lakashmanan et al., 2002] Laks V.S. Lakashmanan, Jian Pei, et Jiawei Han. Quo-
+tient Cube : How to Summarize the Semantics of a Data Cube. In Proceedings of
+International Conference of Very Large Data Bases, VLDB’02, 2002.
+[Lakshmanan et al., 2003] Laks V.S. Lakshmanan, Jian Pei, et Yan Zhao. QC-Trees :
+An Efficient Summary Structure for Semantic OLAP. In ACM Press, editor, Pro-
+ceedings of the 2003 ACM SIGMOD International Conference on Management of
+Data, pages 64–75, 2003.
+[Lebart et al., 2000] Ludovic Lebart, Alain Morineau, et Marie Piron. Statistique ex-
+ploratoire multidimensionnelle. Dunold, Paris, 3e e´dition edition, 2000.
+[Li et al., 2004] Xiaolei Li, Jiawei Han, et Hector Gonzalez. High-Dimensional OLAP :
+A Minimal Cubing Approach. In Proceedings of the 30th International Conference
+on Very Large Data Bases (VLDB 2004), pages 528–539, August 2004.
+[Messaoud et al., 2005] Riadh Ben Messaoud, Sabine Rabaseda, et Omar Boussaid.
+L’analyse factorielle pour la construction de cubes de donne´es complexes. In 2e`me
+atelier Fouille de Donne´es Complexes dans un processus d’extraction des connais-
+sances, EGC 05, Paris, pages 53–56, Janvier 2005.
+[Niemi et al., 2003] Tapio Niemi, Jyrki Nummenmaa, et Peter Thanisch. Normalising
+OLAP cubes for controlling sparsity. Data & Knowledge Engineering , 46 :317–343,
+2003.
+[Ross et Srivastava, 1997] Kenneth A. Ross et Divesh Srivastava. Fast Computation
+of Sparse Datacubes. In Proceedings of the 23rd International Conference of Very
+Large Data Bases, VLDB’97, pages 116–125. Morgan Kaufmann, 1997.
+[Shanmugasundaram et al., 1999] Jayavel Shanmugasundaram, Usama M. Fayyad, et
+Paul S. Bradley. Compressed Data Cubes for OLAP Aggregate Query Approxima-
+tion on Continuous Dimensions. In Proceedings of the fifth ACM SIGKDD Interna-
+tional Conference on Knowledge Discovery and Data Mining, pages 223–232, August
+1999.
+RNTI - E -
+- 49 - RNTI-B-1
+Ben Messaoud et al.
+[Sismanis et al., 2002] Yannis Sismanis, Antonios Deligiannakis, Nick Roussopoulos, et
+Yannis Kotidis. Dwarf : Shrinking the PetaCube. In Proceedings of the 2002 ACM
+SIGMOD international conference on Management of data, pages 464–475. ACM
+Press, 2002.
+[Vitter et al., 1998] Jeffrey Scott Vitter, Min Wang, et Bala Iyer. Data cube approxi-
+mation and histograms via wavelets. In Proceedings of the 7th ACM International
+Conferences on Information and Knowledge Management (CIKM’98), pages 96–104,
+Washington D.C., U.S.A., November 1998. Association for Computer Machinery.
+[Vitter et Wang, 1999] Jeffrey Scott Vitter et Min Wang. Approximate Computation
+of Multidimensional Aggregates of Sparse Data Using Wavelets. In Proceedings of
+the 1999 ACM SIGMOD international conference on Management of Data, pages
+193–204, Philadelphia, Pennsylvania, U.S.A., June 1999. ACM Press.
+[Wang et al., 2002] Wei Wang, Hongjun Lu, Jianlin Feng, et Jeffrey Xu Yu. Condensed
+Cube : An Effective Approach to Reducing Data Cube Size. In Proceedings of the
+18th IEEE International Conference on Data Engineering (ICDE’02), 2002.
+Summary
+In decision-support systems, the visual component is important for On Line Ana-
+lysis Processing (OLAP). In this paper, we propose a new approach that faces the
+visualization problem due to data sparsity. We use the results of a Multiple Correspon-
+dence Analysis (MCA) to reduce the negative effect of sparsity by organizing differently
+data cube cells. Our approach does not reduce sparsity, however it tries to build re-
+levant representation spaces where facts are efficiently gathered. In order to evaluate
+our approach, we propose an homogeneity criterion based on geometric neighborhood
+of cells. The obtained experimental results have shown the efficiency of our method.
+RNTI - E -
+- 50 -RNTI-B-1
