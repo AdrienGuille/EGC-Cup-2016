@@ -30,6 +30,12 @@ def serialize(corpus, file_path):
 def deserialize(file_path):
     return pickle.load(open(file_path, 'rb'))
 
+def title_list(corpus):
+    titles = []
+    for article in corpus:
+        titles.append(article.get('title'))
+    return titles
+
 def abstract_list(corpus):
     abstracts = []
     for article in corpus:
