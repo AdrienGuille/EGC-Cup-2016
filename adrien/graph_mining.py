@@ -6,7 +6,15 @@ import networkx as nx
 import plotting
 
 def merge(graph1, graph2):
-    return nx.compose(graph1, graph2)
+    graph = nx.Graph(name=graph1.name+'+'+graph2.name)
+    graph.add_nodes_from(graph1)
+    graph.add_nodes_from(graph2)
+    graph.add_edges_from(graph1.edges())
+    graph.add_edges_from(graph2.edges())
+    return graph
+
+def draw(graph):
+    nx.draw_graphviz(graph, name=graph.name)
 
 def print_basic_properties(graph):
     print nx.number_of_nodes(graph), 'distinct authors'
@@ -26,11 +34,10 @@ def degree_analysis(graph):
 def average_clustering_coefficient(graph):
     return nx.average_clustering(graph)
 
-def advanced_metrics(graph):
-    print ' - Graph: ', graph.name
-    if nx.is_connected(graph):
-        print 'diameter', nx.diameter(graph)
-    else:
-        print 'disconnected graph'
+def page_rank(graph):
+    node_dictionary = nx.pagerank(graph, alpha=0.85, max_iter=300)
+    return sorted(node_dictionary.items(), key=lambda x: x[1], reverse=True)
+
+def k_core_decomposition(graph):
     k_core = nx.core_number(graph)
-    print 'k-core decomposition: ', sorted(k_core.items(), key=lambda x: x[1], reverse=True)
+    return sorted(k_core.items(), key=lambda x: x[1], reverse=True)

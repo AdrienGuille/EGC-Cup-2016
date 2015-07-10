@@ -41,13 +41,18 @@ graphs = []
 for i in range(2004, 2015):
     print i
     article_corpus = corpus.load('input/RNTI_articles_export.txt', i, i+1)
-    collaboration_graph = corpus.collaboration_graph(article_corpus, 'collaboration_graph ('+str(i)+')')
+    collaboration_graph = corpus.collaboration_graph(article_corpus, str(i))
     graph_mining.print_basic_properties(collaboration_graph)
     graphs.append(collaboration_graph)
+    graph_mining.draw(collaboration_graph)
     degree_analysis = graph_mining.degree_analysis(collaboration_graph)
     print 'max degree:', max(degree_analysis[0])
     density.append(degree_analysis[1])
     average_clustering.append(graph_mining.average_clustering_coefficient(collaboration_graph))
+    page_rank = graph_mining.page_rank(collaboration_graph)
+    print page_rank[:10]
+    k_core = graph_mining.k_core_decomposition(collaboration_graph)
+    print k_core[:10]
     year.append(i)
     print ''
 plotting.scatter_plot(data_x=year,
@@ -59,20 +64,27 @@ plotting.scatter_plot(data_x=year,
                       plot_name='Density vs. time',
                       file_path='output/density_vs_time.png')
 print ' - Accumulating collaborations through years'
+
 cumulative_graph = graphs[0]
 density = []
 average_clustering = []
-for i in range(1,len(graphs)):
+for i in range(0,len(graphs)):
     cumulative_graph = graph_mining.merge(cumulative_graph, graphs[i])
     graph_mining.print_basic_properties(cumulative_graph)
     degree_analysis = graph_mining.degree_analysis(cumulative_graph)
     print 'max degree:', max(degree_analysis[0])
     density.append(degree_analysis[1])
     average_clustering.append(graph_mining.average_clustering_coefficient(cumulative_graph))
+    page_rank = graph_mining.page_rank(cumulative_graph)
+    print page_rank[:10]
+    k_core = graph_mining.k_core_decomposition(cumulative_graph)
+    print k_core[:10]
     print ''
-plotting.scatter_plot(data_y=average_clustering,
+plotting.scatter_plot(data_x=year,
+                      data_y=average_clustering,
                       plot_name='Clustering coefficient vs. time (cumulative graph)',
                       file_path='output/cumulative_clustering_coefficient_vs_time.png')
-plotting.scatter_plot(data_y=density,
+plotting.scatter_plot(data_x=year,
+                      data_y=density,
                       plot_name='Density vs. time (cumulative graph)',
                       file_path='output/cumulative_density_vs_time.png')
