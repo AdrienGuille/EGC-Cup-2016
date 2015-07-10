@@ -4,6 +4,7 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 
 import networkx as nx
 import plotting
+import community
 
 def merge(graph1, graph2):
     graph = nx.Graph(name=graph1.name+'+'+graph2.name)
@@ -25,7 +26,7 @@ def degree_analysis(graph):
     degree_sequence = sorted(nx.degree(graph).values(), reverse=True)
     plotting.scatter_plot(data_y=degree_sequence,
                           plot_name='Degree distribution ('+graph.name+')',
-                          file_path='output/degree_distribution('+graph.name+').png',
+                          file_path='output/plots/degree_distribution('+graph.name+').png',
                           ymax=100,
                           xmax=1000,
                           loglog=True)
@@ -41,3 +42,6 @@ def page_rank(graph):
 def k_core_decomposition(graph):
     k_core = nx.core_number(graph)
     return sorted(k_core.items(), key=lambda x: x[1], reverse=True)
+
+def louvain_modularity(graph):
+    return community.best_partition(graph)
