@@ -1,0 +1,543 @@
+Cadre general et algorithmes de
+constructions pour des representations
+symboliques adaptatives de series
+temporelles
+Bernard Hugueney1
+Universite PARIS-DAUPHINE
+LAMSADE
+Place du Marechal de Lattre de Tassigny
+75775 PARIS CEDEX 16
+bernard.hugueney@lamsade.dauphine.fr,
+http ://www.lamsade.dauphine.fr/~hugueney
+Resume Les series temporelles constituent un domaine tres important de la fouille
+de donnees. En eet, les tres gros volumes de donnees numeriques generalement en-
+treposes ne se pre^tent pas a une analyse directe. Dans un but a la fois de reduction
+de la dimensionnalite et d'extraction d'information, la fouille de donnees de series
+temporelles donne generalement lieu a un changement de representation des series
+temporelles. Dans un objectif d'intelligibilite de l'information extraite lors du chan-
+gement de representation, on peut avoir recours a des representations symboliques
+de series temporelles. Nous proposons un cadre general de representation de series
+temporelles, ainsi que deux representations particulieres (Clustering-Based Symbo-
+lic Representations : CBSR et Segmentation-Based Symbolic Representation with
+Linear models of 0th order : SBSR-L0) s'inscrivant dans ce cadre general.
+Keywords : fouille de donnees, series temporelles, changements de representations,
+representations symboliques, recherche de motifs recurrents.
+1 Introduction
+Les series temporelles constituent un domaine tres actif de la fouille de donnees. En
+eet, les bases de donnees de series temporelles sont caracterisees non seulement par
+leur tres grand volume, mais aussi par le fait que les informations recherchees (tendances,
+correlations,...) ne sont pas directement accessibles a partir des donnees brutes. Pour cette
+raison, des changements de representation doivent e^tre eectues. Nous nous interessons
+plus particulierement a des representations symboliques, pluto^t que numeriques, car elles
+sont intelligibles par les utilisateurs. Nous presentons tout d'abord un cadre general per-
+mettant de formuler une tres large gamme de representations symboliques, notamment
+SAX (Symbolic Aggregate approXimation) qui est une representation symbolique de series
+temporelles classiquement utilisee. Nous proposons deux nouvelles representations sym-
+boliques qui peuvent e^tre considerees comme des extensions adaptatives de SAX : CBSR
+(Clustering-Based Symbolic Representations) et SBSR-L0 (Segmentation-Based Symbolic
+Representation with Linear models of 0th order). Pour chacune de ces representations sym-
+boliques, nous proposons un algorithme de construction. En conclusion, nous suggerons
+c Revue MODULAD, 2006 -1- Numero 34
+d'autres representations symboliques a partir du me^me cadre general, ainsi que diverses
+applications possibles de ces representations symboliques.
+Il n'est plus rare d'avoir des bases de donnees constituees de centaines de series tem-
+porelles, elles-me^mes constituees de dizaines de milliers de points. En eet, les series tem-
+porelles sont parmi les donnees qu'il est le plus facile d'accumuler en tres grande quantite
+car il sut de disposer de capteurs numeriques pour remplir les bases de donnees, a une
+vitesse qui n'est limitee que par la frequence d'echantillonnage des capteurs. On peut
+donc tres facilement se retrouver dans le cas typique de la fouille de donnees, a savoir
+que des masses de donnees ont ete recueillies a un niveau de detail sans rapport avec
+les utilisations qui en seront faites. La gure 1 montre par exemple un extrait de serie
+temporelle issu de la base que nous allons utiliser pour valider notre approche. On y voit
+un extrait d'une serie temporelle sur une periode d'une semaine,la base contenant 420
+series temporelles enregistrees pendant un an.
+0 500 1000 1500 2000 2500 3000
+0
+20
+40
+60
+80
+extrait sur 1 semaine, 1 pt=3’
+Fig. 1 { Extrait d'une serie temporelle de la base.
+Les changements de representation peuvent e^tre eectues pour deux raisons distinctes.
+Ces raisons ne sont pas exclusives mais induisent des variations sur les criteres d'evaluation
+des representations.
+La motivation premiere est souvent la simple reduction de dimensionnalite. Le vo-
+lume des donnees en jeu dans l'exemple vu plus haut ne permet pas de manipuler di-
+rectement celles-ci, soit parce qu'elles ne tiennent pas en memoire centrale, soit que le
+temps de calcul de n'importe quel algorithme non trivial est prohibitif. On cherche alors
+a construire des representations preservant au maximum l'information presente dans les
+donnees, mais sans avoir de connaissances sur ce qui constitue justement cette informa-
+tion. On en est alors reduit a utiliser des representations qui permettent de reconstruire
+des series temporelles et a chercher les parametres de ces representations de facon a mi-
+nimiser l'erreur de modelisation, generalement au sens des moindres carres. Par exemple,
+la representation APCA (Adaptive Piecewise Constant Approximation) presentee par
+[Keogh et al.(2001a)] permet une plus faible erreur quadratique de modelisation (a com-
+plexite de representation egale) que la representation PAA (Piecewise Aggregate Approxi-
+mation [Keogh et al.(2001b)] , [Yi and Faloutsos(2000)]). Elle permet aussi une indexation
+basee sur une distance Lp plus ecace que cette derniere.
+La nalite de l'analyse de donnees etant la presentation d'informations aux utilisa-
+teurs, un autre objectif des changements de representation peut e^tre la construction des
+elements d'information de plus haut niveau qui seront pertinents. L'evaluation de telles
+representations devra alors prendre en compte une semantique adaptee a la problematique
+du domaine.
+c Revue MODULAD, 2006 -2- Numero 34
+2 Representations symboliques de series temporelles
+Les utilisateurs naux d'outils d'analyse de donnees reechissent a propos de celles-ci
+en des termes symboliques. Les outils d'analyse de donnees ayant intere^t a mettre en uvre
+un "univers du discours" associe a la semantique du domaine, cela amene naturellement
+a considerer des representations symboliques des donnees a analyser et non simplement
+des \resultats numeriques". Diverses representations symboliques de series temporelles
+ont deja ete proposees. Nous presentons un cadre general permettant d'unier celles-ci
+ainsi que deux representations symboliques particulieres s'incrivant dans ce cadre general :
+l'une (CBSR) basee sur la classication d'extraits de series temporelles, l'autre (SBSR-L0)
+basee sur la segmentation par modeles lineaires d'ordre 0.
+2.1 Cadre general pour les representations symboliques de series
+temporelles
+Soit une serie temporelle ST de N points denie par ST = f(di; vi)gi2f1Ng; avec di 2
+D et vi 2 V , avec D le domaine de denition temporel et V l'espace numerique des va-
+leurs de la serie temporelle, eventuellement muni de l'element NA indiquant une valeur
+manquante.
+Nous proposons de denir une representation symbolique de ST par :
+{ un decoupage en P episodes E = fej = [djdebut; djn[gj2f1Pg; avec(djdebut; djn) 2
+D2 et djdebut < djn ,
+{ un alphabet de K symboles  = fsmgm2f1Kg,
+{ la representation symbolique proprement dite RS : E ! ; ej 7! RS(ej) qui est
+alors l'application associant chacun des episodes de E a un symbole de .
+Cette denition ne specie absolument pas la semantique associee aux elements de l'alpha-
+bet symbolique. Ceci lui permet d'e^tre independante des domaines d'application speciques.
+En revanche, an de permettre une evaluation des representations symboliques, nous im-
+posons qu'elles permettent de reconstruire une serie temporelle numerique sur le domaine
+de denition temporel D de la serie d'origine.
+Une representation symbolique sera pertinente si elle satisfait au mieux les imperatifs
+contradictoires suivants :
+{ concision maximale de la representation : avec des cardinalites de E et  minimales
+et des symboles d'interpretation aussi simples que possible
+{ delite maximale : permettant une reconstruction aussi proche que possible de la
+serie d'origine, au sens d'une distance qui peut e^tre liee au domaine d'application.
+En l'absence de distance propre au domaine, on pourra utiliser une distance point
+a point et minimiser par exemple la somme des erreurs quadratiques.
+Bien su^r l'ensemble des representations symboliques qu'il est possible de denir est inni
+et depend principalement de la semantique associee a l'alphabet symbolique. Pour une
+semantique donnee, l'espace des representations symboliques possibles d'une serie tempo-
+relle de N points avec P episodes associes a des symboles d'un alphabet de cardinalite K
+est KPCPN . Il est donc evident qu'il sera hors de question d'enumerer les solutions pos-
+sibles. Les representations symboliques devront donc e^tre choisies de facon a permettre
+leur construction de facon ecace. Les representations symboliques que nous proposons
+ci-apres atteignent cet objectif de diverses facons. SAX propose une partition reguliere de
+l'espace temporel et un alphabet independants des donnees, tandis que CBSR et SBSR-L0
+c Revue MODULAD, 2006 -3- Numero 34
+se basent respectivement sur des algorithmes de classication et sur des algorithmes de
+segmentation de series temporelles.
+Des lors que les representations des series temporelles d'une base de donnees sont
+adaptees aux donnees, se pose la question de decider si les parametres (decoupage en
+episodes et interpretation des symboles de l'alphabet) doivent e^tre adaptes speciquement
+pour chacune des series temporelles. En eet, il est aussi possible de choisir une adaptation
+globale an de determiner un seul decoupage et un seul ensemble d'interpretations de
+symboles communs a l'ensemble des series. An de faciliter la comparaison avec SAX,
+nous presentons ici les resultats correspondants a une adaptation globale pour l'ensemble
+des series de la base.
+2.2 Representation symbolique existante : Symbolic Aggregate
+approXimation (SAX)
+Dans un objectif de reduction de la dimensionnalite, il est important de denir des
+unites temporelles permettant de regrouper les points des series temporelles. On denit
+generalement des episodes comme des intervalles du domaine de denition temporel des
+series temporelles a representer. Tres generalement, en raison du cou^t minime d'acquisi-
+tion et de stockage des donnees, les series temporelles sont enregistrees dans les bases de
+donnees sous la forme la plus detaillee possible, independamment de l'echelle de temps a la-
+quelle se developpent les comportements a identier. On pourra alors regrouper les points
+en episodes sans perdre d'information essentielle. C'est le principe de la representation
+symbolique SAX, presentee par [Lin et al.(2003)].
+SAX est une representation symbolique de series temporelles univariees centrees reduites
+qui n'est pas adaptative :
+{ le domaine temporel est divise en episodes de me^me taille
+{ les classes d'equivalence des valeurs prises par les series temporelles sont xees a
+priori en fonction du nombre de symboles a utiliser, de facon a obtenir un decoupage
+en classes de me^me eectif sous reserve que la distribution centree et reduite des
+valeurs soit normale.
+La non adaptativite de la representation et la reference a la distance euclidienne
+donnent a SAX les avantages suivants :
+{ la construction des representations est extre^mement ecace en temps de calcul
+(O(N)) pour une representation d'une serie temporelle de N points
+{ toutes les representations (basees sur un me^me nombre de symboles et des episodes
+de me^me taille) sont trivialement commensurables.
+En contrepartie, cette representation soure des inconvenients qui sont intrinsequement
+lies :
+{ l'erreur de modelisation, pour une reduction donnee de la dimensionnalite, n'est pas
+minimale puisque le modele n'est pas localement adapte aux donnees
+{ les classes d'equivalence auxquelles les symboles sont associes ne sont pas forcement
+pertinentes car elles ne sont pas adaptees aux donnees.
+Si l'on dispose des ressources necessaires, il peut donc e^tre interessant de construire
+des representations symboliques adaptatives. De nombreuses representations symboliques
+peuvent e^tre envisagees, non seulement en fonction des donnees a analyser, mais aussi en
+fonction des ta^ches d'analyse a eectuer. Dans le cadre generique que nous avons presente,
+nous detaillons maintenant deux types de representation symbolique qui peuvent e^tre
+c Revue MODULAD, 2006 -4- Numero 34
+consideres comme des extensions adaptatives des principes qui sous-tendent SAX. L'un
+est base sur des classications automatiques d'extraits de series temporelles, l'autre sur
+des segmentations de series temporelles.
+2.3 Representations symboliques adaptatives basees sur des clas-
+sications automatiques d'extraits de series temporelles
+2.3.1 Principes et denitions
+SAX eectue des regroupements des points des series temporelles representees sui-
+vant des episodes de me^me taille. Or les series temporelles que nous etudions sont issues
+de la mesure de phenomenes en rapport avec des activites humaines et presentent des
+periodicites liees aux cycles d'activite (journalier et hebdomadaire). Un decoupage perti-
+nent en episodes de me^me taille de telles series pourrait tirer parti de ces periodicites.
+SAX represente les episodes par un symbole associe a un intervalle de valeurs. La
+representation symbolique obtenue sera d'autant plus dele que les points d'un episode
+donne appartiennent bien a un me^me intervalle de valeurs. Une telle interpretation ne
+permet donc pas de representer correctement des episodes d'une journee ou d'une semaine
+au cours desquels les series temporelles presentent de trop grandes variations.
+Pour cette raison, nous proposons d'associer a ces episodes de me^me taille des formes
+que nous appellerons formes prototypiques car chacune sera associee a un ensemble d'ex-
+traits de series temporelles. Ces extraits representes par un me^me symbole sont donc
+conceptuellement reunis au sein d'une classe d'equivalence. An de determiner automati-
+quement ces classes, nous utilisons un algorithme de classication automatique numerique
+non-supervisee (par exemple les k-moyennes). Comme dans le cas de la compression vecto-
+rielle, il est possible de reconstruire une serie temporelle a l'aide des formes prototypiques.
+Ainsi que vu en 1, il est possible de chercher a minimiser soit l'erreur en reconstruction
+(dans une optique de reduction de la dimensionnalite), soit l'erreur de classication (dans
+une optique d'extraction d'information). An de permettre une evaluation des resultats
+sans avoir recours a une interpretation experte sur la pertinence des classes, nous pri-
+vilegions ici le critere d'erreur en reconstruction.
+2.3.2 Algorithme de construction
+Pour construire une representation CBSR, il sut d'eectuer une classication numerique
+non-supervisee des extraits de series temporelles apres avoir determine les deux pa-
+rametres :
+{ d la duree des episodes
+{ o 2 f1;    ; dg, indice, que nous appelons oset , de debut du premier episode (qui ne
+correspond donc pas forcement a 1, indice du premier instant de la serie temporelle
+a modeliser).
+La duree des episodes est generalement donnee par des connaissances a priori sur les series
+temporelles a modeliser, par exemple une journee ou une semaine. Lorsque cela n'est pas
+le cas, il est possible d'utiliser la densite spectrale des series temporelles an d'estimer
+des periodicites interessantes. Deux methodes sont couramment utilisees a cet eet :
+{ la transformee de Fourier de la fonction d'auto-correlation (theoreme de Wiener-
+Kinchine) : cette methode a une bonne resolution spectrale, mais le calcul de la
+fonction d'auto-correlation est assez cou^teux en temps de calcul
+c Revue MODULAD, 2006 -5- Numero 34
+{ le periodogramme moyenne : il faut moyenner le periodogramme car celui-ci represente
+le spectre instantane. La precision de la localisation des pics de puissance qui nous
+interessent est aectee par le lissage, mais le calcul du periodogramme par trans-
+formee de Fourier rapide (FFT) est ecace en temps de calcul.
+Pour des raisons d'ecacite algorithmique, on utilise generalement le periodogramme
+moyenne.
+Une fois la duree des episodes determinee, plusieurs approches (detaillees dans [Hugueney(2003)])
+peuvent e^tre utilisees pour determiner un oset pertinent. Nous avons ici utilise la plus
+simple, a savoir celle qui place les points de coupure entre episodes aux endroits de la serie
+temporelle ou les variations locales sont les plus faibles, ceci de facon a essayer d'eviter de
+couper un comportement (lie a des variations de la serie temporelle) entre deux episodes.
+2.3.3 Illustration des resultats
+Le contexte de l'activite humaine a laquelle sont liees nos series temporelles nous a
+amene a choisir des episodes d'une journee. La gure 2 montre les formes prototypiques
+obtenues pour un alphabet de cinq symboles. Bien qu'il soit toujours possible d'approximer
+aussi delement que necessaire des series temporelles quelconques a l'aide de modeles
+constants par morceaux, les prols observes montrent clairement qu'il faudrait alors un
+certain nombre d'episodes pour modeliser correctement une journee. Au contraire, le fait
+que les series temporelles de la base de donnees soient associees a des activites humaines,
+donc periodiques et repetitives, permet une representation dele par CBSR avec un seul
+episode par jour.
+0 100 200 300 400
+0
+1
+2
+3
+4
+5
+6
+0 100 200 300 400
+0
+10
+20
+30
+40
+0 100 200 300 400
+−0
+.5
+0.
+0
+0.
+5
+0 100 200 300 400
+−0
+.6−
+0.
+4−0
+.20
+.0
+0 100 200 300 400
+−0
+.5
+0.
+5
+1.
+5
+Fig. 2 { Formes prototypiques associees a des episodes d'une journee.
+2.3.4 Evaluation de la modelisation
+Le tableau 1 montre les sommes d'erreurs quadratiques des representations symbo-
+liques CBSR comparees a celles des representations de type SAX pour lesquelles on asso-
+cierait chaque symbole a la valeur moyenne (sous hypothese de distribution normale) des
+valeurs des series temporelles dans l'intervalle associe au symbole. On constate que le fait
+que les series temporelles de la base de donnees soient associees a des activites humaines,
+donc periodiques et repetitives, permet une bien meilleure modelisation par CBSR.
+c Revue MODULAD, 2006 -6- Numero 34
+nb. de symboles CBSR SAX
+2 3.48738e+07 8.62192e+09
+3 3.09921e+07 8.31765e+09
+4 2.89774e+07 8.22382e+09
+5 2.74725e+07 7.9138e+09
+6 2.66821e+07 7.81554e+09
+7 2.60723e+07 7.80194e+09
+8 2.5515e+07 7.78745e+09
+9 2.50619e+07 7.72299e+09
+Tab. 1 { Erreurs de modelisation (SSE) pour des representations CBSR et SAX.
+2.4 Representations symboliques adaptatives basees sur des seg-
+mentations lineaires d'ordre 0 (SBSR-L0)
+2.4.1 Principes et denitions
+Une representation symbolique telle que denie en 2.1 est caracterisee par l'interpretation
+donnee a l'alphabet symbolique. Nous proposons une representation symbolique de series
+temporelles univariees dont les symboles correspondent a des niveaux constants. Les
+series temporelles reconstruites a partir de telles representations symboliques seront donc
+constantes par morceaux. Alors que dans le cas d'une segmentation classique par modeles
+lineaires d'ordre 0, chaque episode est associe a un niveau qui est optimise localement
+de facon a representer au mieux la serie sur cet episode, dans le cas d'une representation
+SBSR-L0, chaque niveau est associe a un symbole de l'alphabet dont la cardinalite est
+K  P . Chaque niveau represente ainsi un ensemble d'episodes et nous parlons donc de
+niveaux prototypiques. Pour simplier, nous utiliserons l'association biunivoque entre les
+symboles et leur interpretation par un niveau prototypique pour parler d'un alphabet de
+niveaux prototypiques  pluto^t que d'un ensemble de niveaux associes aux symboles de
+l'alphabet. On note DS l'application qui associe le niveau prototypique a un episode de
+D.
+Par rapport a SAX, qui est la representation symbolique la plus proche, les dierences
+sont les suivantes :
+{ les symboles sont associes a des niveaux et non pas un intervalle. On associe un
+episode au symbole correspondant au niveau le plus proche de la moyenne des valeurs
+prises par la serie sur cet episode pluto^t qu'a un symbole correspondant a l'intervalle
+contenant cette valeur moyenne
+{ Les niveaux associes aux symboles sont adaptes aux valeurs prises par les series tem-
+porelles a representer, alors que SAX utilise un partitionnement predeni de facon
+a obtenir une distribution equi-repartie si la distribution des valeurs est normale
+{ Le decoupage en episodes est adapte aux valeurs prises par les series temporelles a
+representer, alors que SAX utilise un decoupage en episodes de me^me taille.
+Il faut bien su^r decider d'un critere pour adapter l'ensemble des niveaux et le decoupage
+en episodes. Conformement a l'objectif de delite aux donnees presente en 2.1, nous
+cherchons a minimiser la somme des erreurs quadratiques entre les series a representer et
+les reconstructions permises par leur representation symbolique.
+Formellement, la denition de cette representation symbolique est constituee a par-
+c Revue MODULAD, 2006 -7- Numero 34
+tir du cadre general presente en 2.1 en precisant la denition de l'alphabet de niveaux
+prototypiques associe a l'alphabet symbolique  = flmgm2f1Kg avec lm 2
+ 
+.
+Puisque le decoupage en episodes et l'alphabet symbolique sont optimises en fonc-
+tion des donnees, deux series temporelles dont on calcule les representations symboliques
+n'auront a priori pas les me^mes ensembles d'episodes et de niveaux prototypiques. An de
+simplier les calculs des distances entre representations symboliques de series temporelles
+et d'avoir une comparaison plus immediate avec SAX, nous avons decide d'optimiser E et
+ sur l'ensemble des series temporelles de la base. Cela est rendu possible par le fait que
+toutes nos series temporelles sont denies sur le me^me domaine temporel D et que leurs
+valeurs numeriques sont commensurables. Il serait cependant tout a fait envisageable de
+calculer des decoupages et/ou alphabets de niveaux symboliques propres a chaque serie
+en denissant un calcul de distance adapte, par exemple sur le modele de celui deni pour
+une autre representation adaptative (voir [Keogh and Pazanni(1998)]).
+2.4.2 Algorithme de construction
+Avec les denitions vues en 2.4.1, l'erreur de reconstruction que nous cherchons a
+minimiser est SSE(ST; R(RS(ST; P;K))), avec SSE la somme des erreurs quadratiques,
+ST la serie temporelle a representer et R(RS(ST; P;K)) la reconstruction obtenue a partir
+de la representation symbolique de ST avec un decoupage du domaine temporel en P
+episodes et un alphabet de K niveaux prototypiques. Cette erreur de modelisation vautP
+ej2E
+P
+i2ej
+(vi   DS(ej))
+2 qui exprime que l'erreur a minimiser est la somme des erreurs
+quadratiques sur tous les episodes de E et que l'erreur quadratique sur un episode ej est
+calculee entre les valeurs vi de la serie a modeliser et la description symbolique par un
+niveau prototypique de  de cet episode. Pour minimiser cette erreur, il faut aussi avoir
+DS(ej) = argminl2(
+P
+i2ej
+(vi   DS(ej))
+2).
+Calculer une SBSR-L0 optimale revient donc a trouver les P   1 points de rupture
+entre episodes qui denissent E et les K niveaux qui denissent  de facon a minimiser
+ce cou^t.
+Pour des raisons evidentes de complexite algorithmique, il n'est pas envisageable de
+calculer simultanement E et  car la complexite algorithmique serait alors redhibitoire,
+comme vu en 2.1. Il est neanmoins possible de construire une solution en procedant de
+facon iterative, en optimisant alternativement E et  :
+1. Etape initiale : calcul d'un decoupage en episodes E. En l'absence d'un alphabet de
+niveaux, on eectue une segmentation classique avec modele lineaire d'ordre 0.
+2. Calcul d'un ensemble de K niveaux permettant de minimiser l'erreur en reconstruc-
+tion si chaque episode de E est associe a l'un de ces niveaux. Cet ensemble denit
+l'interpretation de .
+3. Calcul d'un ensemble de P   1 points delimitant les P episodes qui denissent E de
+facon a minimiser l'erreur en reconstruction si chaque episode est associe a l'un des
+K niveaux trouves en 2.
+4. Iterer en retournant a l'etape 2 jusqu'a convergence de l'erreur en reconstruction.
+Cette convergence est garantie par le fait que les etapes 2 et 3 diminuent l'erreur en
+reconstruction et que celle-ci ne peut e^tre negative.
+Cet algorithme ne peut garantir qu'une optimalite locale de la solution trouvee, mais le
+volume des donnees a traiter est tel qu'il impose d'enormes contraintes sur la complexite
+c Revue MODULAD, 2006 -8- Numero 34
+algorithmique acceptable.
+2.4.3 Complexite algorithmique
+Il n'est pas possible de donner une expression exacte de la complexite algorithmique
+totale car le nombre d'iterations jusqu'a convergence depend des donnees. Neanmoins, il
+est possible de calculer les complexites algorithmiques des dierentes etapes.
+L'etape initiale est une segmentation classique par modeles lineaires d'ordre 0. L'algo-
+rithme optimal de segmentation classique par modeles lineaires d'ordre 0 qui peut e^tre lui
+aussi considere comme une partition sous contrainte d'ordre total (voir [Lechevallier(1990)])
+pour laquelle il est possible d'utiliser un algorithme de programmation dynamique per-
+mettant de trouver la solution optimale en O(PN2)([Fisher(1958)]).
+L'etape de calcul des niveaux peut e^tre consideree comme une etape de classication
+des episodes. Les episodes etant regroupes selon une seule dimension (liee au niveau moyen
+de la serie sur l'episode), il est donc aussi possible d'utiliser un algorithme de classication
+sous contrainte d'ordre total. La classication optimale des P episodes en K classes de
+niveaux est donc realisable en O(KP2).
+L'etape 3 est algorithmiquement tres proche de l'etape 1 puisque la seule dierence
+est qu'il faut trouver le niveau optimal parmi les K elements de  pluto^t que de prendre
+la valeur moyenne. La complexite de l'algorithme optimal est alors de O(KPN2).
+Dans un contexte de fouille de donnees comme celui de notre application, les ordres
+de grandeur sont les suivants :
+{ N, le nombre de points des series temporelle est de l'ordre de 104 ou 105
+{ P, le nombre d'episodes extraits de chaque serie temporelles est de l'ordre de 102 ou
+103
+{ K, le nombre de niveaux prototypiques utilises pour representer les series temporelles
+est de 10.
+On est alors oblige d'utiliser des algorithmes plus rapides mais ne garantissant pas
+l'optimalite de la solution au probleme de segmentation. Une revue detaillee de tels algo-
+rithmes depasse le cadre de cet article. Dierents compromis entre le temps d'execution
+et la qualite de la solution sont presentes en [Hugueney(2003)].
+Comme nous l'avons indique en 2.1, nous avons choisi de calculer un decoupage en
+episodes et un alphabet de niveaux prototypiques communs a toutes les series temporelles
+de la base. Cela n'a pas d'inuence sur le temps d'execution global car la complexite
+algorithmique des dierentes etapes est seulement modiee d'un facteur M , avec M le
+nombre de series temporelles de la base, et qu'il n'est plus necessaire d'appliquer l'algo-
+rithme qu'une seule fois pour les M series au lieu d'une fois pour chacune des M series.
+2.4.4 Illustration des resultats
+Sur la gauche de la gure 3, nous montrons un extrait de la distribution des valeurs
+prises par les series temporelles, centrees et reduites, de notre base de donnees, ainsi que les
+intervalles correspondants aux cinq symboles d'un alphabet d'une representation SAX en
+traits pleins. Il ne s'agit que d'un extrait de la distribution car il y a dans la base quelques
+valeurs atypiques superieures a 20. On constate que l'hypothese d'une distribution normale
+qui sous-tend SAX n'est pas respectee. En eet, il n'y a pas de valeurs inferieures a zero
+dans notre base, car nous etudions les mesures de quantites positives ou nulles, ce qui
+c Revue MODULAD, 2006 -9- Numero 34
+induit un \desequilibre" de la distribution que l'on retrouve apres avoir centre et reduit
+les series temporelles. De plus, l'information sur les valeurs atypiques est completement
+perdue par la representation SAX. Sur cette me^me gure de gauche, les traits en pointilles
+et mixtes representent les valeurs prototypiques que l'on peut associer respectivement aux
+symboles SAX et aux symboles SBSR-L0. Seulement quatre des cinq valeurs prototypiques
+de SBSR-L0 sont visibles sur la gure car la cinquieme valeur, qui correspond aux valeurs
+atypiques, est situee hors de l'extrait de distribution represente. Sur la gure de droite,
+on a represente le decoupage en episodes obtenu par SBSR-L0 sur un extrait d'une serie
+temporelle. On remarque que celui-ci permet eectivement de mieux modeliser la serie
+en question alors me^me qu'il est issu d'un decoupage adapte globalement a l'ensemble de
+toutes les series de la base.
+valeurs prises par les séries temporelles
+oc
+cu
+rr
+en
+ce
+s
+−1 0 1 2 3 4
+0
+50
+00
+0
+10
+00
+00
+15
+00
+00 intervalles SAX
+valeurs SAX
+valeurs SBSR−L0
+1600 1700 1800 1900 2000 2100 2200
+−1
+0
+1
+2
+3
+4
+Fig. 3 { Distribution des valeurs des series temporelles et valeurs prototypiques.
+Decoupage adapte aux donnees.
+2.4.5 Evaluation de la modelisation
+Le tableau 2 montre les sommes d'erreurs quadratiques des representations symbo-
+liques SBSR-L0 comparees a celles d'une representation de type SAX pour laquelle on
+associerait chaque symbole a la valeur moyenne (sous hypothese de distribution nor-
+male) des valeurs des series temporelles dans l'intervalle associe au symbole. Le nombre
+d'episodes est encore une fois xe a quatre (en moyenne) par jour.
+nb. de symboles SBSR-L0 SAX
+2 2.50095e+09 8.62192e+09
+3 2.32939e+09 8.31765e+09
+4 2.21192e+09 8.22382e+09
+5 2.17804e+09 7.9138e+09
+6 2.14144e+09 7.81554e+09
+7 2.11467e+09 7.80194e+09
+8 2.10549e+09 7.78745e+09
+9 2.09249e+09 7.72299e+09
+Tab. 2 { Erreurs de modelisation (SSE) pour des representations SBSR-L0 et SAX.
+c Revue MODULAD, 2006 -10- Numero 34
+3 Conclusions et recherches en cours
+Au sein du cadre tres general que nous avons presente en 2.1, de nombreuses autres
+representations symboliques sont envisageables.
+3.1 Decoupages et alphabets adaptes a des classes de series tem-
+porelles
+Pour permettre une comparaison equitable avec l'existant, nous avons etudie ici le
+cas de decoupages et alphabets de symboles adaptes a l'ensemble des series temporelles
+d'une base de donnees. Il serait bien su^r possible de calculer des decoupages et/ou des
+alphabets adaptes a chacune des series temporelles. Neanmoins, une telle multiplication
+des decoupages et alphabets peut s'averer prejudiciable lorsqu'il s'agit de comparer les
+series temporelles entre elles. Pour cette raison, on aura intere^t a utiliser lorsque cela est
+possible des decoupages et alphabets communs. A cette n, on adaptera les decoupages
+et alphabets a des classes homogenes de series temporelles au sein de la base de donnees.
+3.2 Generalisation a d'autres representations symboliques basees
+sur des segmentations
+SBSR-L0 est une representation symbolique basee sur des segmentations par modeles
+lineaires d'ordre 0. Bien evidemment, le principe est generalisable a tous types de segmen-
+tations bases sur d'autres modeles dont on peut classier automatiquement tout ou partie
+des parametres. Nous avons par exemple etudie des representations symboliques basees
+sur des segmentations lineaires d'ordre 1 associant les symboles a des classes de pentes.
+3.3 Traitements en ligne de ux de donnees numeriques
+L'inconvenient majeur des representations symboliques adaptatives est la necessite
+de disposer de l'ensemble des series temporelles a traiter, ainsi que le temps de calcul
+necessaire aux algorithmes de construction de ces representations. Ceci interdit a priori
+leur usage pour du traitement en ligne de ux de donnees. Neanmoins, dans la plupart des
+cas, il sera possible d'apprendre un alphabet hors-ligne sur un historique des donnees et
+d'utiliser celui-ci pour realiser en-ligne la representation symbolique d'un ux de donnees
+numeriques. Il faudra cependant veiller a s'assurer que l'alphabet precalcule reste pertinent
+pour representer les nouvelles donnees et eventuellement proceder aux reactualisations
+necessaires.
+References
+[Fisher(1958)] Fisher, W. D. (1958). On grouping for maximum homogeneity. Jasa (53),
+789{798.
+[Hugueney(2003)] Hugueney, B. (2003). "Representations symboliques de longues series
+temporelles". Ph. D. thesis, LIP6.
+c Revue MODULAD, 2006 -11- Numero 34
+[Keogh et al.(2001a)] Keogh, E., K. Chakrabarti, M. Pazzani, and S. Mehrotra (2001a).
+Locally adaptive dimensionality reduction for indexing large time series databases. SIG-
+MOD Record (ACM Special Interest Group on Management of Data) 30 (2), 151{162.
+[Keogh and Pazanni(1998)] Keogh, E. and M. J. Pazanni (1998). An enhanced repre-
+sentation of time series which allows fast and accurate classication, clustering and
+relevance feedback. In D. Heckerman, H. Mannila, D. Pregibon, and R. Uthurusamy
+(Eds.), Proceedings of the Forth International Conference on Knowledge Discovery and
+Data Mining (KDD-98). AAAI Press.
+[Keogh et al.(2001b)] Keogh, E. J., K. Chakrabarti, M. J. Pazzani, and S. Mehrotra
+(2001b). Dimensionality reduction for fast similarity search in large time series da-
+tabases. Knowledge and Information Systems 3 (3), 263{286.
+[Lechevallier(1990)] Lechevallier, Y. (1990). Recherche d'une partition optimale sous
+contrainte d'ordre total. Technical report, INRIA.
+[Lin et al.(2003)] Lin, J., E. Keogh, S. Lonardi, and B. Chiu (2003). A symbolic repre-
+sentation of time series, with implications for streaming algorithms. In Proceedings of
+the 8th ACM SIGMOD workshop on Research issues in data mining and knowledge
+discovery, pp. 2{11. ACM Press.
+[Yi and Faloutsos(2000)] Yi, B.-K. and C. Faloutsos (2000). Fast time sequence indexing
+for arbitrary Lp norms. In A. El Abbadi, M. L. Brodie, S. Chakravarthy, U. Dayal,
+N. Kamel, G. Schlageter, and K.-Y. Whang (Eds.), VLDB 2000, Proceedings of 26th
+International Conference on Very Large Data Bases, September 10{14, 2000, Cairo,
+Egypt, Los Altos, CA 94022, USA, pp. 385{394. Morgan Kaufmann Publishers.
+c Revue MODULAD, 2006 -12- Numero 34

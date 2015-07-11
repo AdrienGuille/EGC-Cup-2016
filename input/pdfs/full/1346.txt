@@ -1,0 +1,991 @@
+Conception et construction d’entrepôts en XML
+Omar Boussaid⋆, Riadh Ben Messaoud‡, Rémy Choquet†, Stéphane Anthoard†
+Laboratoire ERIC – Université Lumière Lyon 2
+5 avenue Pierre Mendès-France
+69676 Bron Cedex
+⋆omar.boussaid@univ-lyon2.fr, ‡rbenmessaoud@eric.univ-lyon2.fr
+†{ remy.choquet | stephanea }@gmail.com
+http://eric.univ-lyon2.fr
+Résumé. Les entreprises sont de plus en plus concernées par des données dites
+complexes, se présentant sous une forme autre que numérique ou symbolique,
+issues de sources différentes et ayant des formats hétérogènes. Pour une exploi-
+tation à des fins décisionnelles, ces données complexes nécessitent un travail
+préparatoire pour les structurer et les homogénéiser.
+La prolifération des données sous forme de documents XML incite à une so-
+lution d’entreposage. Nous proposons dans ce papier une approche basée sur
+XML, d’entreposage de données complexes contenues dans des documents XML,
+appelée X-Warehousing. Celle-ci définit une méthodologie pour concevoir des
+entrepôts de données complexes à l’aide du formalisme XML. Pour valider notre
+approche, nous avons implémenté une application Java et nous avons réalisé une
+étude de cas sur des données complexes concernant les régions suspectes sur des
+mammographies.
+1 Introduction
+Avec l’avènement des nouvelles technologies de communication et plus précisément Inter-
+net, les entreprises recueillent des masses de données de plus en plus importantes. Ces données
+étant généralement hétérogènes car elles proviennent de différentes sources. Elles sont dites
+complexes car elles sont de formats différents et sont sur des supports différents. En médecine,
+le dossier d’un patient contient des informations générales sur le patient (age, sexe, etc) ; ainsi
+que des images de scanner, des interrogatoires sous forme d’enregistrements sonores ou des
+compte-rendus manuscrits de médecins. Pour exploiter de telles données à des fins décision-
+nelles, il est nécessaire de les structurer et de les homogénéiser. Le langage XML (eXtensible
+Markup Language) s’avère comme une solution appropriée à ce travail préparatoire sur les
+données complexes. XML est une norme de W3C1 et est considéré comme un standard dans
+la description et l’échange des données. Il représente les données de façon semi-structurée.
+Sa capacité d’auto-description et sa structure arborescente donne à ce formalisme une grande
+1http ://www.w3.org/
+- 3 -
+Conception et construction d’entrepôts en XML
+flexibilité et une puissance suffisante pour décrire des données complexes, hétérogènes et pro-
+venant de sources éparpillées. Les données sont alors stockées dans des documents XML for-
+més conformément à une grammaire associée, exprimée sous forme de DTD (Document Type
+Definition) ou de Schéma XML. Si les DTDs n’offrent qu’un seul type de données (chaînes de
+caractères), les schémas XML utilisent davantage de types de données et permettent également
+d’en définir des types complexes.
+Le document XML est perçu, incontestablement, comme un moyen efficace pour repré-
+senter et stocker des données. Cependant, dans le cadre des applications décisionn-elles, des
+efforts sont nécessaires, plus précisément d’un point de vue méthodologique, pour construire
+des solutions d’entreposage de documents XML. Cette difficulté est due à l’organisation mul-
+tidimensionnelle des entrepôts de données qui diffère de celle semi-structurée des documents
+XML. Un entrepôt de données a une architecture intégrée, centralisée, orientée sujets et né-
+cessite des rafraîchissements périodiques des données pour garantir leur historisation, Kimball
+(1996); Inmon (1996). A partir de l’entrepôt, il est possible de construire des cubes de don-
+nées représentant des contextes d’analyse multidimensionnels. Ainsi, la difficulté est comment
+peut-on concevoir un modèle multidimensionnel à l’aide d’un formalisme semi-structuré tel
+que XML?
+Dans ce papier, nous proposons une approche d’entreposage de données complexes en-
+tièrement basée sur XML. Celle-ci, appelée X-Warehousing, propose une démarche métho-
+dologique pour construire des entrepôts ou des magasins de données XML en XML. Plus
+précisément, elle permet de concevoir un entrepôt (ou un magasin), de représenter son schéma
+conceptuel à l’aide de schémas XML et enfin d’alimenter la structure multidimensionnelle à
+l’aide de données initialement stockées dans des documents XML. Il est possible de représen-
+ter avec XML, des données complexes comme une information entière plutôt qu’un ensemble
+d’informations séparées comme c’est le cas dans un dossier de patient par exemple. Une col-
+lection de documents XML – où chaque document est une entité informationnelle – peut alors
+être considérée comme une base décisionnelle représentant un entrepôt (ou un magasin) de
+données complexes. Le choix de construire des structures multidimensionnelles en XML est
+dicté par le fait de la prolifération des documents XML d’une part, et par le fait que les données
+complexes sont décrites sous forme de documents XML, d’autre part. La structure classique
+d’un cube de données n’est plus appropriée dans ce cas.
+En fait, X-Warehousing est une approche pilotée par les besoins d’analyse. Elle part des
+objectifs d’analyse d’un utilisateur représentés par un modèle conceptuel multidimensionnel
+(MCM). Elle utilise un ensemble de données complexes structurées dans des documents XML
+pour générer une base organisée de façon multidimensionnelle exprimant un contexte d’ana-
+lyse. Il n’est pas utile de chercher au départ une structure commune multidimensionnelle dans
+les documents XML sources, car elle n’existe pas a priori. Ainsi, nous nous focalisons plutôt
+sur les besoins d’analyse de l’utilisateur que nous représentons par un schéma en étoile, Kim-
+ball (1996); Chaudhuri et Dayal (1997). Ce dernier exprime comment représenter conceptuel-
+lement les données pour les orienter vers l’analyse et cela indépendamment de la manière de
+les organiser aux niveaux logiques ou physiques (c.f. sous-section 4.2).
+Le MCM et les documents XML sources sont initialement exprimés à l’aide de schémas
+XML pour être appariés. Cependant pour les rendre comparables, ils sont alors traduits sous
+forme d’arbre d’attributs, Golfarelli et al. (1998); Golfarelli et Rizzi (1999). Les deux arbres
+d’attributs représentant respectivement le MCM et les documents XML sources qui seront
+- 4 -
+O. Boussaid et al.
+fusionnés selon une certaine stratégie à l’aide d’opérations de fusion par élagage (pruning)
+et/ou par greffe (grafting), Golfarelli et al. (2001a,b).
+De plus, dans notre approche, nous n’extrayons dans les documents XML sources que les
+données utiles pour les besoins d’analyse, pour alimenter le cube à construire. Nous employons
+volontairement le terme de cube au lieu d’entrepôt (ou magasin) pour désigner la structure mul-
+tidimensionnelle décrite en XML et alimentée par des données se trouvant dans des documents
+XML. Et cela, pour privilégier la véritable vocation de celle-ci qui est l’analyse des données
+complexes constituées en fait OLAP (On-Line Analytical Processing), plutôt que leur stockage.
+Le cube sera composé de documents XML valides et de plus conformes au MCM de départ,
+c’est à dire, aux objectifs d’analyse de l’utilisateur. Chaque document XML de ce cube repré-
+sente un fait OLAP constitué d’un ou plusieurs indicateurs (mesures) à observer à travers des
+axes d’analyse (dimensions et hiérarchies de dimensions). L’ensemble des documents XML
+entreposés correspond au modèle physique du cube de données que nous désignons par cube
+XML.
+Le reste du papier est organisé comme suit. Après l’état de l’art présenté dans la section 2,
+nous exposerons le contexte de notre approche dans la section 3. La section 4 indiquera le
+formalisme de X-Warehousing. Alors que dans la section 5, nous montrons comment nous
+construisons un cube XML à partir de documents XML sources. Nous validons notre approche
+par une implémentation Java présentée dans la section 6 ; et nous l’illustrons par une étude de
+cas sur des dossiers de patientes atteintes de cancer du sein dans la section 7. Nous terminons
+dans la section 8, par une conclusion et les perspectives qu’ouvre le travail présenté dans le
+cadre de ce papier.
+2 État de l’art
+Dans Krill (1998), Krill affirme que les fournisseurs tels que Microsoft, IBM, et Oracle
+emploieront largement XML dans leurs systèmes de base de données pour l’interopérabilité
+entre les entrepôts de données. Des travaux de recherche s’intéressent déjà à la modélisation
+multidimensionnelle et au langage XML. Ce dernier est utilisé comme langage de base pour
+décrire des magasins de données. Les travaux de Rusu, Rusu et al. (2005), abordent la problé-
+matique des entrepôts XML et aboutissent déjà sur des solutions pour les différentes tâches du
+processus d’entreposage. D’autre part, Pokorný propose dans Pokorný (2001) une structure de
+données, appelée XMLStar schema avec des hiérarchies de dimensions explicites utilisant des
+DTDs pour décrire la structure des objets. Une dimension est modélisée comme une séquence
+de DTDs logiquement associées, telle l’intégrité référentielle dans les bases de données rela-
+tionnelles. Pokorny définit également la notion d’intégrité référentielle XML et ses propriétés
+requises pour caractériser des collections de XML. Dans Golfarelli et al. (2001a), XML est
+devenu une solution intéressante pour l’intégration des sources d’information dans des sys-
+tèmes décisionnels. Néanmoins, ils notent que le mapping logique entre les documents XML
+sources et le schéma cible doit être défini par le concepteur. Ainsi, ils utilisent leur Modèle
+Dimensionnel de Faits basé sur la représentation d’arbre d’attributs, Golfarelli et al. (1998),
+et proposent une approche semi-automatique pour construire le schéma conceptuel d’un data
+mart directement à partir des sources XML. Dans Golfarelli et al. (2001a), les auteurs montrent
+la possibilité de recourir aux schémas XML pour représenter des modèles multidimensionnels
+en exprimant les relations à l’aide de sous-éléments et de clef REF/IDREF. Cependant, Tru-
+- 5 -
+Conception et construction d’entrepôts en XML
+jillo et al. pensent que cette approche se focalise plus sur la présentation du ce que peut être
+le XML multidimensionnel, que sur la structure du modèle conceptuel multidimensionnel lui-
+même, Trujillo et al. (2004). Les auteurs affirment qu’à des niveaux structurel et dynamique, un
+modèle conceptuel standard doit considérer toutes les propriétés multidimensionnelles. Pour
+cela, l’approche orientée objet(OO) avec UML (Unified Modeling Language) est utilisée. Pour
+faciliter l’échange du modèle conceptuel multidimensionnel, les auteurs produisent une DTD
+à partir de laquelle des documents XML valides sont générés pour représenter des modèles
+multidimensionnels à un niveau conceptuel.
+Nassis et al. proposent une approche OO similaire pour développer un modèle conceptuel
+d’un entrepôt de documents XML (XDW), Nassis et al. (2004). Elle permet de concevoir et de
+construire un repository (une collection) de documents XML appelé xFACT. Ils utilisent des
+concepts objets et des schémas XML pour intégrer les données. Les auteurs définissent éga-
+lement des dimensions virtuelles des vues conceptuelles XML pour traiter les besoins d’ana-
+lyse de l’utilisateur. Ils utilisent des diagrammes de packages UML pour construire des vues
+conceptuelles hiérarchiques, Rajugan et al. (2003), et rehausser la sémantique et l’expressivité
+du XDW. Baril et Bellahsène proposent une approche de manipulation d’une base de données
+XML, appelée Modèle de Vues, Baril et Bellahsène (2000). Ils ont défini un mécanisme de
+vues pour restructurer les données contenues dans des documents XML et répondre aux be-
+soins d’analyse de l’utilisateur. Ils ont défini un modèle de données pour chaque vue pour
+représenter des données semi structurées. Ce modèle de données peut être utilisé pour amé-
+liorer les performances des requêtes. Dans Baril et Bellahsène (2003), les auteurs proposent
+DAWAX, un entrepôt de documents XML basé sur le modèle des vues. Leur système consiste
+en un gestionnaire de vues (View Manager), une interface entre les sources XML et les clients.
+L’entrepôt XML se compose de fragments de vues créées par le gestionnaire de vues et d’un
+modèle générique. Chaque vue peut être créée par une agrégation de plusieurs sources. Cette
+approche est puissante dans un environnement multi-sources. Une fois tous les fragments sont
+créés, ils sont associés aux identificateurs IDREF et stockés dans une base de données rela-
+tionnelle. Hümmer et al. ont présenté XCube, une famille de documents XML pour l’échange
+des cubes de données dans Hümmer et al. (2003). XCube supporte un modèle multidimension-
+nel sur divers sources de données. Il se compose de trois schémas XML décrivant entièrement
+un cube de données : (1) XCubeSchema pour décrire le schéma multidimensional ; (2) XCu-
+beDimension pour décrire la structure hiérarchique des dimensions ; et (3) XCubeFact qui
+contient l’ensemble des faits (les cellules du cube). Néanmoins, cette approche utilise XML
+pour l’échange des cubes de données via Internet, plutôt que la modélisation multidimension-
+nelle avec XML.
+Park et al., dans Park et al. (2005), ont proposé une démarche, nommée XML-OLAP, assez
+proche de X-Warehousing. Elle consiste à créer un entrepôt XML composé d’un ensemble de
+collections de documents XML représentant les faits et les dimensions. Les auteurs utilisent
+XQuery et le langage MDX de Microsoft qu’ils ont adapté à XML pour construire des cubes
+XML.
+En conclusion, notons que l’utilisation de XML dans des entrepôts de données nous amène
+à deux approches différentes :
+– la première porte sur le stockage physique des documents XML dans des entrepôts
+de données. Les documents XML alimentent alors les entrepôts et XML est considéré
+comme une technologie efficace supportant des données faiblement structurées et adap-
+- 6 -
+O. Boussaid et al.
+tée à l’interopérabilité et à l’échange des données ;
+– la deuxième approche utilise le formalisme XML pour concevoir des entrepôts ou des
+magasins de données selon les modèles multidimensionnels classiques tels que les sché-
+mas en étoile ou en flocons de neige.
+Notre approche X-Warehousing est entièrement basée sur XML. Elle permet en même
+temps, de concevoir des entrepôts avec des schémas XML et de les alimenter avec des do-
+cuments XML valides. XML est perçu comme une solution potentielle pour l’entreposage des
+données complexes.
+3 Contexte général de notre approche
+Notre approche ne consiste pas seulement à stocker des documents XML dans une base
+cible, mais elle apporte un niveau d’abstraction pertinent pour préparer ces derniers à l’analyse.
+Elle permet de construire des cubes XML. Ces derniers sont composés chacun d’une collection
+de documents XML. Chaque document correspond alors à un fait OLAP et doit satisfaire
+certaines contraintes, comme respecter une information minimale pour que le fait à observer
+soit consistant. Pour cela, nous proposons de valider les documents par un schéma XML. Ce
+dernier représente le modèle conceptuel du cube qui généralement consiste en un schéma en
+étoile ou en flocons de neige.
+Collection XML
+en sortie
+(Modèle physique)
+XMLXMLXML
+XMLXMLXML
+Schéma
+XML
+Schéma
+XML
+Schéma
+XML
+Arbre 
+d'attributs
+Arbre
+d'attributs
+Fusion des 
+arbres d'attributs
+X-Warehousing
+Collection XML
+en entrée
+Modèle conceptuel
+multidimensionnel
+Cube XML
+(Modèle logique)
+FIG. 1 – Les étapes de l’approche X-Warehousing.
+La figure 1 résume les différentes étapes de notre approche X-Warehousing. Au départ,
+l’utilisateur déclare ses objectifs d’analyse sous la forme d’un modèle conceptuel multidi-
+mensionnel (MCM). Ce modèle est exprimé par un schéma XML puis transformé en un arbre
+d’attributs également représenté par un schéma XML (sauvegardé dans un fichier .XSD). L’uti-
+lisateur soumet alors les documents qu’il veut analyser. Ces derniers sont traduits en arbres
+d’attributs. Chaque arbre d’attributs d’un document XML en entrée est alors comparé à celui
+- 7 -
+Conception et construction d’entrepôts en XML
+du MCM. Deux cas sont alors possibles. (1) Si le document en entrée contient une information
+minimale requise dans le MCM : il est alors accepté. Une instance de ce document sera créée et
+validée en accord avec le schéma XML du cube XML que génère l’application X-Warehousing.
+(2) Si le document soumis en entrée ne contient pas une information suffisante pour un fait
+OLAP, il est alors rejeté et ne fera donc pas partie du cube XML. Cette approche permet d’ob-
+tenir un ensemble homogène de données avec des contraintes strictes sur leurs contenus. Ces
+données sont structurées dans des documents XML et orientées vers des analyses en ligne.
+Cette collection de documents XML représente un cube OLAP que nous désignons par cube
+XML.
+4 Formalisation
+Nous proposons ici des définitions des schémas en étoile et en flocon de neige. Nous pré-
+sentons un modèle logique de cubes de données utilisant les schémas XML. Quant aux arbres
+d’attributs, le lecteur pourra trouver une formalisation détaillée dans Golfarelli et al. (1998).
+4.1 Modèle conceptuel multidimensionnel
+UnMCM est une description des objectifs d’analyse. La finalité de cette dernière est de dé-
+crire un contexte d’analyse. Il s’agit de représenter un ou plusieurs indicateurs et un ensemble
+d’axes d’observation et cela d’un point de vue strictement conceptuel, indépendamment de
+toute considération logique ou physique. Pour représenter ces indicateurs et leurs descripteurs,
+ceux qui sont à l’origine des schémas en étoile ont proposé d’utiliser des concepts empruntés
+au formalisme relationnel : des tables pour regrouper les indicateurs d’une part et leurs descrip-
+teurs d’autre part. De plus, pour relier ces différentes tables, on a utilisé le mécanisme des clefs
+(principales, étrangères). Ce dernier se révèle très pratique pour expliquer la configuration en
+étoile du schéma et cela dans un but d’assurer les performances d’interrogation de ces tables
+qui sont globalement très volumineuses. Ainsi, l’évocation d’un schéma en étoile est souvent
+systématiquement rapprochée à un environnement relationnel. Pourtant, ceci n’est toujours pas
+vrai. Les tableaux mutidimensionnels, les classes objets et aujourd’hui les schémas XML sont
+d’autres possibilités d’exprimer un schéma en étoile à un niveau logique autrement qu’en rela-
+tionnel. On gagnerait en clarté à considérer le schéma en étoile comme un modèle strictement
+conceptuel et cela en l’absence d’un véritable langage de modélisation multidimensionnelle
+des entrepôts de données. Ainsi, nous utiliserons les concepts de tables, de clefs principales et
+étrangères pour définir notre MCM.
+Le schéma en étoile consiste donc en une table de faits entourée par r tables de dimensions
+notées D = {Ds, 1 ≤ s ≤ r} (notons qu’il n’y a pas de relations particulières entre les tables
+de dimensions). Nous supposons qu’une table de dimensionDs aDs.PK comme clé primaire
+et ns attributs {Ds.Ai, 1 ≤ i ≤ ns}. Une table de faits sera notée F et contient un jeu de
+clés d (d ≥ 1) composites tel que {F.Kt, 1 ≤ t ≤ d}. Les autres attributs non clés de F
+seront appelés "faits" ou "mesures". Enfin, une table de faits F contient m mesures notées
+{F.Mq, 1 ≤ q ≤ m}.
+Definition 1 (Schéma en étoile)
+Soit D = {Ds, 1 ≤ s ≤ r} un ensemble de r tables de dimensions indépendantes. Chaque
+- 8 -
+O. Boussaid et al.
+table de dimension Ds contient une clé primaire Ds.PK. F est une table de faits contenant d
+clés composites. Un schéma en étoile est alors défini par le couple (F,D) vérifiant les condi-
+tions suivantes :
+– ∀t ∈ {1, . . . , d}, il existe exactement un s ∈ {1, . . . , r} tel que F.Kt = Ds.PK ;
+– ∀s ∈ {1, . . . , r}, il existe un ou plusieurs t ∈ {1, . . . , d} tel que F.Kt = Ds.PK.
+(a)
+Office
+Office-id
+District-id
+District
+District-id
+Country-id
+Country
+Country-id
+State-id
+State
+State-id(b)
+F
+F.K1
+F.K2
+F.K31
+F.K32
+F.K4
+F.M1
+F.M2
+D1
+D1.PK
+D2
+D2.PK
+D2.A1D1.A1
+D2.A2
+D3
+D3.PK
+D4
+D4.PK
+D4.A1
+D3.A1
+D3.A2
+FIG. 2 – Un exemple d’un schéma en étoile (a) et d’une hiérarchie de dimension (b).
+Cette définition signifie que chaque clé composite de la table des faits est liée à une et une
+seule table de dimension via sa clé primaire. Alors qu’une table de dimension peut être liée
+à une ou plusieurs clés composites de la table des faits. Notons que sur la figure 2 (a), la clé
+primaireD3.PK est liée à deux clés composites (F.K31 et F.K32) dans la table des faits. Cette
+situation peut être rencontrée dans beaucoup de problèmes réels. Par exemple, un fait Sales
+peut être caractérisé par un Origin Country et un Destination Country. Généralement, dans un
+contexte d’analyse, l’utilisateur a besoin de différents niveaux de détail pour une dimension
+donnée. Par exemple, il peut vouloir se renseigner sur l’origine (Origin) d’un produit Product.
+Cependant, le modèle conceptuel multidimensionnel devrait aussi pouvoir le renseigner sur
+le pays (Country), le département d’origine (State), le district (District), l’agence (Office) du
+produit (Product). Ceci nous amène à définir une notion de hiérarchie dans une dimension.
+Definition 2 (Hiérarchie d’une dimension)
+SoitH un jeu de l tables notéesH = {D1, . . . ,Dt, . . . ,Dl}.H étant une hiérarchie de dimen-
+sions avec l niveaux de détails, si ∀t ∈ {2, . . . , l} la clé primaire Dt.PK de Dt est un attribut
+(clé étrangère) dans Dt−1.
+En d’autres termes, les l tables de la hiérarchie sont liées par inclusion sémantique :
+D1 ⊂ . . . ⊂ Dt−1 ⊂ Dt ⊂ . . . ⊂ Dl. Dans la dimension hiérarchique de la figure 2 (b), un
+n-uplet de la table Office est sémantiquement inclus dans la table District. Définissons mainte-
+nant la clé primaire d’une dimension hiérarchisée d’une part, et la modélisation en flocon de
+neige d’autre part.
+- 9 -
+Conception et construction d’entrepôts en XML
+Assessment
+Assessment_id
+Assessment_code
+Subtlety
+Subtlety_id
+Subtlety_code
+Year
+Year_id
+Year_name
+Day
+Date_id
+Month_id
+Day_name
+Month
+Month_id
+Year_id
+Month_name
+Pathology
+Pathology_id
+Pathology_name
+Lesion_category
+Lesion_category_id
+Lesion_category_name
+Lesion_type
+Lesion_type_id
+Lesion_category_id
+Lesion_type_nameSuspicious_region
+Lesion_type_id
+assessment_id
+Subtlety_id
+Patology_id
+Scanner_id
+Patient_id
+Date_of_study
+Date_of_digitization
+Digitizer_id
+Region_length
+Number_of_regions
+Patient
+Patient_id
+Patient_age
+Patient_age_class_id
+Scanner_image
+Scanner_id
+Scanner_file_name
+Age_class
+Age_class_id
+Age_class_name
+Digitizer
+Digitizer_id
+Digitizer_name
+FIG. 3 – modèle conceptual du cube de données des ”Régions suspectées”.
+Definition 3 (Clé primaire d’une hiérarchie)
+SoitH = {D1, . . . ,Dt, . . . ,Dl} une dimension hiérarchisée avec l niveaux de détail oùD1 ⊂
+. . . ⊂ Dt−1 ⊂ Dt ⊂ . . . ⊂ Dl. La clef primaires de la dimension hiérarchiséeH notéeH.PK
+correspond à la clef primaire de la première table de H (H.PK = D1.PK).
+Definition 4 (Modèle en flocon de neige)
+Soit H = {Hs, 1 ≤ s ≤ r} un ensemble de r hiérarchies indépendantes. Chaque hiérarchie
+Hs aHs.PK comme clé primaire. La table de faits F contient d clés composites. Une modèle
+en flocon de neige est défini par le couple (F,H) vérifiant les conditions suivantes :
+– ∀t ∈ {1, . . . , d}, il existe exactement un s ∈ {1, . . . , r} tel que F.Kt = Hs.PK ;
+– ∀s ∈ {1, . . . , r}, il existe un ou plusieurs t ∈ {1, . . . , d} tel que F.Kt = Hs.PK.
+Un modèle en flocons de neige prend donc en compte les dimensions hiérarchisées. Par
+exemple, le modèle MCM de la figure 3 représente un cube des régions suspectes (tumeurs
+détectées sur des mammographies) organisé en flocon de neige.
+4.2 Modélisation des cubes de données avec XML
+Un document XML est une structure composée d’imbrications d’éléments, débutant par
+une racine. Chaque élément pouvant contenir des sous éléments et des attributs. Les attributs
+sont inclus, avec leurs valeurs respectives, entre les déclarations d’ouverture et de fermeture
+de l’élément (balises). Entre les balises d’ouverture et de fermeture, plusieurs sous éléments
+peuvent être insérés. Nous proposons une formalisation pour définir un MCM d’un cube XML.
+Pour cela, nous définissons la notion de schéma en étoile XML :
+Définition 5 (Schéma en étoile XML)
+Soit (F,D) un schéma en étoile, où F est une table de faits ayant m attributs de mesure
+{F.Mq, 1 ≤ q ≤ m} et D = {Ds, 1 ≤ s ≤ r} un ensemble de r tables de dimension où
+chaque Ds contient un ensemble de ns attributs {Ds.Ai, 1 ≤ i ≤ ns}. Le Schéma en étoile
+XML de (F,D) est un schéma XML tel que :
+- 10 -
+O. Boussaid et al.
+– F définit l’élément racine dans le schéma XML ;
+– ∀q ∈ {1, . . . ,m}, F.Mq définit un attribut XML inclus dans l’élément racine ;
+– ∀s ∈ {1, . . . , r}, Ds est un sous éléments XML de l’élément racine XML. Il y a autant
+de sous éléments XML que de dimensions liées à la tables des faits F ;
+– ∀s ∈ {1, . . . , r} et ∀i ∈ {1, . . . , ns}, Ds.Ai définit un attribut XML inclut dans l’élé-
+ment XML Ds.
+<xs:element name="F">
+ <xs:complexType>
+  <xs:sequence>
+   <xs:element name="D1" type="D1_Type" />
+   <xs:element name="D2" type="D2_Type" />
+   <xs:element name="D3" type="D3_Type" />
+   <xs:element name="D3" type="D3_Type" />
+   <xs:element name="D4" type="D4_Type" />
+  </xs:sequence>
+  <xs:attribute name="F.M1" type="xs:integer" />
+  <xs:attribute name="F.M2" type="xs:integer" />
+ </xs:complexType>
+</xs:element>
+<xs:complexType name="D1_Type">
+ <xs:attribute name="D1.A1" type="xs:string" />
+</xs:complexType>
+<xs:complexType name="D2_Type">
+ <xs:attribute name="D2.A1" type="xs:string" />
+ <xs:attribute name="D2.A2" type="xs:string" />
+</xs:complexType>
+<xs:complexType name="D3_Type">
+ <xs:attribute name="D3.A1" type="xs:string" />
+ <xs:attribute name="D3.A2" type="xs:string" />
+</xs:complexType>
+<xs:complexType name="D4_Type">
+ <xs:attribute name="D4.A1" type="xs:string" />
+</xs:complexType>
+FIG. 4 – Un exemple d’un schéma en étoile XML.
+La figure 4 montre une partie du schéma XML équivalent au modèle conceptuel de la
+Figure 2(a). Nous proposons maintenant une solution pour écrire un modèle en flocons de
+neige en XML Schéma. Pour ce faire, nous définissons la notion de dimension hiérarchisée
+XML .
+Définition 6 (Dimension Hiérarchisée XML)
+SoitH = {D1, . . . ,Dt, . . . ,Dl} une dimension hiérarchisée. La dimension hiérarchisée XML
+est une partie d’un schéma XML tel que :
+– D1 définit un élément XML ;
+– ∀t ∈ {2, . . . , l}, Dt définit un sous élément XML de l’élément XML Dt−1 ;
+– ∀t ∈ {1, . . . , l}, chaque attribut dans Dt définit un attribut XML inclus dans l’élément
+XML Dt.
+Définition 7 (Modèle en flocons de neige XML)
+Soit (F,H), un modèle en flocons de neige où F est une table de faits ayant m mesures
+- 11 -
+Conception et construction d’entrepôts en XML
+{F.Mq, 1 ≤ q ≤ m} etH = {Hs, 1 ≤ s ≤ r} est un ensemble de r hiérarchies indépendantes.
+Le modèle en flocons de neige XML de (F,H) est un schéma XML tel que :
+– F définit l’élément XML racine du schéma XML ;
+– ∀q ∈ {1, . . . ,m}, F.Mq définit un sous élément XML inclut dans l’élément racine
+XML ;
+– ∀s ∈ {1, . . . , r}, Hs définit autant de fois des dimensions hiérarchisées XML, comme
+des sous éléments de l’élément XML racine qu’elle est liée à la table de faits F .
+En conclusion, en utilisant le typage des données et les relations exprimées par les sous élé-
+ments, les schéma XML permettent d’écrire un modèle logique d’un cube de données. Comme
+les document XML contiennent les valeurs des éléments et des attributs, nous en déduisons
+qu’ils contiennent l’information nécessaire pour définir des faits OLAP. Nous dirons qu’un
+document XML supporte un fait XML tel que :
+Definition 8 (Fait XML)
+Un fait XML est un document XML valide conformément au modèle en étoile ou au modèle
+XML en flocon de neige correspondant au modèle conceptuel du cube de données (MCM).
+La figure 5 montre un exemple d’un fait XML associé au MCM “Régions suspectes” pré-
+senté sur la figure 3.
+<?xml version="1.0" encoding="UTF-8" ?>
+<Suspicious_region Region_length="287" Number_of_regions="6">
+ <Patient Patient_age="60" >
+  <Age_class Age_class_name="Between 60 and 69 years old" />
+ </Patient>
+ <Lesion_type Lesion_type_name="calcification type round_and_regular distribution n/a">
+  <Lesion_category Lesion_category_name="calcification type round_and_regular" />
+ </Lesion_type>
+ <Assessment Assessment_code="2" />
+ <Subtlety Subtlety_code="4" />
+ <Pathology Pathology_name="benign_without_callback" />
+ <Date_of_study Date="1998-06-04">
+  <Day Day_name="June 4, 1998">
+   <Month Month_name="June, 1998">
+    <Year Year_name="1998" />
+   </Month>
+  </Day>
+ </Date_of_study>
+ <Date_of_digitization Date="1998-07-20">
+  <Day Day_name="July 20, 1998">
+   <Month Month_name="July, 1998">
+    <Year Year_name="1998" />
+   </Month>
+  </Day>
+ </Date_of_digitization>
+ <Digitizer Digitizer_name="lumisys laser" />
+ <Scanner_image Scanner_file_name="B_3162_1.RIGHT_CC.LJPEG" />
+</Suspicious_region>
+FIG. 5 – Exemple d’un fait XML.
+- 12 -
+O. Boussaid et al.
+Month_name
+Year_name
+Date_of_study
+Date_of_digitization
+Day_name
+Month_name
+Year_nameDay_name
+Scanner_file_name
+Patient_age
+Digitizer_name
+Age_class_name
+Pathology_name
+Subtlety_code
+Assessment_code Lesion_type_name
+Lesion_category_name
+Suspicious_region
+Region_length
+Number_of_regions
+FIG. 6 – Arbre d’attributs associé au MCM des ”Régions suspectes”.
+5 Construction des cubes XML
+Rappelons que, dans notre approche, le MCM est un référentiel qui exprime les objectifs
+d’analyse de l’utilisateur. Il doit être apparié avec les données complexes contenues dans des
+documents XML afin de construire une base décisionnelle. Le MCM et les documents XML
+sources sont exprimés à l’aide de schémas XML puis transformés en arbres d’attributs pour
+être comparés. Des algorithmes d’appariement permettent grâce à des opérateurs de fusion par
+élagage ou par greffe, proposés par Golfarelli et al. dans Golfarelli et al. (1998); Golfarelli
+et Rizzi (1999), de traiter les arbres d’attributs pour générer le schéma XML du cube XML
+ainsi que les documents XML conformes Golfarelli et al. (2001a,b). Il est possible que certains
+documents XML sources risquent d’être rejetés. Pour cela, nous introduisons la notion du
+contenu minimal d’un document XML.
+5.1 Fusion des arbres d’attributs
+L’objectif de notre approche est de fusionner, à l’aide des opérations de fusion, deux arbres
+d’attributs correspondant au MCM et aux documents XML sources en un seul contenant les
+attributs communs et en conservant leurs relations de départ. La fusion par élagage (pruning)
+consiste à supprimer des parties des deux arbres. Dans l’exemple de la figure 7(a), seuls les
+sommets communs (cercles noirs) dans les deux arbres d’attributs de départ sont conservés
+dans l’arbre fusionné. Tous les autres sommets (cercles blancs) sont élagués avec les sous-
+arbres associés.
+Quant à la fusion par greffe, elle s’effectue lorsque des sous-arbres communs n’ont pas
+la même structure de relations dans les deux arbres en entrée. Dans ce cas, certains sommets
+non communs (cercles blancs) sont éliminés et seuls les sommets identiques et leurs relations
+(cercles noirs) sont maintenus dans l’arbre fusionné. Lorsqu’un sommet est éliminé, ses des-
+cendants sont conservés dans l’arbre fusionné. Dans la figure 7(b), les sommets non communs
+x et y sont éliminés et leurs descendants respectifs sont greffés aux sommets maintenus dans
+l’arbre fusionné.
+- 13 -
+Conception et construction d’entrepôts en XML
+(a) Fusion par élagage
+a
+b c
+d
+e
+a
+b c
+d
+e
+d
+e
+c b
+a
++ =
+(b) Fusion par greffe
+a
+b c
+d
+e
+a
+b c
+d
+x
+y
+e
+d
+e
+c
+b
+a
++ =
+FIG. 7 – Exemples de fusion de deux arbres d’attributs par élagage (a) et par greffe (b).
+5.2 Contenu minimal d’un document XML
+Dans certains cas, lorsque le document XML en entrée ne contient pas assez d’information
+requise par le MCM, le résultat de la fusion peut s’avérer un document XML relativement
+démuni d’un point de vue informationnel. Il risque de représenter un fait OLAP avec trop de
+valeurs absentes. Il est donc non utile d’alimenter l’entrepôt avec de tels documents. Ainsi,
+il est important d’introduire un contrôle sur l’arbre d’attributs correspondant aux documents
+XML sources. Le but de ce contrôle est de vérifier si un document XML en entrée contient
+les informations requises par l’utilisateur ou non. Pour cela, nous introduisons la notion du
+contenu minimal d’un document XML.
+Le contenu minimal d’un document XML est entièrement défini par l’utilisateur lorsqu’il
+soumet le modèle du cube pour exprimer ses objectifs d’analyse (MCM). Lors de la phase
+de saisie ou de chargement du MCM, l’utilisateur peut ainsi déclarer pour chaque élément
+de celui-ci, s’il est obligatoire ou optionnel dans le cube final. Ces éléments portent sur les
+mesures, les dimensions ou les hiérarchies de dimensions et leurs attributs. Le contenu minimal
+d’un document XML corresponds donc à la partie obligatoire de l’arbre d’attributs associé
+au modèle du cube soumis. Rappelons que l’objectif de notre approche est de construire des
+cubes de données avec des documents XML sources pour faire des analyses en ligne (OLAP).
+Il n’est pas possible de décider dans un processus complètement automatisé si des éléments
+d’un documents XML sont optionnels ou non. C’est donc à l’utilisateur de définir le contenu
+minimal d’un document XML. Ceci dit, nous supposons que par défaut, toutes les mesures et
+tous les attributs des dimensions et des hiérarchies seront présents dans le cube final, c’est à
+dire, sont obligatoires. Nous supposons également que les mesures ne peuvent pas être toutes
+optionnelles Au moins une mesure doit être obligatoire puisqu’un fait OLAP sans mesure n’a
+pas de sens et ne peut donc pas être exploité par des opérateurs OLAP tel l’agrégation. Lors
+de la phase de fusion des arbres d’attributs, l’arbre des documents XML en entrée est vérifié
+s’il contient tous les éléments obligatoires imposés par l’utilisateur. Il est alors fusionné avec
+l’arbre du MCM si ce contrôle est satisfaisant. Autrement, la fusion n’a pas lieu, l’arbre est
+rejeté et le document XML en sortie n’est pas généré.
+- 14 -
+O. Boussaid et al.
+6 Implémentation
+Nous avons choisi Java pour implémenter notre approche dans l’optique d’une plate-forme
+Java dédiée à X-Warehousing. L’application contient deux modules : un module de chargement
+et un module de fusion (Figure 8).
+Document
+XML valide
+Cube XML
+(Schéma XML)
+X-Warehousing
+Chargement
+manuel
+C
+h
+a
+rg
+e
+m
+e
+n
+t
+a
+u
+to
+m
+a
+ti
+q
+u
+e
+Document
+XML
+Modèle
+XSD
+Arbre
+d'attribut
+du document
+Arbre 
+d'attribut
+du modèle
+Attribute Tree Builder
+Attribute Trees Merger
+Document Builder
+Modèle
+XSD
+MCM
+M
+o
+d
+u
+le
+d
+e
+ f
+u
+si
+o
+n
+M
+o
+d
+u
+le
+d
+e
+ c
+h
+a
+rg
+e
+m
+e
+n
+t
+XML
+Repository
+FIG. 8 – Architecture de l’application.
+6.1 Module de chargement
+Pour définir un contexte d’analyse, l’utilisateur doit définir un modèle de cube comme réfé-
+rence. Il peut alors saisir manuellement un MCM (c.f. sous-section 4.1) ; ou charger un fichier
+XSD contenant le schéma XML d’un MCM déjà existant (c.f. sous-section 4.2). Lorsque le
+MCM est saisi manuellement, il est automatiquement décrit en schéma XML, stocké dans un
+fichier XSD et ensuite transformé en arbre d’attributs. Lorsque l’utilisateur charge un fichier
+XSD, ce dernier est considéré comme un type document JDOM. Il est alors analysé par un al-
+gorithme de l’interface JDOM API et l’arbre d’attributs correspondant est construit. La figure 9
+présente les fonctions recursivesWriteTreeDeep et ReadTreeDeep que nous avons créées pour
+manipuler les arbres d’attributs. Le module de chargement charge respectivement le MCM
+et les documents XML en entrée. Ces derniers, le MCM et leurs arbres d’attributs sont tous
+décrits en schémas XML pour faciliter leur manipulation par les algorithmes de traitements.
+L’arbre d’attributs est un arbre orienté, acyclique et a un centre. Il est entièrement compatible
+avec la structure XML des documents en entrée.
+6.2 Module de fusion
+Une fois le MCM et les documents XML en entrée sont chargés, l’application peut fonc-
+tionner selon deux modes : automatique ou manuel. Ces modes emploient le même noyau
+- 15 -
+Conception et construction d’entrepôts en XML
+Function WriteTreeDeep(document,tree)
+root=GetRootElement(document)
+nodeList=GetNodes(tree,root)
+While Not(end(nodeList))
+Graphe.AddVertex(nodeList.name)
+Call Function ReadTreeDeep(nodeList.name,tree)
+End While
+End Function
+Function ReadTreeDeep(root,tree)
+nodeList=GetNodes(tree,root)
+While Not(end(nodeList))
+Graphe.AddVertex(nodeList.name)
+Call Function ReadTreeDeep(nodeList.name,tree)
+End While
+End Function
+FIG. 9 – Functions récursives WriteTreeDeep et ReadTreeDeep.
+d’algorithmes avec une seule différence dans le cas du mode automatique. En effet dans ce
+denier cas, l’application extrait des documents XML partir d’une collection stockée dans un
+répertoire donné, les valident conformément au modèle de référence, et les stockent dans un
+répository XML et cela de façon automatique et itérative. Le module de fusion utilise les opé-
+rations de fusion par élagage et par greffe présentées dans la section 5. La figure 10 montre la
+fonction MergeTree que nous avons développée pour fusionner deux arbres d’attributs. Cette
+fonction lit les deux arbres respectifs du MCM et du document XML source et génère l’arbre
+fusionné. Celui-ci correspond au schéma du cube XML à partir duquel les documents XML
+valides générés vont alimenter le cube XML. Quand un sommet de l’arbre du MCM ne corres-
+pond pas à un nœud de l’arbre du document source, nous plaçons la valeur d’arc à zéro. Nous
+réécrivons ensuite l’arbre seulement avec les arcs non nuls.
+Function MergeTree(tree1,tree2)
+tree3=DuplicateTree(tree1)
+While Not(end(nodeList(tree3)))
+vertex1=GetVertex(tree3)
+While Not(end(nodeList(tree2)))
+vertex2=GetVertex(tree2)
+If vertex2=vertex1 Then vertex1.arc = 0
+End While
+End While
+Tree3=WriteTree(tree3)
+End Function
+FIG. 10 – La fonctionMergeTree.
+7 Étude de cas
+Pour illustrer notre approche X-Warehousing, nous l’avons appliquée sur un cas réel. Consi-
+dérons le cube de données des “régions suspectes dans des mammographies” présenté dans la
+figure 3 en tant que MCM de référence. Nous disposons de 4 686 documents XML2 en entrée
+que nous souhaitons entreposer. L’ensemble de ces documents en entrée ont la même structure
+2http ://eric.univ-lyon2.fr/∼rbenmessaoud/ ?page=donnees&section=3
+- 16 -
+O. Boussaid et al.
+et sont valides par rapport à un schéma XML. Par conséquent, ils ont le même arbre d’attributs
+indiqué dans la figure 11. L’application procède à la fusion des arbres d’attributs respectifs (Fi-
+gures 11 et 6). Le résultat de la fusion dépend du contenu minimal des documents XML défini
+par l’utilisateur lors de la déclaration du MCM.
+Film_type_id
+Scanner_file_name
+Patient_age
+Digitizer_name
+Age_class_name
+Patient_id
+Patient_type
+Overlay_file_url
+Starting_row
+Starting_column
+Pathology_code
+Subtlety_name
+Lesion_type_name
+Lesion_category_nameLesion_type_id
+Film_type_name
+Pathologie_id
+Boundary_chain_code
+Suspicious_region
+Region_length
+LA/TLA
+Number_of_regions
+Date_of_digitization
+Month_name
+Year_nameDay_name
+Month_name
+Year_name
+Date_of_study
+Day_name
+FIG. 11 – Arbre d’attributs des documents XML en entrée.
+Supposons que toutes les dimensions et les mesures soient marquées “obligatoires” sur le
+MCM par l’utilisateur. Lors de la fusion des arbres d’attributs du MCM et des documents XML
+en entrée, lemodule de fusion rejettera tous ces derniers. En effet, nous constatons que l’attribut
+Assessment_code est absent de l’arbre d’attributs des documents XML en entrée (figure11).
+Comme il est marqué “obligatoire” sur le MCM, aucun document XML en entrée ne sera
+apparié avec ce dernier et aucun document XML en sortie ne sera généré.
+Supposons maintenant que l’utilisateur définit un contenu minimal des documents XML
+plus souple et qu’il considère que la dimension Assessment n’est pas pertinente pour son ana-
+lyse. Il va donc la définir comme “optionnelle” sur son MCM de référence. Dans ce cas, l’ab-
+sence de l’attribut Assessment_code dans les documents XML en entrée ne perturbera pas la
+fusion des arbres d’attributs correspondants et le module de fusion générera le modèle logique
+du cube XML sous la forme d’un schéma XML, comme le montre la figure 12.
+De plus, pour chaque document en entrée, un fait XML (document XML) est créé. Comme
+tous les documents XML en entrée ont la même structure, tous les faits XML générés sont
+valides conformément au schéma XML de la figure 12. Notons également que tous les attributs
+non concernés dans les arbres d’attributs (figures 11 et 6) sont élagués par le module de fusion.
+Par exemple, D’autres attributs (Lesion_type_id, Boundary_chain_code et Patient_id. . .) ne
+figureront pas dans le cube XML.
+Finalement à travers cette étude de cas nous avons validé notre approche X-Warehousing.
+Cette dernière permet de concevoir des entrepôts XML (ou des magasins XML) et de les ali-
+menter avec des données complexes contenues dans des documents XML ; et cela conformé-
+ment aux besoins d’analyses d’un utilisateur définis dans un MCM. Par conséquent XML peut
+être considéré comme une description logique d’un entrepôt de données complexes.
+- 17 -
+Conception et construction d’entrepôts en XML
+8 Conclusion et perspectives
+Dans ce papier, nous avons proposé une méthodologie basée sur le formalisme XML pour
+entreposer des données complexes. Notre approche ne consiste pas seulement à alimenter une
+structure multidimensionnelle à l’aide de documents XML mais permet également d’expri-
+mer un niveau d’abstraction intéressant pour préparer ces derniers à l’analyse. En effet, cela
+consiste à valider les documents XML selon une grammaire XML (schéma XML) représentant
+un modèle de cube de données. Nous avons défini une formalisation des schémas en étoile ou
+en flocons de neige en XML. Nous avons utilisé le concept d’arbre d’attributs, Golfarelli et al.
+(2001a,b), pour apparier des besoins d’analyse exprimés par un modèle conceptuel multidi-
+mensionnel et des documents XML et cela dans le but d’entreposer des données complexes.
+Pour valider notre approche, nous avons développé une application Java qui charge en entrée
+un MCM et des documents XML. Elle produit en sortie un modèle logique et un modèle phy-
+sique pour un cube composé de documents XML homogènes correspondant chacun à un fait
+OLAP que nous désignons par cube XML. Une étude de cas sur les régions suspectes sur des
+mammographies a montré l’intérêt de notre approche sur des applications réelles pour conce-
+voir et construire des entrepôts de données complexes en utilisant XML.
+Plusieurs perspectives semblent se dessiner pour notre approche X-Warehousing. La pre-
+mière porte sur l’interrogation du cube XML. Une extension du langage XQuery est nécessaire
+pour permettre de réaliser l’opération du Group-by. Dans l’exemple de notre étude de cas, les
+mesures étaient numériques, il n’est pas difficile de les agréger à l’aide d’opérateurs classiques
+quoique dans notre cas nous avons opté pour une moyenne statistique plus élaborée que la
+moyenne empirique. Cependant, dans le cas où les mesures ne seraient pas numériques, le re-
+cours à des opérateurs appropriés est requis. L’exemple de l’opérateur OpAC, Messaoud et al.
+(2004), peut s’avérer fort utile. D’autres perspectives sont inscrites dans la continuation de nos
+travaux. Une étude de performance des requêtes OLAP dans le cadre de cube XML pemettra
+de valider cette approche de ce point de vue. La fiabilité de l’application X-Warehousing passe
+par une étude de complexité et des temps de réponse des chargements des documents XML
+en entrée, de la construction et de la fusion des arbres d’attributs et de la création des docu-
+ments XML en sortie. Une autre perspective concerne le problème de mise à jour du cube XML
+lors des changements dans les données sources, Pedersen et Pedersen (2003); Yin et Pedersen
+(2004), ou lorsqu’un utilisateur désire modifier le MCM de référence pour prendre en compte
+une évolution de ses objectifs d’analyses.
+Références
+Baril, X. et Z. Bellahsène (2000). A View Model for XML Documents. In Proceedings of
+the 6th International Conference on Object Oriented Information Systems (OOIS 2000),
+London, UK, pp. 429–441.
+Baril, X. et Z. Bellahsène (2003). XML Data Management : Native XML and XML-Enabled
+Database Systems (First ed.)., Chapter Designing and Managing an XML Warehouse, pp.
+455–474. Addison Wesley Professional.
+Chaudhuri, S. et U. Dayal (1997). An Overview of Data Warehousing and OLAP Technology.
+SIGMOD Record 26(1), 65–74.
+- 18 -
+O. Boussaid et al.
+Golfarelli, M., D. Maio, et S. Rizzi (1998). Conceptual Design of Data Warehouses from E/R
+Schema. In Proceedings of the 31st Annual Hawaii International Conference on System
+Sciences (HICSS 1998), Washington, DC, USA, pp. 334–343. IEEE Computer Society.
+Golfarelli, M. et S. Rizzi (1999). Designing the Data Warehouse : Key Steps and Crucial
+Issues. Journal of Computer Science and Information Management 2(3), 88–100.
+Golfarelli, M., S. Rizzi, et B. Vrdoljak (2001a). Data Warehouse Design from XML Sources.
+In Proceedings of the 4th ACM International Workshop on Data Warehousing and OLAP
+(DOLAP 2001), Atlanta, Georgia, USA, pp. 40–47. ACM Press.
+Golfarelli, M., S. Rizzi, et B. Vrdoljak (2001b). Integrating XML Sources into a Data Ware-
+house Environment. In Proceedings of IEEE International Conference on Software, Tele-
+communications and Computer Networks (SoftCOM 2001), Dubrovnik, Croatia, pp. 49–56.
+Hümmer, W., A. Bauer, et G. Harde (2003). XCube : XML for Data Warehouses. In Procee-
+dings of the 6th ACM International Workshop on Data Warehousing and OLAP (DOLAP
+2003), New Orleans, Louisiana, USA, pp. 33–40. ACM Press.
+Inmon, W. H. (1996). Building the Data Warehouse. John Wiley & Sons.
+Kimball, R. (1996). The Data Warehouse Toolkit. John Wiley & Sons.
+Krill, P. (1998). XML Builds Momentun as Repository Standard. InfoWorld 20(25), 6.
+Messaoud, R. B., O. Boussaid, et S. Rabaséda (2004). A New OLAP Aggregation Based
+on the AHC Technique. In Proceedings of the 7th ACM International Workshop on Data
+Warehousing and OLAP (DOLAP 2004), Washington D.C., USA, pp. 65–72. ACM Press.
+Nassis, V., R. Rajugan, T. S. Dillon, et J. W. Rahayu (2004). Conceptual Design of XML Do-
+cument Warehouses. In Proceedings of the 6th International Conference Data Warehousing
+and Knowledge Discovery (DaWaK 2004), Zaragoza, Spain, pp. 1–14. Springer.
+Park, B. K., H. Han, et I. Y. Song (2005). XML-OLAP : A Multidimensional Analysis Fra-
+mework for XMLWarehouses. In Proceedings of the 7th International Conference on Data
+Warehousing and Knowledge Discovery (DaWaK 2005), Copenhagen, Denmark, pp. 32–42.
+Springer.
+Pedersen, D. et T. B. Pedersen (2003). Achieving Adaptivity for OLAP-XML Federations.
+In Proceedings of the 6th ACM International Workshop on Data Warehousing and OLAP
+(DOLAP 2003), New Orleans, Louisiana, USA, pp. 25–32. ACM Press.
+Pokorný, J. (2001). Modelling Stars Using XML. In Proceedings of the 4th ACM International
+Workshop on Data Warehousing and OLAP (DOLAP 2001), Atlanta, Georgia, USA, pp. 24–
+31. ACM Press.
+Rajugan, R., E. Chang, T. S. Dillon, et L. Feng (2003). XML Views : Part 1. In Proceedings
+of the 14th International Conference on Database and Expert Systems Applications (DEXA
+2003), Prague, Czech Republic, pp. 148–159. Springer.
+Rusu, L. I., J. W. Rahayu, et D. Taniar (2005). A Methodology for Building XML Data Wa-
+rehouses. International Journal of Data Warehousing and Mining, Idea Group Inc. 1(2),
+67–92.
+Trujillo, J., S. Lujàn-Mora, et I. Song (2004). Applying UML and XML for Designing and In-
+terchanging Information for DataWarehouses and OLAP Applications. Journal of Database
+Management 15(1), 41–72.
+- 19 -
+Conception et construction d’entrepôts en XML
+Yin, X. et T. B. Pedersen (2004). Evaluating XML-Extended OLAP Queries Based on a Physi-
+cal Algebra. In Proceedings of the 7th ACM International Workshop on Data Warehousing
+and OLAP (DOLAP 2004), Washington D.C., USA, pp. 73–82. ACM Press.
+Summary
+Nowadays, complex data have a wide spread proliferation and companies are concerned by
+this kind of data that are neither numeric nor symbolic. XML is suitable for structuring com-
+plex data coming from different sources and supported by heterogeneous formats. It allows
+a flexible formalism capable to represent and store different types of data. Therefore, the im-
+portance of integrating complex data, through XML, in decision support systems is becoming
+increasingly high. In this paper, we propose to warehouse complex data supported on XML
+documents. Our approach, named X-Warehousing, is a methodology to design and to build an
+XML warehouse using the XML formalism. In order to validate it, a Java application is devel-
+oped and a case study of complex data taken from the breast cancer domain is also achieved.
+- 20 -
+O. Boussaid et al.
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs :schema xmlns="http ://www.w3schools.com">
+<xs :element name="Suspicious_region">
+<xs :complexType>
+<xs :sequence>
+<xs :element name="Patient" type="Patient_Type" />
+<xs :element name="Lesion_Type" type="Lesion_Type_Type" />
+<xs :element name="Subtlety" type="Subtlety_Type" />
+<xs :element name="Pathology" type="Pathology_Type" />
+<xs :element name="Date_of_study" type="Date_Type" />
+<xs :element name="Date_of_digitization" type="Date_Type" />
+<xs :element name="Digitizer" type="Digitizer_Type" />
+<xs :element name="Scanner_image" type="Scanner_Type" />
+</xs :sequence>
+<xs :attribute name="Region_length" type="xs :integer" />
+<xs :attribute name="Number_of_regions" type="xs :integer" />
+</xs :complexType>
+</xs :element>
+<xs :complexType name="Patient_Type">
+<xs :sequence>
+<xs :element name="Age_class">
+<xs :complexType>
+<xs :attribute name="Age_class_name" type="xs :string"/>
+</xs :complexType>
+</xs :element>
+</xs :sequence>
+<xs :attribute name="Patient_age" type="xs :integer"/>
+</xs :complexType>
+<xs :complexType name="Lesion_Type_Type">
+<xs :sequence>
+<xs :element name="Lesion_category">
+<xs :complexType>
+<xs :attribute name="Lesion_category_name" type="xs :string"/>
+</xs :complexType>
+</xs :element>
+</xs :sequence>
+<xs :attribute name="Lesion_type_name" type="xs :string"/>
+</xs :complexType>
+<xs :complexType name="Subtlety_Type">
+<xs :attribute name="Subtlety_code" type="xs :integer"/>
+</xs :complexType>
+<xs :complexType name="Pathology_Type">
+<xs :attribute name="Pathology_name" type="xs :string"/>
+</xs :complexType>
+<xs :complexType name="Date_Type">
+<xs :sequence>
+<xs :element name="Day">
+<xs :complexType>
+<xs :sequence>
+<xs :element name="Month">
+<xs :complexType>
+<xs :sequence>
+<xs :element name="Year">
+<xs :complexType>
+<xs :attribute name="Year_name" type="xs :integer"/>
+</xs :complexType>
+</xs :element>
+</xs :sequence>
+<xs :attribute name="Month_name" type="xs :string"/>
+</xs :complexType>
+</xs :element>
+</xs :sequence>
+<xs :attribute name="Day_name" type="xs :string"/>
+</xs :complexType>
+</xs :element>
+</xs :sequence>
+<xs :attribute name="Date" type="xs :date"/>
+</xs :complexType>
+<xs :complexType name="Scanner_Type">
+<xs :attribute name="Scanner_file_name" type="xs :string"/>
+</xs :complexType>
+</xs :schema>
+FIG. 12 – Modèle logique du cube XML “Régions suspectes”.
+- 21 -
+- 22 -

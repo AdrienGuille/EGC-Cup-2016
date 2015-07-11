@@ -1,0 +1,684 @@
+Accélération des cartes auto-organisatrices sur tableau de
+dissimilarités par séparation et évaluation
+Brieuc Conan-Guez∗, Fabrice Rossi∗∗
+∗LITA EA3097, Université de Metz, Ile du Saulcy, F-57045 Metz
+Brieuc.Conan-Guez@univ-metz.fr
+∗∗Projet AxIS, INRIA, Domaine de Voluceau, Rocquencourt, B.P. 105,
+78153 Le Chesnay Cedex
+Fabrice.Rossi@inria.fr
+Résumé. Dans cet article, nous proposons une nouvelle implémentation d’une
+adaptation des cartes auto-organisatrices de Kohonen (SOM) aux tableaux de
+dissimilarités. Cette implémentation s’appuie sur le principe de séparation et
+évaluation afin de réduire le temps de calcul global de l’algorithme. Une pro-
+priété importante de ce nouvel algorithme tient au fait que les résultats produits
+sont strictement identiques à ceux de l’algorithme original.
+1 Introduction
+Dans beaucoup d’applications réelles, les individus étudiés ne peuvent pas être décrits ef-
+ficacement par des vecteurs numériques : on pense par exemple à des données de tailles va-
+riables, comme les séquences d’acides aminés constituant des protéines, ou bien à des données
+(semi-)structurées (par exemple des documents XML). Une solution pour traiter de telles don-
+nées est de s’appuyer sur une mesure de dissimilarité permettant de comparer les individus
+deux à deux.
+Nous nous intéressons dans cet article à une adaptation des cartes auto-organisatrices de
+Kohonen (SOM pour Self-Organizing Map, (Kohonen, 1995)) aux données décrites seulement
+par un tableau de dissimilarités, proposée dans (Kohonen et Somervuo, 1998, 2002). Nous dé-
+signons cette adaptation par le sigle DSOM (pour Dissimilarity SOM). On trouve aussi dans la
+littérature l’appellationMedian SOM. Le DSOM et ses variantes ont été appliqués avec succès
+à des problèmes réels d’analyse exploratoire portant sur des protéines, des données météorolo-
+giques (El Golli et al., 2004a), spectrométriques (El Golli et al., 2004b) ou encore provenant de
+l’usage d’un site web (Rossi et al., 2005; El Golli et al., 2006). Comme dans le cas classique,
+les résultats obtenus par le DSOM en terme de la qualité de la classification sont comparables
+à ceux obtenus avec d’autres méthodes applicables à des tableaux de dissimilarités (comme
+PAM (Kaufman et Rousseeuw, 1987) ou les algorithmes de type nuées dynamiques (Celeux
+et al., 1989)). L’avantage du DSOM sur ces algorithmes réside dans prise en compte d’une
+structure a priori qui permet la représentation graphique des classes et prototypes obtenus, ce
+qui facilite l’analyse exploratoire des données étudiées.
+Le problème majeur du DSOM réside dans son temps de calcul : pour N observations et
+M classes, le coût algorithmique du DSOM est de O(N2M +NM2) par itération. A titre de
+Heuristiques d’accélération pour le DSOM
+comparaison, un algorithme comme PAM (Kaufman et Rousseeuw, 1987) a un coût deO(N2)
+par itération, ce qui le rend utilisable pour des données beaucoup plus volumineuses. Dans nos
+travaux précédents (Conan-Guez et al., 2005, 2006a,b), nous avons proposé une modification
+algorithmique (rappelée à la section 3 du présent article) qui ramène ce coût àO(N2+NM2),
+tout en conservant exactement les mêmes résultats. La réduction du coût théorique a été confir-
+mée par des expériences montrant une très forte diminution du temps de calcul. Nous avons
+en outre étudié diverses heuristiques d’accélération des calculs qui permettaient de gagner un
+facteur allant jusqu’à 3.5 par rapport au code en O(N2 + NM2), tout en garantissant encore
+des résultats identiques à ceux de l’algorithme d’origine.
+Dans le présent article, nous proposons de nouvelles modifications de l’algorithme, basées
+sur le principe de séparation et évaluation (branch and bound, (Land et Doig, 1960)). Celui-ci
+s’appuie sur le calcul d’un minorant (dans la phase d’évaluation). La qualité de ce minorant
+ainsi que le temps nécessaire pour le calculer influent de manière importante sur le temps glo-
+bal d’exécution. Nous proposons donc diverses heuristiques de calcul de ce minorant, et nous
+illustrons grâce à des expériences menées sur des données simulées et réelles l’intérêt de ces
+différentes approches. Enfin, nous combinons au principe de séparation et évaluation certaines
+des techniques d’implémentations employées dans notre précédent travail, afin de réduire en-
+core plus le temps de calcul. Nous obtenons ainsi une implémentation dont les temps de calcul
+sont comparables à ceux des méthodes concurrentes au DSOM. Comme pour notre travail an-
+térieur, les résultats produits par cette nouvelle version du DSOM sont strictement identiques
+à ceux du DSOM original. Bien que cet article ne porte que sur le DSOM, la plupart des
+techniques proposées peuvent aisément être appliquées à d’autres algorithmes de classification
+de tableaux de dissimilarités s’appuyant sur la notion de prototype, en particulier le Median
+Neural Gas proposé dans (Cottrell et al., 2006).
+2 Cartes auto-organisatrices de Kohonen adaptées aux ta-
+bleaux de dissimilarités
+Nous rappelons dans cette section l’adaptation du SOM aux tableaux de dissimilarités
+(DSOM, (Kohonen et Somervuo, 1998, 2002; El Golli et al., 2004a)). On considère N in-
+dividus Ω = (xi)1≤i≤N appartenant à un espace arbitraire X . Cet espace est muni d’une me-
+sure de dissimilarité d, qui vérifie les propriétés classiques : symétrie (d(xi,xj) = d(xj ,xi)),
+positivité (d(xi,xj) ≥ 0), et self-égalité (d(xi,xi) = 0).
+Comme pour le SOM, le but du DSOM est double : construire un ensemble de proto-
+types représentatifs des données et organisés selon une structure a priori. Cette dernière est
+décrite par un graphe non orienté G = (Γ,A), où Γ est l’ensemble des nœuds (ou sommets)
+du graphe, numérotés de 1 àM (Γ = {1, . . . ,M}), et A est l’ensemble des arêtes. On munit
+G d’une distance, notée δ. A l’instar du SOM, le DSOM est souvent utilisé afin d’obtenir une
+visualisation simplifiée d’un jeu de données. Dans ce cas, il est usuel de définir le graphe G
+comme un maillage régulier (rectangulaire ou hexagonal) appartenant à un espace bidimen-
+sionnel : chaque nœud est un élément du plan. La distance de graphe δ est alors définie comme
+étant soit la distance de graphe naturelle (la distance séparant deux nœuds est donnée par le
+nombre d’arêtes composant le chemin de longueur minimale entre les deux nœuds considérés),
+soit la distance euclidienne (distance dans le plan entre les deux nœuds).
+B. Conan-Guez et F. Rossi
+A chaque noeud du graphe, on associe un prototypemlj qui est choisi dans Ω (pour chaque
+nœud j, il existe i tel que mlj = xi). L’exposant l indique que le prototype est celui obtenu
+à l’itération l de l’algorithme. On voit apparaître dans le choix des prototypes une des diffé-
+rences majeures entre l’algorithme du SOM standard et le DSOM : pour le SOM standard,
+les prototypes sont décrits par des vecteurs quelconques choisis sans contrainte dans X . Pour
+le DSOM en revanche, il n’est pas possible de construire des éléments arbitraires de X et on
+impose donc aux prototypes d’être choisis parmi les données.
+La quantification réalisée par les prototypes est représentée par une fonction d’affectation
+cl(i), qui à chaque individu xi associe un nœud du graphe : le prototype associé au noeud,
+mlcl(i) est le représentant de l’individu concerné. On note Clj la classe associée au nœud j à
+l’itération l : Clj = {xi ∈ Ω|cl(i) = j}. Les Clj forment une partition P l de Ω.
+La structure de graphe impose une contrainte topologique par l’intermédiaire d’une fonc-
+tion de voisinage définie à partir d’une fonction noyau décroissante K (par exemple K(x) =
+exp(−x2)) de la façon suivante : h(j, k) = K(δ(j, k)). Le but de la fonction de voisinage est
+de mesurer l’influence d’un nœud j du graphe sur ses voisins : deux prototypes associés à des
+nœuds voisins sur le graphe auront des comportements relativement identiques, alors que deux
+prototypes associés à des nœuds distants sur le graphe seront libres d’évoluer indépendemment.
+La fonction de voisinage évolue à chaque itération l : on note hl(., .) la fonction utilisée
+à l’itération l (on l’obtient généralement par une relation de la forme h(j, k) = K
+(
+δ(j,k)
+T l
+)
+,
+où T l diminue avec l). La suite de fonctions (hl)l vérifie dans la pratique deux propriétés
+importantes. (hl)l est décroissante (i.e., hl > hl′ si l < l′). De plus, lors des dernières itérations
+l de l’algorithme, hl peut être assimilée à une fonction delta de Kronecker. Ces deux propriétés
+font que la contrainte topologique se relâche au cours des itérations, l’algorithme se comportant
+en fin d’apprentissage comme un algorithme de type nuées dynamiques.
+L’algorithme du DSOM, qui est basé sur la version non stochastique du SOM (version
+batch), cherche à minimiser la fonction énergie suivante :
+E l(P l,Ml) =
+N∑
+i=1
+∑
+j∈Γ
+hl(cl(i), j)d(xi,mlj). (1)
+Cette fonction mesure l’adéquation entre une partition des individus P l et un ensemble de pro-
+totypesMl, en tenant compte de la topologie. L’algorithme commence par une phase d’initia-
+lisation : on choisit par exempleM0 = (m01, . . . ,m0M ) de manière aléatoire. Puis l’algorithme
+alterne les phases d’affectation et les phases de représentation jusqu’à la convergence. Pour
+l’itération l, on a :
+1. phase d’affectation : chaque individu xi est affecté au prototype qui le représente
+le mieux. Pour ce faire, on peut choisir le prototype le plus proche et donc poser
+cl(i) = argminj∈Γ d(xi,ml−1j ). Dans la pratique cependant, cette règle d’affectation,
+bien que classique, présente un inconvénient important : elle ne permet pas de lever les
+ambiguïtés relatives aux collisions entre prototypes (cas relativement fréquent où deux
+nœuds distincts sont associés au même prototype). Pour contourner ce problème, nous
+utilisons la modification proposée dans (Kohonen et Somervuo, 1998). Cette méthode
+consiste à affiner le critère d’affectation dans le cas où une collision entre prototypes se
+produit : on ne cherche plus à trouver le prototype le plus proche de l’individu, mais
+Heuristiques d’accélération pour le DSOM
+le prototype dont l’ensemble des voisins est le plus proche de l’individu (le rayon de
+recherche sur le graphe est incrémenté de 1 tant qu’un prototype n’est pas déclaré vain-
+queur). Remarquons que ces deux règles d’affectation ne garantissent pas la décroissance
+de la fonction énergie à chaque itération : on observe cependant dans la pratique la dé-
+croissance en moyenne de celle-ci. On pourrait aussi affecter les individus en minimisant
+directement E l(P l,Ml) par rapport à P l, en considérantMl fixé, comme dans (El Golli
+et al., 2004b). Cela conduit en général à des résultats similaires à ceux obtenus avec la
+méthode retenue ici, mais au prix d’une légère augmentation du temps de calcul.
+2. phase de représentation : l’algorithme cherche de nouvelles valeurs pour les prototypes
+(i.e.,Ml) en minimisant la fonction énergie E l(P l, .) pour une partition P l fixée. Ce
+problème d’optimisation peut se réécrire facilement comme la somme deM problèmes
+d’optimisation indépendants (un problème par nœud du graphe). Chaque prototypemlj
+est donc solution du nouveau problème :
+mlj = arg min
+m∈Ω
+N∑
+i=1
+hl(cl(i), j)d(xi,m). (2)
+3 Recherche exhaustive efficace
+Si l’on examine le coût algorithmique du DSOM, on constate que pour une itération de l’al-
+gorithme, le coût de la phase d’affectation est en O(NM2) au pire (voir la règle d’affectation
+modifiée dans (Kohonen et Somervuo, 1998)) et que la phase de représentation (voir équation
+2) est en O(N2M)1 dans le cadre d’une recherche exhaustive. Comme N > M dans tous les
+cas, la phase de représentation domine nettement le calcul.
+Cependant, nous avons montré (Conan-Guez et al., 2005, 2006a,b) qu’il était possible d’ex-
+ploiter la structure de l’équation 2 pour réduire le coût d’une recherche exhaustive. A l’itération
+l et pour chaque nœud j, on cherche à trouver pour quel k, la fonction Sl(j, k) est minimale,
+où Sl(j, k) =
+∑N
+i=1 h
+l(cl(i), j)d(xi,xk). Si l’on note Dl(u, k) =
+∑
+xi∈Clu d(xi,xk), on peut
+exprimer Sl(j, k) en regroupant les individus par classes :
+Sl(j, k) =
+M∑
+u=1
+hl(u, j)
+∑
+xi∈Clu
+d(xi,xk) =
+M∑
+u=1
+hl(u, j)Dl(u, k). (3)
+Il y aMN différentes valeursDl(u, k) (nommées sommes partielles dans la suite de l’article),
+qui peuvent être pré-calculées une fois pour toute avant la phase de représentation. On montre
+dans (Conan-Guez et al., 2006a) que le coût de cette phase de pré-calcul est en O(N2) et que
+celui de la recherche exhaustive s’appuyant sur cette nouvelle formulation est en O(NM2).
+On a donc un coût total pour la phase de représentation de O(N2 + NM2), à comparer avec
+O(N2M) pour l’algorithme initial. Comme on a N > M dans toutes les situations, cette
+approche réduit le coût du DSOM. De plus, les résultats obtenus sont strictement identiques à
+ceux de l’algorithme initial.
+1à comparer avec O(nNM) dans le cas du SOM batch classique sur des vecteurs de dimension n.
+B. Conan-Guez et F. Rossi
+4 Accélération par séparation et évaluation
+Dans la section précédente, les modifications apportées à l’algorithme du DSOM ont per-
+mis de réduire sa complexité algorithmique de manière significative. Dans cette section, nous
+allons exploiter le principe général de séparation et évaluation (branch and bound) pour rendre
+encore plus efficace la phase de représentation en évitant une recherche exhaustive naïve.
+4.1 Séparation et évaluation
+Rappelons tout d’abord le principe général de séparation et évaluation. Quand on doit mi-
+nimiser une fonction f sur un domaine K, on cherche à éviter l’exploration exhaustive de K.
+Pour ce faire, on se donne une décomposition de K en sous-ensembles (si possible disjoints)
+qui correspond au terme séparation. On suppose être capable d’évaluer efficacement un mi-
+norant des valeurs de f sur chaque sous-ensemble (ce qui correspond au terme évaluation).
+Au lieu de faire une recherche exhaustive dans K, on commence par une région donnée, dans
+laquelle la recherche est conduite de façon exhaustive, ce qui conduit à un majorant pour le mi-
+nimum. On compare alors ce majorant au minorant d’une région non explorée jusqu’à présent.
+Si le minorant est plus grand que le majorant actuel, on peut éliminer la région entière sans
+avoir besoin de l’explorer. Dans le cas contraire, on met à jour le majorant grâce à l’exploration
+exhaustive de la région.
+Les performances d’un algorithme exploitant la séparation et l’évaluation dépendent de
+plusieurs facteurs : la rapidité de calcul des minorants dans une région, la qualité de ces mino-
+rants, l’ordre de parcours des régions, etc.
+4.2 Séparation pour la représentation
+Dans la phase de représentation du nœud j, on cherche le minimum sur Ω (identifié à
+{1, . . . , N}) de Sl(j, .). Nous proposons de réaliser la séparation de Ω à partir de la partition
+produite par l’algorithme lors de la phase d’affectation (P l). Le but du DSOM est en effet
+de produire des classes homogènes, mais aussi séparées (bien que la séparation entre classes
+ne soit pas maximisée explicitement). En raison de l’homogénéité, la valeur de Sl(j, .) reste
+relativement constante sur une classe et un minorant est donc assez représentatif des valeurs
+attendues. En raison de la séparation, les éléments d’une classe i ne devraient pas être de
+bons candidats pour représenter la classe j 6= i : on peut donc espérer qu’un minorant de
+Sl(j, .) pour les éléments de Cli soit relativement élevé et rende donc superflue une recherche
+exhaustive dans cette classe (nous reviendrons sur ce point dans la section 4.3).
+Si l’on fait l’hypothèse d’une équi-répartition des observations dans les classes (soit donc
+N
+M individus par classe), l’approche séparation et évaluation peut réduire considérablement le
+coût de la phase de représentation. Considérons en effet le cas d’un nœud fixé, pour lequel la
+recherche exhaustive est enO(NM). Dans le cas le plus favorable, on n’effectue une recherche
+exhaustive seulement dans la première classe considérée. Pour chaque individu de cette classe,
+le coût d’évaluation de Sl(j, k) est de O(M), soit donc un coût total en O(N) (avec équi-
+répartition). Pour les M − 1 classes restantes, on se contente de comparer l’évaluation du
+minorant au majorant obtenu grâce à la première classe, ce qui ajoute un temps de calcul en
+O(M) (en ne tenant pas compte de la phase d’évaluation pour l’instant).
+Heuristiques d’accélération pour le DSOM
+Dans le cas idéal, on passe donc d’une phase de représentation en O(NM2) à une phase
+en O(M(N +M)), à laquelle on doit ajouter le temps de calcul des évaluations (complexité
+en O(MN)).
+4.3 Ordre de parcours des classes
+L’efficacité de l’approche séparation et évaluation est fortement liée à l’ordre dans lequel
+les groupes d’éléments sont parcourus : l’algorithme est d’autant plus efficace qu’on trouve
+rapidement un bon majorant du minimum. Or, la partition calculée par le DSOM ordonne les
+données en un sens fortement lié au problème d’optimisation de la phase de représentation.
+En effet, les individus affectés à une classe Clj sont par définition proches (au sens de la
+dissimilarité) du prototypeml−1j de cette classe. Il semble donc naturel de chercher la valeur
+demlj d’abord dans les éléments de Clj . Comme nous le verrons à la section 7, cette stratégie
+s’avère en pratique très efficace.
+En raison de la structure a priori imposée aux prototypes par l’algorithme du DSOM, le
+prototype d’un nœud j est aussi un modèle correct pour les éléments affectés aux nœuds voi-
+sins de j dans le graphe. De ce fait, ces éléments sont des candidats potentiels intéressant pour
+trouver le prototype de j. Une fois qu’on a parcouru de façon exhaustive Clj , il semble donc
+pertinent de passer aux classes voisines, i.e., aux Clu pour lesquelles δ(j, u) est petit. En pra-
+tique cependant, cette solution n’améliore que marginalement les résultats et nous ne l’avons
+pas incluse dans les expériences proposées dans l’article. En effet, après quelques itérations de
+l’algorithme, les classes sont déjà suffisamment séparées pour que le prototype d’une classe
+soit très fréquemment un élément de celle-ci. L’évaluation produit alors généralement un mi-
+norant pour les autres classes supérieur à la valeur de Sl(j, .) pour le candidat trouvé dans Clj ,
+ce qui évite leur parcours exhaustif.
+4.4 Évaluation pour la représentation
+L’évaluation consiste donc à minorer Sl(j, .) sur chaque classe Clu de P l. Plus précisément
+on cherche à approcher par les valeurs inférieures la valeur minxk∈Clu S
+l(j, k).
+La stratégie retenue consiste à exploiter la formulation de l’équation 3 et la positivité des
+éléments qui apparaissent dans les Sl(j, k). On constate en effet que
+ζl(j, u, γ) =
+∑
+v∈γ
+hl(v, j) min
+xk∈Clu
+Dl(v, k) ≤ min
+xk∈Clu
+Sl(j, k). (4)
+où γ est sous-ensemble quelconque de Γ = {1, . . . ,M}.
+Le calcul de λl(v, u) = minxk∈Clu D
+l(v, k) se fait en O(|Clu|), et, globalement, celui de
+l’ensemble des λl(., .) se fait en O(NM). Ceci est compatible avec les plus faibles temps de
+calcul envisageables pour la phase de représentation. Etudions à présent les deux stratégies
+extrêmes pour le choix du sous-ensemble γ, i.e. γ égale à Γ et γ réduit à un singleton :
+La première stratégie revient à choisir γ = Γ. Dans ce cas, par positivité des éléments
+sommés, les minorants ζl(j, u,Γ) obtenus sont maximaux : tout autre choix pour γ mène à des
+minorants plus faibles, et donc de moins bonne qualité. Ce choix permet donc de minimiser
+le nombre de recherches exhaustives dans les classes pour l’algorithme du branch and bound.
+Malheureusement, le coût de calcul du minorant de l’équation 4 avec γ = Γ est alors de
+B. Conan-Guez et F. Rossi
+O(M) pour chaque couple de nœuds (j, u), ce qui induit un coût total en O(M3) pour obtenir
+l’ensemble des ζl(., .,Γ). Le sur-coût induit par cette méthode d’évaluation des classes est
+inférieur au coût de la recherche exhaustive (en O(NM2)), mais largement supérieur à celui
+du coût minimal envisageable dans le cas d’un fonctionnement idéal du branch and bound
+(O(M(N +M))). C’est la raison pour laquelle nous envisageons l’alternative suivante.
+La deuxième stratégie revient à restreindre γ à un singleton. On obtient donc une borne
+de moins bonne qualité, mais avec un coût de calcul plus faible, au total en O(M2) pour
+l’ensemble des ζl, du même ordre de grandeur que le coût minimal envisageable (en tenant
+compte en outre du temps de calcul des λl(., .)).
+En pratique, nous nous sommes intéressés au cas de ζl(j, u, {j}) quand γ est réduit à
+un singleton. Cette heuristique est motivée par la remarque suivante. La valeur hl(v, j) est
+d’autant plus petite que la distance δ(v, j) est grande. En outre les fonctions généralement
+utilisées pour calculer hl(v, j) à partir de δ(v, j) décroissent rapidement. En pratique, la valeur
+ζl(j, u, {j}) est donc largement influencée par celle de λl(j, u).
+Nous verrons en pratique à la section 7 que cette heuristique donne des résultats très inté-
+ressants.
+4.5 Algorithme
+Pour le calcul demlj , nous obtenons au final l’algorithme 1 qui s’appuie sur le pré-calcul
+des grandeurs suivantes :
+– les sommes partielles Dl(u, k) =
+∑
+xi∈Clu d(xi,xk) (cf section 3) ;
+– les minima, classe par classe, de ces sommes partielles, c’est-à-dire les λl(v, u) =
+minxk∈Clu D
+l(v, k) (cf section 4.4).
+5 Calculs court-circuités
+Le principe des calculs court-circuités a déjà été exploité dans nos travaux précédents
+(Conan-Guez et al., 2006a) pour accélérer les calculs des sommes Sl(., .). Nous l’appliquons
+ici à la phase d’évaluation2.
+5.1 Principe
+On a vu dans la section précédente que dans le cas où γ est choisi comme étant égal à Γ,
+la qualité des minorants ζl(j, u,Γ) est maximale (ce qui minimise le nombre de recherches
+exhaustives dans l’algorithme du branch and bound). Cependant, ces minorants sont obtenus
+au prix d’un coût algorithmique très important (O(M3)). L’approche par court-circuit a donc
+pour but de calculer de manière efficace de nouveaux minorants de telle sorte que le nombre
+de recherches exhaustives reste identique au cas précédent (γ = Γ).
+Le principe retenu est simple : le calcul de ζl(j, u,Γ) nécessite la sommation deM termes
+(voir équation 4 et algorithme 1, lignes 11 à 14). Cependant, on peut remarquer que ce calcul
+n’a pas besoin d’être mené à son terme. En effet, au cours de cette sommation, si l’un des résul-
+tats intermédiaires (sous-sommes) vient à dépasser la valeur du majorant actuel dans le branch
+2Il serait techniquement possible de combiner les court-circuits de l’évaluation avec ceux du calcul des sommes,
+mais nous n’avons pas exploré cette voie pour l’instant.
+Heuristiques d’accélération pour le DSOM
+algorithme 1 Calcul demlj
+1: mlj ← ε {Initialisation}
+2: qual←∞
+3: for all xk ∈ Clj do {on commence par une recherche exhaustive dans Clj}
+4: calcul de Sl(j, k) {en O(M) grâce aux Dl(u, k)}
+5: if qual > Sl(j, k) then
+6: mlj ← xk
+7: qual← Sl(j, k)
+8: end if
+9: end for
+10: for all u 6= j do {recherche dans les Clu dans l’ordre croissant de δ(j, u)}
+11: ζ ← 0 {ζ contiendra ζl(j, u, γ) après la boucle}
+12: for all v ∈ γ do {évaluation (calcul de ζl(j, u, γ), un minorant deminxk∈Clu Sl(j, k))}
+13: ζ ← ζ + hl(v, j)λl(v, u)
+14: end for
+15: if ζ < qual then {recherche exhaustive dans Clu}
+16: for all xk ∈ Clu do
+17: calcul de Sl(j, k)
+18: if qual > Sl(j, k) then
+19: mlj ← xk
+20: qual← Sl(j, k)
+21: end if
+22: end for
+23: end if
+24: end for
+algorithme 2 Calcul court-circuité d’un minorant pour le nœud j et la classe Cu
+1: qual est le majorant actuel (cf algorithme 1)
+2: ζ ← 0{ζ contiendra un minorant de ζl(j, u,Γ) après la boucle}
+3: for all v ∈ Γ do
+4: ζ ← ζ + hl(v, j)λl(v, u)
+5: if ζ > qual then {court-circuit}
+6: break loop
+7: end if
+8: end for
+B. Conan-Guez et F. Rossi
+and bound, la recherche exhaustive n’a pas besoin d’être effectuée dans la classe considérée, et
+le calcul de la sommation peut être interrompu. Il est important de noter que les sous-sommes
+ainsi calculées sont aussi des minorants. L’algorithme correspondant s’écrit facilement : on
+insère dans la boucle de sommation une structure conditionnelle qui compare le résultat du
+calcul en cours avec le majorant actuel. Si le calcul de la sous-somme dépasse le majorant, la
+boucle est interrompue, et la recherche exhaustive n’est pas effectuée (voir algorithme 2 qui
+remplace les lignes 11 à 14 dans l’algorithme 1).
+5.2 Ordre de calcul
+Comme dans la section précédente, l’ordre des calculs est crucial pour obtenir une accé-
+lération effective. On considère ici l’ordre de parcours des éléments de Γ (voir boucle dans
+l’algorithme 2), le but étant de provoquer un court-circuit le plus tôt possible. Il faut donc
+sommer les termes qui constituent la valeur recherchée en commençant par les plus grands.
+Comme le tri des éléments engendrerait un sur-coût supérieur à celui du calcul complet, on
+doit s’appuyer sur un ordre approximatif. Or, comme nous l’avons remarqué à la section 4.4,
+la fonction de voisinage hl(., .) joue un rôle très important car elle décroît assez vite avec la
+distance entre les nœuds dans la structure a priori. Nous proposons d’utiliser comme ordre
+interne celui induit par cette structure. Pour calculer ζl(j, u,Γ) on commencera donc par le
+terme hl(j, j)λl(j, u), puis on s’éloignera progressivement du nœud j dans le graphe. Notons
+que l’ordre de calcul est induit par le graphe et est fixé pendant les itérations du DSOM.
+6 Mémorisation
+La dernière optimisation à laquelle nous nous intéressons a déjà été exploitée dans nos tra-
+vaux précédents (Conan-Guez et al., 2006a). Elle porte sur la phase de pré-calcul des sommes
+partielles Dl(u, k) et des λl(v, u), dont la complexité est en O(N2 + NM). On s’aperçoit
+en effet que les classes Clu produites par le DSOM ont tendance à se stabiliser lors des der-
+nières itérations de l’algorithme. Il n’est pas rare que d’une itération à l’autre, le contenu d’une
+(ou plusieurs) classe reste strictement identique. Dans de tels cas, les N sommes partielles
+Dl(u, k) correspondantes restent inchangées, et il est donc inutile de les recalculer. De même,
+le recalcul des quantités λl(v, u) = minxk∈Clu D
+l(v, k) n’est nécessaire que si la classe Clu ou
+la classe Clv ont été modifiées. Les algorithmes basés sur la technique de mémorisation sur-
+veillent donc les changements de classes afin de calculer les quantités Dl(u, k) et λl(v, u) de
+manière paresseuse (lazy computing).
+7 Expériences
+7.1 Méthodologie
+Les différents algorithmes ont été implémentés en langage Java, et testés avec le kit de
+développement de Sun (version 1.5). Les programmes ont été étudiés sur une station de travail
+équipée d’un Pentium IV 3.00 Ghz (l’hyperthreading est désactivé) avec 512Mo de mémoire
+vive. Le système d’exploitation utilisé est Linux (Kubuntu). La machine virtuelle java (JVM)
+Heuristiques d’accélération pour le DSOM
+est exécutée en mode serveur afin d’activer l’optimisation la plus poussée du code. Pour chaque
+algorithme proposé, la machine virtuelle Java est démarrée et la matrice de dissimilarités est
+chargée3 entièrement en mémoire. L’algorithme est alors exécuté une première fois. La durée
+de cette première exécution n’est pas prise en compte dans nos résultats, car la JVM utilise
+cette première exécution pour identifier les parties du code nécessitant une optimisation plus
+poussée. A la fin de cette première exécution, l’algorithme est à nouveau exécuté 5 fois. Les
+durées4 rapportées dans ce travail correspondent à la médiane de ces 5 exécutions. Nous n’in-
+diquons pas l’écart-type des différentes mesures car sa valeur est très faible comparée à la
+médiane.
+Ce protocole expérimental a été utilisé afin de minimiser l’influence sur les résultats de
+certaines particularités de la plateforme Java. La machine virtuelle réalise en effet une com-
+pilation au vol (just in time) du code chargé, en s’appuyant sur une analyse dynamique du
+comportement du programme en cours d’exécution. En laissant la machine virtuelle exécuter
+complètement l’algorithme, on lui permet d’optimiser la traduction en langage machine. Les
+exécutions suivantes se font alors en un temps stable et dans une situation comparable à celle
+qu’on aurait avec un langage de programmation plus statique comme le C, pour lequel la tra-
+duction en langage machine est effectuée en amont de l’exécution. Cette méthodologie est très
+classique en Java (cf par exemple (Cecchet et al., 2002)).
+7.2 Données
+Les algorithmes proposés ont été évalués sur des données simulées ainsi que sur des don-
+nées réelles.
+Les différents jeux de données simulées sont générés de la manière suivante. On considère
+N points de R2 choisis aléatoirement dans le carré unité selon la loi uniforme. La matrice de
+dissimilarités contient le carré de la distance euclidienne entre chaque couple de points. Les
+tailles des jeux de données sont les suivantes : N = 500, N = 1000, N = 1500, N = 2000,
+et N = 3000.
+Les données réelles sont issues de la base SCOWL word lists (Atkinson, 2004) dans la-
+quelle nous avons retenu une liste de 4946 mots communs de la langue anglaise. Après avoir
+supprimé les formes plurielles ainsi que les formes possessives, le nombre de mots a été ra-
+mené à 3 200. Cet ensemble correspond à notre premier jeu de données réelles. À partir de
+celui-ci, un second jeu de données a été généré en utilisant l’algorithme de stemming de (Por-
+ter, 1980). Cet algorithme ne conserve que le radical de chaque mot. Cette opération a réduit
+l’ensemble des mots au nombre de 2 277. Les mots sont comparés grâce à la distance de (Le-
+venshtein, 1966) définie comme suit. La distance entre deux chaînes de caractères a et b est le
+nombre minimal de transformations élémentaires nécessaires pour passer de a à b, en considé-
+rant les trois transformations suivantes (avec le même coût par transformation) : remplacement
+d’un caractère par un autre, suppression ou insertion d’un caractère. L’inconvénient de cette
+distance est qu’elle n’est pas très adaptée à un ensemble de mots dont la longueur n’est pas
+uniforme. La distance entre les chaînes "a" et "b" est la même que celle entre "love" et "lover",
+3Dans nos travaux antérieurs, seule la partie triangulaire inférieure de la matrice de dissimilarités était mémorisée.
+Dans ce travail, la totalité de la matrice est chargée en mémoire. On obtient ainsi un temps d’accès réduit aux éléments
+de la matrice au détriment d’une occupation mémoire deux fois plus importante.
+4Ces durées correspondent au temps CPU utilisé par le programme et sont obtenus grâce à l’appel POSIX
+clock_gettime.
+B. Conan-Guez et F. Rossi
+par exemple. Nous avons donc utilisé une version normalisée de la distance de Levenshtein, où
+celle-ci est divisée par la longueur de la plus grande chaîne.
+Nous avons utilisé les différents algorithmes avec une topologie de grille hexagonale. Les
+tailles choisies sont les suivantes :M = 49 = 7×7,M = 100 = 10×10,M = 225 = 15×15
+etM = 400 = 20× 20. Les expériences où le nombre de classesM est trop élevé par rapport
+au nombre d’individus N n’ont pas été menées. La fonction de voisinage est définie grâce
+à un noyau gaussien. Le nombre d’itérations des différents algorithmes est fixé à 100. Cette
+valeur a été choisie de façon heuristique pour conduire à l’obtention d’une classification finale
+de qualité satisfaisante dans les expériences portants sur les données textuelles : avec une
+valeur nettement plus faible, le DSOM a en effet tendance à converger vers une solution qui
+ne préserve pas la topologie des données. Pour le cas des données simulées, nous avons retenu
+cette même valeur, ce qui permet d’obtenir de bons résultats. On peut remarquer que l’ordre
+de grandeur obtenu est comparable à celui observé quand on utilise d’autres méthodes de
+classification sur des tableaux de dissimilarités, comme PAM (Kaufman et Rousseeuw, 1987)
+(il est significativement moins important que celui nécessaire pour des algorithmes de type
+stochastique). Enfin, on constate qu’une valeur de l’ordre de 100 au moins était nécessaire pour
+obtenir une estimation fiable des temps d’exécution pour les jeux de données peu volumineux
+(moins d’une seconde dans certains cas).
+7.3 Implémentation de référence (recherche exhaustive)
+Notre implémentation de référence est celle décrite dans la section 3 qui consiste en une
+recherche exhaustive des prototypes avec pré-calcul des sommes partielles. Dans nos travaux
+antérieurs (Conan-Guez et al., 2006a), nous avons montré, sur des données similaires à celles
+utilisées ici, que cet algorithme enO(N2+NM2) était toujours plus efficace que la recherche
+naïve en O(N2M). A titre d’exemple, pour le cas des données uniformes sur le carré unité
+avec N = 3000 et M = 400, le temps d’exécution était de 2 heures pour l’algorithme naïf
+et de seulement 4 minutes et demie pour l’algorithme des sommes partielles5. L’amélioration
+étant systématique, il n’y a pas lieu d’utiliser l’algorithme naïf. Les différents algorithmes
+proposés seront donc comparés à l’algorithme de la section 3 (qui servira ainsi de référence).
+On donnera le facteur d’accélération d’une méthode, c’est-à-dire le rapport entre le temps de
+calcul de l’algorithme de référence et le temps de calcul de la méthode.
+Le tableau 1 récapitule les temps d’exécution en secondes de cet algorithme pour les diffé-
+rents jeux de données.
+On remarque une différence de comportement importante de l’algorithme entre les don-
+nées simulées pour N = 3000 et les données réelles pour N = 3200, avec M = 400, le
+second problème demandant nettement plus de temps calcul que le premier. Cette différence
+tient au fait que les deux jeux de données SCOWL sont nettement plus sensibles au problème
+de collisions entre prototypes que les jeux de données simulées, ce qui implique des calculs
+supplémentaires dans la phase d’affectation. En effet, en l’absence de collision, on se contente
+de chercher le prototype le plus proche d’une observation, ce qui conduit àM−1 comparaisons
+par observation. En présence de collisions, on doit évaluer chaque noeud en tenant compte de
+certains de ses voisins, ce qui peut conduire à un calcul en O(M2) pour chaque individu. A
+5Dans les résultats présentés ici, le temps d’exécution n’est que de 4 minutes sur les mêmes données : ceci est une
+conséquence de l’utilisation d’une matrice de dissimilarités pleine.
+Heuristiques d’accélération pour le DSOM
+Données simulées SCOWL
+N (individus)
+M (classes)
+500 1 000 1 500 2 000 3 000 2 277 3 200
+49 = 7× 7 0.7 1.5 2.5 3.7 6.6 4.6 8.6
+100 = 10× 10 2.6 4.5 7.3 10.0 16.9 12.6 19.4
+225 = 15× 15 26.6 40.9 54.4 83.2 62.5 86.4
+400 = 20× 20 133.2 174.2 242.8 185.9 318.0
+TAB. 1 – Temps d’exécution en secondes pour l’algorithme des sommes partielles
+titre d’exemple, le nombre moyen de voisins pris en compte pour chaque noeud est de 0.987
+pour les données simulées avec N = 3000 etM = 400, contre 30.2 dans le cas des données
+réelles (N = 3200 etM = 400). On voit donc que la phase d’affectation peut avoir un impact
+négatif sur le temps d’exécution global si les collisions sont trop fréquentes. On retrouvera ce
+problème dans toutes les implémentations optimisées que nous proposons.
+7.4 Séparation et évaluation
+Nous étudions tout d’abord les effets de la mise en place du principe de séparation et
+d’évaluation, en considérant les deux stratégies d’évaluation décrites dans la section 4.4.
+Données simulées SCOWL
+N (individus)
+M (classes)
+500 1 000 1 500 2 000 3 000 2 277 3 200
+49 = 7× 7 1.2 | 1.5 1.1 | 1.4 1.1 | 1.4 1.1 | 1.3 1.0 | 1.3 1.0 | 1.2 0.9 | 1.1
+100 = 10×10 1.4 | 1.7 1.4 | 2.1 1.3 | 2.2 1.2 | 2.2 1.2 | 2.1 1.0 | 1.5 1.0 | 1.3
+225 = 15×15 2.0 | 2.7 2.0 | 3.4 2.0 | 4.0 2.0 | 4.3 1.2 | 1.8 1.2 | 2.0
+400 = 20×20 2.5 | 2.8 2.5 | 3.4 2.4 | 4.2 1.3 | 2.0 1.2 | 1.7
+TAB. 2 – Facteurs d’accélération de l’algorithme avec séparation et évaluation : minorant
+(un seul terme | tous les termes)
+Le tableau 2 récapitule les facteurs d’accélération obtenus. Dans chaque case, le premier
+facteur correspond au minorant ζl(j, u, {j}) issu de l’équation 4 (minorant calculé à partir
+d’un seul terme), alors que le second facteur correspond au minorant de l’équation 4 (minorant
+calculé à partir de l’ensemble des termes).
+Si nous étudions les résultats obtenus pour le premier minorant (ζl(j, u, {j})), nous consta-
+tons que l’utilisation du principe de séparation et évaluation est presque toujours bénéfique
+(seul le cas N = 3200 etM = 49 se révèle plus lent). Quand N augmente, l’accélération est
+plus faible car le terme en O(N2) domine le coût total et une réduction du temps d’exécution
+de la partie théoriquement en O(NM2) n’a qu’un effet marginal. Considérons par exemple
+le cas des données simulées avec N = 3000 et M = 49. La recherche exhaustive nécessite
+l’évaluation de NM = 147000 sommes Sl(., .) par itération. Or, le principe de séparation et
+évaluation conduit à évaluer moins de 71000 sommes en moyenne. Le coût effectif de la re-
+présentation est donc réduit de moitié, mais les sur-coûts et l’importance du terme en O(N2)
+empêchent cette amélioration d’avoir un réel impact sur le temps de calcul. Pour N = 500 et
+B. Conan-Guez et F. Rossi
+M = 49, on retrouve une réduction approximative du coût de la représentation par un facteur
+2, qui se traduit cette fois-ci par une amélioration réelle en raison de la valeur plus faible de
+N : la phase en O(NM2) domine le temps de calcul.
+Pour la même raison (équilibre entre N2 et NM2), l’accélération augmente avecM , alors
+que la réduction du nombre de sommes évaluées reste sensiblement la même : pourN = 3000
+et M = 100, par exemple, on calcule en moyenne 148000 sommes, contre 300000 avec une
+recherche exhaustive. On retrouve ce facteur 2 pour toutes les expériences réalisées sur les
+données simulées.
+Les résultats moins bons obtenus sur les données réelles s’expliquent par la difficulté du
+problème : le DSOM réalise une quantification de moins bonne qualité pour ces données que
+pour les données simulées (ce problème est lié à celui des collisions de prototypes évoqué
+dans la section 7.3). De ce fait, la séparation induite par la partition est moins efficace et la
+réduction du nombre d’évaluations est plus faible : pour N = 3200 etM = 100, on évalue en
+moyenne 250000 sommes au lieu des 320000 de la recherche exhaustive. On retrouve la même
+proportion (environ 20 % de sommes en moins) pour d’autres valeurs deM , mais aussi pour
+N = 2277.
+Si nous étudions à présent les résultats obtenus pour le second minorant (équation 4), nous
+constatons qu’ils sont tous strictement meilleurs que ceux obtenus avec le minorant précédent.
+Ceci est une conséquence de la qualité bien meilleure des minorants obtenus par le calcul plus
+complet. Dans le cas de N = 3000 etM = 225, on passe de 675000 évaluations de sommes
+à 333000 en moyenne pour le premier minorant, et à seulement 39000 pour le minorant plus
+précis. Bien que son temps de calcul soit plus élevé d’un facteurM , ce sur-coût est largement
+compensé par la réduction très importante du nombre de sommes évaluées.
+7.5 Algorithmes basés sur le calcul court-circuité des minorants avec ou
+sans ordre
+La section précédente montre que le calcul complet des minorants selon l’équation 4
+conduit à une plus grande accélération que le calcul des minorants réalisé avec un seul terme.
+Le principe du court-circuit présenté à la section 5 permet en théorie de réduire le temps de
+calcul des minorants. Nous étudions maintenant son impact pratique, avec ou sans ordre heu-
+ristique pour les calculs considérés.
+Données simulées SCOWL
+N (individus)
+M (classes)
+500 1 000 1 500 2 000 3 000 2 277 3 200
+49 = 7× 7 1.4 | 1.5 1.4 | 1.4 1.3 | 1.4 1.3 | 1.4 1.2 | 1.2 1.2 | 1.2 1.1 | 1.1
+100 = 10×10 1.7 | 1.9 2.1 | 2.3 2.2 | 2.3 2.1 | 2.3 2.0 | 2.1 1.5 | 1.5 1.4 | 1.3
+225 = 15×15 3.1 | 4.4 3.8 | 5.0 4.2 | 5.3 4.5 | 5.3 2.0 | 2.0 2.1 | 2.2
+400 = 20×20 3.6 | 6.2 4.1 | 6.5 5.0 | 7.1 2.4 | 2.6 1.8 | 1.9
+TAB. 3 – Facteurs d’accélération de l’algorithme avec calculs court-circuités : sans ordre |
+avec ordre
+Le tableau 3 récapitule les facteurs d’accélération obtenus pour l’algorithme basé sur le
+principe de séparation et évaluation avec calculs court-circuités de l’évaluation des minorants
+sans ordre (résultat de gauche dans chaque case) et avec ordre (résultat de droite).
+Heuristiques d’accélération pour le DSOM
+En se focalisant tout d’abord sur l’algorithme sans ordre, on constate que les facteurs d’ac-
+célération sont en général meilleurs que ceux obtenus par l’algorithme sans calculs court-
+circuités. On voit donc que bien que le calcul court-circuité induise un sur-coût de calcul (lié
+à la présence d’un test dans la boucle de calcul du minimum), ce sur-coût est en général bien
+compensé par la réduction du nombre d’opérations à effectuer.
+Si l’on s’intéresse à présent au cas où l’on ordonne le calcul du minorant, on constate
+que les résultats sont nettement améliorés par rapport à l’algorithme sans ordonnancement.
+Là encore, on peut déduire que le sur-coût lié à cette implémentation (une indirection dans
+la boucle du calcul du minorant) est compensé par l’obtention plus rapide d’un minorant de
+même qualité.
+7.6 Mémorisation et comparaison avec les travaux antérieurs
+La section précédente montre l’intérêt de la combinaison d’une approche séparation et
+évaluation avec une évaluation court-circuité et ordonnée de minorants précis. Dans la présente
+section, nous combinons cette approche avec la technique de mémorisation décrite à la section
+6.
+Données simulées SCOWL
+N (individus)
+M (classes)
+500 1 000 1 500 2 000 3 000 2 277 3 200
+49 = 7× 7 1.9 | 1.4 1.9 | 1.4 1.9 | 1.4 1.8 | 0.9 1.8 | 1.3 1.4 | 1.2 1.3 | 1.1
+100 = 10×10 2.2 | 1.7 2.9 | 1.9 2.9 | 1.7 2.9 | 1.6 2.8 | 1.5 1.6 | 1.2 1.5 | 1.1
+225 = 15×15 5.1 | 2.7 5.8 | 2.8 6.3 | 2.7 6.4 | 2.5 2.1 | 1.6 2.3 | 1.5
+400 = 20×20 6.8 | 3.6 7.3 | 3.5 8.2 | 3.2 2.6 | 1.9 1.9 | 1.5
+TAB. 4 – Facteurs d’accélération de l’algorithme avec mémorisation et de l’algorithme pré-
+senté dans des travaux antérieurs
+Le tableau 4 récapitule les résultats de cet algorithme hybride. Ses résultats sont com-
+parés à ceux (résultats de droite) obtenus par le meilleur algorithme décrit dans nos travaux
+précédents (algorithme des sommes partielles avec calculs court-circuités, ordonnancement et
+mémorisation (Conan-Guez et al., 2005, 2006a,b)).
+Si l’on s’intéresse tout d’abord aux résultats produits par la technique de mémorisation, on
+constate que ceux-ci sont toujours strictement meilleurs que ceux de la version sans mémorisa-
+tion6. Un point crucial est que les effets de la mémorisation sont d’autant plus marqués que le
+nombre d’individusN est important. Ceci peut s’expliquer par le fait que la mémorisation per-
+met de réduire la phase de pré-calcul dont la complexité est très dépendante de N (complexité
+en O(N2 + NM) pour le pré-calcul des Dl(u, k) et des λl(v, u)). On constate en revanche
+que l’efficacité de la mémorisation décroît avec le nombre de classes M . Ceci peut être ex-
+pliqué par deux raisons. Premier point, la phase de représentation n’est pas améliorée par la
+mémorisation et devient de plus en plus importante dans le coût global. Deuxième point, plus
+le nombre de classes M est important, plus les modifications de ces classes sont fréquentes.
+Ceci réduit donc l’efficacité de la mémorisation.
+6Dans nos précédents travaux, une technique plus fine de mémorisation avait été envisagée. Grâce à une amélio-
+ration de la localité mémoire dans notre nouvelle implémentation, l’apport de cette technique devient marginal. Cette
+technique n’est donc pas reprise dans le présent travail.
+B. Conan-Guez et F. Rossi
+D’une manière plus générale, on constate que les résultats obtenus par notre nouvel algo-
+rithme sont très bons : les divers techniques d’implémentations ont permis d’accélérer jusqu’à
+un facteur 8 le temps d’exécution par rapport à l’algorithme des sommes partielles pour les
+données simulées (le facteur n’est que de 2.6 pour les données réelles SCOWL). Les compa-
+raisons avec l’algorithme proposé dans nos travaux précédents sont aussi concluantes : sur les
+données simulées, le facteur d’accélération atteint la valeur de 2.5 sous des conditions favo-
+rables. Pour les données SCOWL, ce même facteur atteint la valeur de 1.5.
+8 Conclusions
+Lors de précédents travaux, nous avions proposé un algorithme efficace pour le SOM ap-
+pliqué aux tableaux de dissimilarités. Dans le présent travail, nous utilisons le principe de sé-
+paration et évaluation afin de proposer une version encore plus performante : le ratio du temps
+d’exécution entre l’ancienne version et la version proposée atteint la valeur de 2.5 dans le cas
+le plus favorable. De plus, les résultats produits par cette nouvelle approche sont strictement
+identiques à ceux obtenus par l’algorithme original.
+Remerciements
+Nous remercions les rapporteurs anonymes dont les remarques et conseils ont contribué à
+améliorer le présent article.
+Références
+Atkinson, K. (2004). Spell checking oriented word lists (SCOWL). Available at URL http:
+//wordlist.sourceforge.net/. Revision 6.
+Cecchet, E., J. Marguerite, et W. Zwaenepoel (2002). Performance and scalability of ejb
+applications. In OOPSLA ’02 : Proceedings of the 17th ACM SIGPLAN conference on
+Object-oriented programming, systems, languages, and applications, New York, NY, USA,
+pp. 246–261. ACM Press.
+Celeux, G., E. Diday, G. Govaert, Y. Lechevallier, et H. Ralambondrainy (1989). Classification
+Automatique des Données. Paris : Bordas.
+Conan-Guez, B., F. Rossi, et A. El Golli (2005). A fast algorithm for the self-organizing map
+on dissimilarity data. In Proceedings of the 5th Workshop on Self-Organizing Maps (WSOM
+05), Paris (France), pp. 561–568.
+Conan-Guez, B., F. Rossi, et A. El Golli (2006a). Fast algorithm and implementation of dissi-
+milarity self-organizing maps. Neural Networks 19(6–7), 855–863.
+Conan-Guez, B., F. Rossi, et A. El Golli (2006b). Un algorithme efficace pour les cartes auto-
+organisatrices de kohonen appliquées aux tableaux de dissimilarités. In M. Nadif et F.-X.
+Jollois (Eds.), Actes des treizièmes rencontres de la Société Francophone de Classification,
+Metz, France, pp. 73–76.
+Heuristiques d’accélération pour le DSOM
+Cottrell, M., B. Hammer, A. Hasenfuß, et T. Villmann (2006). Batch and median neural gas.
+Neural Networks 19, 762–771.
+El Golli, A., B. Conan-Guez, et F. Rossi (2004a). Self organizing map and symbolic data.
+Journal of Symbolic Data Analysis 2(1).
+El Golli, A., B. Conan-Guez, et F. Rossi (2004b). A self organizing map for dissimilarity
+data. In D. Banks, L. House, F. R. McMorris, P. Arabie, et W. Gaul (Eds.), Classification,
+Clustering, and Data Mining Applications (Proceedings of IFCS 2004), Chicago, Illinois
+(USA), pp. 61–68. IFCS : Springer.
+El Golli, A., F. Rossi, B. Conan-Guez, et Y. Lechevallier (2006). Une adaptation des cartes
+auto-organisatrices pour des données décrites par un tableau de dissimilarités. Revue de
+Statistique Appliquée LIV(3), 33–64.
+Kaufman, L. et P. J. Rousseeuw (1987). Clustering by means of medoids. In Y. Dodge (Ed.),
+Statistical Data Analysis Based on the L1-Norm and Related Methods, pp. 405–416. North-
+Holland.
+Kohonen, T. (1995). Self-Organizing Maps (Third ed.), Volume 30 of Springer Series in Infor-
+mation Sciences. Springer. Last edition published in 2001.
+Kohonen, T. et P. J. Somervuo (1998). Self-organizing maps of symbol strings. Neurocompu-
+ting 21, 19–30.
+Kohonen, T. et P. J. Somervuo (2002). How to make large self-organizing maps for nonvectorial
+data. Neural Networks 15(8), 945–952.
+Land, A. H. et A. G. Doig (1960). An automatic method for solving discrete programming
+problems. Econometrica 28, 497–520.
+Levenshtein, V. I. (1966). Binary codes capable of correcting deletions, insertions and rever-
+sals. Sov. Phys. Dokl. 6, 707–710.
+Porter, M. F. (1980). An algorithm for suffix stripping. Program 14(3), 130–137.
+Rossi, F., A. El Golli, et Y. Lechevallier (2005). Usage guided clustering of web pages with
+the median self organizing map. In Proceedings of XIIIth European Symposium on Artificial
+Neural Networks (ESANN 2005), Bruges (Belgium), pp. 351–356.
+Summary
+In this paper, a new implementation of the adaptation of Kohonen self-organising maps
+(SOM) to dissimilarity matrices is proposed. This implementation relies on the branch and
+bound principle to reduce the algorithm running time. An important property of this new
+approach is that the obtained algorithm produces exactly the same results as the standard algo-
+rithm.

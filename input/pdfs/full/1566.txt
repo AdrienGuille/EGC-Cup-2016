@@ -1,0 +1,1034 @@
+OLAP query optimization : A Framework for
+Combining Rule-Based and Cost-Based Approaches
+Ladjel Bellatreche∗, Arnaud Giacometti ∗∗, Dominique Laurent ∗∗∗,
+Patrick Marcel ∗∗, Hassina Mouloudi∗∗
+∗ LISI/ENSMA
+Te´le´port 2, 1, ave. Cle´ment Ader 86960 Futuroscope - France
+bellatre@ensma.fr
+∗∗ Universite´ Francois-Rabelais de Tours, LI
+Master SIR, Antenne Universitaire, 3 place Jean Jaure`s 41000 Blois
+(arnaud.giacometti, patrick.marcel, hassina.mouloudi)@univ-tours.fr
+∗∗ Universite´ de Cergy-Pontoise
+2, ave. A. Chauvin - BP 222 - 95302 Cergy-Pontoise Cedex - France
+dominique.laurent@dept-info.u-cergy.fr
+Abstract. To optimize queries in relational databases, two categories of
+optimization techniques have been proposed : the Rule-Based Approach
+(RBA), and the Cost-Based Approach (CBA). In the RBA, the optimizer
+uses rule transformations using the relational algebra. In the CBA, the
+optimizer uses a cost model to estimate the potential cost of each ope-
+ration using statistics about the database and the tables involved in the
+query. Usually both categories are implemented by commercial DBMSs
+and are often intermixed. In multidimensional databases however, most of
+query optimization techniques follow only the CBA to select optimization
+structures such as : materialized views, advanced indexing schemes and
+data partitioning. No approach has been proposed yet to rewrite OLAP
+queries using a multidimensional algebra. In this paper, we show that
+the RBA can be applied to multidimensional databases by rewriting each
+OLAP query to obtain an efficient rewritten query that can be executed
+using a CBA. In particular, we show that the RBA can be used to take
+into account one of the specificities of OLAP which is the visualization
+of the OLAP query result. We propose a multidimensional algebra that
+represents the core of our RBA optimization, and we show how rewritten
+queries can be processed using the CBA proposed for multidimensional
+databases.
+1 Introduction
+A data warehouse (DW) integrates massive amounts of data from multiple
+sources. In a DW, users access very large databases to carry out strategic analy-
+sis for maintaining business competitiveness by executing complex OLAP queries
+[Karloff et Mihail, 1999]. This complexity is due to the presence of join and aggre-
+gation operations. Therefore, an efficient query processing becomes a critical issue. To
+optimize these complex queries, several techniques were proposed that we can divide
+- 177 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+into two categories : redundant-structures and non redundant-structures. In the first
+category, we can find materialized views [Gupta, 1997, Kotidis et Roussopoulos, 1999,
+Ross et al., 1996, Theodoratos et Sellis, 1997, Yang et al., 1997] and indexing schemes
+(b-tree, bitmap, join indexes, bitmap join indexes, etc.) [Chaudhuri, 2004]. All these
+structures need a space storage and a maintenance overhead. Structures in the second
+category are those which do not need an extra storage space. For example, horizon-
+tal and vertical data partitioning [Bellatreche et al., 2004, Sanjay et al., 2004], parallel
+processing [Molina et al., 1998]. All these structures are supported by commercial sys-
+tems [Zilio et al., 2004, Sanjay et al., 2004].
+We focus on relational data warehouses, where a data cube is stored using a star
+schema [Kimball, 1996]. The database thus consists of a huge fact table and multiple
+dimensions tables. Dimensions are hierarchically structured. Queries typically perform
+aggregations on the fact table based on selection among the available dimension levels.
+These queries are called star join queries which can be optimized using redundant
+structures as bitmap indexes. But these structures still involve substantial processing
+and I/O cost for high cardinality attributes and thus high storage overhead.
+In the traditional databases, query optimization is done using two approaches : rule
+based approach (RBA), and cost-based approach (CBA). In the RBA, the optimizer
+uses rule transformations using the relational algebra. A set of rewriting rules can be
+used to generate directly the optimized form of the query. In general, these rewriting
+rules are based on relational algebra equivalences. For example, since a selection can
+commute with a join (joins are typically expensive operations [Lei et Ross, 1998]), a
+classical rewriting rule pushes the selection conditions ahead of the joins, or picks the
+most ”promising” relation to join next (Oracle). In the CBA, a cost model assigns an
+estimated cost to any partial or complete plan in the search space. It also determines
+the estimated size of the data stream for output of every relational operator (selection,
+projection, join, etc.) in the plan. This cost model can estimate the CPU and I/O costs
+of query execution for every operator, by taking into account the statistical properties
+of its inputs data streams, or its existing access methods. The accuracy of the cost
+estimation depends on both the quality of the cost model and on the accuracy of the
+statistical information used. Most of commercial systems offer the two approaches.
+In an OLAP environment, no approach has been proposed yet to rewrite OLAP
+queries using a multidimensional algebra. In this paper, we show that the RBA can
+be applied to multidimensional databases by rewriting each OLAP query to obtain an
+efficient plan that can be executed using a CBA (see Figure 1). In particular, we show
+that the RBA can be used to take into account one of the specificities of OLAP which
+is the visualization of the OLAP query result.
+To reach this goal, we propose to describe both datacubes and their structure in a
+single logical model. Then, we translate the main OLAP operators in our model and
+give rewriting rules involving these operators. These rewriting rules can be used to
+obtain the optimized form of an OLAP query. For example, to optimize aggregation
+operation, we propose a rewriting rule that pushes the selection conditions on members
+ahead of the aggregates. Note that in this paper we do not take into account the physical
+definition of the algebraic operators.
+In this framework, we also study the possibilities of optimizing OLAP queries based
+RNTI - E -
+- 178 -RNTI-B-1
+Bellatreche et al.
+on the visualization of a cube on a screen. Our proposed optimization technique consists
+in determining which part of the query output will be displayed on the screen. In
+general, this part is the first two-dimensional slice of the cube, which is also a cube. In
+this article, we show that this slice can be computed by adding selection conditions to
+the initial OLAP query. Note these conditions are mainly obtained by computing the
+structure of the cube to be visualized.
+The intuition behind our optimization approach is as follows : given a cube C and
+an OLAP query q over C, let us denote by q(C) the answer to q. We first compute
+the selection conditions ϕ that defines the first two-dimensional slice of C ′ = q(C).
+This step requires the computation of the structure of the cube C ′. Then, we add
+the selection conditions ϕ to the initial OLAP query and we use the rewriting rules to
+push them ahead of the aggregates and joins. The rewriting process is done in the main
+memory without accessing base tables. Finally, the rewritten query will be executed
+using CBA.
+Rule-based 
+rewriting
+Cost-based 
+execution
+User
+query
+Algebra
+Cost-Model
+M
+a
+i
+n
+m
+e
+m
+o
+r
+y
+D
+i
+s
+k
+Fig. 1 – The Execution Strategy using our Approach
+To the best of our knowledge, this is the first paper combining RBA and CBA
+approaches to optimize OLAP queries. The main contributions of this paper are that :
+(a) we propose a logical model to describe both datacubes and their structures, this
+model represents the core of our RBA approach (Section 3 and 4), (b) we propose an
+optimization technique of OLAP queries using rewriting rules (Section 5), and (c) we
+show the utility of combining the two approaches through a cost model (Section 6).
+We start by motivating our approach in the next section.
+2 A Motivating Example
+Let us consider the cube C0, inspired by the example given in [Corporation, 1998],
+and the star schema of which is presented Figure 2. The dimensions of this cube are :
+Y ear (the different years), Quarter (the months grouped in quarters), Location (the
+cities grouped in regions and countries), Product (the items grouped in categories),
+and Salesman (the different salespersons).
+RNTI - E -
+- 179 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+Fig. 2 – The star schema of the cube C0
+All the dimensions are hierarchically structured, for example the hierarchy of di-
+mension Quarter is : All Quarter → quarter → month.
+Consider now the following OLAP query q that aims to at presenting the cumulated
+sales of food and cumulated sales of beer and wine, detailed by salespersons and
+quarters. Using the MDX language proposed by Microsoft [Corporation, 1998], q
+can be expressed by :
+WITH MEMBER drink.Mydrink AS ’wine + beer’
+SELECT
+{[quarter].MEMBERS} ON COLUMNS,
+CROSSJOIN([Name].MEMBERS, [North].CHILDREN) ON ROWS
+{Mydrink, Food} ON PAGES
+year.MEMBERS ON SECTIONS
+FROM Co
+WHERE [sales]
+The final output of this query is presented Figure 3. Note that in this figure, we
+only visualize the first two-dimensional slice of the answer of the query. Indeed, we only
+see the cumulated sales of drinks beer and wine for year 1988. Thus, in order to obtain
+the visualization presented Figure 3, it is neither necessary to compute the cumulated
+sales of food, nor the cumulated sales of drinks beer and wine for years other than year
+1988. In our approach, it means that we will add to the initial query q the selection
+conditions (category = drink) and (year = 1988). Then, we will push these selection
+conditions ahead of the aggregates.
+In our approach, we know precisely that the data visualized Figure 3 are the cumu-
+lated sales of drinks beer and wine for year 1988. It follows from the fact that in our
+model, the position of the members on the axes are explicitly represented. Thus, if the
+user wants to see the cumulated sales of another category of product or for another
+year, he has to use the restructuring operators of the language. For example, he can
+switch the position of year 1988 with the position of another year to see the cumulated
+sales for another year. Or he can nest the axes A2 and A4 to visualize the cumulated
+sales of beer and wine for every year.
+RNTI - E -
+- 180 -RNTI-B-1
+Bellatreche et al.
+A1 A3
+bill north lille 40 60 60 70 drink
+blois 10 20 30 20 ↑
+paris 30 90 50 60 beer,wine
+...
+john north lille 70 70 50 50 A4
+blois 20 30 20 20 1988
+paris 50 50 90 80
+A2 q1 q2 q3 q4
+Fig. 3 – Visualization of the MDX query q
+3 Cube Model
+Our notion of cube extends the classical star-schema model [Kimball, 1996] by ad-
+ding a structure component. This structure component defines how the cube is to be
+displayed to the user. The structure component models a multidimensional cross-tab,
+and allows to precisely describe e.g., on which axis the members of a dimension are
+located and in which order. In our approach, cubes are manipulated mainly by using
+the classical restructuring OLAP operators like nest or switch [Marcel, 1999]. We now
+turn to the formal definition.
+Cube An N -dimensional cube C is a triple C = 〈D, F, S〉 where :
+– D = {D1, . . . , DN} is the set of dimension tables Di of C, i ∈ [1, N ],
+– F is the fact table of C, that describes the facts at a particular level of detail,
+– S is the structure of C.
+The components D, F and S of a given cube C are defined and illustrated below.
+As usual in a star-schema, a dimension is a relation that represents each level of
+details of a hierarchy over which the facts can be aggregated.
+Dimension tables A dimension Di, i ∈ [1, N ], is a relation of schema sch(Di) =
+{L0i : dom(L0i ), L1i : dom(L1i ), . . . , Lqii : dom(Lqii )}.
+Each attribute Lji represents a level of detail j in the dimension i, and thus dom(L
+j
+i )
+is the set of members at level j for dimension Di. qi is the deepest level of detail for
+dimension Di. If v ∈ Lji is a member, the ancestor anc(v) of v is v′ ∈ dom(Lj−1i ) such
+that v′ = piLj−1i (σLji=v(Di)).
+Example 1 We consider two cubes :
+– The cube C0 of Section 2, and the star schema of which is presented Figure 2. In
+our model, C0 is a tuple C0 = 〈D0, F0, S0〉.
+– The cube C6 which is the result of the query q of Section 2 over the cube C0, and
+which first slice can be seen Figure 5. In our model, C6 = 〈D6, F6, S6〉.
+Let us detail the dimensions of cubes C0 and C6.
+D0 = {Y ear,Quarter, Location, Product, Salesman} with :
+RNTI - E -
+- 181 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+– sch(Y ear) = {All Y ear, year}, – sch(Quarter) =
+{All Quarter, quarter,month},
+– sch(Location) = {All Location, country, region, city},
+– sch(Product) = {All Product, category, item},
+– sch(Salesman) = {All Salesman, name}.
+Let us detail the dimension Quarter of the cube C0. This dimension is a relation
+over the schema sch(Quarter) = {All Quarter, quarter,month}. The domains of the
+attributes All Quarter, quarter and month are respectively : dom(All Quarter) =
+{all}, dom(quarter) = {q1, q2, q3, q4}, dom(month) = {jan, . . . , dec}. A tuple of this
+dimension is 〈all, q1,mar〉. Obviously we have that anc(mar) = q1.
+The dimensions of the cube C6 are the following :
+D6 = {Y ear′, Quarter′, Location′, P roduct′, Salesman′} where :
+– sch(Y ear′) = {year}, – sch(Quarter′) = {quarter},
+– sch(Location′) = {region, city} , – sch(Product′) = {category, item},
+– sch(Salesman′) = {name}.
+Note that the dimension Quarter′ of the cube C6 is a relation over the schema
+sch(Quarter′) = {quarter}, since quarter is the only attribute of the dimension
+Quarter the user wants to see for the cube C6.
+As for the dimensions, the fact table is defined in much the same way as in a star-
+schema.
+Fact table A fact table F is a relation of schema sch(F ) =
+{Ld11 : dom(Ld11 ), . . . , LdNN : dom(LdNN ),m1 : dom(m1), . . . ,mp : dom(mp)}
+such that, for every i, 0 ≤ di ≤ qi.
+An instance of F is the set of facts of the cube at level di for dimension Di. The
+mi are attributes describing the measures.
+Example 2 The fact table of the cube C0 is a relation over the schema sch(F0) =
+{year,month, city, item, name, sales}, where sales is a measure attribute and the facts
+are presented at the deepest level of details in each dimension. An example of fact in
+F0 is the tuple 〈1988, jan, paris,milk, john, 07〉.
+The fact table of the cube C6 is a relation over the schema sch(F6) =
+{year, quarter, city, category, name, sales}. An example of fact in F6 is the tuple
+〈1988, q1, paris, drink, john, 50〉.
+To precisely describe the cross-tab used to display a cube, we need to know the
+following information : the number of axes of the cross-tab, what are the dimensions
+on the different axes, what are the positions of the members on an axis, and at which
+level of details the measures are represented.
+RNTI - E -
+- 182 -RNTI-B-1
+Bellatreche et al.
+The structure The structure S of the cube is a 4-tuple S = 〈K, axis, pos, depth〉
+where :
+– K is the number of axes.
+– axis is a function that defines which dimensions appear on which axis, and spe-
+cifies the order of the dimensions on each axis. It mapps each integer i in [1,K]
+to a totally ordered set (Ei,≺i) where Ei ⊆ D.
+– pos is a function that associates to every attribute Lji of each dimension Di a
+total order on it. pos(Lji ) specifies the order of the members on an axis.
+– depth indicates the level of detail of a fact for a given dimension. It is a function
+defined from D to ⋃Di∈D sch(Di). We can note that depth(Di) = Ldii if sch(F ) =
+{Ld11 , . . . , LdNN }.
+Example 3 The structure of the cube C0 is S0 = 〈5, axis, pos, depth〉 where :
+– The function axis is defined by :
+– axis(1) = ({Y ear},≺1), – axis(2) = ({Quarter},≺2),
+– axis(3) = ({Location},≺3), – axis(4) = ({Product},≺4) and
+– axis(5) = ({Salesman},≺5).
+Note that since the ordered sets axis(k), k ∈ [1, 5] are singletons, the orders ≺k
+are trivial.
+– Let <year, <category and <item be the total orders associated by function pos to
+attributes year, category and item, respectively. They are such that :
+– 1988 <year . . . <year 2004, – drink <category . . . <category food,
+– milk <item . . . <item beer.
+– The function depth is defined by depth(Y ear) = year, depth(Quarter) = month,
+depth(Location) = city, depth(Product) = item and depth(Salesman) = name.
+The visualization of C6 of Figure 5(c) shows a case of nesting several dimensions
+on the same axis. The structure of the cube C6 is S6 = 〈4, axis′, pos′, depth′〉 where :
+– The function axis′ is defined by :
+– axis′(1) = ({Salesman,Location},≺′1) with Salesman ≺′1 Location,
+– axis′(2) = ({Quarter},≺′2), – axis′(3) = ({Product},≺′3),
+– axis′(4) = ({Y ear},≺′4).
+– For every attribute Lji , pos
+′(Lji ) is the restriction of pos(L
+j
+i ) to adom(L
+j
+i ).
+– The function depth′ is defined by depth′(Y ear) = year, depth′(Quarter) =
+quarter, depth′(Location) = city, depth′(Product) = category and
+depth′(Salesman) = name.
+4 Operations
+In this section, we translate the most typical OLAP operators [Marcel, 1999] into
+our model. We consider the following OLAP operators, that are classified according to
+3 categories :
+RNTI - E -
+- 183 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+A1 A3
+2004 04 02 alll
+2003 30 30 ↑
+2002 20 70 france
+2001 10 60 ↑
+2000 10 40 north
+1999 20 02 ↑
+1998 15 06 paris
+ally 1997 20 30 A4
+1996 02 05 allp
+1995 20 60 ↑
+1994 10 40 drink
+1993 01 40 ↑
+1992 02 20 milk
+1991 60 02 A5
+1990 30 40 alls
+1989 10 08 ↑
+1988 07 70 john
+jan . . . dec
+q1 . . .
+A2 allq
+The first 2-dimensional slice of C0
+A1 A3
+2004 10 20 20 10 north
+2003 50 70 50 60 ↑
+2002 60 60 80 80 paris
+.
+..
+1995 40 50 80 70 A4
+1994 50 80 30 50 drink
+1993 10 70 40 50 ↑
+1992 10 80 40 30 milk
+..
+.
+1989 40 50 50 10 A5
+1988 20 50 70 80 john
+A2 q1 q2 q3 q4
+(b) C2 = piyear(piquarter(piregion,city(
+picategory,item(name(C1)))))
+A1 A3
+2004 10 20 20 10 alll
+2003 50 70 50 60 ↑
+2002 60 60 80 80 france
+2001 70 50 40 70 ↑
+2000 40 80 10 80 north
+1999 50 30 10 10 ↑
+1998 50 30 70 10 paris
+ally 1997 40 50 30 70 A4
+1996 10 40 50 10 allp
+1995 40 50 80 70 ↑
+1994 50 80 30 50 drink
+1993 10 70 40 50 ↑
+1992 10 80 40 30 milk
+1991 80 40 50 10 A5
+1990 70 70 10 50 alls
+1989 40 50 50 10 ↑
+1988 20 50 70 80 john
+q1 q2 q3 q4
+A2 allq
+(a) C1 =
+Aggregatemonth→quarter,sum(sales)(C0)
+A1 A3
+2004 40 30 20 40 north
+2003 50 50 40 50 ↑
+2002 60 40 30 50 paris
+.
+.. A4
+1992 70 80 50 70 drink
+1991 60 40 60 80 ↑
+1990 60 70 50 40 beer
+1989 50 50 30 10 A5
+1988 30 40 70 70 john
+A2 q1 q2 q3 q4
+(c) C3 =
+σmemberitem=beer∨item=wine∨category=food(C2)
+Fig. 4 – Outputs of steps 1-3. On each figure, the left-hand side displays the first
+2-dimensional slice of the cube, and the right-hand side displays the member at the
+lowest position for each hidden axis.
+RNTI - E -
+- 184 -RNTI-B-1
+Bellatreche et al.
+A1 A3
+2004 60 60 40 50 north
+2003 80 90 90 90 ↑
+2002 70 50 70 80 paris
+... A4
+1992 80 90 60 80 drink
+1991 80 50 70 90 ↑
+1990 70 80 60 50 beer,wine
+1989 90 90 50 20 A5
+1988 50 50 90 80 john
+A2 q1 q2 q3 q4
+(a) C4 = Aggregateitem→category;sum(sales)(C3)
+A1 A3
+bill 30 90 50 60 north
+rose 30 10 90 90 ↑
+irma 70 60 70 10 paris
+kate 90 60 50 10 A4
+lara 90 90 70 10 drink
+averell 10 30 30 90 ↑
+jack 10 60 50 60 beer,wine
+joe 90 70 30 10 A5
+john 50 50 90 80 1988
+A2 q1 q2 q3 q4
+(b) C5 = Permute5,1(C4)
+A1 A3
+bill north lille 40 60 60 70 drink
+blois 10 20 30 20 ↑
+paris 30 90 50 60 beer,wine
+.
+..
+john north lille 70 70 50 50 A4
+blois 20 30 20 20 1988
+paris 50 50 90 80
+A2 q1 q2 q3 q4
+(c) C6 = Nest1(3)(σregion=north(C5))
+Fig. 5 – Outputs of steps 4-6
+– Restructuring operators that change the viewpoint on data. Operators in this
+category are Permute, Switch, Nest, Order by.
+– Operator that change the level of detail. We consider the Aggregate operator that
+groups the members of a dimension and then aggregates the measures accordingly.
+– Filtering operators, that are mainly the extension of classical selection and pro-
+jection to cubes.
+We introduce the different operators on an example, the formal definitions are given
+in the Appendix.
+Example 4 We use as an example the following query over C0, which is the translation
+of the query q of Section 2 into our algebra :
+Nest1(3)(σmemberregion=north(Permute1,5(Aggregateitem→category;sum(sales)(
+σmemberitem=beer∨item=wine∨category=food(piyear(piquarter(piregion,city(
+picategory,item(piname(Aggregatemonth→quarter;sum(sales)(C0)))))))))))
+We decompose the query and examine the different steps independently. The first
+step, i.e. :
+C1 = Aggregatemonth→quarter;sum(sales)(C0), allows to present the data at level quarter
+by rolling up from the current level month of the C0 cube.
+We now illustrate the filtering operations in step 2 and 3 of the query :
+– step 2 : C2 = piyear(piquarter(piregion,city(picategory,item(piname(C1)))))
+RNTI - E -
+- 185 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+– step 3 : C3 = σmemberitem=beer∨item=wine∨category=food(C2)
+The outputs of these two steps are given in Figure 4(b) and 4(c), respectively, where
+we see the first slice of the resulting cubes. These two steps reduce the amount of
+displayed facts (for selection) and displayed hierarchies (for projection).
+Remark 1 Note that after step 3, the displayed slice has changed. This is due to the
+fact that the item milk, that was at the lowest position on axis A4 in C2 is no more
+selected in cube C3. Then among the selected items, the one at the lowest position, beer,
+is displayed first. Note also that in our formalism, a selection on members changes the
+dimension part of the cube in such a way that a dimension represents the hierarchy
+that has been used to aggregate the data. Thus, for a given dimension, selection on
+members cannot be applied on a member attribute that identifies a level deeper than the
+level currently displayed (e.g., selection cannot be applied on the item level if the facts
+are depicted at the category level). Otherwise the measures displayed would no more
+correspond to the hierarchy displayed. The same remark holds for the projection opera-
+tion. Finally, note that the projection operation allows to choose among all the levels
+of a hierarchy, the ones that the user wants to see, since by default all the hierarchical
+levels are displayed.
+Step 4, i.e. C4 = Aggregateitem→category;sum(sales)(C3) illustrates a way of changing
+the level of detail of the cube. Intuitively, the Aggregate operation groups and aggregates
+the data according to the groupings defined by the dimensions. The output of step 4 is
+given in Figure 5(a).
+The last operations to be considered are the restructuring operations. These operations
+allow to exchange the positions of two axes (Permute), exchange the positions of two
+members (Switch), nest two axes (Nest) or order the members on an axis (Orderby).
+Permute and Nest are illustrated by the following steps :
+– step 5 : C5 = Permute5,1(C4) – step 6 : C6 = Nest1(3)(σregion=north(C5))
+The outputs of these two steps are given in Figure 5. Note that these operations do
+not change the facts of the cubes, but only the way they are displayed.
+Summary of the operators The table of Figure 6 summarizes the influence of the
+operators over the three components D, F and, S of a cube C = 〈D, F, S〉.
+Note that q can be decomposed in q1, q2, q3 such that : C ′ = 〈q1(D), q2(F,D), q3(S)〉.
+This follows from the definition of the algebraic operators and the definition of a cube.
+For example the structure of a cube is independent from both its facts and its dimen-
+sions, and thus the structure of the result of a query can be computed independently
+from its facts and dimensions.
+Rewriting rules Figure 7 shows the rules we defined for transforming any OLAP
+query. Note that the last rule r13 is valid since in our formalism, selection cannot
+be applied on an attribute that identifies a level deeper than the displayed level (see
+Remark 1). For example, on cube C6 displayed in Figure 5(d), selection on item, e.g.,
+item = beer is not allowed, because facts are displayed at the category level. To express
+RNTI - E -
+- 186 -RNTI-B-1
+Bellatreche et al.
+Changes D F S
+Permute
+√
+Switch
+√
+Nest
+√
+Order by
+√
+Project members
+√ √
+Project measures
+√
+Aggregate
+√ √
+Select members
+√ √ √
+Select measures
+√
+Fig. 6 – Influence of the algabraic operators
+Nesti(j)(Permutek,l(C)) = Permutek′,l′(Nesti(j)(C)) if i, j /∈ {k, l} r1
+Nesti(j)(Permutei,l(C)) = Permutei′,l′(Nestl(j)(C)) if l /∈ {i, j} r2
+Nesti(j)(Permutej,l(C)) = Rotate[l′,j′](Nesti(l)(C)) if l /∈ {i, j} r3
+Nesti(j)(Permutek,j(C)) = Rotate[k′,j′](Nesti(k)(C)) if k /∈ {i, j} r4
+Nesti(j)(Permutei,j(C)) = Rotate[i′,j′](Nestj(i)(C)) r5
+Nesti(j)(SwitchLl
+k
+;v,v′(C)) = SwitchLl
+k
+;v,v′(Nesti(j)(C)) r6
+Nesti(j)(piLj1i ,..., L
+jp
+i
+(C)) = pi
+L
+j1
+i ,..., L
+jp
+i
+(Nesti(j)(C)) r7
+Permutei,j(SwitchLl
+k
+;v,v′(C)) = SwitchLl
+k
+;v,v′(Permutei,j(C)) r8
+Permutei,j(pi
+L
+j1
+i ,...,L
+jp
+i
+(C)) = pi
+L
+j1
+i ,...,L
+jp
+i
+(Permutei,j(C)) r9
+Switch
+L
+j
+i ;v,v
+′(piLj1i ,...,L
+jp
+i
+(C)) = pi
+L
+j1
+i ,...,L
+jp
+i
+(Switch
+L
+j
+i ;v,v
+′(C)) r10
+σϕ(Op(C)) = Op(σϕ(C)) r11
+Aggregate
+L
+di
+i →L
+j
+i ; f(m)
+(Op(C)) = Op(Aggregate
+L
+di
+i →L
+j
+i ; f(m)
+(C)) r12
+σmembersϕ (AggregateLdii →L
+j
+i ; f(m)
+(C))) = Aggregate
+L
+di
+i →L
+j
+i ; f(m)
+(σmemberϕ (C))) r13
+Fig. 7 – Rewriting rules for OLAP algebra. In r1, r4 : if j < k then k′ = k − 1 else
+k′ = k. In r1, r2, r3 : if j < l then l′ = l− 1 else l′ = l. In r2, r5 : if j < i then i′ = i− 1
+else i′ = i. In r3, r4, r5 : if l < j, k < j or i < j then j′ = j − 1 else j′ = j.
+the rules in an user-friendly way, we define the Rotate operation as follows (◦ denotes
+the composition of operations) :
+(a) Rotate[i,j](C) = (◦j−1k=iPermutek,k+1)(C)) if i < j, and
+(b) Rotate[i,j](C) = (◦jk=i−1Permutek,k+1)(C)) if i > j.
+In this figure, Op ∈ {Permute, Switch,Nest, pi}, σ denotes a selection on measures or
+members and pi denotes a projection on measures or members.
+Example 5 As an example, consider the translation of query q into our algebra (see
+Example 4). This query can be rewritten using rule r11 and r13 to push selections ahead
+of aggregations, projections and permute. The rewritten query is :
+Nest1(3)(Permute1,5(Aggregateitem→category;sum(sales)(piyear(piquarter(
+piregion,city(picategory,item(piname(Aggregatemonth→quarter;sum(sales)(
+σmemberregion=north(σ
+member
+item=beer∨item=wine∨category=food(C0)))))))))))
+RNTI - E -
+- 187 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+5 Optimization
+In this section, we propose an optimization technique at the logical level for OLAP
+queries. We first introduce this technique informally.
+5.1 Intuition
+Our optimization technique consists in the following two steps :
+1. Determine which part of the query output will be displayed on the screen. As-
+suming that we can visualize data in V dimensions, this part is the first V-
+dimensional slice of the cube, which is also a cube. This slice can be computed
+by adding selection conditions to the initial query. These conditions are obtained
+by only computing the dimensions and structure of the answer to the query.
+2. Once the selection conditions are added to the query, the rewriting rules are used
+to push the selections ahead of the Aggregate operations, assuming this operation
+is the most costly.
+We now illustrate these two steps.
+Step 1 : Let C = 〈D, F, S〉 be a N -dimensional cube, q be a query over C and
+C ′ = q(C) = 〈D′, F ′, S′〉 be the results of the query. Evaluating q means computing the
+different parts D′, F ′ and S′ of C ′, which can be written C ′ = 〈q1(D), q2(F,D), q3(S)〉.
+To find the first V-dimensional slice of C ′, we only need to know what are the members
+on the axes of C ′ and what are the positions of these members, so computingD′ = q1(D)
+and S′ = q3(S) is sufficient. If only V dimensions are used to display the cube C ′, V
+axes are fully displayed, and the facts displayed are the facts for the members at the
+lowest positions on the remaining axes (called the hidden axes). This defines the first
+V-dimensional slice of C ′. Hence, this slice can be seen as the cube C ′ on which we have
+selected the members at the lowest positions on the hidden axes. Determining these
+selection conditions is done by the function FirstSliceSelection, presented Figure 9.
+Step 2 : The selection conditions computed in Step 1, referred to as ϕ, are added to
+the selection conditions of the original query q, resulting in a new query σmemberϕ (q(C)).
+The rewriting rules are then used to obtain a query q′ where the selections are pushed
+ahead of aggregations. This query q′ is such that q′ = 〈q′1(D), q′2(F,D), q′3(S)〉. It is
+then sufficient to compute q′2(F,D) since :
+1. q′1(D) ⊆ q1(D) and q1(D) has already been computed in step 1,
+2. q3(S) = 〈K3, axis3, pos3, depth3〉 has already been computed in step 1, and q′3(S)
+is 〈K, axis3, pos′3, depth3〉 where, for all attributes Lji , pos′3(Lji ) is the restriction
+of pos3 to the active domains of the attributes.
+The principle of our optimization technique is summarized in Figure 8.
+5.2 The optimization algorithm
+The function FirstSliceSelection is presented Figure 9. Let us examine each step
+of the function :
+RNTI - E -
+- 188 -RNTI-B-1
+Bellatreche et al.
+q(C)
+↓ FirstSliceSelection
+σmemberϕ (q(C))
+↓ rewriting rules
+q′(C) = 〈q′1(D), q′2(F,D), q3(S)〉
+↓ evaluation of q′2
+F ′ = q′2(F,D)
+Fig. 8 – Summary of the optimization technique
+Function FirstSliceSelection
+Input : A cube C and an OLAP query q
+Output : A selection condition ϕ such that σmembersϕ (q(C)) is the first V -dimensional
+slice of q(C)
+Use : The size V of the slice to be visualized
+1. Compute the structure S′ of cube C′ = q(C)
+2. Compute the dimensions D′ of cube C′ = q(C)
+3. Let D′ = {D′1, . . . , D′N}
+4. Let S′ = 〈K′, axis′, pos′, depth′〉 and ϕ = true
+5. For l = V + 1 to K′ do
+6. Let (El,≺l) = axis′(l)
+7. For every D′i ∈ El do
+8. Let v = minpos′(depth′(D′i))
+(pidepth′(D′i)
+(D′i))
+9. ϕ = ϕ ∧ (depth′(D′i) = v)
+10. End for
+11. End for
+12. Return ϕ
+Fig. 9 – Identification of the first V -dimensional slice of a cube
+RNTI - E -
+- 189 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+Optimization Algorithm
+Input : A cube C and an OLAP query q
+Output : An optimized query q′
+1. Let ϕ = FirstSliceSelection(C, q)
+2. Rewrite σmemberϕ (q(C)) using the rewriting rules
+3. Return q′ the rewritten query
+Fig. 10 – The optimization algorithm
+1 This step computes the structure of the result.
+2 This step computes the dimensions of the result.
+4 This steps initialises the selection condition.
+5 This loop explores each hidden axis.
+7 This loop explores every nested dimension on the hidden axis.
+8 This step finds the member at lowest position for the level of the dimension at
+which the facts are displayed.
+The full algorithm is presented in Figure 10. We illustrate the different steps of the
+algorithm on an example.
+Example 6 Consider the cube C6 = 〈D6, F6, S6〉, and recall that
+S6 = 〈4, axis′, pos′, depth′〉. Suppose that V = 2, meaning that we can only visualize
+the first two-dimensional slice of C6. Thus there are two hidden axes, and l varies
+from 3 to 4. Let us detail the execution of the body of the loop of step 5 in function
+FirstSliceSelection.
+When l = 3, we have axis′(3) = ({Product},≤′3) and category = depth′(Product′).
+Let <′category be the total order associated by pos
+′ with attribute category. We have
+drink = min<′category (picategory(Product
+′)}), and thus ϕ = ϕ ∧ (category = drink).
+When l = 4, we have axis′(4) = ({Y ear},≤′4) and year = depth′(Y ear′). Let <′year
+be the total order associated by pos′ with attribute year.
+Since 1988 = min<year (piyear(Y ear
+′)}), we have ϕ = ϕ∧ (year = 1988) = (category =
+drink)∧ (year = 1988) which concludes the execution of function FirstSliceSelection.
+After application of the rewriting rules of Figure 7, the optimized query is :
+Permute1,5(Nest1(3)(piyear(piquarter(piregion,city(picategory,item(piname(
+Aggregateitem→category;sum(sales)(Aggregatemonth→quarter,sum(sales)(
+σmemberϕ (C0))))))))))
+where ϕ = (region = north ∧ (item = beer ∨ item = wine ∨ category = food)) ∧
+(year = 1988 ∧ category = drink). Moreover it is easy to see that ϕ can be simplified
+as (region = north ∧ (item = beer ∨ item = wine) ∧ year = 1988).
+6 Translation into the relational algebra
+In our cube model, the parts D and F are regarded as the components of a star
+schema. Thus a straightforward translation of the optimized query into the relational
+RNTI - E -
+- 190 -RNTI-B-1
+Bellatreche et al.
+algebra can be given by considering only the algebraic operators that operate on these
+parts (see the table of Figure 6). We illustrate this translation on an example.
+Example 7 Let F0 be the fact table of cube C0. The fact table F ′ of the result of q′,
+the optimized version of q is :
+F1 = piyear,quarter,city,item,name,sum(sales)(pisch(F0)(F0 ./city σregion=north(Location)
+./item σitem=beer∨item=wine(Product) ./year σyear=1988(Y ear)) ./month Quarter)
+F ′ = piyear,quarter,city,category,name,sum(sales)(F1 ./item Product)
+The dimensions of the result are :
+– Y ear′ = piyear(σyear=1988(Y ear)),
+– Quarter′ = piquarter(Quarter)),
+– Location′ = piregion,city(σregion=north(Location)),
+– Salesman′ = piname(Salesman),
+– Product′ = picategory,item(σitem=beer∨item=wine(Product)).
+Thus, if the query q′ is evaluated on the star schema of cube C0, the join sequence of q′
+can be noted F0 ./city σregion=north(Location) ./item σitem=beer∨item=wine(Product)
+./year σyear=1988(Y ear)) ./month σtrue(Quarter) ./name σtrue(Salesman).
+7 Cost-based Approach
+We consider a DW modeled by a star schema. Let q be a star join query. Let
+Dsel = {Dsel1 , ..., Dselk } be the set of dimension tables having selection predicates. Each
+selection predicate pj has two selectivity factors, one defined on a dimension table (Di)
+used by this predicate and denoted by SelpjDi (Sel
+pj
+Di
+∈ [0, 1]) and another defined on
+the fact table denoted by SelpjF . Note that Sel
+pj
+Di
+6= SelFpj , as it is shown in the following
+example :
+Example 8 Let us consider the selection predicate quarter=q1 defined on the dimen-
+sion table Quarter (Figure 2). Its selectivity factor is 0.25. But sales for quater q1 may
+represent 70% of sale activities.
+Now we present a cost model to show the utility of our approach by considering
+a Large Memory Hypothesis (LMH) : all dimension tables are in the main memory
+because their sizes are very small [Corp., 1997]. This assumption becomes more and
+more realistic as the size of main memory keeps increasing because of fall in main
+memory prices. The selection conditions are always pushed down onto the dimension
+tables like in [Labio et al., 1997]. This model computes the Inputs/outputs cost for
+reading and writing data between disk and main memory. The notations used by this
+cost model are summarized in Table 1.
+Let M be the number of selection predicates defined on dimension tables. The cost
+of executing the query q without using our RBA is given by :
+JCW =
+M∏
+i=1
+SelpiF × |F | (1)
+RNTI - E -
+- 191 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+Selection predicate p
+1
+. . .
+Selection predicate p
+n
+D
+i
+D
+j
+Generation
+of fact selectivity:
+ϕ
+F
+Loading
+of relevant
+fact tuples
+Fig. 11 – Execution strategy using RBA
+Symbol Meaning
+PS Page size of the file system (in bytes)
+w(Tj) Width, in bytes, of a tuple of a table Tj
+||Tj || Number of tuples present in a table Tj
+|Tj | Total number of pages occupied by a table Tj
+Sel
+pj
+Di
+Selection factor of the predicate pj defined on dimension table Di
+Sel
+pj
+F Selection factor of the predicate pj defined on the fact table F
+Tab. 1 – Symbols and their Meanings
+where |F | =
+⌈
+||F ||×w(F )
+PS
+⌉
+(representing the number of pages occupied by the fact table).
+By using our RBA, we get a new query q′ withM ′ (M ′ ≥ 1) new selection predicates
+(see Figure 11). Therefore, the cost of executing q′ is given by :
+JC =
+M+M ′∏
+j=1
+Sel
+pj
+F × |F | (2)
+where M ′ represents the number of new predicates added by the RBA.
+Our optimization technique reduces the I/O cost of the query q if and only if :
+JC
+JCW < 1 =⇒
+∏M+M′
+i=1 Sel
+pi
+F ×|F |∏M
+j=1 Sel
+pj
+F ×|F |
+< 1 =⇒∏M+M ′i=M ′+1 SelpiF < 1.
+In the reality, this can be always true because a selectivity factor of a fact table is
+always less than 1. If we consider the example of section 2, the new added selection
+predicates were year = 1988 and category = drink. The product of the selectivity
+factors of these predicates is usually less than 1.
+To execute the rewritten query q′, we can force the optimizer to use bitmap join
+indexes already defined on the new added predicate selection attributes using hints
+available on commercial systems (like Oracle).
+Example 9 Let consider the query defined in the motivating example section. The new
+selection attributes are : year and category. To extract the relevant tuples of the fact
+tables, the query can use the two bitmap join indexes, defined as follows :
+RNTI - E -
+- 192 -RNTI-B-1
+Bellatreche et al.
+CREATE BITMAP INDEX Year_sales_bji ON Sales(Year.year)
+FROM Sales, Year
+WHERE Sales.year = Year.year;
+CREATE BITMAP INDEX Product_sales_bji ON Sales(Product.category)
+FROM Sales, Product
+WHERE Sales.product = Product.product;
+This example shows clearly the benefit of the combination of RBA and CBA approaches
+in optimizing OLAP queries. The new added selection predicates can also be used
+to provide a fragmentation schema (since the data partitioning process is based on
+selection predicates defined on OLAP queries) of the star schema of the data warehouse
+and also in selecting a set of materialized views and indexing schemes (as in previous
+example).
+8 Conclusion
+In this paper, we addressed a framework for combining Rule-Based Approache
+(RBA) and Cost-Based Approach (CBA) to optimize OLAP queries. In order to use
+the RBA in the data warehousing environment, we developed a logical model to des-
+cribe both datacubes and their structures. The main OLAP operators are translated
+into this model, and a set of rewriting rules involving these operators are proposed.
+These rules are similar to those defined on relational algebra (e.g., pushing down se-
+lection operations in query trees). An optimization algorithm is proposed based on
+the visualization of a cube on a screen. This algorithm is implemented using Java and
+generates new selection predicates over the dimension tables of a given OLAP query
+and therefore a new rewritten query is generated. These new predicates contribute in
+optimizing queries. Finally, the rewritten query can be executed by CBA. To show the
+utility of our framework, we developed a simple cost model for reading and writing
+data between disk and main memory. Our proposed approaches can be incorporated
+in the existing systems without modifying the existing optimization techniques.
+To show the effectiveness of our approach, we are now evaluating the performance
+of our approach using a benchmark (TPC-H or APB-1) with a large set of queries.
+Our future works include : the study in more details of the combination of our RBA
+and materialized views, index and partitioning schema selections algorithms, the study
+of the optimization of sequences of OLAP queries, and the extension of the algebra
+towards more sophisticated OLAP operators.
+Re´fe´rences
+[Bellatreche et al., 2004] L. Bellatreche, M. Schneider, H. Lorinquer, et M. Mohania.
+Bringing together partitioning, materialized views and indexes to optimize perfor-
+mance of relational data warehouses. Proceeding of the International Conference on
+Data Warehousing and Knowledge Discovery (DAWAK’2004), pages 15–25, Septem-
+ber 2004.
+RNTI - E -
+- 193 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+[Chaudhuri, 2004] S. Chaudhuri. Index selection for databases : A hardness study
+and a principled heuristic solution. IEEE Transactions on Knowledge and Data
+Engineering, 16(11) :1313–1323, November 2004.
+[Corp., 1997] Oracle Corp. Star queries in oracle8. White Paper, June 1997.
+[Corporation, 1998] Microsoft Corporation. OLEDB for OLAP. Available at
+http ://www.microsoft.com/data/oledb/olap, 1998.
+[Gupta, 1997] H. Gupta. Selection of views to materialize in a data warehouse. Pro-
+ceedings of the 6th International Conference on Database Theory (ICDT ’97), pages
+98–112, 1997.
+[Karloff et Mihail, 1999] H. Karloff et M. Mihail. On the complexity of the view-
+selection problem. Proceedings of the Symposium on Principles of Databases Systems
+(PODS’99), pages 167–173, 1999.
+[Kimball, 1996] R. Kimball. The Data Warehouse Toolkit. John Wiley & Sons, 1996.
+[Kotidis et Roussopoulos, 1999] Y. Kotidis et N. Roussopoulos. Dynamat : A dynamic
+view management system for data warehouses. Proceedings of the ACM SIGMOD
+International Conference on Management of Data, pages 371–382, June 1999.
+[Labio et al., 1997] W. Labio, D. Quass, et B. Adelberg. Physical database design for
+data warehouses. Proceedings of the International Conference on Data Engineering
+(ICDE), 1997.
+[Lei et Ross, 1998] H. Lei et K. A. Ross. Faster joins, self-joins and multi-way joins
+using join indices. Data and Knowledge Engineering, 28(3) :277–298, November 1998.
+[Marcel, 1999] P. Marcel. Modeling and querying multidimensional databases : An
+overview. Networking and Information Systems Journal, 2(5-6) :515–548, 1999.
+[Molina et al., 1998] H. Molina, W. J. Labio, J. L. Wiener, et Y. Zhuge. Distributed
+and parallel computing issues in data warehousing. Proceedings of the Seventeenth
+Annual ACM Symposium on Principles of Distributed Computing, page 7, June 1998.
+[Ross et al., 1996] K. Ross, D. Srivastava, et S. Sudarshan. Materialized view mainte-
+nance and integrity constraint checking : Trading space for time. Proceedings of the
+ACM SIGMOD International Conference on Management of Data, pages 447–458,
+1996.
+[Sanjay et al., 2004] A. Sanjay, V. R. Narasayya, et B. Yang. Integrating vertical and
+horizontal partitioning into automated physical database design. Proceedings of the
+ACM SIGMOD International Conference on Management of Data, pages 359–370,
+2004.
+[Theodoratos et Sellis, 1997] D. Theodoratos et T. K. Sellis. Data warehouse configu-
+ration. Proceedings of the International Conference on Very Large Databases, pages
+126–135, August 1997.
+[Yang et al., 1997] J. Yang, K. Karlapalem, et Q. Li. Algorithms for materialized view
+design in data warehousing environment. Proceedings of the International Conference
+on Very Large Databases, pages 136–145, August 1997.
+RNTI - E -
+- 194 -RNTI-B-1
+Bellatreche et al.
+[Zilio et al., 2004] D. C. Zilio, J. Rao, S. Lightstone, G. M Lohman, A. Storm,
+C. Garcia-Arellano, et S. Fadden. Db2 design advisor : Integrated automatic phy-
+sical database design. Proceedings of the International Conference on Very Large
+Databases, pages 1087–1097, August 2004.
+Appendix
+In this appendix, we give the formal definitions of the algebraic operators of the
+language. Note that for this language, we consider only atomic operators, i.e., Permute
+only exchanges two axes, Switch only exchanges two members. In this framework, the
+non atomic Rotate can be expressed as a combination of Permutes and Switches.
+In what follows, let C = 〈D, F, S〉 be an N -dimensional cube with D =
+{D1, . . . , DN} and S = 〈K, axis, pos, depth〉. We note adom(L) the active domain
+of attribute L.
+Permute : Let i, j ∈ {1, . . . ,K}. Permutei,j(C) is a cube C ′ = 〈D, F, S′〉 where
+S′ = 〈K, axis′, pos, depth〉 such that :
+– axis′(k) = axis(k) for all k ∈ [1,K] \ {i, j}.
+– axis′(i) = axis(j). – axis′(j) = axis(i).
+Switch : Let Lji ∈ sch(Di) and let v, v′ ∈ adom(Lji ) such that anc(v) = anc(v′).
+SwitchLji ;v,v′
+(C) is a cube C ′ = 〈D, F, S′〉 where S′ = 〈K, axis, pos′, depth〉 and pos′
+is defined by :
+– For every Llk ∈
+⋃
+D∈D sch(D) such that L
+l
+k 6= Lji , pos′(Llk) = pos(Llk).
+– Let < and <′ be the total orders associated with attribute Lji by the functions
+pos and pos′ respectively. If v < v′, then v′ <′ v, else v <′ v′. Moreover, for every
+x ∈ adom(Lji ) \ {v, v′}, we have :
+– If x < v, then x <′ v′, else v′ <′ x. – If x < v′, then x <′ v, else v <′ x.
+Nest : Let i, j ∈ {1, . . . ,K} and such that i 6= j. Nesti(j)(C) is a cube C ′ = 〈D, F, S′〉
+where S′ = 〈K − 1, axis′, pos, depth〉 is defined by :
+1. axis′(k) = axis(k) for all k such that 1 ≤ k ≤ K
+2. axis′(i) = (Eij ,≺ij) where Eij = Ei ∪ Ej if axis(i) = (Ei,≺i) and axis(j) =
+(Ej ,≺j), and ≺ij is defined by :
+– For every D,D′ ∈ Ei, if D ≺i D′, then D ≺ij D′.
+– For every D,D′ ∈ Ej , if D ≺j D′, then D ≺ij D′.
+– For every (D,D′) ∈ Ei × Ej , we have D ≺ij D′.
+3. axis′(k) = axis(k + 1) for all k such that j ≤ k ≤ K − 1.
+Order by Let Lji ∈ sch(Di), and let < be an order on dom(Lji ). orderbyLji ,<(C) is
+a cube C ′ = 〈D, F, S′〉 where S′ = 〈K, axis, pos′, depth〉 and pos′ is defined by :
+– ∀(k, l) 6= (i, j), pos′(Llk) = pos(Llk),
+– pos′(Lji ) is the restriction of < to adom(L
+j
+i ).
+RNTI - E -
+- 195 - RNTI-B-1
+Combining rule-based and cost-based for optimizing OLAP queries
+Projection on members : Let X = {Lj1i , . . . , Ljpi } such that X ⊆ sch(Di) and
+depth(Di) ∈ X. pimembersX (C) is a cube C ′ = 〈D′, F, S′〉 where D′ = (D \ {Di}) ∪ {D′i}
+with D′i = piX(Di) and S
+′ = 〈K, axis′, pos′, depth〉 is defined by :
+– Let k ∈ {1, . . . ,K} such that axis(k) = (Ek,≺k) and Di ∈ Ek. For every l ∈
+{1, . . . ,K}, if l 6= k, then axis′(l) = axis(l). On the other hand, axis′(k) =
+(E′k,≺′k) where E′k = (Ek \ {Di}) ∪ {D′i} and ≺′k is defined by :
+– For every D,D′ ∈ E′k \ {D′i}, if D ≺k D′, then D ≺′k D′.
+– For every D ∈ E′k \ {D′i}, if D ≺k Di, then D ≺′k D′i.
+– pos′ is the restriction of pos to
+⋃
+D∈D′ sch(D).
+Projection on measures Let sch(F ) = {Ld11 : dom(Ld11 ), . . . , LdNN : dom(LdNN ),m1 :
+dom(m1), . . . ,mp : dom(mp)} and let {mj1 , . . . ,mjp} ⊆ {m1, . . . ,mp}. pimeasuresmj1 ,...,mjp (C)
+is a cube C ′ = 〈D, F ′, S〉 where F ′ = pi
+L
+d1
+1 ,...,L
+dN
+N ,mj1 ,...,mjp
+(F ).
+Aggregate : Let Ldii ∈ sch(F ), Lji ∈ sch(Di) such that di > j. Let f1, . . . , fp be
+aggregate functions.
+Aggregate
+L
+di
+i →Lji ; f1(m1),...,fp(mp)
+(C) is a cube C ′ = 〈D, F ′, S′〉 such that :
+– sch(F ′) = {Ld11 , . . . , Ldi−1i−1 , Lji , Ldi+1i+1 , . . . , LdNN ,m1, . . . ,mp}
+F ′ = pi
+L
+d1
+1 ,...,L
+di−1
+i−1 ,L
+j
+i ,L
+di+1
+i+1 ,...,L
+dN
+N ; f(m)
+(Fon
+L
+di
+i
+Di)
+– S′ = 〈K, axis, pos, depth′〉 with :
+– depth′(Dk) = depth(Dk), for all k ∈ [1, N ] \ {i}. – depth′(Di) = Lji .
+Selection on members : Let Lji ∈ sch(Di) be such that j ≤ di where Ldii =
+depth(Di). Let v ∈ dom(Lji ). σmembersLji=v (C) is a cube C
+′ = 〈D′, F ′, S′〉 where
+– D′ = {D1, . . . , Di−1, D′i, Di+1, . . . , DN} with D′i = σLji=v(Di)
+– F ′ = pisch(F )(F onLdii σLji=v(Di))
+– S′ = 〈K, axis, pos′, depth〉 where pos′(Llk) = pos(Llk) if Llk 6= Lji and pos′(Lji ) is
+the restriction of pos(Lji ) to adom(L
+j
+i ).
+Selection on measures : Let m ∈ {m1, . . . ,mp} and c ∈ dom(m). σmeasuresm=c (C) is
+a cube C ′ = 〈D, F ′, S〉 where F ′ = σm=c(F ).
+RNTI - E -
+- 196 -RNTI-B-1
