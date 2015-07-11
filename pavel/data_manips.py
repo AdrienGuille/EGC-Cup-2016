@@ -57,17 +57,33 @@ def add_index_column(df):
     return df
 
 def add_lang_column(df):
-    langs = [my_detect(l[1]['title']) for l in df.iterrows()]
+    langs = [my_detect(l[1]['title'] + l[1]["authors"]) for l in df.iterrows()]
     df["lang"] = langs
     df.to_csv("../input/RNTI_articles_export_fixed1347_ids.txt", sep="\t", encoding="utf-8", index=False, index_label=False)
     return df
 
+
+def do_OCR(df, path_txt_files, min_size):
+    lang_map = {"en":"eng", "fr":"fra"}
+    import os
+    from subprocess import call
+    text_files = get_files(path_txt_files, "txt")
+    for f in text_files:
+        if os.path.getsize(f) < min_size:
+            lang = df.loc[df["id"] == int(os.path.basename(f)[:-4])]["lang"].tolist()[0]
+            call("convert -density 300 {0} -depth 8 -background white -alpha remove  {0}.tiff".format(f.replace(".txt", ".pdf")), shell=True)
+            call("tesseract -l {0} {1}.tiff {2}".format(lang_map[lang], f.replace(".txt", ".pdf"), f[:-4]), shell=True)
+            call("rm {0}.tiff".format(f.replace(".txt", ".pdf")), shell=True)
+
+
 def main():
     df = load_data("../input/RNTI_articles_export_fixed1347_ids.txt")
-    download_pdfs(df)
+    # download_pdfs(df)
     # pdf2txt("../input/pdfs/1page")
     # pdf2txt("../input/pdfs/full")
     # add_index_column(df)
     # df = add_lang_column(df)
+    do_OCR(df, "../input/pdfs/full", 3000)
+    do_OCR(df, "../input/pdfs/1page", 1000)
 if __name__ == "__main__":
     main()
