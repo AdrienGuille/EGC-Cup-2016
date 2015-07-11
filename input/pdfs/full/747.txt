@@ -1,0 +1,1381 @@
+Les mode`les de me´lange, un outil utile pour
+la classification semi-supervise´e
+Vincent Vandewalle1,2
+1 Laboratoire Paul Painleve´ UMR CNRS 8524
+Universite´ Lille I
+59655 Villeneuve d’Ascq Cedex, France
+vincent.vandewalle@math.univ-lille.fr
+2 INRIA
+Re´sume´ En classification supervise´e, la re`gle de classement est apprise a` partir
+d’un e´chantillon d’apprentissage ge´ne´ralement constitue´ de donne´es classe´es. Dans
+la plupart des cas l’obtention de la classe est plus couˆteuse que l’obtention de co-
+variables associe´es a` la classe d’ou` l’inte´reˆt d’apprendre une re`gle de pre´diction de
+la classe a` partir de ces covariables. Ainsi dans de nombreuses situations beaucoup
+de donne´es non classe´es, obtenues a` un couˆt relativement faible, sont disponibles
+en plus des donne´es classe´es. Au cours des dernie`res anne´es la classification semi-
+supervise´e, qui fait usage des donne´es non classe´es pour ame´liorer la pre´cision de la
+re`gle de classement apprise, a connu un essor important, ceci notamment dans la
+communaute´ du Machine Learning. Les mode`les ge´ne´ratifs, qui mode´lisent la distri-
+bution jointe de la classe et des covariables, permettent de prendre naturellement en
+compte l’information apporte´e par les donne´es non classe´es dans l’apprentissage de
+la re`gle de classement. Dans cet article nous dressons un panorama de la classifica-
+tion semi-supervise´e et nous de´taillons sa mise en oeuvre dans le cadre des mode`les
+ge´ne´ratifs.
+Mots-cle´s : donne´es manquantes, mode`les de me´lange, algorithme EM, analyse
+discriminante, validation croise´e.
+Abstract In supervised classification, the classification rule is learnt from a learning
+sample generally composed of labeled data. In most settings obtaining the label is
+more expensive than obtaining covariates linked with the label, hence the interest to
+learn a prediction rule of the label given these covariates. So, in many settings a lot of
+unlabeled data, obtained at a relatively low cost, are available in addition to labeled
+data. Over past years the semi-supervised classification, which uses unlabeled data
+in order to improve the classification rule accuracy, has known a great development,
+especially in Machine Learning community. Generative models, which model the
+joint distribution of the label and of the covariates, allow to naturally take into
+account information contained in unlabeled data when learning the parameters of
+the model. In this article we give a survey of semi-supervised classification and we
+detail how to use it with generative models.
+Keywords: missing data, mixture models, EM algorithm, discriminant analysis,
+cross-validation.
+c© Revue MODULAD, 2009 -121- Nume´ro XX
+1 Introduction
+En analyse discriminante l’objectif est de pre´dire la classe d’appartenance d’un indi-
+vidu a` partir de l’observation de covariables [38]. Cette re`gle de classement doit la plupart
+du temps eˆtre apprise a` partir d’un e´chantillon d’apprentissage constitue´ de donne´es
+classe´es. Dans ce cadre un grand nombre de me´thodes ont e´te´ de´veloppe´es. La grande
+majorite´ d’entre-elles mode´lise directement la distribution de la classe conditionnellement
+aux covariables, ou meˆme uniquement la position de la frontie`re de classification. On par-
+lera de ces me´thodes sous le nom ge´ne´rique de me´thodes pre´dictives. Il s’agit entre autres
+des me´thodes non parame´triques comme les k plus proches voisins [21] ou les me´thodes de
+classification a` base d’arbres comme CART [13], ou encore des me´thodes d’apprentissage
+de la distribution de la classe conditionnellement aux covariables comme la re´gression
+logistique [3]. Enfin des me´thodes de recherche d’un hyperplan optimal comme le Percep-
+tron de Rosenblat [49] ou les Support Vecteur Machines (SVM) [59] sont utilise´es. Ces
+me´thodes ont pour avantage de prendre directement en compte l’objectif de pre´diction.
+Cependant elles ne font pas d’hypothe`ses sur la distribution des covariables. Ainsi sans
+modifications il est impossible pour elles de prendre en compte l’information contenue
+dans les donne´es non classe´es. En effet, c’est justement de l’information sur les cova-
+riables qu’apportent les donne´es non classe´es. Une autre cate´gorie de me´thodes consiste a`
+mode´liser la distribution jointe des e´tiquettes et des covariables. Il s’agit par exemple de
+la ce´le`bre analyse discriminante line´aire (ADL) de Fisher [13]. On regroupera de manie`re
+ge´ne´rique l’ensemble de ces me´thodes sous le nom de me´thodes ge´ne´ratives. On peut leur
+reprocher de ne pas assez prendre en compte l’objectif de pre´diction dans l’apprentissage
+de la re`gle de classement puisqu’elles mode´lisent la distribution jointe de la classe et des
+covariables, alors qu’en pre´diction seule la distribution de la classe conditionnellement
+aux covariables est requise [59]. Cependant, ces me´thodes donnent dans de nombreuses si-
+tuations des re´sultats comparables aux me´thodes pre´dictives [32]. En outre, dans le cadre
+semi-supervise´ elles ont l’avantage de naturellement prendre en compte l’information ap-
+porte´e par les donne´es non classe´es, ceci puisqu’elles mode´lisent la distribution jointe de la
+classe et des covariables et par conse´quent la distribution des covariables en marginalisant
+sur la classe.
+Le plan de cet article est le suivant : dans une premie`re partie on dresse un pano-
+rama de la classification semi-supervise´e. Dans une seconde partie, on de´taille sa mise en
+oeuvre dans le cadre des mode`les ge´ne´ratifs. Dans une troisie`me partie, on illustre son
+comportement par des exemples sur des donne´es re´elles et simule´es.
+2 Panorama de la classification semi-supervise´
+L’apprentissage semi-supervise´ trouve ses racines dans les proble`mes d’apprentissage
+en pre´sence de donne´es manquantes [27]. Ainsi de nombreux travaux on e´te´s effectue´s
+a` ce sujet a` la fin des anne´es 1970 [33, 22, 45]. Cependant l’utilisation des donne´es non
+e´tiquete´es pour ame´liorer la pre´cision de la re`gle de classement apprise connaˆıt un regain
+d’inte´reˆt depuis la fin des anne´es 1990 ou` la communaute´ du Machine Learning a com-
+mence´ a` s’inte´resser a` ce sujet. Ceci suite a` la disponibilite´ d’un grand nombre de donne´es
+acquises de manie`re automatique graˆce aux nouvelles technologies. Ainsi des travaux en
+classification de texte [43] ont contribue´ a` relancer l’inte´reˆt de l’utilisation des donne´es
+c© Revue MODULAD, 2009 -122- Nume´ro XX
+non classe´es en vue d’ame´liorer la pre´cision de la re`gle de classement apprise. La parution
+re´cente d’un livre entie`rement de´die´ a` la classification semi-supervise´e [17] est la preuve
+de l’inte´reˆt actuel pour ce sujet. Dans cette section on de´taille les principales approches
+de classification semi-supervise´e.
+2.1 L’auto-apprentissage
+La premie`re approche a` effectuer de l’apprentissage semi-supervise´ est l’auto-apprentissage.
+Elle consiste a` apprendre une re`gle de classement a` partir de l’une des me´thodes de´crites
+pre´ce´demment uniquement sur les donne´es classe´es. Ensuite une fraction des donne´es non
+classe´es est classe´e a` partir de la re`gle apprise. La re`gle est ensuite re´apprise a` partir des
+donne´es classe´es a` la base et des donne´es classe´es a` l’e´tape pre´ce´dente qui sont maintenant
+conside´re´es comme classe´es. Ces e´tapes sont ite´re´es jusqu’a` ce que toutes les donne´es non
+classe´es soient classe´es [52, 26, 1]. L’inte´reˆt pratique de cette me´thode est qu’elle permet
+d’adapter n’importe qu’elle me´thode de classification supervise´e au cadre semi-supervise´e.
+Cependant, le comportement de l’auto-apprentissage ainsi que ses conse´quences de´pendent
+fortement de la me´thode d’apprentissage supervise´e utilise´e. De plus l’absence de re´sultat
+the´orique sur ce a` quoi correspond l’auto-apprentissage rend difficile la compre´hension de
+ce qui est effectivement fait et des ame´liorations qui peuvent en eˆtre attendues.
+2.2 De´bat apprentissage inductif/apprentissage transductif
+L’approche semi-supervise´e fait apparaˆıtre une diffe´rence entre apprentissage inductif
+et apprentissage transductif. En effet la plupart des me´thodes de classification supervise´e
+consistent a` apprendre une re`gle de classement qui permet de classer tout nouveau point
+du domaine. C’est ce que qu’on appelle l’apprentissage inductif ; a` partir d’un nombre
+limite´ d’exemples on en de´duit une re`gle de classement pour tout nouvel exemple. Cepen-
+dant en classification semi-supervise´e l’objectif se re´sume souvent a` classer les donne´es non
+e´tiquete´es a` disposition ; c’est a` dire a` un proble`me d’apprentissage transductif. Il n’est
+alors pas ne´cessaire de partitionner tout le domaine, mais il suffit de classer les donne´es
+non e´tiquete´es a` disposition. Ainsi d’un certain point de vue ce proble`me peut sembler
+plus simple puisqu’il ne ne´cessite que de classer un ensemble fini de points, et non pas
+d’apprendre une re`gle pour classer tout nouvel exemple a` venir. On pourra retrouver ce
+de´bat au Chapitre 25 du livre d’O. Chapelle [17]. Cependant, l’apprentissage transduc-
+tif se re´ve`le eˆtre plus complexe a` mettre en oeuvre, c’est par exemple le cas des SVM
+transductifs.
+2.3 Les SVM transductifs
+Le principe des SVM transductifs reste toujours de trouver la se´paration avec la plus
+vaste marge possible. Cependant, le principe d’apprentissage transductif implique que la
+re`gle de classement est uniquement apprise pour classer les donne´es non e´tiquete´es. Les
+SVM tranductifs, recherchent la frontie`re de classement avec la plus vaste marge possible
+une fois les donne´es non e´tiquete´es classe´es. Ainsi l’optimisation se fait a` la fois sur la taille
+de la marge et sur les e´tiquettes des donne´es non classe´es. D’un point de vue the´orique
+ceci consiste a` minimiser une borne sur l’erreur de l’e´chantillon test [59]. Contrairement
+aux SVM standards, le proble`me d’optimisation est non convexe et pose par conse´quent
+c© Revue MODULAD, 2009 -123- Nume´ro XX
+des proble`mes combinatoires. Il ne peut pas eˆtre re´solu exactement quand le nombre de
+donne´es non classe´es exce`de 100. Des approches heuristiques permettent de faire face a`
+ce proble`me d’intractabilite´. C’est par exemple le cas des SVMlight [34], qui ne´cessitent
+en pratique de fixer la proportion d’exemples e´tiquete´s positivement et ne´gativement afin
+d’e´viter l’obtention de solutions de´ge´ne´re´es. Une autre possibilite´ qui permet de traiter
+le proble`me des SVM transductifs est d’utiliser des outils de programmation semi-de´finie
+positive [6]. Celle-ci consiste a` relaxer les contraintes impose´es. Cette me´thode permet de
+traiter des situations allant jusqu’a` 1000 donne´es non e´tiquete´es.
+Les SVM transductifs, comme les SVM classiques sont particulie`rement bien adapte´s
+pour re´soudre des proble`mes de classification de donne´es en grande dimension. Les SVM
+transductifs ont notamment montre´ de bonnes performances en classification de texte [35].
+2.4 Re´gularisation de la solution supervise´e
+Une approche pour prendre en compte la distribution des donne´es non e´tiquete´es dans
+l’apprentissage de la re`gle de classement consiste a` pe´naliser par l’entropie de classification.
+Elle permet par exemple de re´gulariser la solution obtenue par la re´gression logistique
+line´aire [28]. La pe´nalisation par l’entropie conduit a` favoriser les solutions pour lesquelles
+l’entropie de classification est petite. Ainsi, les frontie`res de classification sont repousse´es
+dans des zones de faible densite´. Elle ne´cessite le choix d’un parame`tre de re´gularisation
+qui est ge´ne´ralement effectue´ par validation croise´e du taux d’erreur [53]. Cette me´thode a
+montre´ de bonnes performances en classification d’images et notamment en classification
+d’expressions faciales [28].
+Une autre possibilite´ de re´gularisation consiste en la re´gularisation par l’information
+mutuelle. Le principe de cette me´thode repose principalement sur le de´coupage du do-
+maine en petites re´gions pour lesquelles on calcule l’information mutuelle. L’information
+mutuelle globale est ensuite obtenue par une combinaison line´aire des informations mu-
+tuelles locales [19]. De meˆme que dans la re´gularisation par l’entropie de classification,
+l’oppose´ de l’information mutuelle joue un roˆle de re´gularisation en favorisant les solutions
+pour lesquelles l’information mutuelle est importante.
+2.5 Propagation des e´tiquettes
+Les mode`les a` base de graphes reposent sur une matrice de voisinage. Cette dernie`re
+est construite a` partir d’une distance entre deux points de l’espace qui ne´cessite le choix
+d’un parame`tre de re´glage. Ensuite, on utilise un algorithme ite´ratif pour propager les
+e´tiquettes des points e´tiquete´s vers les points non e´tiquete´s dans le graphe [60]. Cette
+propagation consiste principalement a` utiliser la me´thode de Jacobi pour la re´solution de
+syste`mes line´aires [51]. La complexite´ de cet algorithme est proportionnelle au nombre
+moyen de voisins. Ainsi dans certains cas il est utile de seuiller les plus petites valeurs
+afin d’obtenir un graphe moins dense, et par conse´quent des algorithmes plus rapides. Si
+les parame`tres de re´glage sont bien qualibre´s de bons re´sultats peuvent eˆtre obtenus [60].
+2.6 Re´duction de la dimension
+Enfin les donne´es non e´tiquete´es peuvent servir a` re´duire la dimension des donne´es.
+Cette re´duction de la dimension peut eˆtre re´alise´e a` partir de me´thodes de type ACP [46],
+c© Revue MODULAD, 2009 -124- Nume´ro XX
+MDS [56] ou ISOMAP [54]. L’enjeu est de repre´senter dans un sous-espace plus petit
+des donne´es en grande dimension en perdant le moins d’information possible. En effet,
+de nombreuses me´thodes de classification ne´cessitent que le nombre de variable soit petit
+comparativement au nombre de donne´es. Dans de nombreux cas des me´thodes comme
+l’ACP permettent une re´gularisation des solutions obtenues. La pre´sence de nombreuses
+donne´es non classe´es permet ainsi d’obtenir des bonnes projections des donne´es dans
+des sous-espaces plus petits. Une fois la re´duction de dimension re´alise´e, les me´thodes
+d’apprentissage supervise´ usuelles peuvent eˆtre utilise´es sur l’espace de dimension re´duite.
+2.7 Mode`les ge´ne´ratifs
+Dans la communaute´ statistique l’approche semi-supervise´e a de´bute´ avec la volonte´
+d’actualiser la re`gle de classement de l’analyse discriminante line´aire a` partir de donne´es
+non classe´es dans le cas Gaussien homosce´dastique [27, 45]. A notre connaissance l’ap-
+proche la plus ancienne est celle d’Hosmer [33]. Dans ses travaux il s’agissait d’une po-
+pulation de fle´tans (grand poisson plat des mers froides), pour laquelle l’objectif e´tait
+d’estimer la proportion de maˆles et de femelles. Pour ces poissons la de´termination du
+sexe n’e´tant possible qu’apre`s dissection, des mesures biome´triques de nombreux individus
+peuvent aider a` de´terminer la fraction de maˆles et de femelles. Il avait a` sa disposition
+de nombreuses donne´es commerciales ou` seuls l’aˆge et la longueur e´taient fournis. Tandis
+qu’une e´tude scientifique sur un nombre beaucoup plus petit de donne´es fournissait aussi
+le sexe. Ainsi l’usage des donne´es commerciales en plus des donne´es de l’e´tude scientifiques
+permettent une estimation plus pre´cise des parame`tres. Dans ces travaux l’estimation est
+re´alise´e par maximum de vraisemblance graˆce a` un algorithme ite´ratif, qui sera plus tard
+formalise´ sous le nom d’algorithme EM [22]. Cet algorithme est bien adapte´ pour trai-
+ter les proble`mes de donne´es manquantes ce qui est le cas des donne´es non-e´tiquete´es
+pour lesquelles les e´tiquettes constituent les donne´es manquantes. Les mode`les conside´re´s
+consistent principalement en des me´langes de distributions Gaussiennes et des me´langes de
+distributions multinomiales [18]. Cette approche connaˆıt un renouveau depuis les anne´es
+1990, ceci notamment dans la communaute´ du Machine Learning. Elle sera de´taille´e dans
+la Section 3.
+2.8 Entre estimation ge´ne´rative et pre´dictive
+Une question qui revient souvent en analyse discriminante, ceci meˆme dans le cadre
+supervise´, est celle du choix entre un mode`le ge´ne´ratif de type analyse discriminante
+line´aire et un mode`le pre´dictif de type re´gression logistique. D’un coˆte´ le mode`le ge´ne´ratif
+fait des hypothe`ses de mode´lisation fortes qui si elles sont ve´rifie´es permettent d’obtenir
+une erreur de classification plus faible que les mode`les pre´dictifs. O’Neill a par exemple
+montre´ la supe´riorite´ de l’analyse discriminante line´aire face a` la re´gression logistique
+si les donne´es proviennent effectivement du mode`le postule´ (ici le mode`le Gaussien ho-
+mosce`dastique) [44]. Ceci peut se comprendre intuitivement car les mode`les ge´ne´ratifs
+prennent aussi en compte l’information sur la distribution des covariables et estiment
+donc plus pre´cise´ment les parame`tres de la re`gle de classement. D’un autre coˆte´ si le
+mode`le ge´ne´ratif postule´ est faux, c’est le mode`le pre´dictif qui produira la divergence de
+Kullback a` la distribution conditionnelle la plus faible pour un nombre de donne´es assez
+grand. Dans la pratique il est reconnu que les mode`les ge´ne´ratifs produisent de meilleurs
+c© Revue MODULAD, 2009 -125- Nume´ro XX
+re´sultats quand le nombre de donne´es est petit, tandis que les mode`les pre´dictifs pro-
+duisent de meilleurs re´sultats quand le nombre de donne´es est grand [42].
+Une approche re´cemment de´veloppe´e est la recherche d’un compromis entre estima-
+tion ge´ne´rative et pre´dictive [11]. Cette approche a ensuite e´te´ reformule´e par Lasserre
+et al. [36] dans un cadre Bayesien permettant ainsi une interpre´tation plus naturelle.
+Leur approche se place profonde´ment dans un cadre semi-supervise´. En the´orie cette
+approche doit permettre de trouver de manie`re automatique le bon compromis entre es-
+timation ge´ne´rative et pre´dictive. Cependant, en pratique le compromis choisi de´pend en
+grande partie du choix des hyperparame`tres. De plus cette approche double le nombre de
+parame`tres a` estimer et ne´cessite l’utilisation d’algorithmes de Newton nume´riquement
+instables en grande dimension.
+2.9 Discussion sur les hypothe`ses du semi-supervise´
+2.9.1 Hypothe`ses du semi-supervise´
+En synthe`se, la plupart des extensions des me´thodes pre´dictives au semi-supervise´
+ne´cessitent des modifications plus ou moins ad-hoc, ainsi que le choix des parame`tres de
+re´gularisation. D’autre part, les mode`les ge´ne´ratifs permettent de prendre naturellement
+en compte l’information apporte´e par les donne´es non e´tiquete´es. L’approche compromis
+entre estimation pre´dictive et ge´ne´rative pose des difficulte´s techniques importantes bien
+qu’e´tant attrayante d’un point de vue the´orique. Remarquons d’autre part que comme
+mentionne´ dans [17], l’approche semi-supervise´e est susceptible de bien fonctionner quand
+les hypothe`ses suivantes sont ve´rifie´es :
+– Hypothe`se de re´gularite´ : Si deux points dans des zones de forte densite´ sont proches
+alors il devrait en eˆtre de meˆme pour leur classe.
+– Hypothe`se de cluster : Si deux points sont dans le meˆme cluster (groupe de points
+au sens non supervise´) alors il est probable qu’ils soient dans la meˆme classe.
+– Hypothe`se de se´paration par zones de faible densite´ : La frontie`re de classification
+se trouve dans des zones de faible densite´.
+– Hypothe`se de dimensionalite´ : Les donne´es en grande dimension vivent dans des
+sous espaces de petite dimension.
+2.9.2 Application aux mode`les pre´dictifs
+Les me´thodes pre´dictives cherchent a` introduire le type d’information de la partie
+pre´ce´dente quand elles veulent s’adapter a` la situation semi-supervise´e. Par exemple pour
+la re´gularisation par l’entropie les parame`tres sont estime´s par maximisation de la vrai-
+semblance conditionnelle pe´nalise´e par l’entropie de classification, c’est a` dire par le re-
+couvrement des classes. Ceci force la recherche de se´paration dans des zones de faible
+densite´. Il en est de meˆme pour les SVM transductifs. Les me´thodes de re´duction de la
+dimension supposent que les donne´es en grande dimension vivent dans un sous espace de
+plus petite dimension. Ici on voit apparaˆıtre la difficulte´ qu’ont de nombreuses me´thodes
+pre´dictives a` utiliser les donne´es non-e´tiquete´es ; elles forcent certaines proprie´te´s sur la
+distribution des covariables en lien avec les e´tiquettes, ceci sans pour autant accepter de
+la mode´liser directement.
+c© Revue MODULAD, 2009 -126- Nume´ro XX
+2.9.3 Application aux mode`les ge´ne´ratifs
+Dans le cadre des mode`les ge´ne´ratifs un certain nombre des hypothe`ses pre´ce´dentes est
+pre´sent de`s la construction du mode`le. Si chaque classe est mode´lise´e par une distribution
+gaussienne, on a bien l’hypothe`se de cluster qui est faite d’office puisqu’on impose alors la
+correspondance entre une classe et un composant gaussien. D’autre part, dans la plupart
+des situations de classification il est souhaitable que les classes soient bien se´pare´es pour
+obtenir une faible erreur de classement. Enfin des hypothe`ses sur la matrice de covariance
+peuvent eˆtre faites comme dans [39, 12] pour imposer a` chaque classe de vivre dans
+un espace de dimension re´duite. Ainsi a` premie`re vue les hypothe`ses sous lesquelles la
+classification semi-supervise´e est susceptible de bien fonctionner sont les hypothe`ses pour
+lesquelles utiliser un mode`le ge´ne´ratif fait sens. C’est a` dire que conditionnellement a` la
+classe les covariables ont effectivement une distribution spe´cifique. De plus l’inte´reˆt de
+faire des hypothe`ses explicites sur la distribution des donne´es et non pas des hypothe`ses
+implicites est que ces dernie`res peuvent eˆtre remises en cause lors d’une proce´dure de
+choix de mode`le. Ainsi, si on dispose de mode`les relativement parcimonieux e´pousant
+correctement la distribution des donne´es, on peut ame´liorer l’estimation de la distribution
+jointe des donne´es, et par suite obtenir une re`gle de classement plus pre´cise.
+D’autre part contrairement aux autres me´thodes les mode`les ge´ne´ratifs permettent par
+exemple de de´tecter l’apparition de nouvelles classes, de faire de la classification robuste ou
+bien de de´tecter des donne´es abhe´rantes [41]. Pre´cisons que ce point peut-eˆtre important
+en apprentissage actif, c’est a` dire lorsque l’utilisateur a le choix des donne´es a` e´tiqueter.
+En effet, la pre´sence de donne´es non e´tiquete´es dans certaines zones de l’espace peut
+conduire le praticien a` e´tiqueter des donne´es dans ces zones et par suite a` e´ventuellement
+de´couvrir de nouvelles classes. Le lecteur inte´resse´ pourra se re´fe´rer a` [4] pour la de´couverte
+de classes en classification de galaxies.
+2.10 Synthe`se
+Nous avons dresse´ un panorama des principales approches utilise´es pour l’incorporation
+des donne´es non e´tiquete´es dans le processus d’apprentissage de la re`gle de classement.
+Nous allons maintenant nous focaliser sur les mode`les ge´ne´ratifs. Remarquons avant tout
+que l’utilisation des donne´es non e´tiquete´es ne permet pas toujours de re´duire l’erreur
+de classement par rapport aux me´thodes supervise´es. Cependant, sous les hypothe`ses
+pre´ce´dentes on peut espe´rer que cette re´duction du taux d’erreur ait lieu. On trouve dans
+la litte´rature des exemples ou` les donne´es non e´tiquete´es de´gradent la pre´cision de la
+re`gle de classification [20]. Nous de´taillerons les hypothe`ses sous lesquelles les donne´es
+non classe´es permettent d’ame´liorer la pre´cision de la re`gle de classement lorsqu’on utilise
+des mode`les ge´ne´ratifs. Ainsi, il sera toujours important de ve´rifier que les donne´es non
+e´tiquete´es ne de´gradent pas la re`gle de classement. Pour cela on pourra par exemple
+utiliser la validation croise´e.
+3 Mise en oeuvre des mode`les ge´ne´ratifs
+Dans cette section nous introduisons de manie`re plus pre´cise le cadre probabiliste
+ne´cessaire a` l’utilisation des mode`les ge´ne´ratifs en classification semi-supervise´e.
+c© Revue MODULAD, 2009 -127- Nume´ro XX
+3.1 Hypothe`ses d’e´chantillonnage
+Supposons que les donne´es appartiennent a` G classes diffe´rentes. Soit un couple de va-
+riables ale´atoires (X1,Z1) a` valeurs dans X × Z ou` X est une espace mesurable (Rd
+par exemple) qui repre´sente l’espace des covariables, et ou` Z = {0, 1}G est l’espace
+des classes. Supposons que n` donne´es e´tiquete´es et nu donne´es non e´tiquete´es ont e´te´
+observe´es et on note n = n` + nu. Les donne´es e´tiquete´es correspondent a` (x`, z`) =
+({(x1, z1), . . . , (xn` , zn`)}), et les donne´es non e´tiquete´es sont repre´sente´es par xu = (xn`+1, . . . ,xn),
+avec zi ∈ Z, c’est-a`-dire que zi = (zi1, . . . , ziG) ou` zik = 1 si l’individu i appartient a` la
+classe k et 0 sinon. On va supposer que les donne´es non e´tiquete´es proviennent de n`
+re´alisations inde´pendantes et identiquement distribue´es du couple (X1,Z1) et que les
+donne´es non e´tiquete´es proviennent de nu re´alisations inde´pendantes et identiquement
+distribue´es de X1. On peut se demander dans quel rapport e´voluent n` et nu quand n
+augmente. Il est naturel de supposer que chaque donne´e est e´tiquete´e inde´pendamment
+avec une probabilite´ β, ce qui implique que n` est la re´alisation d’une variable ale´atoire
+N` ∼ B(n, β). Ainsi quand n tend vers l’infini, n`n tend vers β en probabilite´.
+Avant de passer aux questions de mode´lisation quelques remarques sur les hypothe`ses
+d’e´chantillonnage s’imposent. En effet dans le cadre des donne´es manquantes, les hy-
+pothe`ses formule´es pre´ce´demment impliquent que les donne´es manquantes, en l’occurrence
+les e´tiquettes des donne´es non e´tiquete´es, sont manquantes comple`tement au hasard. C’est
+a` dire, que le fait pour une e´tiquette de ne pas eˆtre observe´e ne de´pend ni de sa valeur,
+ni de la valeur des covariables [50]. Cette hypothe`se peut sembler relativement forte mais
+c’est l’hypothe`se de travail faite explicitement ou non dans la majorite´ des travaux en
+classification supervise´e et semi-supervise´e. En effet, quand une re`gle de classement est
+apprise on souhaite ensuite l’appliquer a` des donne´es qui proviennent de la meˆme distri-
+bution que celles qui ont servies a` l’apprendre. Sans cette hypothe`se l’estimation du taux
+d’erreur sur les donne´es a` venir par validation croise´e sur les donne´es d’apprentissage perd
+alors une grande partie de son sens.
+Des approches existent pour prendre en compte d’e´ventuels biais mais elles com-
+pliquent grandement les choses [61, 24]. Toutefois notons que l’hypothe`se que les donne´es
+soient manquantes au hasard, c’est-a`-dire que le fait pour une e´tiquette de ne pas eˆtre
+observe´e est inde´pendant de sa valeur conditionnellement aux covariables, est suffisante
+pour garantir la consistance de l’estimation par maximum de vraisemblance [50]. Dans le
+cas ou` les donne´es classe´es et non-classe´es proviennent de distributions diffe´rentes mais
+qu’il existe des liens entre-elles des travaux montrent que la re`gle de classement apprise
+sur les donne´es classe´es peut eˆtre transpose´e aux donne´es non classe´es dans le cadre de
+l’analyse discriminante ge´ne´ralise´e [7].
+3.2 De´finition du mode`le
+Passons maintenant au mode`le parame´trique postule´ sur la distribution des donne´es.
+On suppose que le couple de variables ale´atoires (X1,Z1) admet une densite´ de probabilite´
+(p.d.f.) f par rapport a` une mesure sur X × Z. On suppose que f appartient a` une fa-
+mille parame´trique parame´tre`e par θ ∈ Θ, ou` Θ est l’espace des parame`tres de dimension
+finie. Ainsi, on suppose ∃θ∗ ∈ Θ tel que f(x1, z1) = f(x1, z1; θ∗) ∀(x1, z1) ∈ X × Z. Plus
+pre´cise´ment on effectue la de´composition suivante f(x1, z1; θ) =
+∏G
+k=1 (pikf(x1; θk))
+z1k ,
+ou` pik repre´sente la probabilite´ d’appartenir a` la classe k (pik > 0,
+∑G
+k=1 pik = 1) et
+c© Revue MODULAD, 2009 -128- Nume´ro XX
+ou` θk repre´sente les parame`tres spe´cifiques a` la distribution de la classe k. Ainsi θ =
+(pi1, . . . , piG−1, θ1, . . . , θG). Ces mode`les sont appele´s mode`les ge´ne´ratifs puisqu’ils mode´lisent
+le processus de ge´ne´ration des donne´es :
+– Z1 ∼M(1, pi∗1, . . . , pi∗G),
+– X1|Z1k = 1 a pour densite´ de probabilite´ f(·; θ∗k).
+Il en re´sulte ainsi que la densite´ marginale pour X1 = x1 s’e´crit sous la forme f(x1; θk) =∑G
+k pikf(x1; θk) apre`s marginalisation sur la variable Z1. On parle de loi me´lange.
+Si le parame`tre θ∗ est connu la re`gle de classement optimale pour un individu i consiste
+a` le classer dans la classe kˆ = argmaxk P (zik = 1|Xi = xi; θ∗) ou` P (zik = 1|Xi = xi; θ∗) ∝
+pi∗kf(xi; θ
+∗
+k). L’enjeu est d’estimer θ
+∗ de la manie`re la plus pre´cise possible. Si les hypothe`ses
+sont correctes, alors une estimation pre´cise de θ∗ implique un re`gle de classement proche
+de la re`gle de classement optimale.
+3.3 Estimation des parame`tres du mode`le
+3.3.1 Motivation de l’estimation par maximum de vraisemblance
+Compte tenu des hypothe`ses faites pre´ce´demment, la log-vraisemblance de θ s’e´crit de
+la manie`re suivante :
+`(θ;x`, z`,xu) =
+n∑`
+i=1
+G∑
+k=1
+zik log(pikf(xi; θk)) +
+n∑
+i=n`+1
+log
+(
+G∑
+k=1
+pikf(xi; θk)
+)
+(1)
+Le premier terme repre´sente la log-vraisemblance des donne´es e´tiquete´es, le second
+terme repre´sente la log-vraisemblance des donne´es non e´tiquete´es. Ainsi, les donne´es non
+e´tiquete´es interviennent de fac¸on naturelle dans la vraisemblance, et par suite dans l’esti-
+mation des parame`tres. Sous certaines conditions de re´gularite´ sur le mode`le l’estimateur
+du maximum de vraisemblance a de bonnes proprie´te´s [58]. Ainsi les parame`tres sont es-
+time´s par maximum de vraisemblance θˆ = argmaxθ∈Θ `(θ;x`, z`,xu). L’inte´reˆt the´orique
+de l’utilisation des donne´es non e´tiquete´es dans l’estimation des parame`tres est qu’elles
+permettent de re´duire la variance de θˆ comparativement a` l’estimation supervise´e. Sous
+l’hypothe`se du bon mode`le, cette re´duction de variance conduit a` une re´duction de l’erreur
+moyenne du classifieur appris.
+La maximisation de la vraisemblance ne peut pas eˆtre effectue´e explicitement puisqu’il
+y a une somme dans la log-vraisemblance des donne´es non e´tiquete´es. Dans ce cadre
+comme mentionne´ plus haut il existe un algorithme tre`s bien adapte´ a` la maximisation
+de la vraisemblance qui s’appelle l’algorithme EM [22] et qu’on de´taille dans la section
+suivante.
+3.3.2 Algorithme EM
+Historiquement l’approche ite´rative d’estimation des parame`tres par maximum de vrai-
+semblance a e´te´ utilise´e dans un cadre semi-supervise´ par Hosmer [33] dans le cadre gaus-
+sien homosce´dastique avant meˆme sa formulation plus ge´ne´rale sous le nom d’algorithme
+EM par Dempster et al. [22].
+L’algorithme EM est un algorithme ite´ratif qui consiste a` ite´rer deux e´tapes :
+– E´tape E (Expectation) : Calcul de Q(θ|θ(r)) l’espe´rance de la vraisemblance
+comple´te´e conditionnellement aux donne´es observe´es et aux parame`tres courants
+θ(r).
+c© Revue MODULAD, 2009 -129- Nume´ro XX
+– E´tape M (Maximisation) : Calcul de θ(r+1) = argmaxθ∈ΘQ(θ|θ(r)).
+La succession de ces deux e´tapes permet de faire croˆıtre la vraisemblance a` chaque
+ite´ration. Elle permet donc la convergence de l’algorithme vers une racine de la vrai-
+semblance.
+Ici les donne´es manquantes sont les e´tiquettes des donne´es non e´tiquete´es zu = (zn`+1, . . . , zn),
+et la vraisemblance comple´te´e s’e´crit alors :
+`c(θ;x`, z`,xu, zu) =
+n∑`
+i=1
+G∑
+k=1
+zik log(pikf(xi; θk)) +
+n∑
+i=n`+1
+G∑
+k=1
+zik log(pikf(xi; θk)). (2)
+On prend l’espe´rance de la vraisemblance comple´te´e conditionnellement au parame`tre
+courant θ(r) et aux donne´es observe´es x`, z`,xu, ce qui donne en utilisant la line´arite´ de
+l’espe´rance et le fait que les donne´es soient i.i.d. :
+Q(θ|θ(r)) =
+n∑`
+i=1
+G∑
+k=1
+zik log(pikf(xi; θk)) +
+n∑
+i=n`+1
+G∑
+k=1
+E[zik|xi, θ(r)] log(pikf(xi; θk)). (3)
+Enfin remarquons que E[zik|xi, θ(r)] = P (zik = 1|xi, θ(r)) et nous avons d’apre`s le the´ore`me
+de Bayes P (zik = 1|xi, θ(r)) = pi(r)k f(xi; θ(r)k )/(
+∑G
+l=1 pi
+(r)
+l f(xi; θ
+(r)
+l )). Dans la suite on notera
+t
+(r+1)
+ik cette quantite´. Ainsi l’espe´rance de la log-vraisemblance comple´te´e s’e´crit :
+Q(θ|θ(r)) =
+n∑`
+i=1
+G∑
+k=1
+zik log(f(xi; θk)) +
+n∑
+i=n`+1
+t
+(r+1)
+ik log(f(xi; θk)) +
+G∑
+k=1
+n
+(r+1)
+k log(pik), (4)
+en notant n
+(r+1)
+k =
+∑n`
+i=1 zik +
+∑n
+i=n`+1
+t
+(r+1)
+ik . A` ce stade on est ramene´ a` une expression
+qui ne comporte pas le log d’une somme. L’e´tape de M, consiste a` maximiser Q(θ|θ(r)) en
+θ, pour l’actualisation des proportions on obtient la formule suivante :
+pi
+(r+1)
+k =
+n
+(r+1)
+k
+n
+. (5)
+Concernant l’actualisation des autres parame`tres, cette e´tape de´pend de la famille pa-
+rame´tre´e choisie. Remarquons qu’en ge´ne´ral cette e´tape n’est pas plus difficile que dans
+la situation supervise´e.
+Des variantes de l’algorithme EM existent. C’est par exemple le cas de l’algorithme
+CEM (Classification EM) [16] qui introduit une e´tape de classification entre l’e´tape E
+et l’e´tape M de l’algorithme, celle ci consiste a` affecter chaque donne´e de manie`re dure
+a` la classe qui a la plus grande probabilite´ a posteriori. Pre´cisons que cette variante
+ne maximise pas la vraisemblance mais la vraisemblance comple´te´e. Cette version de
+l’algorithme EM a pour avantage de converger rapidement. Cependant dans le cas ou` les
+classes se chevauchent elle produit une estimation biaise´e de parame`tres. Dans le cadre
+semi-supervise´ l’algorithme CEM peut eˆtre interpre´te´ comme de l’auto-apprentissage ite´re´.
+Ainsi pour des mode`les ge´ne´ratifs, on voit que l’auto-apprentissage he´rite des proble`mes
+de biais pre´sents dans l’algorithme CEM.
+Comme pour la plupart des algorithmes ite´ratifs, l’algorithme EM ne´cessite d’eˆtre
+initialise´. En semi-supervise´ on dispose d’une bonne initialisation de l’algorithme qui
+consiste a` l’initialiser a` partir des parame`tres estime´s uniquement a` partir des donne´es
+c© Revue MODULAD, 2009 -130- Nume´ro XX
+e´tiquete´es. Toutefois des initialisations de type non supervise´ peuvent eˆtre utilise´es, ainsi
+que des chaˆınages d’algorithmes [8]. En effet, la vraisemblance comportant en ge´ne´ral de
+nombreux maxima locaux, il n’y a priori pas de garantie de trouver le maximum global
+de la vraisemblance en initialisant l’algorithme a` partir du parame`tre estime´ a` partir des
+seules donne´es e´tiquete´es. Le parame`tre retenu au final est celui qui produit le plus grande
+vraisemblance. Une autre question est le choix du moment ou` arreˆter l’algorithme, pour
+ce faire on peut soit arreˆter l’algorithme au bout d’un nombre d’ite´rations fixe´, ou on
+peut l’arreˆter quand la croissance de la vraisemblance entre deux e´tapes est infe´rieure a`
+un certain seuil.
+Une autre strate´gie possible pour maximiser la vraisemblance est le recuit de´terministe [48].
+Cette dernie`re consiste a` commencer a` une tempe´rature importante pour laquelle le
+proble`me a` re´soudre est convexe puis petit a` petit faire de´croˆıtre la tempe´rature pour
+re´soudre a` nouveau le proble`me en partant de la solution pre´ce´dente. Si la de´croissance
+de la tempe´rature est suffisamment lente alors la solution obtenue au final devrait eˆtre
+le maximum global. Remarquons que la de´croissance lente de la tempe´rature implique
+de nombreuses ite´rations. Un des proble`mes rencontre´s par le recuit de´terministe est un
+proble`me d’inversion des classes. Pour e´viter ce proble`me les classes doivent ensuite eˆtre
+re´assigne´es. Si l’e´tape de re´assignation est effectue´e correctement, le recuit de´terministe
+pre´sente alors de meilleures performances compare´es a` l’initialisation a` partir des donne´es
+e´tiquete´es [43]. Remarquons que dans le cadre de la classification de texte la convergence
+de EM est tre`s rapide, typiquement une dizaine d’e´tapes sont suffisantes a` la convergence
+de l’algorithme [43]. Ainsi, dans la plupart des situations re´elles, il est pre´fe´rable de re-
+lancer plusieurs fois l’algorithme a` partir de solutions initiales tire´es au hasard plutoˆt que
+d’utiliser le recuit de´terministe.
+3.3.3 Conditions sur les mode`les utilise´s
+Avant d’aller plus loin dans le de´tail des mode`les utilise´s dans ce contexte il est
+ne´cessaire de de´tailler un peu plus les conditions ge´ne´ralement requises sur les mode`les
+utilise´s. Dans un cadre non supervise´, l’identifiabilite´ de la famille me´lange a` une permu-
+tation des classes pre`s est ge´ne´ralement requise [37]. Cette condition est e´quivalente au
+fait que la famille parame´tre´e de densite´ est alge´briquement libre sur R. Ceci est notam-
+ment le cas pour les me´langes de distributions gaussiennes, exponentielles, de Poisson et
+de Cauchy. Cependant ceci n’est pas le cas pour les me´langes d’uniformes et de Bernoulli.
+Ces conditions permettent ensuite d’assurer la consistance de l’estimation des parame`tres
+a` une permutation des classes pre`s. Dans le cadre semi-supervise´, cette permutation est
+e´limine´e puisque les donne´es e´tiquete´es induisent une asyme´trie dans l’estimation des
+classes. Il est ici important de pre´ciser que les me´langes de produits de distributions de
+Bernoulli ne sont pas identifiables [29] au sens pre´ce´dent. Cependant, d’un point de vue
+pratique, ces mode`les conservent une interpre´tation utile minimisant ainsi l’importance
+du proble`me d’identifiabilite´ [14]. En fait, ce proble`me est leve´ dans [2] en introduisant
+la notion d’identifiabilite´ ge´ne´rique, c’est a` dire que le mode`le est identifiable sauf pour
+un ensemble de points de l’espace des parame`tres de mesure de Lebesgue nulle. Ainsi [2]
+donne une condition simple entre le nombre de classes et le nombre de variables binaires
+pour que le me´lange de produits de distributions de bernouilli soit ge´ne´riquement identi-
+fiable. Dans la section suivante nous de´taillons l’utilisation des me´langes gaussiens ainsi
+que l’utilisation des produits de distributions multinomiales d’ordre 1, et des me´langes de
+c© Revue MODULAD, 2009 -131- Nume´ro XX
+distributions multinomiales d’ordre supe´rieur a` 1. Nous parlerons enfin de l’utilisation des
+me´langes a` plusieurs composants par classe qui sont particulie`rement utiles dans le cadre
+semi-supervise´.
+3.4 Mode`les utilise´s
+3.4.1 Mode`le gaussien
+Un mode`le ge´ne´ratif tre`s populaire quand X = Rd est Xi|Zik = 1 ∼ N (µk,Σk) avec µk
+qui est le vecteur des moyennes et Σk la matrice de covariance. Pour ce mode`le l’espe´rance
+de la vraisemblance comple´te´e s’e´crit :
+Q(θ|θ(r)) = −1
+2
+n∑`
+i=1
+G∑
+k=1
+zik[(xi − µk)′Σ(xi − µk) + log(|Σ|)]
+−1
+2
+n∑
+i=n`+1
+tik[(xi − µk)′Σ(xi − µk) + log(|Σ|)] +
+G∑
+k=1
+n
+(r+1)
+k log(pik) + C
+te.
+Ainsi les formules d’actualisation pour les parame`tres spe´cifiques du mode`le sont :
+µ
+(r+1)
+k =
+∑n`
+i=1 zikxi
+∑n
+i=n`+1
+tikxi
+n
+(r+1)
+k
+(6)
+Σ
+(r+1)
+k =
+∑n`
+i=1 zik(xi − µk)(xi − µk)′ +
+∑n
+i=n`+1
+t
+(r+1)
+ik (xi − µk)(xi − µk)′
+n
+(r+1)
+k
+. (7)
+On retrouve le coˆte´ assez intuitif de l’algorithme EM qui reponde`re pour chaque classe
+l’influence des donne´es non e´tiquete´es en fonction de leur probabilite´ d’appartenance a`
+cette classe. Dans un cadre non supervise´, si aucune contrainte n’est impose´e a` la matrice
+de covariance, la vraisemblance est non borne´e. Cependant [47], montre qu’il existe une
+solution consistante parmi les racines de la vraisemblance, et que si l’algorithme EM est
+initialise´ avec une solution suffisamment proche, alors l’algorithme EM y conduit. Dans le
+cadre semi-supervise´, si on dispose d’au moins d+ 1 donne´es classe´es dans chaque classe
+la vraisemblance reste borne´e. Dans le cas ou` les matrices de covariance par classe sont
+suppose´e e´gales, on retrouve la ce´le`bre analyse discriminante line´aire de Fisher [25].
+Une reparame`trisation de la matrice de covariance permet de de´finir des mode`les
+parcimonieux allant du cas homosce´dastique au cas he´te´rosce´dastique. En effet, la matrice
+de covariance peut eˆtre de´compose´e en valeurs singulie`res sous la forme Σk = λkDkAkD
+′
+k
+ou` λk = |Σk|1/d de´finit le volume de la classe k , Dk est la matrice orthogonale des
+vecteurs propres qui peut eˆtre interpre´te´e en terme d’orientation de la classe k, Ak est
+la matrice diagonale des valeurs propres normalise´es range´es par ordre de´croissant qui
+peut eˆtre interpre´te´e en terme de forme de la classe k. Ainsi en imposant a` λk, Dk ou
+Ak d’eˆtre identiques pour chaque classe 14 mode`les parcimonieux sont obtenus [5]. Leur
+estimation est elle aussi facile en pratique, meˆme si elle ne´cessite e´ventuellement le recours
+a` un algorithme ite´ratif lors de l’e´tape M. Re´cemment reposant sur le meˆme principe de
+de´composition en valeurs singulie`res mais en imposant aux plus petites valeurs propres
+d’eˆtre identiques, des mode`les parcimonieux en grande dimension ont e´te´s de´veloppe´s. Le
+fait d’imposer aux plus petites valeurs propres d’eˆtre identiques a un effet de re´gularisation
+c© Revue MODULAD, 2009 -132- Nume´ro XX
+sur la matrice de covariance et permet ainsi son inversion meˆme dans le cas ou` la dimension
+est supe´rieure au nombre de donne´es observe´es [12]. Cette de´composition qui se place
+dans le cadre des facteurs analysants [39] avait de´ja` montre´ de bonnes performances en
+classification non supervise´e de donne´es ge´nomiques de type biopuces ou` le nombre de
+variables observe´es (intensite´ de transcription pour un grand nombre de ge`nes) est de loin
+supe´rieur au nombre d’individus (patients dans l’e´tude clinique). Dans un cadre supervise´
+ces mode`les ont montre´ des performances comparables aux SVM [12] qui est une me´thode
+de re´fe´rence dans ce contexte.
+3.4.2 Produit de mode`les multinomiaux d’ordre 1
+Supposons maintenant que X soit un espace discret, c’est a` dire que d variables
+discre`tes sont observe´es et que chaque variable j ∈ {1, . . . , d} comporte mj modalite´s.
+Ainsi l’espace probabilise´ X est compose´ de ∏dj=1mj e´ve´nements e´le´mentaires. Dans la
+grande majorite´ des situations il est impossible de mode´liser se´pare´ment chaque re´alisation.
+Ainsi un mode`le tre`s couramment utilise´ dans ce cadre est le mode`le d’inde´pendance des
+covariables conditionnellement a` la classe. Ce mode`le est aussi appele´ mode`le de Bayes
+na¨ıf compte-tenu de l’hypothe`se na¨ıve qu’il fait par rapport a` l’inde´pendance des cova-
+riables conditionnellement a` la classe. Enfin dans le cadre non-supervise´ ce mode`le est
+aussi appele´ mode`le a` classe latente [23]. Ce mode`le bien que rudimentaire donne de
+bons re´sultats dans de nombreuses situations re´elles [30]. Notons ici que l’inde´pendance
+des covariables conditionnellement a` la classe n’implique pas l’inde´pendance des cova-
+riables. Notons aussi que ce mode`le n’est pas identifiable, mais que dans le cas ou` toutes
+les variables ont le meˆme nombre de modalite´s m, si la condition d ≥ dlogmGe + 1
+est ve´rifie´e, alors le mode`le est ge´ne´riquement identifiable [2]. Ainsi, si le nombre de va-
+riables est suffisamment grand devant le nombre de classes, le mode`le est ge´ne´riquement
+identifiable. Soit xjhi = 1 si l’individu i pre´sente la modalite´ h de la variable j et 0 si-
+non. On note αjhk = P (X
+jh
+i = 1|Zik = 1), αjk = (αj1k , . . . , αjmjk ) et αk = (α1k, . . . , αdk).
+Ainsi θ = (pi1, . . . , piG−1, α1, . . . , αG). Dans ce cas la vraisemblance pour une donne´e
+i conditionnellement a` la classe k, qui se re´sume ici a` une probabilite´ discre`te est :
+f(xi|αk) =
+∏d
+j=1
+∏mj
+h=1(α
+jh
+k )
+xjhi . La log-vraisemblance s’e´crit alors :
+`(θ;x`, z`,xu) =
+n∑`
+i=1
+G∑
+k=1
+zik[log pik+
+d∑
+j=1
+mj∑
+h=1
+xjhi log(α
+jh
+k )]+
+n∑
+i=n`+1
+log(
+G∑
+k=1
+pik
+d∏
+j=1
+mj∏
+h=1
+(αjhk )
+xjhi ).
+(8)
+Puis l’espe´rance de la vraisemblance comple´te´e s’e´crit :
+Q(θ|θ(r)) =
+n∑`
+i=1
+G∑
+k=1
+d∑
+j=1
+mj∑
+h=1
+zikx
+jh
+i log(α
+jh
+k ) (9)
++
+n∑
+i=n`+1
+G∑
+k=1
+d∑
+j=1
+mj∑
+h=1
+t
+(r+1)
+ik x
+jh
+i log(α
+jh
+k ) +
+G∑
+k=1
+n
+(r+1)
+k log pik. (10)
+L’e´tape M de l’algorithme ne pose pas de difficulte´, et donne la formule d’actualisation
+suivante :
+αjhk
+(r+1)
+=
+∑n`
+i=1 zikx
+jh
+i +
+∑n
+i=n`+1
+t
+(r+1)
+ik x
+jh
+i
+n
+(r+1)
+k
+. (11)
+c© Revue MODULAD, 2009 -133- Nume´ro XX
+Pour e´viter que certains αˆjhk soient nuls, l’estimation des parame`tres peut eˆtre re´gularise´e.
+Dans un cadre bayesien, cette re´gularisation peut eˆtre interpre´te´e comme l’estimateur du
+maximum a posteriori ou` la distribution a priori sur les parame`tres est une distribution de
+Dirichlet. Comme dans le cas continu, des versions parcimonieuses de ces mode`les existent
+dans le cas ou` les covariables sont des variables binaires [15]. Ces mode`les ont montre´ un
+inte´reˆt en classification non supervise´e ou` ils permettent de faire des liens avec des crite`res
+de classification non supervise´e sur variables discre`tes.
+3.4.3 Mode`le multinomial d’ordre quelconque
+Un mode`le assez similaire a e´te´ utilise´ en classification de texte [43], ou` l’usage des
+donne´es non e´tiquete´es a permis d’ame´liorer les performances du classifieur appris. Il
+consiste a` conside´rer un texte comme un sac de mots. Soit un dictionnaire de d mots
+(w1, . . . , wd). Soit le texte i de longueur `i et xi = (x
+1
+i , . . . , x
+d
+i ) avec x
+j
+i qui est e´gal
+au nombre d’occurrences du mot j dans le texte i. On suppose que Xi|Zik = 1 ∼
+M(`i, α1k, . . . , αdk). αjk repre´sente la fre´quence du mot wj dans les textes appartenant a`
+la classe k. Ce mode`le peut eˆtre interpre´te´ comme le mode`le pre´ce´dent ou` chaque mot
+est la re´alisation d’une variable multinomiale, et ou` on impose a` chaque mot d’un type
+de texte de provenir de cette meˆme distribution multinomiale. Ainsi, on retrouve des
+conditions d’identifiabilite´ ge´ne´rique assez similaires a` celles du mode`le pre´ce´dent. Cette
+condition e´tant ve´rifie´e lorsque la longueur des textes observe´s est suffisamment grande
+par rapport au nombre de classes, ceci est en ge´ne´ralement le cas en pratique. La formule
+d’actualisation est :
+αjk
+(r+1)
+=
+∑n`
+i=1 zikx
+j
+i +
+∑n
+i=n`+1
+t
+(r+1)
+ik x
+j
+i∑n`
+i=1 zik`i +
+∑n
+i=n`+1
+t
+(r+1)
+ik `i
+. (12)
+Cette formule est assez proche de celle rencontre´e dans le cas du mode`le d’inde´pendance
+conditionnelle. En effet dans le cas supervise´ il suffit simplement d’estimer la fre´quence
+de chaque mot pour chaque type de texte. Dans le cas semi-supervise´ on retrouve une in-
+terpre´tation similaire en utilisant l’algorithme EM. De meˆme que pour le mode`le pre´ce´dent
+une re´gularisation de l’estimation des parame`tres peut eˆtre effectue´e. Ce mode`le est bien
+suˆr assez irre´aliste dans le proce´de´ d’e´criture. Cependant, l’information sur la fre´quence
+d’apparition des mots suffit dans de nombreux cas a` classifier correctement les textes.
+3.4.4 Mode`les a` plusieurs composants par classe
+Dans certaines situations la mode´lisation d’une classe par un seul composant peut se
+montrer trop rigide. Une ide´e assez naturelle consiste a` mode´liser une classe par plusieurs
+composants. Cette approche se justifie d’autant plus par les bonnes proprie´te´s d’approxi-
+mation des me´langes de densite´. Pour eˆtre utilise´e cette approche ne´cessite un nombre de
+donne´es relativement e´leve´ ce qui peut parfois eˆtre impossible dans le cas supervise´ en
+raison d’un nombre de donne´es classe´es trop petit. Cependant dans le cas semi-supervise´
+de nombreuses donne´es supple´mentaires sont disponibles, ame´liorant ainsi l’estimation de
+la distribution marginale. Ces mode`les sont utilise´s dans le cadre semi-supervise´ dans [40].
+Notons que cette extension a` plusieurs composants par classe est possible pour les mode`les
+gaussiens, les mode`les multinomiaux et les mode`les d’inde´pendance conditionnelle.
+Deux hypothe`ses sont possibles :
+c© Revue MODULAD, 2009 -134- Nume´ro XX
+– Soit les composants sont communs aux classes ; sachant le composant h la donne´e
+appartient a` la classe k avec une probabilite´ τkh ∈ [0, 1].
+– Soit chaque classe est mode´lise´e par des composants diffe´rents ; sachant le composant
+h la donne´e appartient a` la classe k avec une probabilite´ τkh ∈ {0, 1}.
+L’inte´reˆt de la premie`re approche est qu’elle ne´cessite simplement de fixer le nombre total
+de composants et d’estimer les τkh, tandis que la seconde ne´cessite de fixer le nombre de
+classes par composant et peut donc par suite ne´cessiter d’e´tudier un nombre de mode`les
+relativement grand. Ce qui est fait dans [31] consiste a` imposer aux nombres de compo-
+sants par classe a` eˆtre identiques pour e´viter tout proble`me combinatoire. Dans le cadre
+supervise´ [55] montre que l’approche a` composants communs peut causer une moins bonne
+estimation de la re`gle de classement. En effet, le mode`le a` composants se´pare´s conduit
+a` une bonne estimation de la densite´ des covariables conditionnellement a` la classe et
+peut dans certains cas produire de meilleurs re´sultats que le mode`le a` composants com-
+muns qui recherche avant tout une estimation de la densite´ marginale. Cependant dans
+le cadre semi-supervise´ cela est moins e´vident puisqu’il s’agit justement en grande partie
+de bien estimer la densite´ marginale. Dans le cas a` composants communs, la probabilite´
+pour une donne´e d’appartenir a` une classe sachant son composant d’origine ne peut eˆtre
+estime´e qu’a` partir des donne´es e´tiquete´es. Ainsi en cas de nombreux composants et d’un
+faible nombre de donne´es e´tiquete´es, ce mode`le peut manquer de parcimonie par rapport
+au mode`le a` composants se´pare´s. D’autre part remarquons que dans le cas des compo-
+sants se´pare´s, le choix d’affectation des composants aux classes peut eˆtre vu comme un
+proble`me d’optimisation discre`te. Ce phe´nome`ne peut sembler quelque peu e´vite´ dans le
+cas a` composants communs. Cependant il peut tout de meˆme rester pre´sent compte-tenu
+de l’initialisation de l’algorithme et de la convergence vers des maxima locaux.
+3.5 Synthe`se
+L’inte´reˆt des mode`les ge´ne´ratifs est qu’ils permettent une re´utilisation quasi-imme´diate
+dans le cadre semi-supervise´ des mode`les qui ont montre´ de bonnes performances dans le
+cadre supervise´ ou dans le cadre non supervise´. Remarquons aussi que dans ce contexte
+de mode´lisation, le mode`le peut eˆtre complexifie´ pour permettre l’apparition de nouvelles
+classes, l’existence d’une classe de bruit, ou encore la possibilite´ d’une supervision impar-
+faite. Ainsi ces mode`les ne permettent pas seulement de pre´dire, mais aussi de comprendre.
+Dans la section suivante on illustre l’utilisation de ces mode`les sur des jeux de donne´es
+re´elles et simule´es. On verra que les re´sultats peuvent grandement varier d’un mode`le a`
+un autre, ce qui mettra en avant l’importance du choix de mode`le. Ce proble`me de´passant
+assez largement le cadre de cet article, on se limitera a` de´crire une proce´dure de validation
+croise´e du taux d’erreur permettant d’effectuer ce choix.
+4 Exemples d’utilisation
+La mise en oeuvre de l’estimation semi-supervise´e des parame`tres est imple´mente´e
+dans le logiciel MIXMOD [9] pour le mode`le Gaussien et le produit de distributions
+multinomiales.
+c© Revue MODULAD, 2009 -135- Nume´ro XX
+4.1 Exemples sur certains jeux de donne´es de l’UCI
+La plupart des jeux de donne´es disponibles pour tester les performances des me´thodes
+de classification sont des jeux de donne´es totalement supervise´es. Ces jeux de donne´es
+peuvent facilement eˆtre rendus semi-supervise´s en cachant une partie des e´tiquettes.
+L’inte´reˆt de cette approche meˆme si la proble´matique est a` la base supervise´e est qu’elle
+permet de ve´rifier l’inte´reˆt de l’utilisation des donne´es non e´tiquete´es et de pouvoir valider
+les re´sultats puisque les e´tiquettes des donne´es non e´tiquete´es sont en fait connues. Ici
+on compare les performances des approches supervise´es et semi-supervise´es dans les cas
+homo et he´te´rosce´dastiques. Le dispositif expe´rimental est illustre´ Table 4.1. Pour chaque
+jeu de donne´es, si un e´chantillon test est fourni, les donne´es les e´tiquettes de ce dernier
+sont cache´es et les donne´es sont utilise´es comme des donne´es non e´tiquete´es. Sinon, on
+ge´ne`re ale´atoirement 100 e´chantillons de nu donne´es non classe´es et n` donne´es classe´es
+en cachant nu e´tiquettes au hasard.
+Jeu de donne´es n d G E´chantillon test nu n`
+Breast Cancer 569 30 2 non 500 69
+Crabes 200 5 4 non 150 50
+Iris 150 4 3 non 100 50
+Parkinson 195 22 2 non 95 100
+Pima 532 7 2 oui 332 200
+Transfusion 748 4 2 non 548 200
+Tab. 1 – Dispositif expe´rimental.
+Les re´sultats sont pre´sente´s Table 2, l’e´cart-type du taux d’erreur est obtenu a` partir
+des 100 se´parations donne´es e´tiquete´es donne´es non e´tiquete´es et est e´crit entre parenthe`se.
+Homosce´dastique He´te´rosce´dastique
+Supervise´ Semi-supervise´ Supervise´ Semi-supervise´
+Brest Cancer 9,79 (2,23) 9,38 (5,12) 59,69 (10,53) 7,66 (8,28)
+Crabes 6,89 (2,21) 8,86 (2,30) 11,36 (4,76) 6,47 (3,46)
+Iris 2,72 (1,32) 2,05 (1,02) 4,06 (1,93) 3,05 (1,35)
+Parkinson 15,04 (3,46) 14,91 (4,03) 26,84 (19,23) 20,37 (9,00)
+Pima 20,18 19,58 23,49 25,00
+Transfusion 25,78 (9,25) 23,34 (2,72) 30,17 (17,11) 26,94 (10,56)
+Tab. 2 – Taux d’erreur moyen dans diffe´rentes configurations.
+4.2 Exemples sur les donne´es du SSL book
+4.2.1 Utilisation des mode`les de classification en haute dimension
+Dans le livre d’O.Chappelle sont fournis des jeux de donne´es avec se´paration donne´es
+e´tiquete´es donne´es non e´tiquete´es (http://www.kyb.tuebingen.mpg.de/ssl-book/benchmarks.
+html), ces derniers vont nous permettre d’illustrer l’utilisation des mode`les gaussiens en
+grande dimension. On se limite a` l’utilisation du mode`le qui de´compose la matrice de
+variance Σk en valeurs singulie`res et qui suppose que les p plus petites valeurs propres
+c© Revue MODULAD, 2009 -136- Nume´ro XX
+de ces dernie`res sont identiques, ce qui correspond au mode`le [AijBiQiD] de [12]. Pour
+les formules d’estimation des parame`tres le lecteur inte´resse´ pourra se re´fe´rer a` [12]. Les
+jeux de donne´es propose´s comportent des donne´es en grande dimension : 241 variables
+pour 1500 donne´es observe´es. Douze se´parations entre 1400 donne´es non e´tiquete´es et 100
+donne´es e´tiquete´es sont propose´es. Ces dernie`res sont utilise´es pour comparer les perfor-
+mances des diffe´rents mode`les utilise´s. On va du mode`le qui suppose que toutes les valeurs
+propres sont identiques au mode`le qui suppose que les dix plus grandes sont diffe´rentes,
+et que les plus petites sont identiques.
+Le premier jeu de donne´es intitule´ g241c est constitue´ de donne´es artificielles qui res-
+pectent les hypothe`ses de mode´lisation, a` savoir que conditionnellement a` la classe la dis-
+tribution des covariables est Gaussienne. Les re´sultats supervise´s et semi-supervise´s sont
+illustre´s Figure 1, les boˆıtes a` moustache [57] les plus larges repre´sentent les re´sultats dans
+le cadre semi-supervise´, tandis que les boˆıtes a` moustache les moins larges repre´sentent les
+re´sultats dans le cadre supervise´. Le mode`le le plus simple met en avant l’inte´reˆt de l’uti-
+lisation des donne´es non e´tiquete´es pour ame´liorer la pre´cision de la re`gle de classement
+apprise. Pour les mode`les plus complexes on voit que l’erreur de classement augmente
+dans les cadres supervise´s et semi-supervise´s. Cela met en avant le phe´nome`ne de sur-
+apprentissage quand des mode`les trop complexes sont utilise´s.
+Le second jeu de donne´es intitule´ g241n illustre une situation ou` une classe est mode´lise´e
+par deux composants gaussiens ; ainsi le mode`le postule´ est faux. Figure 2 on remarque
+que les donne´es non classe´es contribuent encore a` re´duire le taux d’erreur moyen quand au
+moins une valeur propre est suppose´e diffe´rente des autres. On remarque un phe´nome`ne
+inte´ressant qui est que ce n’est ni le mode`le le plus complexe ni le mode`le le plus simple
+qui produit les meilleurs re´sultats, mais qu’il y a un compromis entre la bonne approxi-
+mation de la distribution des donne´es par le mode`le, et la variance dans l’estimation des
+parame`tres.
+0 1 2 3 4 5 6 7 8 9 10
+0.15
+0.2
+0.25
+0.3
+0.35
+0.4
+0.45
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de valeurs propres différentes
+Taux d’erreur en fonction du nombre de valeurs propres
+différentes en supervisé et en semi−supervisé
+Fig. 1 – Jeu de donne´es g241c (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+0 1 2 3 4 5 6 7 8 9 10
+0.05
+0.1
+0.15
+0.2
+0.25
+0.3
+0.35
+0.4
+0.45
+0.5
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de valeurs propres différentes
+Taux d’erreur en fonction du nombre de valeurs propres
+différentes en supervisé et en semi−supervisé
+Fig. 2 – Jeu de donne´es g241n (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+Le troisie`me jeu de donne´es intitule´ Digit1 repre´sente des donne´es artificielles plus
+proches de la re´alite´. Pour l’exemple on s’est limite´ a` 10 valeurs propres diffe´rentes
+c© Revue MODULAD, 2009 -137- Nume´ro XX
+0 1 2 3 4 5 6 7 8 9 10
+0.02
+0.04
+0.06
+0.08
+0.1
+0.12
+0.14
+0.16
+0.18
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de valeurs propres différentes
+Taux d’erreur en fonction du nombre de valeurs propres
+différentes en supervisé et en semi−supervisé
+Fig. 3 – Jeu de donne´es Digit1 (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+0 1 2 3 4 5 6 7 8 9 10
+0.05
+0.1
+0.15
+0.2
+0.25
+0.3
+0.35
+0.4
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de valeurs propres différentes
+Taux d’erreur en fonction du nombre de valeurs propres
+différentes en supervisé et en semi−supervisé
+Fig. 4 – Jeu de donne´es USPS (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+au maximum. On voit Figure 3 que pour les mode`les les plus simples les donne´es non
+e´tiquete´es de´gradent les performances de la re`gle de classement. Cependant au fur et a` me-
+sure que des mode`les plus complexes sont propose´s, les donne´es non e´tiquete´es ame´liorent
+les performances de la re`gle de classement. Remarquons qu’ici il aurait fallu laisser plus
+de valeurs propres libres pour obtenir de meilleures performances.
+Enfin un quatrie`me jeu de donne´es intitule´ USPS, repre´sente un jeu de donne´es re´elles.
+Il s’agit de distinguer les chiffres 5 et 2 des autres chiffres. Ici on voit que pour les
+mode`les conside´re´s les donne´es non e´tiquete´es de´gradent la re`gle de classement apprise.
+Les re´sultats sont illustre´s Figure 4. Cependant cette de´gradation semble diminuer au fur
+et a` mesure que des mode`les plus complexes sont utilise´s.
+Ainsi ces exemples nous ont permis d’illustrer un certain nombre de situations ren-
+contre´es. On voit que les performances de la re`gle de classement peuvent varier grandement
+selon le mode`le choisi ce qui justifie l’importance de la question du choix de mode`le dans
+ce contexte.
+4.2.2 Utilisation des me´langes a` plusieurs composants par classe
+Un autre type de mode`le potentiellement utile en grande dimension est le mode`le
+d’inde´pendance conditionnelle qui e´vite les proble`mes d’inversibilite´ de la matrice de co-
+variance rencontre´s en grande dimension. Cette hypothe`se correspond a` conside´rer des
+distributions gaussiennes avec des matrices de variance diagonales. Cependant ces mode`les
+sont dans de nombreuses situations trop simplistes ; une possibilite´ est alors de conside´rer
+un mode`le a` plusieurs composants par classe. Nous illustrons les performances de ces
+mode`les selon le nombre de composants par classe choisi sur les meˆmes jeux de donne´es
+que pre´ce´demment.
+Pour le premier jeu de donne´es, le vrai nombre de composants par classe est 1. C’est
+donc le mode`le le plus simple qui produit les meilleures performances. On note encore une
+ame´lioration des performances dans le cadre semi-supervise´.
+c© Revue MODULAD, 2009 -138- Nume´ro XX
+Pour le second jeu de donne´es, les donne´es sont issues d’un mode`le a` deux composants
+par classe, c’est donc le mode`le a` deux composants par classe qui produit les meilleurs
+re´sultats. Un mode`le a` un composant par classe est trop simpliste et un mode`le a` plus
+de deux composants par classe est trop complexe. On remarque que dans le cas ou` les
+hypothe`ses de mode´lisation sont mauvaises, le semi-supervise´ de´grade les performances
+du classifieur appris. On voit ici que le semi-supervise´ tire un tre`s bon parti des donne´es
+non e´tiquete´es lorsque le mode`le postule´ est correct.
+1 2 3 4 5 6 7 8 9 10
+0.1
+0.15
+0.2
+0.25
+0.3
+0.35
+0.4
+0.45
+0.5
+0.55
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de composants par classe
+Taux d’erreur en fonction du nombre de composants par classe
+Fig. 5 – Jeu de donne´es g241c (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+1 2 3 4 5 6 7 8 9 10
+0.05
+0.1
+0.15
+0.2
+0.25
+0.3
+0.35
+0.4
+0.45
+0.5
+0.55
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de composants par classe
+Taux d’erreur en fonction du nombre de composants par classe
+Fig. 6 – Jeu de donne´es g241n (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+1 2 3 4 5 6 7 8 9 10
+0.02
+0.04
+0.06
+0.08
+0.1
+0.12
+0.14
+0.16
+0.18
+0.2
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de composants par classe
+Taux d’erreur en fonction du nombre de composants par classe
+Fig. 7 – Jeu de donne´es Digit1 (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+1 2 3 4 5 6 7 8 9 10
+0
+0.1
+0.2
+0.3
+0.4
+0.5
+Ta
+ux
+ d
+’e
+rre
+ur
+Nombre de composants par classe
+Taux d’erreur en fonction du nombre de composants par classe
+Fig. 8 – Jeu de donne´es USPS (semi-
+supervise´e : boˆıtes larges, supervise´ :
+boˆıtes fines).
+Pour le troisie`me jeu de donne´es on voit que les re´sultats obtenus sont a` peu pre`s les
+meˆmes dans les cadre supervise´ et semi-supervise´ et qu’ils ne varient pas trop selon le
+c© Revue MODULAD, 2009 -139- Nume´ro XX
+nombre de composants choisis.
+Pour le jeu de donne´es USPS on voit aussi que l’utilisation de plusieurs composants par
+classe permet aussi d’ame´liorer fortement les re´sultats produits, remarquons que le faible
+nombre de donne´es classe´es ne permet pas d’estimer des mode`les a` plus sept composants
+par classe dans le cadre supervise´.
+Remarquons aussi qu’on aurait pu combiner l’approche a` plusieurs composants par
+classe et l’approche mode`le en grande dimension, ce que nous n’avons pas fait ici pour
+rester simple. En effet, dans ce cas il faut a` la fois choisir le nombre de composants
+par classe et le nombre de plus grandes valeurs propres diffe´rentes. D’autre part nous
+avons opte´ pour l’approche composants se´pare´s et nous avons impose´ le meˆme nombre de
+composants pour chaque classe, l’approche composants communs e´tant aussi possible.
+4.3 Comparaison du semi-supervise´ au supervise´ dans le cas du
+bon mode`le
+Dans cette partie on explique l’inte´reˆt du semi-supervise´ sur des jeux de donne´es
+simule´es. Soit deux classes Gaussiennes en dimension 50, et en proportions e´gales. On a
+X|Z1 = 1 ∼ N (0, I50) et X|Z2 = 1 ∼ N (µ, I50) avec µi = 1i pour i allant de 1 a` 50.
+Soit n` = 100 donne´es classe´es et nu = 10000 donne´es non classe´es. On trace Figure 9
+l’erreur moyenne en fonction du nombre de variables utilise´es dans les cadres supervise´
+et semi-supervise´. Cette figure nous permet de remarquer deux inte´reˆts de l’approche
+semi-supervise´e. Le premier est que lorsqu’on conside`re le nombre de variables optimal
+dans le cadre supervise´ (taux d’erreur moyen 29,36%), a` meˆme nombre de variable le
+semi-supervise´ permet d’obtenir un taux d’erreur plus bas (taux d’erreur moyen 27,79%).
+Le second est que le semi-supervise´ permet d’utiliser efficacement un plus grand nombre
+de variables et permet ainsi d’obtenir un taux d’erreur minimal de 26,82%. Ainsi deux
+effets participent a` la re´duction du taux d’erreur moyen. Tout d’abord pour des mode`les
+de meˆme complexite´ on a une re´duction du taux d’erreur moyen, ensuite le semi-supervise´
+permet de faire un usage plus efficace des mode`les plus complexes.
+0 5 10 15 20 25 30 35 40 45 50
+0.26
+0.28
+0.3
+0.32
+0.34
+0.36
+0.38
+Nombre de variables selectionnées
+Ta
+ux
+ d
+’e
+rre
+ur
+ m
+oy
+en
+Taux d’erreur moyen en fonction du nombre de variables conservées
+ 
+ 
+Semi−supervisé
+Supervisé
+Fig. 9 – Taux d’erreur en fonction du nombre de variables utilise´es
+c© Revue MODULAD, 2009 -140- Nume´ro XX
+4.4 Choix de mode`le par validation croise´e
+Le principal objet de cet article est l’utilisation des mode`les ge´ne´ratifs pour la classifica-
+tion semi-supervise´e. Cependant, les exemples pre´ce´dents mettent clairement en e´vidence
+le fait que la question du choix d’un mode`le est de premie`re importance. On explique
+maintenant comment le choix de ce dernier peut se faire par validation croise´e.
+Comme on souhaite se´lectionner le mode`le qui produit l’erreur de classement la plus
+faible, il est naturel de se´lectionner le mode`le qui produit l’erreur de classement la plus
+faible estime´e par validation croise´e. Notons ici que la validation croise´e ne´cessite des
+adaptations. En effet, pour estimer correctement l’erreur de classement il faut retirer
+la meˆme fraction de donne´es e´tiquete´es et non-e´tiquete´es en V fold validation croise´e.
+Cette remarque est d’autant plus importante que V est petit. Remarquons aussi que si le
+nombre de donne´es e´tiquete´es est petit les performances de la validation croise´e peuvent
+eˆtre relativement me´diocres tout comme dans le cadre supervise´. Le principe de la V fold
+validation croise´e est le suivant :
+– Couper au hasard Du = xu et D` = (x`, z`) en V blocks de tailles a` peu pre`s
+identiques : D` =
+⋃V
+i=1{D{i}` }, and Du =
+⋃V
+i=1{D{i}u }
+– Pour i = 1 a` V
+– eˆi =
+1
+card(D{i}` )
+∑
+(xp,zp)∈D{i}`
+1{r(xp;θˆ{−i}) 6=zp} avec θˆ
+{−i} l’estimateur du maximum
+de vraisemblance calcule´ en utilisant {D`,Du}\{D{i}` ,D{i}u }.
+– Fin
+– Calculer eˆ = 1
+V
+∑V
+i=1 eˆi.
+Remarquons que cette approche est relativement couˆteuse puisqu’elle ne´cessite de recourir
+V fois a` l’algorithme EM, cet algorithme pouvant bien sur eˆtre initialise´ a` partir de θˆ.
+Ainsi comparativement a` la situation supervise´e ou` les parame`tres peuvent parfois eˆtre
+recalcule´s de fac¸on peu couˆteuse a` partir des anciens parame`tres [10], ceci est impossible
+dans le cadre semi-supervise´ puisque l’estimateur du maximum de vraisemblance n’est
+pas explicite.
+5 Conclusion
+Nous avons dresse´ un panorama des me´thodes utilise´es en semi-supervise´. Nous avons
+justifie´ l’inte´reˆt des mode`les ge´ne´ratifs dans ce contexte, et nous avons de´taille´ leur mise
+en oeuvre : hypothe`ses faites, inte´reˆt the´orique de l’utilisation des donne´es non e´tiquete´es,
+mode`les pouvant eˆtre utilise´s, formules d’actualisation pour ces mode`les. Nous avons
+montre´ sur quelques exemples qu’ils pouvaient effectivement ame´liorer la pre´cision de
+la re`gle de classement apprise. Ces expe´riences nous ont permis de mettre en e´vidence une
+question importante qui est celle du choix de mode`le, cette question pouvant eˆtre re´solue
+en utilisant une proce´dure de validation croise´e.
+Re´fe´rences
+[1] A. Agrawala. Learning with a probabilistic teacher. Information Theory, IEEE
+Transactions on, 16(4) :373–379, 1970.
+c© Revue MODULAD, 2009 -141- Nume´ro XX
+[2] E. S. Allman, C. Matias, and J. A. Rhodes. Identifiability of latent class mo-
+dels with many observed variables. http://www.citebase.org/abstract?id=oai:
+arXiv.org:0809.5032, 2008.
+[3] J. A. Anderson and S. C. Richardson. Logistic discrimination and bias correction in
+maximum likelihood estimation. Technometrics, 21(1) :71–78, 1979.
+[4] D. Bazell and D. J. Miller. Class discovery in galaxy classification. The Astrophysical
+Journal, 618(2) :723–732, Jan. 2005.
+[5] H. Bensmail and G. Celeux. Regularized discriminant analysis. Journal of the Ame-
+rican Statistical Association, 91 :1743–1748, 1996.
+[6] T. De Bie and N. Cristianini. Convex methods for transduction. In Advances in
+Neural Information Processing Systems 16, pages 73–80. MIT Press, 2004.
+[7] C. Biernacki, F. Beninel, and V. Bretagnolle. A generalized discriminant rule when
+training population and test population differ on their descriptive parameters. Bio-
+metrics, 58(2) :387–397, 2002.
+[8] C. Biernacki, G. Celeux, and G. Govaert. Choosing starting values for the EM
+algorithm for getting the highest likelihood in multivariate gaussian mixture models.
+Computational Statistics and Data Analysis, 41 :561–575, 2003.
+[9] C. Biernacki, G. Celeux, G. Govaert, and F. Langrognet. Model-based cluster and
+discriminant analysis with the MIXMOD software. Computational Statistics & Data
+Analysis, 51(2) :587–600, November 2006.
+[10] C. Biernacki and G Govaert. Choosing models in model-based clustering and dis-
+criminant analysis. Journal of Statistical Computation and Simulation, 64 :49–71,
+1999.
+[11] G. Bouchard and B. Triggs. The tradeoff between generative and discriminative
+classifiers. In IASC International Symposium on Computational Statistics (COMPS-
+TAT), pages 721–728, Prague, August 2004.
+[12] C. Bouveyron, S. Girard, and Cordelia Schmid. Class-specific subspace discriminant
+analysis for high-dimensional data, pages 139–150. Number 3940 in Lecture Notes
+in Computer Science. Springer Verlag, 2006.
+[13] L. Breiman, J. Friedman, R.A. Olsen, and C. J. Stone. Classification and Regression
+Trees. Chapman and Hall/CRC, 1984.
+[14] M. A´. Carreira-Perpin˜n and S. Renals. Practical identifiability of finite mixtures of
+multivariate Bernoulli distributions. Neural Computation, 12(1) :141–152, 2000.
+[15] G. Celeux and G. Govaert. Clustering criteria for discrete data and latent class
+models. Journal of Classification, 8 :157–17, 1991.
+[16] G. Celeux and G. Govaert. A classification EM algorithm for clustering and two
+stochastic versions. Computational Statistics and Data Analysis, 14(3) :315–332,
+1992.
+[17] O. Chapelle, B. Scho¨lkopf, and A. Zien, editors. Semi-Supervised Learning. MIT
+Press, Cambridge, MA, 2006.
+[18] D.B. Cooper and J.H. Freeman. On the asymptotic improvement in the out-come
+of supervised learning provided by additional nonsupervised learning. Computers,
+IEEE Transactions on, C-19(11) :1055–1063, Nov. 1970.
+c© Revue MODULAD, 2009 -142- Nume´ro XX
+[19] A. Corduneanu and T. Jaakkola. Distributed information regularization on graphs.
+In Neural Information Processing Systems, 2004.
+[20] F.G. Cozman and I. Cohen. Unlabeled data can degrade classification performance of
+generative classifiers. In Fifteenth International Florida Artificial Intelligence Society
+Conference, pages 327–331, 2002.
+[21] B. V. Dasarathy. Nearest neighbor (NN) norms : NN pattern classification techniques.
+Los Alamitos : IEEE Computer Society Press, 1990, 1990.
+[22] A. P. Dempster, N. M. Laird, and D. B. Rubin. Maximum likelihood from incom-
+plete data via the EM algorithm. Journal of the Royal Statistical Society. Series B
+(Methodological), 39(1) :1–38, 1977.
+[23] B. Everitt. A Introduction to Latent Variable Models. Chapman and Hall, 1984.
+[24] W. Fan, I. Davidson, B. Zadrozny, and P. S. Yu. An improved categorization of classi-
+fier’s sensitivity on sample selection bias. In ICDM, pages 605–608. IEEE Computer
+Society, 2005.
+[25] R. A. Fisher. The use of multiple measurements in taxonomic problems. Annals of
+Eugenics, 7 :179–188, 1936.
+[26] S. Fralick. Learning to recognize patterns without a teacher. Information Theory,
+IEEE Transactions on, 13(1) :57–64, 1967.
+[27] S. Ganesalingam and G. J. McLachlan. The efficiency of a linear discriminant function
+based on unclassified initial samples. Biometrika, 65(3) :658–665, 1978.
+[28] Y. Grandvalet and Y. Bengio. Entropy regularization. In O. Chapelle, B. Scho¨lkopf,
+and A. Zien, editors, Semi-Supervised Learning, pages 151–168. MIT Press, 2006.
+[29] M. Gyllenberg, T. Koski, E. Reilink, and M. Verlann. Non-uniqueness in probabilistic
+numerical identification of bacteria. Journal of Applied Probability, 31(2) :542–548,
+1994.
+[30] David J. Hand and Keming Yu. Idiot’s Bayes - not so stupid after all ? International
+Statistical Review, 69(3) :385–398, 2001.
+[31] T. Hastie and R. Tibshirani. Discriminant analysis by Gaussian mixtures. Journal
+of the Royal Statistical Society. Series B (Methodological), 58 :155–176, 1996.
+[32] T. Hastie, R. Tibshirani, and J. Friedman. The Elements of Statistical Learning.
+Springer Series in Statistics, 2001.
+[33] D. W. Hosmer. A comparison of iterative maximum likelihood estimates of the
+parameters of a mixture of two normal distributions under three different types of
+samples. Biometrics, 29 :761–770, 1973.
+[34] T. Joachims. Making large-scale support vector machine learning practical, pages
+169–184. MIT Press, Cambridge, MA, USA, 1999.
+[35] T. Joachims. Transductive inference for text classification using support vector ma-
+chines. In Ivan Bratko and Saso Dzeroski, editors, Proceedings of ICML-99, 16th
+International Conference on Machine Learning, pages 200–209, Bled, SL, 1999. Mor-
+gan Kaufmann Publishers, San Francisco, US.
+[36] J.A. Lasserre, C.M. Bishop, and T.P. Minka. Principled hybrids of generative and
+discriminative models. Computer Vision and Pattern Recognition, 2006 IEEE Com-
+puter Society Conference on, 1 :87–94, June 2006.
+c© Revue MODULAD, 2009 -143- Nume´ro XX
+[37] G. Mclachlan and D. Peel. Finite Mixture Models. Wiley Series in Probability and
+Statistics. Wiley-Interscience, October 2000.
+[38] G. J. McLachlan. Discriminant Analysis and Statistical Pattern Recognition. Wiley,
+New York, 1992.
+[39] G. J. McLachlan, D. Peel, and R. Bean. Modelling high-dimensional data by mixtures
+of factor analyzers. Computational Statistics and Data Analysis, 41 :379–388, 2003.
+[40] D. J. Miller and H. Uyar. A mixture of experts classifier with learning based on
+both labelled and unlabelled data. In Proceedings in Neural Information Processing
+Systems Conference, volume 9, pages 321–328, 1997.
+[41] David J. Miller and John Browning. A mixture model and em-based algorithm for
+class discovery, robust classification, and outlier rejection in mixed labeled/unlabeled
+data sets. IEEE Transaction on Pattern Analysis Machine Intelligence, 25(11) :1468–
+1483, 2003.
+[42] A. Ng and M. Jordan. On discriminative vs. generative classifiers : A comparison of
+logistic regression and naive bayes. http://citeseer.ist.psu.edu/542917.html,
+2002.
+[43] K. Nigam, A. K. McCallum, S. Thrun, and T. Mitchell. Text classification from
+labeled and unlabeled documents using EM. Machine Learning, 39(2-3) :103–134,
+2000.
+[44] T. O’Neill. The general distribution of the error rate of a classification procedure with
+application to logistic regression discrimination. Journal of the American Statistical
+Association, 75(369) :154–160, 1980.
+[45] Terence O’Neill. Normal discrimination with unclassified observations. Journal of
+the American Statistical Association, 73(364) :821–826, 1978.
+[46] K. Pearson. On lines and planes of closest fit to systems of points in space. Philoso-
+phical Magazine, 2(6) :559–572, 1901.
+[47] R. Redner and H. Walker. Mixture densities, maximum likelihood and the EM
+algorithm. SIAM Review, 26(2) :195–239, 1984.
+[48] K. Rose. Deterministic annealing for clustering, compression, classification, regres-
+sion, and related optimization problems. In Proceedings of the IEEE, pages 2210–
+2239, 1998.
+[49] F. Rosenblat. The perceptron : A probabilistic model for information storage and
+organization in the brain. Psychological Review, 65 :386–408, 1958.
+[50] D. B. Rubin. Inference and missing data. Biometrika, 63 :581–592, 1976.
+[51] Y. Saad. Iterative Methods for Sparse Linear Systems, Second Edition. Society for
+Industrial and Applied Mathematics, April 2003.
+[52] H. J. Scudder, III. Probability of error of some adaptive pattern-recognition machines.
+IEEE Transactions on Information Theory, IT-11 :363–371, 1965.
+[53] M. Stone. Cross-validatory choice and assessment of statistical predictions. Journal
+of the Royal Statistical Society, 36 :111–147, 1974.
+[54] J. B. Tenenbaum, V. de Silva, and J. C. Langford. A global geometric framework for
+nonlinear dimensionality reduction. Science, 290(5500) :2319–2323, December 2000.
+c© Revue MODULAD, 2009 -144- Nume´ro XX
+[55] Michalis K. Titsias and Aristidis Likas. Mixture of experts classification using a
+hierarchical mixture model. Neural Computation, 14(9) :2221–2244, 2002.
+[56] Warren Torgerson. Multidimensional scaling of similarity. Psychometrika, 30(4) :379–
+393, December 1965.
+[57] J. W. Tukey. Exploratory data analysis, 1977.
+[58] A. W. van der Vaart. Asymptotic Statistics. Cambridge University Press, June 2000.
+[59] V. Vapnik. The Nature of Statistical Learning Theory. Springer-Verlag, 1995.
+[60] D. Zhou, O. Bousquet, T. N. Lal, J. Weston, and B. S. Scho¨lkopf. Learning with
+local and global consistency. In Advances in Neural Information Processing Systems
+16, volume 16, pages 321–328, 2004.
+[61] H. Zou, J. Zhu, and T. Hastie. Automatic bayes carpentry using unlabeled data in
+semi-supervised classification. http://www-stat.stanford.edu/∼hastie/Papers/
+NIPS04/abc nips04.pdf, June 21 2004.
+c© Revue MODULAD, 2009 -145- Nume´ro XX

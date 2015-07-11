@@ -1,0 +1,508 @@
+De´tection de faibles homologies de prote´ines par
+machines a` vecteurs de support
+Je´roˆme Mikolajczak∗, Ge´rard Ramstein∗∗
+Yannick Jacques∗
+∗ De´partement de Cance´rologie, Institut de Biologie
+9 Quai Moncousu, F-44035 Nantes cedex
+jmikolaj@nantes.inserm.fr, yjacques@nantes.inserm.fr
+∗∗LINA, e´quipe EGC, Ecole polytechnique de l’Universite´ de Nantes
+Rue Christian Pauc, BP 50609 44306 Nantes cedex 3
+gerard.ramstein@polytech.univ-nantes.fr
+Re´sume´. Cet article de´crit une approche discriminative pour la recherche
+de nouveaux membres dans des familles de prote´ines a` faibles homologies
+de se´quences. L’originalite´ de la me´thode repose sur une mode´lisation de
+ces familles par un ensemble M de motifs inte´grant les proprie´te´s physi-
+cochimiques des re´sidus. Nous proposons un algorithme de de´couverte de
+motifs suivant le paradigme de la classification hie´rarchique ascendante.
+L’ensemble M de´finit un espace de repre´sentation des se´quences : chaque
+se´quence est transforme´e en un vecteur indiquant la pre´sence ou l’absence
+de chaque motif appartenant a`M . Nous utilisons la technique d’apprentis-
+sage par machine a` vecteurs de support (SVM) pour discriminer la famille
+d’inte´reˆt vis-a`-vis des se´quences non apparente´es. Cette me´thode est teste´e
+sur la famille biologique des interleukines dont les membres posse`dent des
+homologies de se´quences faibles en de´pit d’un repliement tridimensionnel
+en he´lices alpha tre`s conserve´. Nous montrons que l’ensemble des motifs
+hie´rarchiques mode´lise spe´cifiquement les interleukines par rapport aux
+autres familles structurales de la base de donne´es SCOP (1.51). Notre
+classifieur est en effet plus performant sur notre famille de prote´ines que
+d’autres me´thodes de classification dont le SVM base´ sur les spectres de
+chaˆıne.
+1 Introduction
+La de´couverte de nouveaux membres d’une famille de prote´ines repose sur deux
+types de techniques. La plus courante est base´e sur une mesure d’homologie de la
+prote´ine candidate avec un motif spe´cifique caracte´ristique de la famille d’inte´reˆt. Cette
+me´thode consiste a` fouiller le ge´nome a` partir d’outils bioinformatiques tels que BLAST
+[Altschul et al., 1990]. Certaines familles de prote´ine sont trop he´te´roge`nes pour qu’on
+puisse retrouver des re´gions conserve´es au niveau de leur structure primaire. Pour
+lever cette difficulte´, une de´marche alternative a e´te´ sugge´re´e par plusieurs auteurs
+[Jaakola et al., 2000]. Elle est fonde´e sur des me´thodes d’apprentissage dans lesquelles
+les se´quences de prote´ines sont e´tiquete´es selon leur appartenance ou non a` la famille
+recherche´e. Les exemples positifs (e´tiquette +1) regroupent les membres connus de la
+De´tection de faibles homologies de prote´ines par machines a` vecteurs de support
+famille. Les contre-exemples (e´tiquette −1) peuvent eˆtre extraits au sein de familles
+non apparente´es. Une approche particulie`rement prometteuse dans le domaine de la
+classification supervise´e repose sur les machines a` vecteurs de support [Vapnik, 1995]
+(ou support vector machines, nomme´es SVMs par la suite). Dans cette technique, le
+jeu d’apprentissage subit une transformation en un ensemble de vecteurs de taille fixe.
+Dans notre classe d’application, les se´quences primaires des prote´ines seront donc pro-
+jete´es dans un espace vectoriel. Plusieurs espaces vectoriels ont e´te´ propose´s avec des
+performances remarquables. Une me´thode particulie`rement efficace et rapide utilise des
+spectres de chaˆıne [Leslie et al., 2002]. Ce type de repre´sentation est abondamment uti-
+lise´ en fouille de textes [Jalam et Teytaud, 2001]. Un spectre de chaˆıne regroupe toutes
+les combinaisons possibles de se´quences de n caracte`res (ou n-gramme) a` partir d’un
+alphabet Ω. Le spectre de chaˆıne d’une se´quence est donc un vecteur repre´sente´ par les
+occurrences de ses k-sous-se´quences. Il est a` noter que l’espace de repre´sentation est de
+haute dimension (|Ω|n combinaisons possibles de n-grammes). La technique du spectre
+de chaˆıne est tre`s simple a` mettre en oeuvre et peu couˆteuse en temps d’exe´cution. Les
+auteurs montrent que la performance de leur algorithme est comparable avec celle fai-
+sant intervenir des me´thodes complexes, comme les HMMs [Karplus et al., 1998]. Nos
+propres expe´rimentations sur la famille des cytokines de´montrent l’efficacite´ de cette
+me´thode en terme de classification. Il se trouve que notre famille d’inte´reˆt posse`de des
+membres tre`s e´loigne´s entre eux en terme d’homologie de se´quence. Nous proposons
+dans cet article d’utiliser un espace de repre´sentation de faible dimension qui cible des
+proprie´te´s spe´cifiques de notre famille d’inte´reˆt. Nous allons dans un premier temps
+de´crire le concept de motif hie´rarchique, puis nous donnerons un algorithme d’extrac-
+tion de ces motifs. Nous rappelerons ensuite les principes des SVMs avant de discuter
+des re´sultats obtenus sur la famille des cytokines.
+2 Motifs hie´rarchiques
+La structure primaire d’une prote´ine est repre´sente´e par une se´quence s = 〈s1s2 . . . sn〉
+ou` chaque si appartient a` Ω, l’ensemble des acides amine´s :
+Ω = {A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y }
+Soit P (Ω) l’ensemble des parties de Ω. Certaines de ces parties posse`dent des re´sidus
+partageant des proprie´te´s physico-chimiques particulie`res. Plusieurs variantes de syste`-
+mes de classes ont e´te´ propose´es ; nous avons opte´ pour celui de Taylor [Taylor, 1986]
+pre´sente´ en table 1. La pertinence de cette classification se ve´rifie par l’e´tude des
+re´gions conserve´es : on observe que les mutations s’ope`rent ge´ne´ralement au sein d’une
+meˆme classe (par exemple, les acides amine´s I, L et V appartenant a` la classe alipha-
+tique sont tre`s fre´quemment interchange´s). Les classes physico-chimiques de´finissent
+un sous-ensemble de P (Ω), auquel nous ajoutons l’ensemble des singletons de Ω ainsi
+que l’ensemble Ω lui-meˆme. Nous noterons C(Ω) l’alphabet suivant :
+C(Ω) = {{A},{C}, . . . ,{Y }} ∪ {α,β,γ,δ,ε,ζ,η,θ} ∪ Ω
+On conside´rera l’ensemble ordonne´ (C(Ω), ⊆) qui forme un sup-demi-treillis : toute
+paire (x,y) de C(Ω)× C(Ω) posse`de une borne supe´rieure, que l’on notera sup(x,y).
+RNTI - C - 1
+Mikolajczak et al.
+Symbole Classe Membres
+α aliphatique ILV
+β aromatique FHWY
+γ non polaire ACFGHIKLMVWY
+δ charge´ DEHKR
+ε polaire CDEHKNQRSTWY
+ζ charge positive HKR
+η chaˆıne late´rale courte ACDGNPSTV
+θ chaˆıne late´rale tre`s courte ACGST
+Tab. 1 – Classes d’acides amine´s base´es sur des proprie´te´s physico-chimiques
+Un motif m = 〈m1m2 . . .mk〉 est une k-se´quence forme´e d’ensembles mi ∈ C(Ω).
+Pour la simplicite´ de la notation, on notera le singleton {R} par R directement ; le
+motif Kα de´signera ainsi le motif compose´ de la classe {K} suivie de la classe {I,L,V }.
+Bien que rien n’interdise dans notre me´thode d’utiliser des motifs de taille k va-
+riable, nous supposerons pour la simplicite´ de l’expose´ que k est fixe. Nous appe-
+lerons occurrence d’un motif m une sous-se´quence 〈si+1si+2 . . . si+k〉 de s telle que
+si+j ∈ mj ∀j, 1 ≤ j ≤ k. On dira que la se´quence s ve´rifie le motif m. Le support d’un
+motif m dans un jeu de se´quences S est le nombre de se´quences de S qui ve´rifie m.
+La se´quence MH ve´rifie ainsi 21 motifs de taille 2, dont les motifs MH, Mβ, γδ, et
+ΩΩ. Le motif MH ne peut eˆtre ve´rifie´ que par une seule sous-se´quence, tandis que le
+motif ΩΩ est ve´rifie´ pour n’importe quelle se´quence de taille supe´rieure ou e´gale a` 2. Il
+importe donc de qualifier la spe´cificite´ d’un motif en prenant en compte la probabilite´
+de le voir apparaˆıtre dans une se´quence. Comme l’estimation pre´cise de cette proba-
+bilite´ est complexe et inutile pour notre classifieur, nous avons opte´ pour la fonction
+de couˆt suivante : c(m) =
+∏k
+i=1 f(mi) ou` f(mi) est la fre´quence de la classe mi dans
+une base d’apprentissage comprenant de nombreuses familles de prote´ines diffe´rentes.
+La spe´cificite´ d’un motif m sera de´finie par φ(m) = − log(c(m)).
+La table 2 montre qu’on observe une bonne corre´lation entre l’estimation φ(m) et
+le support effectif de m dans la base de contre-exemples de se´quences issues de SCOP
+[Murzin et al., 1995].
+Nous avons de´fini deux proprie´te´s d’un motif hie´rarchique : son support et sa spe´cifici-
+te´. Il est important de remarquer que ces deux caracte´ristiques sont ge´ne´ralement op-
+pose´es. Plus un motif posse`de un support e´leve´, moins il est spe´cifique, comme le montre
+l’exemple extreˆme d’un motif compose´ uniquement de la classe Ω. A l’inverse, un motif
+uniquement compose´ de singletons est fortement spe´cifique mais aura peu de chances
+d’eˆtre de´couvert.
+Les motifs peuvent eˆtre hie´rarchise´s selon une relation de ge´ne´ralisation. Soit deux
+k-motifs m1 et m2. Nous noterons  la relation d’ordre suivante :
+m1  m2 ssi pour tout i ∈ [1,k] on a m1i ⊆ m2i . L’estimateur φ(m) est construit de
+sorte que φ(m1) ≥ φ(m2) pour toute paire de motifs ve´rifiant m1  m2. En spe´cialisant
+un motif, on augmente sa spe´cificite´. Nous appellerons borne supe´rieure des motifs m1
+et m2 (note´e sup(m1,m2)) le motif m1,2 ve´rifiant :
+m1,2i = sup(m
+1
+i ,m
+2
+i ) pour tout i ∈ [1,k].
+RNTI - C - 1
+De´tection de faibles homologies de prote´ines par machines a` vecteurs de support
+motif support spe´cificite´ fre´quence
+βαε 1.00 4.4 0.7984
+αδεα 0.96 5.1 0.6095
+δΩγεΩαζε 0.65 6.8 0.2427
+Ωαζεαεεγ 0.54 7.6 0.1130
+LEE 0.28 7.9 0.0893
+βγΩΩγζεL 0.28 8.4 0.0433
+εγαζδLΩε 0.37 9.2 0.0359
+LεεγαεδL 0.22 10.2 0.0107
+ΩηLαLαΩL 0.15 11.0 0.0019
+FεRγKεΩγ 0.15 11.4 0.0018
+Tab. 2 – Exemples de motifs avec leur support dans la famille des cytokines, leur
+spe´cificite´ estime´e et leur fre´quence effective dans la base SCOP.
+Le motif m1,2 repre´sente le motif le plus spe´cifique qui ge´ne´ralise m1 et m2 : toute
+sous-se´quence ve´rifiant m1 ou m2 ve´rifiera m1,2. La table 3 donne des exemples de
+bornes supe´rieures pour des motifs de taille 4. La section suivante pre´sente comment
+extraire les motifs de spe´cificite´ minimale.
+3 De´couverte de motifs hie´rarchiques
+La recherche de motifs hie´rarchiques proce`de en deux e´tapes :
+1. L’extraction de motifs germes,
+2. La ge´ne´ration des motifs hie´rarchiques.
+La premie`re e´tape consiste a` extraire des motifs germes a` partir de la famille S.
+Un motif germe est un motif qui ne posse`de pas de minorants. Plus pratiquement, les
+motifs germes sont les motifs forme´s uniquement de classes singletons (re´sidus). Une
+fac¸on triviale d’obtenir la liste des motifs germes est de relever l’ensemble des k-sous-
+se´quences pre´sentes dans le jeu d’apprentissage. Nous avons proce´de´ a` un filtrage en
+ne conside´rant que les k-sous-se´quences potentiellement inte´ressantes. Cette premie`re
+e´tape consiste a` croiser chaque k-sous-se´quence avec une autre : chaque couple de k-
+sous-se´quences fournit un motif. Si ce dernier posse`de un support suffisant, les k-sous-
+se´quences ve´rifiant ce motif sont retenues. Avec un support minimal de 3, nous avons
+pu re´duire ainsi le nombre de motifs germes d’un facteur 8.
+La seconde e´tape ope`re un appariement des motifs pour de´terminer leurs bornes
+supe´rieures. L’algorithme de de´couverte de motifs consiste donc a` ge´ne´raliser les mo-
+tifs afin de rechercher des caracte´ristiques de support suffisamment repre´sentatives.
+La de´finition pre´ce´dente de borne supe´rieure permet de de´finir le motif commun le
+plus spe´cifique a` partir de deux motifs. Il est donc possible par ite´rations successives
+d’agre´ger des motifs afin d’obtenir des motifs de support supe´rieur. La deuxie`me e´tape
+de notre algorithme s’inspire de la technique de la classification hie´rarchique ascen-
+dante pour former des clusters de motifs ge´ne´raux a` partir de motifs germes compose´s
+RNTI - C - 1
+Mikolajczak et al.
+uniquement de singletons. La deuxie`me e´tape de l’algorithme de de´couverte de motifs
+est pre´sente´e ci-dessous :
+algorithme de´couverteMotifs
+entre´es
+M , l’ensemble de motifs germes obtenus lors de l’e´tape 1
+supMin, le seuil de support minimal recherche´
+speMin, le seuil de spe´cificite´ minimale recherche´e
+sortie
+E, l’ensemble de motifs hie´rarchiques
+E = {m ∈M | support(m) ≥ supMin et φ(m) ≥ speMin};
+Re´pe´ter
+Soit m1 et m2 la paire de motifs de M telle que :
+1. m1,2 = sup(m1,m2)
+2. φ(m1,2) ≥ φ(mi,j) pour tout mi et mj dans M
+M ←M − {m1,m2} ;
+M ←M ∪ {m1,2} ;
+si support(m1,2) ≥ supMin et φ(m1,2) ≥ speMin
+alors E ← E ∪ {m1,2} ;
+jusqu’a` cardinal(M) = 1 ou φ(m1,2) < speMin ;
+La table 3 pre´sente les motifs hie´rarchiques de taille k = 4 relatifs aux se´quences
+HIWY, HIDY, KLTY, HVSG et DARG. Les motifs m1 a` m5 sont les motifs germes
+extraits des sous-se´quences de taille 4 dans le jeu de se´quences pre´ce´dent. La figure 1
+montre la construction hie´rarchique des motifs par l’algorithme de´couverteMotifs. A
+supposer que l’on se soit fixe´ un support minimal de 3 et une spe´cificite´ de 3.0, seul le
+motif m6 serait retenu.
+motif chaˆıne support spe´cificite´
+m1 HIWY 1 14.25
+m2 HIDY 1 12.83
+m3 KLTY 1 11.44
+m4 HVSG 1 11.79
+m5 DARG 1 10.96
+m6 = m1,2 KIεY 2 10.64
+m7 = m3,6 ζαεY 3 7.55
+m8 = m4,5 δηεG 2 5.26
+m9 = m7,8 δΩεγ 5 2.56
+Tab. 3 – Motifs extraits par l’algorithme de´couverteMotifs.
+RNTI - C - 1
+De´tection de faibles homologies de prote´ines par machines a` vecteurs de support
+HIWY HIDY
+KIεY
+KLTY
+ζαεY
+HVSG DARG
+δηεG
+δΩεγ
+Fig. 1 – Hie´rarchie de motifs a` partir de 5 motifs germes
+Notre algorithme diffe`re dans sa finalite´ des techniques usuelles d’extraction de
+motifs. Alors que ces dernie`res visent a` de´couvrir un nombre restreint de motifs ayant
+le support le plus large possible (ce qui s’ave`re quasi impossible pour des familles
+fortement he´te´roge`nes), nous cherchons au contraire un ensemble e´leve´ M de motifs
+au support tre`s variable. Le caracte`re hie´rarchique de l’algorithme nous permet de
+trouver un nombre conse´quent de motifs tout en s’affranchissant des proble`mes de
+combinatoire.
+Pour utiliser les machines a` vecteurs de support, nous allons transformer une
+se´quence quelconque en un vecteur boole´en de dimension n (n de´signant le cardinal de
+M). L’e´le´ment de rang i est a` vrai ssi le motif de rang i dans M est pre´sent dans la
+se´quence (une alternative consiste a` compter les occurrences des motifs, mais dans la
+pratique, il est fort rare de rencontrer deux fois le meˆme motif dans une meˆme se´quence
+pour des valeurs de k importantes). Il est a` noter que cette vectorisation s’effectue en
+O(N), ou` N de´signe la taille de la se´quence. Si l’apprentissage est relativement com-
+plexe, la classification est peu couˆteuse en temps d’exe´cution. La table 4 montre les
+valeurs de vecteurs associe´s aux se´quences de l’exemple pre´ce´dent en conside´rant l’en-
+semble des motifs donne´s en table 3 (support et spe´cificite´ minimaux fixe´s a` 0).
+se´quence repre´sentation vectorielle
+HIWY 100001101
+HIDY 010001101
+KLTY 001000101
+HVSG 000100011
+DARG 000010011
+Tab. 4 – Repre´sentation vectorielle des se´quences a` partir des motifs extraits. Le vec-
+teur repre´sente neuf valeurs boole´ennes (1 pour vrai, 0 pour faux) correspondant a` la
+pre´sence du motif mi, i = 1 a` 9, dans la se´quence conside´re´e.
+RNTI - C - 1
+Mikolajczak et al.
+4 Machines a` vecteurs de support
+Cette section introduit la me´thode des machines a` vecteurs de support [Vapnik, 1995],
+[Vapnik, 1998]. Cette technique de classification supervise´e est base´e sur l’apprentis-
+sage d’une frontie`re de de´cision line´aire qui discrimine au mieux deux classes forme´es
+par des exemples et des contre-exemples. Le SVM optimise la frontie`re de de´cision par
+un hyperplan qui maximise la distance entre les points voisins (ou vecteurs de support)
+durant la phase d’apprentissage. Dans la phase de classification, un point est classe´
+en exemple ou contre-exemple selon sa position par rapport a` la frontie`re de de´cision.
+Dans la plupart des proble`mes concrets, il y a peu de chances qu’on puisse trouver une
+se´paration line´aire parfaite dans l’espace χ des donne´es. L’efficacite´ remarquable des
+SVMs repose sur une transformation non line´aire de l’espace d’entre´e χ en un nouvel
+espace Φ(χ) de redescripteurs de plus grande dimension dans lequel les points sont
+se´parables par un hyperplan.
+Des travaux the´oriques ont permis de montrer que le proble`me d’optimisation des
+SVMs revient a` re´soudre un proble`me de forme duale qui de´pend des produits sca-
+laires entre les vecteurs des exemples Φ(x) de l’ensemble d’apprentissage dans l’es-
+pace de redescription. De ce fait, toute la difficulte´ repose sur le calcul des produits
+scalaires < Φ(x),Φ(y) > entre chaque couple (x,y) de vecteurs d’exemples dans un
+espace de redescription Φ(χ) de dimension tre`s e´leve´e, voire infinie. Cette difficulte´
+est leve´e graˆce a` l’introduction de fonctions biline´aires syme´triques positives K(x,y)
+appele´es fonctions noyaux. Les fonctions noyaux permettent d’effectuer tous les cal-
+culs ne´cessaires dans l’espace des donne´es sans jamais devoir passer par l’espace des
+descripteurs : K(x,y) =< Φ(x),Φ(y) >. Il existe trois types de fonctions noyaux K
+simples : les fonctions polynomiales, les fonctions a` bases radiales (RBF) et les fonc-
+tions sigmo¨ıdes. Les fonctions polynomiales sont de´finies par K(x,y) = (x.y + 1)p. Le
+degre´ du polynome est choisi par l’utilisateur. Les fonctions a` bases radiales RBF sont
+de´finies par K(x,y) = e‖x−y‖
+2/2σ2 . La valeur de l’e´cart type σ est estime´e empirique-
+ment. Les fonctions sigmo¨ıdes sont de la forme K(x,y) = tanh(a(x.y− b). En pratique,
+il s’agit de tester les diffe´rentes fonctions noyaux pour de´terminer celle avec laquelle
+on obtient l’hyperplan optimal et la marge minimale. Dans le cadre de ce travail, nous
+avons teste´ la fonction noyau line´aire (polynome de degre´ 1) et les fonctions a` bases
+radiales.
+La premie`re application des SVMs pour la classification d’homologues e´loigne´es
+dans les familles prote´iques est la me´thode des Fisher SVMs [Jaakola et al., 2000].
+Cette me´thode ne´cessite tout d’abord l’apprentissage d’un mode`le de Markov cache´
+(HMM) sur la famille de prote´ines d’inte´ret [Karplus et al., 1998]. Ensuite un jeu d’ap-
+prentissage constitue´ d’exemples et de contre-exemples est repre´sente´ dans un espace
+vectoriel dont chaque dimension est lie´e a` un e´tat ou une transition pre´sent dans
+le mode`le. La valeur de chaque dimension du vecteur est appele´e score de Fisher et
+repre´sente le taux d’utilisation de chaque parame`tre du mode`le pour mode´liser chaque
+se´quence exemple. Les vecteurs obtenus sont utilise´s conjointement avec une fonction
+noyau particulie`re, appele´e fonction de Fisher, pour l’apprentissage du mode`le SVM.
+Les auteurs ont montre´ que les classifications par la me´thode des Fisher SVMs sur-
+passent les me´thodes ge´ne´ratives telles que les HMMs ou BLAST. Cependant cette
+me´thode trouve ses limites dans la ne´cessite´ d’avoir une famille de prote´ines posse´dant
+RNTI - C - 1
+De´tection de faibles homologies de prote´ines par machines a` vecteurs de support
+un nombre important de membres pour pouvoir e´laborer le mode`le HMM. Elle se
+caracte´rise aussi par une complexite´ temporelle importante autant en phase d’appren-
+tissage que lors de la pre´diction de la classe d’une prote´ine. La me´thode des pairwise
+SVMs [Li et Noble, 2003] utilise l’algorithme d’alignement local de Smith et Water-
+man. Les exemples sont vectorise´s dans un espace dont la dimension correspond au
+cardinal du jeu d’apprentissage. Chaque dimension du vecteur correspond au score de
+similarite´ obtenu par l’alignement local avec une se´quence du jeu d’apprentissage. Les
+auteurs de cette me´thode ont obtenu des performances de classification supe´rieure a` la
+me´thode des Fisher SVMs. Cependant elle ne re´soud pas le proble`me de la complexite´
+temporelle et rend la dimension des vecteurs de´pendante de la taille du jeu d’appren-
+tissage. Une alternative au proble`me de complexite´ temporelle est le spectre de chaˆıne
+ou String Spectrum [Leslie et al., 2002], dont nous avons pre´sente´ le principe en intro-
+duction. Dans cette me´thode, chaque vecteur repre´sente les fre´quences des n-grammes
+trouve´s sur la se´quence de l’exemple. Les vecteurs servent ensuite a` l’apprentissage du
+mode`le SVM. Ce simple proce´de´ s’affranchit des me´thodes ge´ne´ratives et permet un
+gain de temps d’exe´cution remarquable. Une adaptation de cette me´thode prend en
+compte tous les motifs de taille n fixe´e et autorise au plus m variations entre deux
+motifs [Leslie et al., 2004]. Cette adaptation prend en compte le concept biologique de
+mutation des re´sidus. Les auteurs de cette technique montrent que la performance de
+leur classification est comparable a` la me´thode des Fisher SVMs tout en optimisant les
+temps d’exe´cution. Nos propres expe´rimentations n’ont pas re´ve´le´ une ame´lioration des
+performances sur notre famille d’inte´reˆt par rapport a` la me´thode de spectre de chaˆıne.
+C’est donc cette dernie`re me´thode qui nous servira de point de comparaison avec notre
+propre algorithme de classification. Les me´thodes de´crites jusqu’a` pre´sent ne prennent
+en compte que l’information situe´e au niveau de la structure primaire des prote´ines.
+La me´thode des SVM-I-sites [Hou et al., 2003] tente d’inte´grer une information struc-
+turale lors de l’e´tape de vectorisation des exemples. Une e´tape pre´alable consiste a`
+rechercher un profil de se´quences a` partir de la se´quence primaire de l’exemple. Le pro-
+fil est obtenu au moyen du logiciel PSI-BLAST [Altschul et al., 1997] et de la base de
+donne´es Swiss-Prot [Boeckmann et al., 2003]. La cre´ation des vecteurs se base ensuite
+sur la recherche des occurences de 263 domaines structuraux au sein du profil. Les
+auteurs indiquent que cette me´thode apporte des re´sultats e´quivalents a` la me´thode
+des pairwise SVMs. Elle est aussi plus efficace lors de l’e´tape de vectorisation.
+Les SVMs ont de´montre´ leur efficacite´ dans la de´tection d’homologies e´loigne´es. Les
+diffe´rents types de classification pre´sente´s mettent en e´vidence l’importance de l’e´tape
+de vectorisation des exemples dans la performance de ce type de classifieur.
+5 Classification des prote´ines utilisant les SVMs
+La classification des prote´ines passe par une premie`re e´tape de vectorisation sui-
+vie de la pre´diction proprement dite par SVM. Dans notre application, la transfor-
+mation des se´quences s’ope`re par la de´tection des motifs retenus par l’algorithme
+de´couverteMotifs. Les se´quences e´tant repre´sente´es par des vecteurs boole´ens de taille
+fixe, il est possible de de´finir le produit scalaire entre deux se´quences s et s′ par le
+nombre d’e´le´ments a` vrai dans le vecteur x ∧ x′ ou` x et x′ de´signent les vecteurs
+RNTI - C - 1
+Mikolajczak et al.
+boole´ens associe´s respectivement a` s et s′. Le choix de la fonction noyau a e´te´ dicte´e
+par certaines proprie´te´s spe´cifiques a` notre espace de redescription. En effet, soit O le
+vecteur nul. La fonction noyau doit ve´rifier les points suivants :
+– si x  O et x′  O alors K(x,x′) doit avoir une valeur proche de la valeur maxi-
+male de la fonction noyau. En effet, dans ce cas, les deux se´quences appartiennent
+toutes deux a` la classe des contre-exemples.
+– si x  O et x′ appartient a` la classe des exemples, alors la valeur de K(x,x′) doit
+eˆtre d’autant plus faible que l’exemple contient un nombre de motifs important.
+Nous avons retenu les fonctions a` bases radiales qui ve´rifient bien ces proprie´te´s (parce
+qu’elles reposent sur le calcul de ‖ x− x′ ‖, contrairement aux fonctions polynomiales
+base´es sur le calcul de x.x′). Il est a` noter que les fonctions a` bases radiales donnent
+ge´ne´ralement de meilleurs re´sultats que les fonctions polynomiales et sigmo¨ıdes.
+Si l’utilisation des SVMs ne pose aucun proble`me d’adaptation, il est cependant
+important d’observer qu’a` l’origine les SVMs de´finissent une frontie`re optimale entre
+deux classes d’individus d’inte´reˆt e´gal. Dans notre type d’application, l’importance
+e´gale de ces deux classes soule`ve une difficulte´. S’il est en effet facile de de´finir ce
+qu’est la famille d’inte´reˆt, la de´finition des contre-exemples est moins e´vidente. Une so-
+lution consiste a` utiliser des repre´sentants dans chaque superfamille de´fini par la base
+SCOP. Il faut alors veiller a` la robustesse de ces choix et a` la sensibilite´ des SVMs
+face au de´se´quilibre entre le nombre des exemples et celui des contre-exemples. Nous
+avons effectue´ des tests portant sur des e´chantillons ale´atoires de contre-exemples de
+meˆme taille que le jeu d’exemples positifs et re´partis uniforme´ment parmi les classes
+structurales de la base SCOP. Ces tests montrent que les performances de la classifi-
+cation sont peu sensibles au tirage effectue´, mais se de´gradent lorsque le nombre de
+contre-exemples s’accroˆıt par rapport au nombre d’exemples positifs. Une autre solu-
+tion consiste a` utiliser la version de SVMs base´e sur une classe unique, propose´e par
+B. Scho¨lkopf [Scho¨lkopf et al., 2001]. Les re´sultats obtenus avec cette me´thode se sont
+montre´s infe´rieurs a` ceux des SVMs a` deux classes. Nous interpre´tons ce phe´nome`ne
+par le nombre restreint d’exemples pre´sente´ en apprentissage ainsi qu’a` leur grande
+dispersion (faible homologie intra-classe).
+Nous avons utilise´ le logiciel open-source libsvm [C.Chang et Lin, 2001] pour imple´-
+menter notre classifieur SVM.
+6 Application a` la superfamille des cytokines
+Les cytokines ont pour fonction d’assurer la me´diation des signaux de prolife´ration,
+de diffe´renciation, et d’activation entre les diffe´rentes cibles cellulaires. Dans cet article,
+nous nous inte´ressons plus particulie`rement aux interleukines a` he´lices courtes (IL-2),
+he´lices longues (IL-6) et aux interleukines de type IL-10 dont les pre´curseurs posse`dent
+six he´lices. Nous avons retenu 45 se´quences primaires relatives a` la famille des cytokines
+chez l’homme.
+La base d’apprentissage qui nous a servi a` l’estimation de la spe´cificite´ est issue de la
+base de donne´es SCOP (Structural Classification Of Proteins, [Murzin et al., 1995]).
+Les se´quences de SCOP forment donc un e´chantillon qui recouvre un large spectre
+RNTI - C - 1
+De´tection de faibles homologies de prote´ines par machines a` vecteurs de support
+de prote´ines. Apre`s suppression des interleukines, notre base de test comporte 6615
+se´quences.
+La famille qui nous inte´resse est caracte´rise´e par une structure secondaire riche en
+he´lice alpha. Le pas de cycle d’une he´lice e´tant de 3.6, nous avons conside´re´ des motifs
+de taille 8 (des motifs de taille 4 seraient moins discriminants).
+La table 5 pre´sente les re´sultats obtenus avec diffe´rents classifieurs. Les valeurs
+pre´sente´es sont des moyennes de performances obtenues par la technique de leave-one-
+out (pour laquelle une se´quence sert de test et les autres pour l’apprentissage). La ligne
+KNN pre´sente les re´sultats obtenus avec la me´thode des k plus proches voisins (k = 3).
+La notion de voisinage se re´fe`re a` la proximite´ entre spectres de chaˆıne : la mesure de
+similarite´ utilise´e est le produit carte´sien des vecteurs normalise´s. Les SVMs a` base
+de spectre de chaˆınes donnent de meilleurs re´sultats (ligne SCSVM) que les KNNs, ce
+qui confirme l’inte´reˆt des machines a` vecteurs de support. Les re´sultats sont identiques
+pour les fonctions noyaux line´aires et a` bases radiales ; la seule diffe´rence consiste en
+une le´ge`re ame´lioration des performances sur la base SCOP pour la fonction a` base
+radiale (table 6). Notre me´thode MotifsSVM surpasse largement la technique a` base
+de spectre de chaˆıne (100% de bonne classification) a` condition de bien optimiser le
+type des motifs. Un seuil de spe´cificite´ de 14 apparaˆıt comme le meilleur compromis ;
+au dela` de cette valeur, on ne de´couvre pas assez de motifs sur certaines cytokines, en
+dec¸a`, les motifs ne sont assez se´lectifs. Un seuil de support minimal de 2 en leave-one-
+out (de 3 en apprentissage normal) est ne´cessaire pour obtenir de bons re´sultats dans
+notre jeu particulier d’application. Il s’ave`re que les exemples pre´sente´s posse`dent peu
+de se´quences proches. Nous avons pu ve´rifier ce fait en calculant les valeurs de fonction
+noyau a` partir de spectres de chaˆıne : la valeur de fonction noyau tend rapidement vers
+0 a` partir de la deuxie`me plus proche voisine.
+classifieur taux d’er-
+reurs
+VP FN VN FP
+KNN 18.9 88.9 11.1 73.3 26.7
+SCSVM line´aire 13.3 84.4 15.6 88.9 11.1
+SCSVM RBF 13.3 84.4 15.6 88.9 11.1
+MotifsSVM 13 2.2 95.6 4.4 100 0
+MotifsSVM 14 0 100 0 100 0
+MotifsSVM 15 5.5 88.9 11.1 100 0
+Tab. 5 – Re´sultats de classification. VP, FN, VN, FP sont les pourcentages respecti-
+vement des vrais positifs, faux ne´gatifs, vrais ne´gatifs, faux positifs.
+La table 6 indique le pouvoir discriminant de notre classifieur sur les se´quences
+ne´gatives extraites de la base SCOP. Sur les 6615 se´quences de la base SCOP, le clas-
+sifieur MotifsSVM en a mal classe´ 8. Le faible pourcentage de faux-positifs autorise
+l’emploi de MotifsSVM pour rechercher de nouveaux membres dans le ge´nome.
+RNTI - C - 1
+Mikolajczak et al.
+classifieur taux de FP dans SCOP
+SCSVM line´aire 4.32
+SCSVM RBF 4.08
+MotifsSVM 14 0.12
+Tab. 6 – Taux de faux-positifs dans la base SCOP.
+7 Conclusion et perspectives
+Les excellents re´sultats obtenus en classification dans la famille des cytokines de´mon-
+trent la pertinence d’une description hie´rarchique des motifs. Ces derniers assurent un
+roˆle de signature, au sens ou` ils sont spe´cifiques a` la famille e´tudie´e. Nous avons pro-
+pose´ un parame´trage simple du degre´ de spe´cificite´ souhaite´ et avons observe´ qu’une
+valeur moyennement haute donne les meilleurs performances (φ(m) ∼ 14). La capacite´
+des SVMs a` ge´rer des espaces de grande dimension nous permet d’obtenir une classi-
+fication sans erreurs sur les exemples positifs et un tre`s faible taux d’erreurs sur les
+exemples ne´gatifs issus de SCOP (0.12%). Certaines ame´liorations de l’algorithme d’ex-
+traction restent a` mettre en oeuvre, afin d’optimiser le nombre de motifs retenus. Sur
+les quelques 600 motifs extraits, une proportion non ne´gligeable d’entre eux peuvent
+certainement eˆtre e´limine´s sans nuire a` la performance du classifieur. Nous envisageons
+dans un premier temps de filtrer plus finement les motifs extraits et de proce´der en-
+suite a` une e´tude de leurs co-occurrences dans les se´quences. Cette analyse permettra
+de de´terminer des patrons de motifs propres a` une famille de prote´ines (un patron est
+de´fini comme une se´quence de motifs situe´s a` des intervalles variables sur une meˆme
+se´quence).
+Re´fe´rences
+[Altschul et al., 1990] S. F. Altschul, W. Gish, W. Miller, E. W. Myers, et D. J. Lip-
+man. A basic local alignment search tool. Journal of Molecular Biology, 215:403–410,
+1990.
+[Altschul et al., 1997] S. F. Altschul, T. L. Madden, A. A. Scha¨ffer, J. Zhang, Z. Zhang,
+W. Miller, et D. J. Lipman. Gapped blast and psi-blast : a new generation of protein
+database search programs. Nucleic Acid Research, 25(3389-3402):17, 1997.
+[Boeckmann et al., 2003] B. Boeckmann, A. Bairoch, R. Apweiler, M.-C. Blatter,
+A. Estreicher, E. Gasteiger, M. J. Martin, K. Michoud, C. O’Donovan, I. Phan,
+S. Pilbout, et M. Schneider. The swiss-prot protein knowledge base and its supple-
+ment trembl in 2003. Nucleic Acid Research, 31:365–370, 2003.
+[C.Chang et Lin, 2001] C. C.Chang et C. J. Lin. LIBSVM: a li-
+brary for support vector machines, 2001. Software available at
+http://www.csie.ntu.edu.tw/~cjlin/libsvm.
+[Hou et al., 2003] Y. Hou, W. Hsu, M. L. lee, et C. Bistroff. Efficient remote homology
+detection using local structure. Bioinformatics, 19(17):2294–2301, 2003.
+RNTI - C - 1
+De´tection de faibles homologies de prote´ines par machines a` vecteurs de support
+[Jaakola et al., 2000] T. Jaakola, M. Diekhans, et D. Haussler. A discriminative frame-
+work for detecting remote protein homologies. Journal of Computationnal Biology,
+7(1-2):95–114, 2000.
+[Jalam et Teytaud, 2001] Radwan Jalam et Olivier Teytaud. Identification de la langue
+et cate´gorisation de textes base´es sur les n-grammes. Extraction de Connaissance et
+Apprentissage, 1(1-2):227–238, Janvier 2001.
+[Karplus et al., 1998] K. Karplus, C. Barret, et R. Hugley. Hidden markov models for
+detecting remote protein homologies. Bioinformatics, 14:846–856, 1998.
+[Leslie et al., 2002] C. Leslie, E. Eskin, et W. S. Noble. The spectrum kernel : a string
+kernel for svm protein classification. In Proceedings of the Pacific Biocomputing
+Symposium, pages 564–575, 2002.
+[Leslie et al., 2004] C. Leslie, E. Eskin, D. Zhou, et W. S. Noble. Mismatch string
+kernel for svm protein classification. Bioinformatics, 2004. a` paraˆıtre.
+[Li et Noble, 2003] L. Li et W. S. Noble. Combining pairwise sequence similarity and
+support vector machines for detecting remote protein evolutionnary and structural
+relationships. Journal of Computationnal Biology, 10(6):857–868, 2003.
+[Murzin et al., 1995] A.G. Murzin, S.E.Brenner, T. Hubbard, et C. Chothia. Scop: a
+structural classification of proteins database for the investigation of sequences and
+structures. Journal of Molecular Biology, 247:536–540, 1995.
+[Scho¨lkopf et al., 2001] B. Scho¨lkopf, J. Platt, J. Shawe-Taylor, A. J. Smola, et R. C.
+Williamson. Estimating the support of a high-dimensional distribution. Neural
+Computation, 13(7), 2001.
+[Taylor, 1986] J. Taylor. Classification of amino acid conservation. Theorical Biology,
+119:205–218, 1986.
+[Vapnik, 1995] V. N. Vapnik. The nature of statistical learning theory. Springer-Verlag,
+1995.
+[Vapnik, 1998] V. N. Vapnik. Statistical Learning Theory. Springer, 1998.
+Summary
+This article presents a discriminative approach to the protein classification in the
+particular case of remote homology. The protein family is modelled by a setM of motifs
+related to the physicochemical properties of the residues. We propose an algorithm for
+discovering motifs based on the ascending hierarchical classification paradigm. The set
+M defines a feature space of the sequences : each sequence is transformed into a vector
+that indicates the possible presence of the motifs that belongs to M . We then use
+the SVM learning method to discriminate the target family. Our hierarchical motif
+set specifically modelises interleukins among all the structural families of the SCOP
+(1.51) database. Our method yields significantly better remote protein classification
+compared to spectrum kernel techniques.
+RNTI - C - 1

@@ -65,8 +65,8 @@ def add_lang_column(df):
 def main():
     df = load_data("../input/RNTI_articles_export_fixed1347_ids.txt")
     download_pdfs(df)
-    pdf2txt("../input/pdfs/1page")
-    pdf2txt("../input/pdfs/full")
+    # pdf2txt("../input/pdfs/1page")
+    # pdf2txt("../input/pdfs/full")
     # add_index_column(df)
     # df = add_lang_column(df)
 if __name__ == "__main__":

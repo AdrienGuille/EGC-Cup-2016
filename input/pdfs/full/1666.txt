@@ -1,0 +1,958 @@
+Extraction de connaissances provenant de donnees
+multisources pour la caracterisation d'arythmies
+cardiaques
+Elisa Fromont, Rene Quiniou, Marie-Odile Cordier
+IRISA, Campus de Beaulieu F-35042 RENNES Cedex France
+fefromont, quiniou, cordierg@irisa.fr,
+http ://www.irisa.fr/dream
+Resume. Nous nous interessons au probleme de l'apprentissage par pro-
+grammation logique inductive de regles symboliques caracterisant des
+arythmies cardiaques a partir de donnees multisources heterogenes telles
+que les dierentes voies d'un electrocardiogramme ou la mesure de la pres-
+sion arterielle. Une premiere approche consiste a agreger les donnees dans
+la base d'apprentissage puis a eectuer un apprentissage directement a
+partir de ces donnees transformees. Cette methode d'apprentissage glo-
+bal est peu performante et dicile a mettre en uvre quand le volume
+des donnees est important. Nous proposons une alternative plus ecace
+permettant de tirer prot d'apprentissages eectues prealablement sur
+chacune des sources independamment, pour construire automatiquement
+un biais permettant de restreindre l'espace de recherche lors d'un appren-
+tissage multisource et ainsi traiter ces donnees complexes. Les resultats
+obtenus par les deux methodes sont analyses et compares. Ils montrent
+que la methode proposee permet de gagner un ordre de grandeur sur les
+temps d'apprentissage.
+1 Introduction
+Nous nous interessons a l'extraction de connaissances, par exemple sous forme de
+regles de classication, a partir de donnees provenant de plusieurs sources reetant
+un me^me phenomene. Ces donnees peuvent e^tre soit totalement independantes, soit
+correlees. Elles peuvent aussi avoir une pertinence ou une abilite dierente selon la
+source dont elles proviennent.
+On peut alors se demander si une seule source contient susamment d'information
+pour traiter un probleme donne ou s'il est preferable de proter de la complementarite
+des dierentes sources. Dans le cas monosource, on acquiert de la connaissance a par-
+tir de chacune des sources independamment, puis on utilise une procedure de decision
+evaluant les resultats obtenus. Cette procedure de decision basee sur la abilite et
+la pertinence des sources [Cholvy, July 2003], est dicile a mettre en uvre sans
+une connaissance precise de chacune des sources. Des methodes telles que le vote
+[Dubois et al., 2001], la combinaison de classieurs [Wemmert et Gancarski, 2002], des
+regles de \bonne fusion" issues des connaissances sur le domaine [Bloch et al., 2001],
+etc. peuvent alors e^tre utilisees. Cependant, ces methodes, me^me si elles sont e-
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+caces en pratique, ne permettent pas d'obtenir de nouvelles connaissances synthetisant
+veritablement les connaissances acquises independamment pour chacune des sources.
+Nous nous interessons donc au cas multisource, permettant de tirer parti conjointe-
+ment de chacune des sources et necessitant d'agreger les informations. Les donnees
+constituant la base de connaissances sont alors exprimees dans un nouveau lan-
+gage permettant de decrire tous les elements des dierentes sources. L'extraction de
+connaissance a partir des donnees agregees permet d'utiliser les connaissances sur les
+correlations entre les dierentes sources et l'utilisation conjointe des donnees peut aug-
+menter la robustesse des resultats.
+Nous nous proposons de resoudre le probleme d'extraction de connaissances par
+programmation logique inductive (PLI). Cette methode d'apprentissage supervise a
+prouve son ecacite sur des donnees monosources etudiees dans le cadre du projet
+Calicot [Carrault et al., 2003]. L'utilisation d'une technique basee sur la logique du
+premier ordre permet, en outre, d'obtenir des regles facilement interpretables.
+L'agregation des donnees destinee a constituer la base d'apprentissage necessaire
+a la PLI pour un apprentissage multisource augmente considerablement la combi-
+natoire du probleme et la complexite des calculs eectues. Il faut donc mettre en
+uvre une strategie permettant de restreindre l'espace de recherche des solutions
+parcourues par l'algorithme de PLI. Pour ce faire, nous utilisons un biais de lan-
+gage declaratif [Nedellec et al., 1996]. Sans connaissance particuliere pour constituer
+ce biais, les resultats obtenus peuvent cependant rester peu ables compte tenu de la
+complexite du calcul. Pour resoudre ce probleme, nous proposons une methode d'ap-
+prentissage en deux etapes. Nous eectuons dans un premier temps un apprentissage
+monosource sur chacune des sources puis nous tirons parti de l'association des regles
+obtenues pour ecrire un biais permettant de limiter ecacement l'espace de recherche
+lors d'un apprentissage sur les donnees agregees.
+L'article debute par une presentation du contexte applicatif et de la nature des
+donnees utilisees, puis donne une analyse des sources de complexite. La section suivante
+presente le cadre formel de l'apprentissage a partir de donnees multisources et decrit
+la methode en deux etapes que nous proposons. Cette methode est evaluee, dans la
+section suivante, en comparant l'apprentissage multisource utilisant un biais classique
+avec un apprentissage base sur un biais issu d'apprentissages monosources.
+2 Contexte applicatif : la rythmologie
+Les donnees dont nous disposons sont enregistrees par des appareils destines a
+surveiller l'etat d'un patient : moniteurs utilises en Unite de Soins Intensifs pour Co-
+ronariens (USIC) ou holters destines a observer un patient pendant 24 h ou 48 h
+pour deceler ses eventuels problemes. Nous presentons dans les paragraphes suivants
+quelques elements de cardiologie. Nous terminons par une analyse rapide de la com-
+plexite des donnees retenues.
+RNTI - E -
+Fromont et al.
+Diastole
+Systole
+Fig. 1 { Exemple d'un battement cardiaque et d'un cycle de pression normal
+Fig. 2 { Exemple de signaux etudies : voies I et V d'un ECG, voie de pression (ABP)
+2.1 Breve introduction a la cardiologie
+La contraction du muscle cardiaque a pour origine la propagation d'une onde
+electrique qui excite les cellules musculaires dans un ordre bien etabli an que la
+contraction soit la plus ecace possible. L'electrocardiogramme (ECG) reete l'ac-
+tivite electrique cardiaque. Il permet ainsi de deceler des problemes de conduction
+electrique au sein du muscle cardiaque. Ces problemes sont appeles troubles du rythme
+ou arythmies cardiaques. L'ECG est mesure en placant des electrodes sur le thorax pres
+du cur (6 voies de V1 a V6) ou sur les bras et les jambes (derivations bipolaires D1
+a D3 et uni-polaires AV). Un ECG normal est une succession de battements normaux
+comme celui de la Figure 1. Deux ondes particulieres caracterisent cet ECG : l'onde
+P et le complexe QRS (toutes deux consequences d'une propagation electrique dans
+des parties speciques du cur). Les ondes T et U, beaucoup moins utilisees pour la
+caracterisation des arythmies, ne sont pas prises en compte dans cette etude. Lorsque
+l'ECG est anormal (delai entre les ondes ou forme des ondes anormale, absence d'onde,
+etc.) on peut diagnostiquer une arythmie. L'activite cardiaque se reete egalement sur
+la courbe de pression arterielle. En eet, lorsque les ventricules se contractent pour
+expulser le sang, la pression augmente fortement : c'est la systole ventriculaire (elle
+se produit peu apres l'observation d'un complexe QRS sur l'ECG). La phase de repos
+(avant l'onde P) est appelee diastole.
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+2.2 Le diagnostic en rythmologie
+Les medecins ont pour habitude de diagnostiquer des troubles du rythme car-
+diaque a partir des seules voies de l'ECG. Pourtant, ils ont souvent a leur disposi-
+tion des donnees complementaires telles que la mesure de la pression arterielle, les
+phono-cardiogrammes, des mesures de ventilation, d'acceleration, etc. Ces informa-
+tions supplementaires pourraient e^tre utilisees en USIC pour reduire le nombre de
+fausses alarmes provenant des appareils programmes pour diagnostiquer des troubles du
+rythme. D'un point de vue pratique, seules certaines arythmies tres graves (considerees
+comme des alarmes rouges) sont diagnostiquees automatiquement, et ce de maniere
+trop sensible dans un souci de securite. Le but du travail amorce dans le projet Calicot
+[Carrault et al., 2003] est d'ameliorer le diagnostic des troubles du rythme cardiaque.
+En particulier, nous voudrions etendre le diagnostic a d'autres arythmies, non letales
+si elles sont detectees susamment precocement (les alarmes oranges), en utilisant les
+donnees provenant de plusieurs sources homogenes (plusieurs voies d'un me^me ECG,
+par exemple) ou heterogenes (pression arterielle et voies d'ECG, par exemple).
+2.3 Nature des donnees et sources de complexite
+La complexite des donnees provient essentiellement de deux sources : le temps
+et le nombre de capteurs utilises. Les enregistrements sont, en general, longs (de
+quelques heures a plusieurs jours). Ils generent une quantite d'information importante
+car la frequence d'echantillonnage doit rester relativement elevee an que les series
+temporelles associees representent de maniere susamment detaillee les phenomenes
+interessants (le QRS dure de 0,12 s a 0,2 s, par exemple). Les donnees necessitent donc
+une preparation importante avant traitement par fouille de donnees ou apprentissage :
+abstraction et focalisation sur les parties ou se produisent des phenomenes interessants.
+L'association de plusieurs sources permet d'avoir une vue plus precise et complete
+de la condition generale d'un patient et de correler les informations pour ameliorer
+le diagnostic. Pour nos experimentations, nous utilisons des donnees provenant des
+voies 1 et 5 de l'electrocardiogramme ainsi que les donnees de pression arterielle systo-
+lique fournies par la voie hemodynamique (ABP : Arterial Blood Pressure). Certaines
+de ces donnees utilisees sont tres correlees voire redondantes, puisqu'elles concernent
+dierentes voies d'un me^me electrocardiogramme (cf. Figure 2). Cependant, les mani-
+festations d'un me^me phenomene peuvent dierer completement d'une source a l'autre.
+Ainsi, l'onde du QRS est inversee sur la voie 5 par rapport a la voie 1 ou l'onde P est
+pratiquement invisible sur certaines voies alors qu'on la distingue aisement sur d'autres.
+Les correlations existant entre les informations sur la voie de pression arterielle systo-
+lique et les informations sur les voies ECG sont moins evidentes. Elles ont neanmoins
+des liens forts puisque l'activite electrique enregistree par l'electrocardiogramme est a
+l'origine de la contraction et, par voie de consequence, de la variation de la pression
+arterielle.
+RNTI - E -
+Fromont et al.
+3 Apprentissage multisource : aspects formels
+Dans cette section, nous proposons une methode d'apprentissage permettant de trai-
+ter des donnees provenant de dierentes sources d'observation d'un me^me phenomene.
+L'idee est d'utiliser les resultats de l'apprentissage partiel a partir des donnees d'une
+source pour biaiser un apprentissage global. Nous rappelons tout d'abord les principes
+de la Programmation Logique Inductive (PLI), puis nous presentons une formalisation
+de l'apprentissage a partir de donnees multisources. Enn, nous presentons l'utilisa-
+tion de resultats d'apprentissages partiels pour ameliorer l'ecacite de l'apprentissage
+global. Nous supposons une certaine familiarite avec la logique du premier ordre (voir
+[Lloyd, 1987] pour une introduction).
+3.1 Introduction a la PLI
+La PLI, encore appelee apprentissage relationnel, est une methode d'appren-
+tissage supervise qui construit une hypothese H expliquant un concept C a par-
+tir de la donnee d'un ensemble P d'instances positives et d'un ensemble N d'ins-
+tances negatives de ce concept. L'apprentissage peut utiliser un ensemble B de regles
+generales appelees connaissances a priori. Comme dans la formulation de Blockeel et
+al. [Blockeel et al., 1999], c+ (resp. c ) est un predicat 0-aire (sans argument) satisfait
+si et seulement si une description exprime le concept (resp. la negation du concept) C.
+B, P , N et H sont tous des programmes logiques constitues de regles, encore appelees
+clauses denies, de la forme h :- b1, b2, ..., bn. Lorsque n = 0 une telle regle est
+appelee fait. Les exemples constituant les ensembles P et N sont des ensembles de faits
+clos (ils ne contiennent pas de variables).
+Denition 1 Un probleme de PLI est un tuple < L;P;N;B > tel que :
+{ L = LH [ LE est un langage du premier ordre. LH est appele langage des hy-
+potheses et LE langage des exemples.
+{ P = f(e1; c+); : : : ; (ep; c+)g est l'ensemble des exemples positifs. Chaque exemple
+ei est un ensemble de faits exprimes dans le langage LE et c
++ est l'etiquette de
+la classe positive.
+{ N = f(e1; c ); : : : ; (en; c )g est l'ensemble des exemples negatifs. Chaque exemple
+ei est un ensemble de faits exprimes dans le langage LE et c
+  est l'etiquette de
+la classe negative.
+{ B est un ensemble de regles exprimees dans le langage L.
+Le but de l'algorithme de PLI est de decouvrir H  LH tel que :
+{ H couvre tout exemple positif : 8(e+; c+) 2 P;H ^ e+ ^ B  c+
+{ H ne couvre aucun exemple negatif : 8(e ; c ) 2 N;H ^ e  ^ B 2 c+
+L'algorithme de PLI recherche l'hypothese H dans un espace de recherche appele
+espace des hypotheses. Une relation de generalisation, generalement la -subsomption
+[Plotkin, 1970], est denie sur les hypotheses. Cette relation induit une structure de
+treillis sur LH ce qui permet son exploration ecace.
+Dierentes strategies peuvent e^tre utilisees pour explorer l'espace des hypotheses.
+Par exemple, ICL [De Raedt et Van Laer, 1995, Van Laer, 2002], le systeme de PLI
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+1 1-1:[
+2 len-len:[p_wave(P1, 1-1:[normal, abnormal], R0),
+3 qrs(R1, 1-1:[normal, abnormal], P1),
+4 0-len:[rr1(R0, R1, 1-1:[short, normal, long]),
+5 pr1(P1, R1, 1-1:[short, normal, long])]],
+6 len-len:[p_wave(P1, 1-1:[normal, abnormal], R0),
+7 pp1(P0, P1, 1-1:[short, normal, long])],
+8 len-len:[qrs(R1, 1-1:[normal, abnormal], R0),
+9 0-1:[rr1(R0, R1, 1-1:[short, normal, long])]]
+10 ],
+Fig. 3 { Specication syntaxique d'un cycle cardiaque en DLAB
+que nous utilisons, et Aleph [Srinivasan, 2003] explorent l'espace de recherche de la
+clause la plus generale vers les clauses plus speciques. Une etape de recherche s'arre^te
+lorsqu'une clause ne couvrant aucun exemple negatif, mais couvrant des exemples posi-
+tifs, est atteinte. A chaque pas, la meilleure clause (par exemple, celle orant le meilleur
+taux de couverture nb exemples positifs couverts/nb total d'exemples) est ranee en
+ajoutant des litteraux dans son corps, en substituant certaines de ses variables par des
+constantes, etc. L'espace de recherche deni initialement par LH peut e^tre restreint
+par un biais de langage. ICL fournit un langage de biais declaratif nomme DLAB
+[De Raedt et Dehaspe, 1997] qui permet de denir, de maniere syntaxique, les clauses
+de LH qui appartiennent a l'espace de recherche. Aleph propose une autre maniere
+de denir le biais au moyen de bottom clauses [Muggleton, 1995]. A chaque exemple
+positif peut e^tre associee une bottom clause qui est plus specique que toute hypothese
+susceptible de couvrir cet exemple. Par extension, nous appellerons bottom clause toute
+clause d'un espace de recherche telle qu'il n'existe pas de clause plus specique dans
+l'espace considere. Pour plus de details sur la PLI, nous invitons le lecteur a lire l'article
+[Muggleton et De Raedt, 1994].
+Dans la suite, nous appellerons predicat evenementiel tout predicat comme
+qrs(R0,normal) qui decrit un evenement se produisant sur une des sources et predicat
+relationnel tout predicat comme suc(R0,R1) qui denote une relation particuliere (ici
+l'ordonnancement chronologique) entre deux evenements.
+3.2 Relations entre DLAB et un ensemble de clauses
+Une grammaire DLAB contient des expressions l-h :[el1,el2,...,eln] qui si-
+gnient : choisir entre l et h elements de la liste [el1,el2,...,eln]. Le symbole
+len est utilise pour specier la longueur totale de la liste. Par exemple, le terme
+DLAB p(2-len :[el1,el2,el3]) genere les expressions p(el1,el2), p(el1,el3),
+p(el2,el3), p(el1,el2,el3). Les expressions DLAB peuvent e^tre encha^ssees comme
+dans l'expression de la Figure 3 decrivant un cycle cardiaque. La Figure 3 exprime le
+fait que les hypotheses doivent avoir exactement l'une (signiee par la contrainte 1-1
+ligne 1) des congurations suivantes :
+{ une onde P nommee P1 suivie par un complexe QRS nomme R1 suivi par des
+predicats optionnels (contrainte 0-len) pr1 et rr1 lignes 2-5. Aux ondes P et QRS
+sont associes des attributs pouvant prendre les valeurs normal ou abnormal ; le
+RNTI - E -
+Fromont et al.
+delai entre deux QRS indique par le predicat rr1 peut e^tre qualie par short,
+normal ou long. Par exemple, l'expression p wave(P1, normal, R0), qrs(R1,
+long, P1), pr1(P1, R1, long) satisfait cette specication DLAB,
+{ une onde P seule associee a un predicat obligatoire pp1 (lignes 6 et 7),
+{ un QRS seul associe a un predicat optionnel rr1(lignes 8 et 9).
+Dans la suite nous utiliserons une clause ou un ensemble de clauses pour construire
+un biais declaratif DLAB.
+Proposition 1 A un ensemble de (bottom) clauses correspond un biais DLAB qui
+induit le me^me espace de recherche que ces (bottom) clauses.
+Clairement, la reciproque n'est pas vraie. Un biais DLAB peut restreindre un es-
+pace de recherche de maniere beaucoup plus precise qu'une bottom clause. Il contient,
+en particulier, des contraintes syntaxiques additionnelles speciant, par exemple, que
+certains litteraux sont optionnels, ou donnant des sequences de litteraux particulieres.
+L'espace de recherche correspondant a un biais DLAB est donc inclus dans l'espace de
+recherche associe a sa clause la plus specique (la clause qui contient tous les litteraux
+qu'il est possible de generer a partir de la specication DLAB).
+3.3 Apprentissage multisource en PLI
+L'apprentissage multisource d'un concept C se denit de la maniere suivante :
+Denition 2 Soient les problemes de PLI < Li; Pi; Ni; Bi >, i = 1; s, tels que Li
+decrit les donnees de la source i. Un probleme multisource en PLI est deni par un
+tuple < L;P;N;B > tel que :
+{ P = Fagg(P1; P2; : : : ; Ps),
+{ N = Fagg(N1; N2; : : : ; Ns) ou Fagg est une fonction d'agregation dependant du
+probleme,
+{ L est le langage multisource tel que :
+L = LE [ LH avec LE = Fagg(LE1 ; LE2 ; : : : ; LEs) et LH 
+Ss
+i=1 LHi ,
+{ B est un ensemble de regles exprimees dans le langage L.
+Le but est de trouver un ensemble de regles H  LH tel que :
+{ 8(e+; c+) 2 P;H ^ e+ ^B  c+
+{ 8(e ; c ) 2 N;H ^ e  ^ B 2 c+
+3.3.1 Agregation des exemples
+Les exemples sont bidimensionnels. La premiere dimension, i 2 [1; s], fait reference
+a une source, la seconde, k fait reference a une situation. Les exemples indexes par
+la me^me situation correspondent a des vues contemporaines d'un phenomene unique.
+Nous supposerons dans la suite que l'agregation d'un ensemble d'exemples est consis-
+tante (il est possible de se ramener a cette situation en utilisant des langages LEi
+disjoints). L'agregation est l'operation consistant a fusionner les vues contemporaines
+d'un phenomene. La fonction d'agregation Fagg depend du type des donnees d'ap-
+prentissage et peut dierer d'un probleme d'apprentissage a l'autre. Dans notre cas la
+fonction d'agregation est simplement l'union ensembliste :
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+Denition 3 Soit Pi = f(e
++
+i;k; c
++)jk = 1; pg, Ni = f(e
+ 
+i;k; c
+ )jk = 1; ng, i = 1; s.
+Fagg(P1; P2; : : : ; Ps) = P = f(e
++
+k ; c
++)je+k =
+Ss
+i=1 e
++
+i;k; k = 1; p et e
++
+k est consistantg et
+Fagg(N1; N2; : : : ; Ns) = N = f(e
+ 
+k ; c
+ )je k =
+Ss
+i=1 e
+ 
+i;k; k = 1; n et e
+ 
+k est consistantg.
+P et N contiennent des faits exprimes dans le langage LE.
+Il serait possible d'enrichir le langage LE en y incorporant des relations nouvelles
+entre evenements provenant de sources dierentes. Dans ce cas LE 
+Ss
+i=1 LEi . Nous
+avons decide de ne pas changer la denition des ek donc LE =
+Ss
+i=1 LEi et Fagg =
+Ss
+i=1.
+Toute la connaissance d'agregation, telle que la specication de la redondance entre
+sources, la correspondance entre attributs et les contraintes temporelles sont decrites
+dans la connaissance a priori B.
+Propriete 1 Soit s le nombre de sources et Fagg =
+Ss
+i=1.
+Liev denote la restriction du langage Li aux predicats evenementiels.
+1. Si Hi couvre l'exemple positif (e
++
+i;k; c
++) alors Hi couvre aussi un exemple positif
+agrege (e+k ; c
++).
+2. Si Hi ne couvre pas l'exemple negatif (e
+ 
+i;k; c
+ ) et si Liev \
+Ss
+j=1;j 6=i Ljev = ; (les
+langages Li n'ont pas de predicats evenementiels en commun) alors, Hi ne couvre
+pas l'exemple negatif agrege (e k ; c
+ ).
+Le nouveau langage L est plus riche que chacun des Li, i = 1; s, par consequent
+l'espace de recherche associe a L est plus vaste que chacun des espaces de recherche
+associe aux Li. Generalement, un ek agrege est beaucoup plus complexe que tout
+exemple ei;k, i = 1; s, qu'il agrege. Me^me restreint par un biais de langage, l'espace
+de recherche d'un processus d'apprentissage a partir d'exemples agreges a toutes les
+chances d'e^tre beaucoup plus vaste que chacun des espaces de recherche associes a des
+apprentissages independants a partir de chaque source.
+L'approche nave consiste a apprendre directement a partir des exemples agreges
+avec un biais couvrant tout l'espace associe a L. Le principal inconvenient de cette
+approche est la taille de l'espace de recherche resultant. Dans beaucoup de situations
+le systeme d'apprentissage ne pourra le gerer ou necessitera un temps de calcul trop
+important. La seule solution consiste donc a specier un biais de langage ecace mais
+cela s'avere e^tre une ta^che dicile quand les relations entre les sources ne sont pas
+explicitees. Dans la suite nous proposons une methode en deux etapes qui facilite la
+creation d'un tel biais.
+3.4 Une methode en deux etapes pour l'apprentissage multi-
+source
+Nous proposons une methode d'apprentissage multisource qui consiste a apprendre
+independamment a partir de chaque source, puis d'utiliser les regles apprises pour
+biaiser une nouvelle etape d'apprentissage sur les donnees agregees. L'algorithme 1
+decrit la methode sur l'apprentissage a partir de deux sources, il peut e^tre facilement
+etendu a l'apprentissage a partir de n sources.
+Nous nous interessons a l'induction de connaissances a partir de l'observation du
+comportement de systemes dynamiques. Par consequent, un exemple, i.e. une situation
+RNTI - E -
+Fromont et al.
+sur une source, est une collection d'evenements dates. Nous supposons que les situations
+sont decrites au moyen d'une horloge commune. Ce n'est pas souvent le cas pour des
+donnees brutes, nous supposons donc que les donnees ont ete pre-traitees pour assurer
+cette propriete. De plus, les exemples correspondant a une me^me situation sont sup-
+poses globalement consistants sur les dierentes sources. Dans la suite, si les dierentes
+sources possedent des predicats relationnels communs, nous faisons l'hypothese qu'il
+s'agit au moins d'une relation d'ordre (par exemple, la relation de succession).
+Algorithme 1
+1. Apprendre avec le biais Bias1 sur le probleme de PLI < L1; P1; N1; B1 >. Soit
+H1 l'ensemble des regles apprises pour une certaine classe C.
+2. Apprendre avec le biais Bias2 sur le probleme de PLI < L2; P2; N2; B2 >. Soit
+H2 l'ensemble des regles apprises pour la classe C.
+3. Agreger les ensembles d'exemples P1, N1 et P2, N2 ce qui produit P3, N3.
+4. Soit LH3 le langage du premier ordre restreint au vocabulaire de H1 =
+fh11; h12; : : : ; h1lg et H2 = fh21; h22; : : : ; h2pg et toutes les relations pouvant exis-
+ter entre les elements de H1 et les elements de H2 dans L.
+Construire a partir de toute paire (h1j ; h2k) 2 H1 H2 un ensemble de bottom
+clauses BT = fbt1; bt2; : : : ; btng denies sur LH3 tel que bti contient tous les
+predicats evenementiels apparaissant dans h1j et h2k et une combinaison des
+predicats relationnels communs a h1j et h2k qui respecte l'ordonnancement des
+relations deja presentes dans h1j et h2k.
+5. Construire Bias3 a partir de BT .
+6. Apprendre avec le biais Bias3 sur le probleme de PLI < L;P3; N3; B3 > ou
+{ L est le langage multisource decrit dans la denition 2,
+{ B3 est un ensemble de regles exprimees dans le langage L.
+Dans le cas tres simple ou il n'existe pas de predicats relationnels communs entre les
+evenements des deux sources, l'ensemble des reglesBT contient une seule bottom clause
+par paire provenant de H1 et H2. L'espace de recherche induit par LH3 est un treillis
+ordonne par la relation de generalisation basee sur la -subsomption. Pour chaque paire
+consideree, la bottom clause est bti = GSS(h1j ; h2k), le plus grand specialise de h1j et
+h2k sous -subsomption (abregee enGSS ) [Nienhuys-Cheng et de Wolf, 1996]. Le GSS
+est egal a la disjonction des clauses de l'ensemble apres standardisation (renommage
+des variables communes a plusieurs regles). Dans notre cas, le GSS de deux clauses h1j
+et h2k est une clause ayant pour te^te celle commune aux hypotheses de h1j et de h2k
+et comme corps la conjonction de tous les litteraux apparaissant dans les clauses h1j
+et h2k apres standardisation.
+Dans le cas ou les regles apprises independamment sur les dierentes sources com-
+portent des predicats relationnels communs, pour chaque paire h1j et h2k l'algorithme
+cree autant de bottom clauses qu'il y a d'ordonnancements maintenant l'ordre relatif
+des evenements sur chacune des sources. Le nombre de bottom clauses ainsi creees est
+Cnn+p ou n est le nombre de predicats evenementiels apparaissant dans la regle h1j et
+p le nombre de predicats evenementiels apparaissant dans la regle h2k. Le cardinal de
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+Soit H1 =class(normal) : 
+p(P0,normal), qrs(R0,normal), suc(R0,P0).
+la regle induite pour la classe normal sur les donnees de la source 1.
+Soit H2 = class(normal) : 
+dias(D0,normal), sys(S0,normal), suc(S0,D0).
+la regle apprise pour la me^me classe normal sur les donnees de la source 2. Les bottom
+clauses generees pour H1 et H2 sont :
+bt1 = class(normal) : 
+p(P0,normal), dias(D0,normal), suc(D0,P0),
+qrs(R0,normal), suc(R0,D0),
+sys(S0,normal), suc(S0,R0) .
+bt2 = class(normal) : 
+dias(D0,normal), p(P0,normal), suc(P0,D0),
+sys(S0,normal), suc(S0,P0),
+qrs(R0,normal), suc(R0,S0) .
+: : :,
+btn 1 = class(normal) : 
+p(P0,normal), qrs(R0,normal), suc(R0,P0),
+dias(D0,normal), suc(D0,R0),
+sys(S0,normal), suc(S0,D0).
+btn = class(normal) : 
+dias(D0,normal), sys(S0,normal), suc(S0,D0),
+p(P0,normal), suc(P0,S0),
+qrs(R0,normal), suc(R0,P0).
+Fig. 4 { Exemple de generation d'un ensemble de bottom clauses a partir de deux
+ensembles d'hypotheses reduits a un singleton.
+BT est egal au nombre total de bottom clauses creees pour chaque paire h1j et h2k.
+Ce nombre peut para^tre tres eleve dans le cas general ou les ensembles de regles H1 et
+H2 contiennent plus d'une clause et ou le nombre d'evenements caracteristiques d'une
+classe donnee pour chaque source est important. En pratique, un nombre signicatif de
+bottom clauses ainsi creees peuvent e^tre eliminees car certaines sequences n'ont aucun
+sens du point de vue de l'application consideree. Sur l'exemple de la Figure 4, un expert
+du domaine interdirait toutes les sequences comprenant un evenement de la source 1
+situe entre les evenements dias(A,B) et sys(C,D) de la source 2 car physiologiquement
+impossibles. Cette contrainte elimine, en particulier, les bottom clauses bt1 et bt2 dans
+l'exemple de la Figure 4.
+Le biais est genere automatiquement a partir de l'ensemble des bottom clauses
+creees (cf. Figure 5 : dans un souci de lisibilite, une seule bottom clause, ici bt2, a
+ete explicitee). A chaque bottom clause est associee une partie (ou bloc) du biais.
+Chaque bloc permet d'induire une hypothese identique ou plus generale que la bottom
+clause consideree. Un bloc denit le chemin que doit emprunter le systeme de PLI
+pour explorer l'espace de recherche, de la racine du treillis de recherche vers la bot-
+RNTI - E -
+Fromont et al.
+tom clause consideree. Chaque nud de l'arbre ainsi explore correspond a une clause
+semantiquement acceptable : les ordonnancements physiquement impossibles n'ont pas
+ete generes et les litteraux utilises ont un sens du point de vue de la classe consideree
+puisqu'ils apparaissent dans une regle apprise lors de l'apprentissage monosource. Pour
+chaque bloc, une toute petite partie de l'espace de recherche induit par LH3 est cou-
+vert, l'exploration est donc tres rapide. Notons que deux des blocs generes a partir des
+clauses btn 1 et btn de l'exemple Figure 4 permettent de reapprendre les hypotheses
+de H1 et H2 (cf les chemins en blanc Figure 6). Si aucune autre solution n'est plus sa-
+tisfaisante que H1 ou H2 dans l'espace de recherche, ICL reapprend les regles induites
+lors des apprentissages monosources independants qui couvrent les me^mes exemples
+que ceux couverts par H1 et H2 (cf. propriete 1).
+1-1:[ %on choisit un et un seul des bloc suivants :
+len-len:[...], %premier bloc : bt1
+len-len:[ % bt2
+dias(D0,normal),p(P0,normal),suc(P0,D0),
+0-1:[
+len-len:[sys(S0,normal),suc(S0,P0),
+0-1:[ len-len:[qrs(R0,normal),suc(R0,S0)]]
+]
+]
+],
+...,
+len-len:[...], %(n-1)ieme bloc : bt(n-1)
+len-len:[...] %nieme bloc : btn
+]
+Fig. 5 { Exemple de biais cree a partir d'un ensemble de bottom clauses
+La methode utilisee permet de reduire l'espace de recherche global par rapport a
+l'approche nave. De plus, la construction du biais multisource est automatique et re-
+pose maintenant sur la construction des biais monosources ce qui s'avere e^tre beaucoup
+plus aise que de construire d'emblee un biais global multisource. La construction de ce
+biais n'assure pas que l'espace de recherche ainsi reduit contiendra la solution optimale
+du probleme multisource mais dans le pire des cas, les regles apprises seront celles des
+apprentissages monosources.
+Dans la suite, nous illustrons l'utilisation de la methode sur des donnees cardiaques
+multisources provenant d'electrocardiogrammes et de mesures de pression arterielle.
+4 Resultats
+La PLI permet d'obtenir des regles discriminantes caracterisant un ensemble ni
+d'arythmies cardiaques sous forme d'un programme logique. Le choix de la logique du
+premier ordre a pour principal avantage de rendre les regles facilement interpretables
+ce qui s'avere indispensable pour e^tre credible dans le domaine medical.
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+bt1
+bt3
+bt4 bt5
+bt6
+bt7
+bt2
+H1 H2
+L1
+L2
+false <− true
+L
+Fig. 6 { Construction de l'espace de recherche pour l'apprentissage biaise
+L'apprentissage monosource produit des regles exploitables independamment ou
+conjointement suivant les contextes : en cas de signaux clairs, une seule voie peut
+s'averer susante ; en cas de signaux bruites, plusieurs regles peuvent e^tre necessaires
+a la reconnaissance, certaines peuvent me^me s'averer inexploitables si le bruit est trop
+important ou si les electrodes sont defaillantes. Par contre, si l'on veut exploiter toutes
+les informations simultanement, il faut exhiber des relations entre des evenements
+se produisant sur l'electrocardiogramme et des evenements se deroulant sur la voie
+hemodynamique. Pour ce faire, nous eectuons des apprentissages multisources. A des
+ns d'illustrations, nous nous focalisons sur deux arythmies : la tachycardie supra-
+ventriculaire (tsv) et l'extra-systole ventriculaire (esv).
+La correction des regles obtenues est estimee par une technique de validation croisee
+de type \leave-one-out" a cause du faible nombre d'exemples disponibles (environ 6
+pour chaque classe). Les resultats sont donnes dans le tableau 1 et sont commentes
+a la n de cette section. Les performances indiquees correspondent a des mesures en
+secondes de temps CPU d'un ordinateur Sun Ultra-Sparc 5.
+4.1 Donnees
+Les signaux utilises proviennent de la base de donnees MIMIC (Multi-parameter
+Intelligent Monitoring for Intensive Care [Moody et Mark, 1997]). Cette base contient
+des donnees enregistrees sur 72 patients en USIC au Beth Israel Hospital Arrhythmia
+Laboratory. Les series temporelles brutes extraites de la base MIMIC sont transformees
+en descriptions symboliques de signaux par des outils de traitement de signal. Ces
+descriptions symboliques sont stockees dans des bases de connaissances logiques sous
+forme de faits (cf. Figures 7 et 8). La Figure 7 donne un exemple de 6 faits apparaissant
+dans un exemple de doublet ventriculaire. Il s'agit de trois QRS intervenant aux temps
+5026, 5638 et 6448, ainsi que les relations de succession permettant de lier une onde
+RNTI - E -
+Fromont et al.
+begin(model).
+doublet_3_I.
+.....
+qrs(r7, 5026,normal).
+suc(p7,r7).
+qrs(r8, 5638,abnormal).
+suc(r8,r7).
+qrs(r9,6448,abnormal).
+suc(r9,r8).
+.....
+end(model).
+Fig. 7 { Exemple de donnees ECG
+pour un doublet ventriculaire
+begin(model).
+rs_3_ABP.
+.......
+diastole(pd4,3406,-882).
+suc(pd4,ps3).
+systole(ps4, 3558,-279).
+suc(ps4,pd4).
+......
+end(model).
+Fig. 8 { Exemple de donnees pres-
+sion pour un rythme sinusal
+avec l'onde qui la precede. Le troisieme argument des predicats decrit la forme de
+l'onde. La Figure 8 fournit des donnees similaires pour la pression. Nous disposons
+pour chaque exemple de l'information sur l'amplitude des ondes etiquetees (ondes P et
+QRS pour l'ECG, la diastole et la systole pour la voie hemodynamique), sur le delai
+entre deux ondes, ainsi que sur la forme des ondes. Les donnees concernent 6 arythmies
+cardiaques : la tachycardie ventriculaire (consideree comme une alarme rouge en USIC),
+le doublet ventriculaire, l'extra-systole ventriculaire, la tachycardie supra-ventriculaire,
+la brillation auriculaire (considerees comme des alarmes orange en USIC) et le rythme
+sinusal ou rythme normal.
+4.2 Apprentissage global
+4.2.1 Protocole d'experimentation
+Pour chaque enregistrement disponible, les donnees de pression et les donnees
+concernant l'ECG sont agregees. Les langages restreints aux predicats evenementiels
+utilises pour chaque source sont disjoints. Le resultat de l'apprentissage est un ensemble
+de regles comportant des evenements provenant des dierentes voies.
+Les predicats choisis pour former les hypotheses doivent contenir, en plus des at-
+tributs decrivant chacune des deux sources, des attributs permettant de lier temporel-
+lement les elements des dierentes sources. Ainsi une contrainte temporelle indiquant
+un delai compris entre 0,2 et 0,3 s lie l'instant d'apparition du complexe QRS sur la
+voie I de l'electrocardiogramme et celui de la systole sur la voie hemodynamique. Nous
+savons egalement que l'onde P precede le complexe QRS et que la diastole commence
+au debut de l'onde P. La pression atteindra donc son point le plus bas (celui utilise
+dans les donnees symboliques) apres la n de l'onde P, mais aussi apres l'apparition
+du complexe QRS. Un cycle cardiaque normal est donc constitue d'une succession
+d'evenements P-QRS-diastole-systole. Cet encha^nement sera appele cycle complet I
+puisqu'il est relatif a la voie I. De me^me, certains predicats ne sont relatifs qu'a une
+seule voie comme le cycle simple I correspondant a une succession P-QRS sur la
+voie I ou le cycle simple ABP correspondant a un cycle diastole-systole sur la voie
+hemodynamique. Les predicats utilises dans le biais doivent contenir un attribut per-
+mettant de maintenir la sequence entre chaque evenement. Cet attribut est une variable
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+dlab_template('
+false <--
+1-1:[len-len:[
+complete_cycle_I(P0,c1_feat,R0,c1_feat,Dias0,_,Sys0,abp_feat,_,_),
+0-len:[pr1(P0,R0, r_feat), ds1(Dias0,Sys0, r_feat)],
+0-1:[len-len:[
+complete_cycle_I(P1,c1_feat,R1,c1_feat,Dias1,abp_feat,Sys1,abp_feat,R0,Sys0),
+0-len:[pr1(P1,R1,r_feat), rr1(R0,R1,r_feat)],
+0-1:[amp_ss(Sys0, Sys1,1-1:[neg,pos],r_feat)],
+0-1:[amp_dd(Dias0,Dias1, 1-1:[neg,pos],r_feat)],
+0-len:[ds1(Dias1,Sys1,r_feat),ss1(Sys0,Sys1,r_feat),
+dd1(Dias0,Dias1,r_feat),sd1(Sys0,Dias1,r_feat)]
+], ... ]').
+dlab_variable(r_feat, 1-1, [short, normal, long]).
+dlab_variable(c1_feat, 1-1, [normal, abnormal]).
+dlab_variable(abp_feat, 1-1, [short, normal, high]).
+Fig. 9 { Une partie du biais de langage permettant d'induire des regles globales
+cycle_complet(P,FormP,R,FormQRS,Dias,Symbd,Sys,Symbs,PrecP):-
+p_wave_I(P,TpsP,FormP), suc(P,PrecP),
+qrs_I(R,TpsR,FormQRS), suc(R,P),
+diastole(Dias,TpsDias,Vald),
+qual_amp(Vald,Symbd),
+//transforme la valeur numerique en symbolique
+systole(Sys,TpsSys,Val), suc(Sys,Dias),
+qual_amp(Val,Symbs),
+//transforme la valeur numerique en symbolique
+const_inter(TpsR,TpsSys,200,300).
+//borne l'intervalle entre le QRS et la Systole
+...
+Fig. 10 { Une partie de la connaissance a priori permettant d'induire des regles globales
+Prolog. La sequence est maintenue par unication des variables entre elles. Par exemple,
+dans la premiere regle caracterisant la classe esv dans l'exemple de la Figure 11, le
+troisieme argument du predicat qrs/3 est le nom du QRS precedent. La variable R0
+s'uniera avec la variable de me^me nom en premier argument du cycle simple ABP
+pour maintenir le sequencement entre les evenements.
+Un exemple de biais DLAB est donne Figure 9 (voir le paragraphe 3.2 pour une ex-
+plication de la syntaxe DLAB). Il indique que le premier predicat de l'hypothese generee
+est soit un cycle complet I, soit un cycle complet V, soit un cycle simple ABP, etc.
+Un seul choix est possible parmi ces propositions (1-1) et l'imbrication des blocs qui
+suivent, obligent ICL a choisir chacun des predicats dans l'ordre sans pouvoir \sauter
+un cycle". Une telle absence de rupture dans la sequence permet d'inserer les attributs
+temporels liant les donnees (cf. Figure 10 ou le complexe QRS est systematiquement
+relie a la systole qui le suit dans un cycle complet).
+RNTI - E -
+Fromont et al.
+class(esv):-
+cycle_simple_ABP(R0,Dias0,normal,Sys0,normal,_),
+qrs(R1,abnormal,R0),
+cycle_simple_I(P2,normal,R2,normal,R1,Sys2).
+class(svt):-
+cycle_simple_I( P0 ,normal, R0 ,normal, _ , Sys0 ),
+cycle_complet_I( P1,normal,R1,normal,Dias1,normal,Sys,normal,R0,Sys0),
+rr1( R0 , R1 ,short), dd1( Dias0 , Dias1 ,short).
+Fig. 11 { Exemple de regles apprises par apprentissage global sur la voie I de l'ECG
+et la voie ABP
+4.2.2 Resultats
+Un exemple de resultat pour les arythmies Extra systole ventriculaire (esv) et Ta-
+chycardie Supra Ventriculaire (tsv) est donne Figure 11. Ces deux regles sont correctes
+et completes, elles couvrent tous les exemples positifs et aucun exemple negatif. La
+premiere regle signie qu'un QRS anormal intervenant apres un cycle hemodynamique
+normal et suivi d'un cycle normal sur la voie I discrimine parfaitement une extrasystole
+ventriculaire. La seconde signie qu'une tsv peut e^tre caracterisee par un cycle complet
+dont les elements sont normaux sur la voie I mais dont les dierences d'amplitude entre
+diastole et systole sont grandes et l'intervalle entre les deux QRS est court (le rythme
+cardiaque est donc rapide).
+L'ensemble des resultats est encourageant puisque de telles regles ont pu e^tre ap-
+prises pour toutes les arythmies. Elles sont compactes et facilement interpretables.
+Les temps d'apprentissage sont cependant tres longs compte tenu du nombre reduit
+d'exemples pour chaque classe (7 exemples au maximum).
+4.3 Apprentissage biaise par fusion de regles
+La methode d'apprentissage biaise par fusion de regles, presentee en section 3,
+necessite au prealable un apprentissage independant sur chacune des sources.
+4.3.1 Apprentissages monosources
+Les apprentissages monosources sur la base de donnees MIMIC (et particulierement
+la creation des biais) proviennent principalement d'experiences preliminaires eectuees
+dans le cadre du projet Calicot [Carrault et al., 2003]. La Figure 12 presente un exemple
+de regles apprises pour les arythmies esv et tsv sur la voie I de l'electrocardiogramme.
+La premiere des regles exprime le fait qu'une esv peut e^tre diagnostiquee sur la voie I
+si deux cycles normaux encadrent un QRS anormal. Cette regle a ete apprise en 5,6 s
+de temps CPU. La deuxieme regle exprime le fait qu'une tsv est caracterisee par deux
+intervalles RR tres courts (rr1 : short) separant deux QRS normaux, chacun etant
+precedes d'ondes P normales.
+Les apprentissages concernant la voie hemodynamique seule ont produit des regles
+complexes et non totalement discriminantes sur la majorite des apprentissages. Un
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+class(esv):-
+p_wav(P0,normal,_),
+qrs(R0,normal,P0),
+qrs(R1,abnormal,R0),
+p_wav(P2,normal,R1),
+qrs(R2,normal,P2).
+class(tsv):-
+qrs(R0,normal,_),
+p_wav(P1,normal,R0),
+qrs(R1,normal,P1),
+rr1(R0,R1,short),
+p_wav(P2,normal,R1),
+qrs(R2,normal,P2),
+rr1(R1,R2,short).
+Fig. 12 { Exemple de regles ap-
+prises sur une voie I de l'ECG
+class(esv):-
+abp_cycle(Dias0,_,Sys0,high,_),
+abp_cycle(Dias1,normal,Sys1,normal,Sys0),
+amp_ss(Sys0,Sys1,neg,normal),
+ss1(Sys0,Sys1,normal),
+abp_cycle(Dias2,normal,Sys2,normal,Sys1),
+ss1(Sys1,Sys2,normal).
+class(esv):-
+abp_cycle(Dias0,_,Sys0,normal,_),
+abp_cycle(Dias1,high,Sys1,high,Sys0),
+amp_ss(Sys0,Sys1,pos,normal),
+ss1(Sys0,Sys1,long).
+class(tsv):-
+abp_cycle(Dias0,_,Sys0,normal,_),
+abp_cycle(Dias1,normal,Sys1,normal,Sys0),
+amp_ss(Sys0,Sys1,pos,normal),
+ss1(Sys0,Sys1,short), ds1(Dias1,Sys1,long).
+Fig. 13 { Exemple de regles ap-
+prises sur la voie hemodynamique
+exemple d'apprentissage pour les arythmies esv et tsv est donne Figure 13. Il existe
+au moins deux facons (deux regles) pour caracteriser une extra systole ventriculaire
+sur la voie de pression. La premiere regle decrit l'esv comme une succession de trois
+cycles de pression avec une dierence d'amplitude grande entre la diastole et la systole
+dans le premier cycle. Cette regle couvre egalement un exemple de doublet ventricu-
+laire. Dans la deuxieme regle, l'esv est caracterisee par deux cycles de pression avec
+une dierence d'amplitude signicative entre la premiere systole (Sys0) et la deuxieme
+diastole (Dias1) ainsi qu'entre la deuxieme diastole et la deuxieme systole (Sys1) et
+un intervalle de temps entre les deux systoles long (ss1(Sys0,Sys1,long)). Cette
+regle couvre egalement un exemple de tachycardie ventriculaire ce qui explique la
+mauvaise precision attribuee a cette regle dans le tableau 1. La tsv est caracterisee
+par 2 cycles de pression normaux avec un intervalle court entre les deux systoles
+(ss1(Sys0,Sys1,short)) et un intervalle de temps court entre la deuxieme diastole et
+la deuxieme systole ds1(Dias1,Sys1,long).
+4.3.2 Construction du biais par fusion de regles
+Nous utilisons les regles obtenues lors de l'apprentissage monosource pour construire
+le biais permettant de limiter l'espace de recherche lors de l'apprentissage global (cf.
+section 3.4). Notons que les predicats apparaissant dans les regles sont lies tempo-
+rellement. Le nouveau biais constitue doit donc contenir la combinaison de tous les
+predicats evenementiels present dans le corps des regles presentees Figures 12 et 13.
+Un exemple d'un tel biais pour la classe tsv est donne Figure 14.
+RNTI - E -
+Fromont et al.
+dlab_template('
+false <--
+1-len:[
+1-1:[len-len:[
+qrs(R0, normal, _, Sys0),
+simple_abp_cycle(R0,Dias0, _, Sys0, normal, _)],
+1-1:[len-len:[
+complete_cycle_I(P1, normal,R1,normal,Dias1,normal,Sys1,normal,R0,Sys0),
+1-1:[rr1(R0, R1, short)],
+0-1:[amp_ss(Dias0, Dias1, neg, normal)],
+0-1:[ss1(Sys0, Sys1, short)],
+0-1:[ds1(Dias0,Sys1, long)]],
+0-1:[len-len:[
+simple_cycle_I(P2, normal, R2, normal, R1, Sys2),
+0-1:[rr1(R1, R2, short)] ] ] ] ,........]).
+Fig. 14 { Partie du biais obtenu par fusion de regles
+class(tsv):-
+qrs( R0, normal, _, Sys0 ),
+cycle_simple_ABP( R0, Dias0, _, Sys0, normal, _ ),
+cycle_complet_I( P1, normal, R1, normal,
+Dias1, normal, Sys1, normal, R0, Sys0 ),
+rr1( R0, R1, short), ss1( Sys0, Sys1, short).
+class(esv):-
+cycle_simple_I( P0, normal, R0, normal, _, Sys0 ),
+qrs( R1, abnormal, R0 ),
+cycle_complet_I( P2, normal, R2, normal,
+Dias2, _, Sys2, hight, R1, Sys1 ).
+Fig. 15 { Exemple de regles induites a partir du nouveau biais obtenu par fusion
+4.3.3 Resultats
+Les resultats pour la tsv et l'esv obtenus gra^ce au biais decrit precedemment sont
+donnes Figure 15. Les regles produites sont correctes et completes et calculees dans
+des temps tout a fait satisfaisants puisque la premiere regle est induite en 2,88 s CPU
+et la seconde sur l'esv en 18,78 s CPU. Dans notre application les combinaisons entre
+les predicats utilisees pour former le biais de langage ont ete largement limitees par les
+connaissances sur l'ordre relatif d'apparition des evenements sur les dierentes voies.
+4.4 Comparaison apprentissage global/apprentissage biaise par
+fusion de regles
+Le tableau 1 donne les resultats de l'evaluation des performances des deux methodes.
+PreApp designe la precision de l'apprentissage et Prec la precision des tests eectues
+lors de la validation croisee. VP (vrai positif) denote le nombre d'exemples positifs
+correctement classes, FN (faux negatif), le nombre d'exemples negatifs mal classes, FP
+(faux positif), le nombre d'exemples positifs mal classes et VN (vrai negatif), le nombre
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+d'exemples negatifs correctement classes. La precision reete le degre de correction de
+la regle et est calculee comme suit : V P+V N
+V P+FN+FP+V N
+.
+Statistiques Complexite Temps de calcul
+(moyenne) (moyen)
+Prec PreApp Regles Litteraux CPU (s)
+App biaise (esv) 1 1 1 3 2.88
+App global (esv) 1 1 1 3 227.43
+App biaise (tsv) 0.973 1 1 5 18.78
+App global (tsv) 0.973 1 1 4 824.28
+monosource(ECG I esv) 1 1 1 5 5.60
+monosource(ABP esv) 0.676 0.953 2.1 9.8 13.82
+monosource(ECG I tsv) 0.973 1 1 6.9 12.00
+monosource(ABP tsv) 0.946 1 1 4.9 19.11
+Tab. 1 { Resultats de la validation croisee et temps de calcul
+Les regles apprises pour la classe esv pour les deux strategies sont completes et
+correctes (la precision lors du test et de l'apprentissage est egale a 1). La precision
+0:973 pour la classe tsv peut e^tre expliquee par un exemple de doublet exceptionnel
+compte comme FP lors des deux tests. Ceci peut s'expliquer car le rythme cardiaque est
+particulierement eleve pour cette exemple, il a donc ete mal classe. Les regles sont moins
+complexes pour l'apprentissage global \classique" que pour l'apprentissage biaise. Le
+biais utilise dans le premier cas etant moins precis, la clause la moins complexe a
+pu e^tre exclue par le biais plus restrictif utilise pour la seconde methode. On peut
+alors s'attendre a ce que les regles apprises lors d'un apprentissage global \classique"
+soient moins complexes mais calculees en un temps nettement superieur puisque le
+nombre d'hypotheses candidates dans l'espace de recherche est superieur. Les temps
+de calcul associes a l'apprentissage biaise sont en eet beaucoup moins importants que
+ceux de l'apprentissage global \classique". Le temps de calcul cumule (apprentissage
+monosource puis apprentissage global biaise) pour l'apprentissage biaise est de 22.3 s
+CPU pour la classe esv et de 49.89 s CPU pour la classe tsv. Ces temps sont multiplies
+respectivement par 10 et 16 lors de l'apprentissage global en une seule etape.
+On peut noter que l'apprentissage tirant parti des regles apprises independamment
+sur chacune des sources ameliore parfois la qualite des regles : par exemple, les regles
+concernant la voie de pression pour l'esv n'etaient pas correctes contrairement a la nou-
+velle regle apprise. La complexite des nouvelles regles reste raisonnable et la technique
+permet de ne pas se soucier de la creation d'un biais global. En eet, la creation d'un
+biais ecace tout en etant susamment large pour apprendre des regles correctes et
+completes peut s'averer dicile lorsque plusieurs sources sont impliquees et qu'il faut
+prendre en compte des relations entre ces sources. Ici, le biais global est construit a
+partir d'apprentissages \partiels" pour lesquels le biais est plus facile a concevoir.
+RNTI - E -
+Fromont et al.
+4.5 Discussion
+Pour obtenir des resultats multisources selon la methode biaisee presentee dans
+cette article, les regles monosources apprises independamment doivent tout d'abord
+posseder des predicats relationnels communs decrivant une relation d'ordre (ici la re-
+lation temporelle de succession). Dans le cas contraire, il n'y a pas d'ordonnancement
+possible entre les evenements se produisant sur les dierentes sources, et les resultats
+multisources seront identiques aux resultats monosources. De plus, pour e^tre ecace, la
+methode doit s'appuyer sur des regles monosources susamment discriminantes pour
+que l'information qu'elles contiennent soit \centree" sur les caracteristiques de la classe
+consideree. En eet, si les regles apprises independamment sur chaque source decrivent
+des evenements qui ne se produisent pas dans une me^me fene^tre temporelle (d'un point
+de vue de l'horloge commune), il n'y aura pas non plus d'ordonnancements interessants,
+ce qui revient au cas precedemment cite.
+En outre, les resultats presentes dans la section precedente, ne montrent pas claire-
+ment l'avantage de l'utilisation de l'apprentissage multisource par rapport a l'apprentis-
+sage monosource (notamment au niveau de la precision des regles) puisque la precision
+des apprentissages monosources est deja tres elevee (100% ou 93% pour l'ECG). Pour
+mesurer l'apport du multisource sur les donnees dont nous disposons, nous envisageons
+de \bruiter" articiellement les exemples de chaque classe en conservant l'exemple non
+bruite. Ceci permettrait d'une part, d'augmenter le nombre d'exemples de la base d'ap-
+prentissage, mais aussi, de reduire la precision des apprentissages monosources notam-
+ment au niveau de l'electrocardiogramme. Il serait alors possible de mesurer l'apport
+d'un apprentissage multisource pour reduire l'impact du bruit sur les donnees (par
+exemple en apprenant des regles plus compactes, moins sujettes au dysfonctionnement
+potentiel d'une des source de donnees, etc).
+Enn, l'algorithme actuel semble tres ecace sur un petit volume de donnees mais
+des experiences complementaires doivent e^tre realisees sur des bases d'apprentissage
+multisource plus volumineuses pour valider totalement la methode multisource biaisee.
+5 Conclusion
+Nous avons formalise le probleme d'apprentissage multisource par programmation
+logique inductive. La quantite importante de donnees introduites pour ce type d'ap-
+prentissage et la complexite des langages choisis pour decrire les relations pouvant
+exister entre les dierentes sources entra^nent des problemes bien connus de dimen-
+sionalite dans le cadre de la PLI. Nous proposons donc une alternative a la methode
+\classique" d'apprentissage multisource et nous comparons ces deux methodes.
+La methode \classique" consiste a agreger toutes les donnees des dierentes sources
+et a ecrire un biais contenant des predicats permettant de mettre en evidence des rela-
+tions entre les elements des dierentes sources. Les resultats obtenus sont satisfaisants
+mais l'ecriture du biais est dicile et le temps de calcul de ces regles est tres eleve
+compte tenu du volume des donnees lorsque l'on fusionne plusieurs sources.
+La methode proposee ici consiste a eectuer un apprentissage independant sur cha-
+cune des sources puis a tirer parti des regles produites pour construire un biais qui
+RNTI - E -
+Extraction de connaissances pour la caracterisation d'arythmies cardiaques
+bornera l'espace de recherche d'un nouvel apprentissage sur les donnees globales. Les
+regles apprises avec cette technique sont correctes et completes et les temps de calcul
+sont divises par 10 par rapport a ceux de la methode globale, ce qui prouve que l'es-
+pace de recherche a ete ecacement reduit. Cette technique requiert egalement moins
+de connaissances prealables sur les donnees puisqu'elle n'utilise que le langage deja
+present dans les regles induites lors des apprentissages sur les sources independantes.
+Elle permet en outre, de simplier la conception du biais global puisque celui-ci est
+cree a partir d'apprentissages \partiels" dont les biais, monosources, sont a priori plus
+simples a concevoir. Cette methode sera plus amplement validee en testant l'impact
+des nouveaux resultats pour la reconnaissance et le diagnostic des arythmies dans un
+contexte hospitalier.
+Remerciements
+Ce travail est eectue dans le cadre du projet CEPICA avec le soutien du RNTS
+(Reseau National de Technologies pour la Sante) en collaboration avec le LTSI-
+Universite de Rennes1, ELA-Medical et le departement de cardiologie du CHU de
+Rennes.
+References
+[Bloch et al., 2001] I. Bloch, A. Hunter, Alain Appriou, A. Ayoun, Salem Benferhat,
+P. Besnard, L. Cholvy, R. Cooke, F. Cuppens, D. Dubois, H. Fargier, M. Grabisch,
+R. Kruse, J. Lang, S. Moral, H. Prade, A. Saotti, P. Smets, et C. Sossai. Fusion :
+General concepts and characteristics. International Journal of Intelligent Systems,
+16 :1107{1134, 2001.
+[Blockeel et al., 1999] H. Blockeel, L. De Raedt, N. Jacobs, et B. Demoen. Scaling
+up inductive logic programming by learning from interpretations. Data Mining and
+Knowledge Discovery, 3(1) :59{93, 1999.
+[Carrault et al., 2003] G. Carrault, M-O. Cordier, R. Quiniou, et F. Wang. Temporal
+abstraction and inductive logic programming for arrhythmia recognition from ECG.
+Articial Intelligence in Medicine, 28(231-263), 2003.
+[Cholvy, July 2003] L. Cholvy. Information evaluation in fusion : a case study. In
+ECSQARU-03 Workshop "Uncertainty, Incompleteness, Imprecision and Conict
+in Multiple Data Sources, Aalborg, Denmark, July 2003.
+[De Raedt et Dehaspe, 1997] L. De Raedt et L. Dehaspe. Clausal discovery. Machine
+Learning, 26 :99{146, 1997.
+[De Raedt et Van Laer, 1995] L. De Raedt et W. Van Laer. Inductive constraint logic.
+Lecture Notes in Computer Science, 997 :80{94, 1995.
+[Dubois et al., 2001] D. Dubois, M. Grabisch, H. Prade, et P. Smets. Using the trans-
+ferable belief model and a qualitative possibility theory approach on an illustrative
+example : the assessment of the value of a candidate. International Journal of In-
+telligent Systems, 16 :1183{1192, 2001.
+RNTI - E -
+Fromont et al.
+[Lloyd, 1987] J.W. Lloyd. Foundations of Logic Programming. Springer-Verlag, Hei-
+delberg, 1987. Second edition.
+[Moody et Mark, 1997] G. B. Moody et Roger G. Mark. A database to
+support development and evaluation of intelligent intensive care monitoring.
+Harvard-MIT Division of Health Sciences and Technology, Cambridge, MA,
+USA, Cardiology Division, Beth Israel Hospital, Boston, MA, USA, 1997.
+http ://ecg.mit.edu/mimic/mimic.html.
+[Muggleton et De Raedt, 1994] Stephen Muggleton et Luc De Raedt. Inductive logic
+programming : Theory and methods. The Journal of Logic Programming, 19 &
+20 :629{680, May 1994.
+[Muggleton, 1995] S. Muggleton. Inverse entailment and Progol. New Generation
+Computing, Special issue on Inductive Logic Programming, 13(3-4) :245{286, 1995.
+[Nedellec et al., 1996] C. Nedellec, C. Rouveirol, H. Ade, F. Bergadano, et B. Tau-
+send. Declarative bias in ILP. In L. De Raedt, editor, Advances in Inductive Logic
+Programming, pages 82{103. IOS, 1996.
+[Nienhuys-Cheng et de Wolf, 1996] S-H. Nienhuys-Cheng et R. de Wolf. Least genera-
+lisations and greatest specializations of sets of clauses. Journal of Articial Intelli-
+gence Research, 4 :341{363, May 1996.
+[Plotkin, 1970] G.D. Plotkin. A note on inductive generalisation. In B. Meltzer et
+D. Michie, editors, Machine Intelligence 5, pages 153{163. Elsevier North Holland,
+New York, 1970.
+[Srinivasan, 2003] A. Srinivasan. Aleph Manual V4 and above, 2003.
+[Van Laer, 2002] Wim Van Laer. From Propositional to First Order Logic in Machine
+Learning and Data Mining - Induction of rst order rules with ICL. Phd, Department
+of Computer Science, K.U.Leuven, Leuven, Belgium, June 2002.
+[Wemmert et Gancarski, 2002] C. Wemmert et P. Gancarski. A multi-view voting me-
+thod to combine unsupervised classications. In IASTED Articial Intelligence and
+Applications, Malaga, Spain, 2002.
+Summary
+In many applications dealing with industrial or medical supervision, data are tem-
+poral time series related to numerous sensors that provide information which is com-
+plementary but also often redundant. We investigate the problem of learning, by in-
+ductive logic programming, symbolic rules that characterize cardiac arrhythmias from
+multisource data such as electrocardiograms or arterial blood pressure measures. A rst
+strategy consists in aggregating the data and then in learning directly from these trans-
+formed data. This method is not very ecient and dicult to implement, especially
+designing the learning bias, when the amount of data is big. We propose an ecient
+two-step strategy that uses monosource learning to automatically bias and reduce the
+search space for multisource learning. The results obtained with this method are ana-
+lysed and compared to those obtained with the naive learning method. We show that
+an order of magnitude is gained on learning times with the new method.
+RNTI - E -
+1RNTI - E -  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

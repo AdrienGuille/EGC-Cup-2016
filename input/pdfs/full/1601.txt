@@ -1,0 +1,487 @@
+Extraction bayesienne et integration de patterns
+representes suivant les K plus proches voisins pour
+le go 19x19
+Bruno Bouzy, Guillaume Chaslot
+Universite Paris 5, C.R.I.P.5
+45, rue des Saints-Peres 75270 Paris Cedex 06 France
+bouzy@math-info.univ-paris5.fr,
+http ://www.math-info.univ-paris5.fr/bouzy
+Ecole Centrale de Lille
+Cite Scientique - BP 48, 59651 Villeneuve d'Ascq Cedex
+chaslot.guillaume@ec-lille.fr
+Resume. Cet article decrit la generation automatique et l'utilisation
+d'une base de patterns pour le go 19x19. La representation utilisee est
+celle des K plus proches voisins. Les patterns sont engendres en parcou-
+rant des parties de professionnels. Les probabilites d'appariement et de jeu
+des patterns sont egalement estimees a ce moment la. La base creee est
+integree dans un programme existant, Indigo. Soit elle est utilisee comme
+un livre d'ouvertures en debut de partie, soit comme une extension des
+bases pre-existantes du generateur de coups du programme. En terme de
+niveau de jeu, le gain resultant est estime a 15 points en moyenne.
+1 Introduction
+Le facteur de branchement et la longueur d'une partie interdisant la recherche
+arborescente globale au go et l'evaluation de positions non terminales etant dicile
+[14], la programmation du jeu de go est une ta^che dicile pour l'informatique [15, 13].
+Cependant, la programmation du go est un terrain d'experiences approprie pour l'IA
+[8]. Indigo [7], programme de go developpe dans l'esprit de valider des methodes d'IA,
+est compose d'un module Monte Carlo (MC) et d'un module base sur des connaissances.
+Le module MC a ete decrit recemment [9, 4], et le module base sur les connaissances a
+ete decrit dans des travaux anterieurs a 2003 [8, 5, 6]. La gure 1 donne un apercu du
+processus de choix du coup a jouer dans Indigo. Le module base sur les connaissances
+fournit ns coups au module MC qui, en vue de selectionner le meilleur coup, joue
+un grand nombre de parties aleatoires jusqu'au bout et commencant par l'un de ces
+coups et calcule des moyennes. Le module base sur les connaissances est donc un pre-
+processeur du module MC.
+L'amelioration du module base sur les connaissances est l'objet de cet article. Ce
+module comprend plusieurs bases de \patterns" construits a la main. Les bases de
+connaissances construites a la main ont plusieurs desavantages : elles contiennent des
+erreurs, elles ont des lacunes et elles ne peuvent pas e^tre mises a jour facilement. Par
+ailleurs, les multiples bases de connaissances dans Indigo ne partagent pas le me^me
+format : la premiere (Forme M) contient des caracteristiques dependantes du domaine
+RNTI-E-355
+Extraction bayesienne et integration de patterns pour le go 19x19
+Ns coups coup
+choisi
+Module de pré-
+sélection basé sur
+des connaissances
+Module
+Monte
+Carlocoups
+légaux
+Forme_M, B, C Forme_3x3
+utilise utilise
+Fig. 1 { L'architecture de Indigo comprend un module de pre-selection et un module
+Monte Carlo et des bases heterogenes de patterns, Forme B, Forme C, Forme M
+et Forme 3x3.
+utilisees par la fonction d'evaluation conceptuelle, la seconde (Forme 3x3) comprend
+des formes 3x3 optimisees pour faire des simulations rapides, et la derniere (Forme B
+et Forme C) est dediee au debut de partie et contient des patterns larges. La gure
+1 montre comment sont utilisees les dierentes bases de patterns dans Indigo. Etant
+donne le succes de l'approche Monte Carlo dans Indigo, nous avons voulu a nouveau
+utiliser des statistiques dans le module base sur les connaissances. C'etait donc le
+bon moment pour tester la creation automatique d'une nouvelle base de patterns et
+d'observer ses eets positifs dans l'architecture de Indigo. La creation automatique
+de patterns evite les erreurs et les manques dans la base. La creation automatique est
+eectuee en parcourant des parties de professionnels pour creer des patterns et estimer
+leur probabilite de \match" et leur probabilite d'e^tre joue sachant qu'ils ont \matches".
+En d'autres termes, l'approche adoptee est une approche bayesienne. Pour eviter une
+limitation liee a la taille des patterns, particulierement au debut de la partie, nous avons
+choisi la representation des K plus proches voisins dans laquelle les faits saillants sont
+les intersections occupees et les bords. Pour cette raison, la base de patterns construites
+s'appelle Forme K.
+Le but de cet article est la description de l'extraction bayesienne de patterns
+representes suivant les K plus proches voisins a partir de parties de joueurs profes-
+sionnels et l'utilisation de ces patterns dans le programme Indigo jouant des parties
+de go. Le but de l'article n'est pas de decrire le programme Indigo dans on ensemble,
+ni son module Monte Carlo (deja decrit dans [9, 4]). La partie 2 rappelle les travaux
+anterieurs lies a ce travail. La partie 3 denit la representation basee sur les K plus
+proches voisins utilisee dans ce travail. Puis, la partie 4 decrit la creation de patterns
+et leurs proprietes probabilistes. La partie 5 presente les experiences eectuees en vue
+d'integrer ce travail dans Indigo, et elle evalue les progres realises. Avant la conclusion,
+les perspectives sont mises en lumiere par la partie 6.
+2 Travaux existants
+Malgre son importance dans les programmes de go, la litterature sur l'acquisition
+de patterns et la generation locale de coups n'est pas tres developpee. [2] de Mark Boon
+RNTI-E-3 56
+Bouzy et Chaslot
+fut le premier article decrivant un algorithme d'appariement au go en details : celui
+de Goliath, meilleur programme en 1990. Mais cet article ne decrivait pas l'acquisition
+des patterns. Plus recemment, Erik van der Werf travaille suivant une approche basee
+sur un reseau de neurones pour engendrer des coups locaux [17], predire la vie et la
+mort des groupes (concepts importants au jeu de go) [19], ou aecter un score aux
+positions terminales [18]. Comme notre systeme parcourt des parties de professionnels
+pour engendrer des patterns conseillant des coups locaux, on peut dire que notre travail
+est dans la lignee de celui de Erik van der Werf. Cependant, il est moins sophistique car
+il utilise l'approche des K plus proches voisins au lieu d'un reseau de neurones. De plus,
+il ne predit pas la vie et la mort et ne donne pas de scores aux positions terminales.
+Tristan Cazenave a travaille sur l'acquisition automatique de patterns tactiques pour les
+\yeux" et la connexion [10], incluant aussi des conditions externes [11]. Notre travail
+est similaire a celui de Cazenave par son approche automatique mais elle est assez
+dierente par ailleurs : les patterns sont crees avec une approche bayesienne dans le
+but d'e^tre utilise par le niveau global du programme alors que les patterns de Cazenave
+sont crees dans un but particulier (capturer ou connecter des cha^nes de pierres, etc.),
+et suivant une methode d'apprentissage basee sur les explications. Enn [3] decrit la
+generation de patterns 4x4 par analyse retrograde. Bien que concernant la generation
+automatique, ce travail etait applique a des patterns limites en taille et il utilisait
+l'analyse retrograde au lieu de l'approche bayesienne.
+3 La representation des K plus proches voisins
+La representation des K plus proches voisins est classique en reconnaissance des
+formes [1]. Cette partie denit la representation des K plus proches voisins utilisee
+dans ce travail.
+3.1 Patterns K plus proches voisins
+Le dessin ci-dessous montre un exemple de pattern K plus proches voisins.
++@+
++++++
+++*+O
++++++
+++@
+Un pattern conseille un coup en son centre indique par un '*'. '+' designe une
+intersection vide. 'O' designe une pierre blanche et '@' une pierre noire. '+' est un
+fait non important dans cette representation. Inversement, une pierre noire, une pierre
+blanche ou un bord ('|') sont des faits importants. Un pattern contient un nombre de
+faits importants appele K. Dans l'exemple precedent, K=3.
+Le centre du pattern etant donne, nous supposons que les intersections voisines sont
+ordonnees suivant une distance. Nous supposons aussi que cet ordre pre-deni evite les
+ex-aequo entre les intersections situees a distance egale du centre du pattern. Avec de
+RNTI-E-357
+Extraction bayesienne et integration de patterns pour le go 19x19
+telles suppositions, l'algorithme d'appariement reste simple et peut e^tre programme
+pour e^tre ecace.
+L'avantage de cette representation est l'absence de limitation de taille des patterns.
+Au go, beaucoup de coups sont joues en fonction du voisinage des pierres et du voisinage
+du bord. Pour simplier le travail, nous avons contraint les patterns de conseiller un
+coup en son centre, et pas ailleurs.
+La representation des K plus proches voisins ne contient pas explicitement de sym-
+bole '#' designant une intersection inconnue (donc potentiellement egale a '@', 'O',
+'+', '|'), approche habituelle dans les programmes de go [2]. Cependant, dans d'autres
+representations gerant les '#', les patterns sont grossierement centres autour du coup
+conseille, et les '#' sont souvent situes \loin" du centre du pattern, alors que les points
+importants sont situes pres du centre. Donc la representation des K plus proches voi-
+sins contient implicitement des '#'. Ne pas gerer ces points explicitement simplie
+l'algorithme d'appariement. Parce que remplacer un pattern contenant un '#' par 4
+patterns contenant une des 4 valeurs possibles ('@', 'O', '+', '|') est toujours possible,
+cette representation ne perd pas de generalite pourvu que la memoire disponible soit
+susante.
+L'algorithme d'appariement doit gerer les symetries, rotations et inversions noir-
+blanc d'une facon ou d'une autre. Sur les 16 patterns equivalents a un pattern donne,
+une premiere approche consiste a ne stocker en memoire que le pattern donne et l'autre
+approche consiste a stocker les 16 patterns. Dans une premiere version de notre travail,
+nous avons utilise la seconde approche qui simplie la programmation de l'algorithme
+d'appariement.
+3.2 La creation des patterns
+Pour un ensemble donne de parties, la creation des patterns est brutale. Elle cor-
+respond au pseudo-code suivant :
+Forme_k::creerPatterns() {
+Pour k = 1 a Kmax
+Pour chaque partie
+Pour chaque coup i de la partie
+creerPattern(k, i);
+}
+Si le pattern n'existe pas encore, la fonction creerPattern(k; i) cree le pattern centre
+en i avec k faits voisins importants suivant l'ordre pre-deni entre les intersections. Les
+patterns sont stockes dans un arbre dont les noeuds ont 4 ls : le noeud \si vide",
+le noeud \si noir", le noeud \si blanc" et le noeud \si bord". Gra^ce a un tel arbre,
+l'algorithme d'appariement est rapide, me^me avec un tres grand nombre de patterns.
+4 Generation bayesienne
+Cette partie decrit l'aspect bayesien du travail eectue, classique dans les ta^ches de
+classication [1]. D'abord, nous denissons et nommons les probabilites interessantes.
+RNTI-E-3 58
+Bouzy et Chaslot
+Puis, nous montrons comment notre generateur de patterns estime ces probabilites.
+Enn, nous presentons la facon d'eliminer les \mauvais" patterns.
+4.1 Denitions
+P designe une probablilite. i designe soit une intersection soit un coup joue sur cette
+intersection. p designe un pattern. P (p) est la probabilite que le pattern p s'apparie sur
+une intersection arbitraire sur l'ensemble des parties de joueurs professionnels. P (i) est
+la probabilite que le coup soit joue sur i. P (i; p) est la probabilite que le coup soit joue
+sur i et que le pattern p s'apparie sur i. P (ijp) est la probabilite que le coup soit joue
+sur i sachant que le pattern p s'apparie sur i. Finalement, P (pji) est la probabilite que
+le pattern p s'apparie sur i sachant que le coup est joue sur i. P (i) et P (p) sont des
+probabilites a priori. P (ijp) et P (pji) sont des probabilites a posteriori.
+Pendant la phase de jeu, l'idee de la methode est d'eectuer l'appariement sur toutes
+les intersections i du damier, et d'utiliser P (ijp) comme une estimation de l'urgence
+a jouer un coup sur i. Pendant la phase d'apprentissage, l'approche est basee sur la
+frequence des evenements, la probabilite qu'un evenement arrive est approximee par
+le nombre d'occurences de l'evenement divise par le nombre de tests eectues. Dans
+la suite, nous dirons qu'un pattern est frequent si P (p) est elevee, bon si P (ijp) est
+elevee, et utile si P (pji) est elevee. Donc, nous avons deni une classe Forme K dont
+les proprietes bayesiennes sont speciees ci-dessous en C++. Le terme \static" est un
+mot-cle C++ designant une propriete de classe.
+class Forme_k {
+static int n_test;
+static int n_joue;
+int n_match; // p.n_match
+int n_joue_sachant_match; // p.n_joue
+static float p_joue; // P(i)
+float p_match; // P(p)
+float p_joue_sachant_match; // P(i|p)
+float p_match_sachant_joue; // P(p|i)
+...
+};
+Les formules pour calculer les probabilites sont les suivantes :
+P(i) = n_joue/n_test;
+P(p) = p.n_match/n_test;
+P(i|p) = p.n_joue/p.n_match;
+P(p|i) = p.n_joue/n_joue;
+Precisons que nous n'avons pas besoin d'utiliser la formule de Bayes mais seulement
+des probabilites a posteriori. Cependant, avec nos denitions, la formule de Bayes est
+valide :
+(p:n match=n test):(p:n joue=p:n match) = (n joue=n test):(p:n joue=n joue)
+RNTI-E-359
+Extraction bayesienne et integration de patterns pour le go 19x19
+4.2 Estimation des probabilites
+Pour un ensemble donne de parties et pour un ensemble donne de patterns, le
+processus bayesien correspond au pseudo-code suivant :
+Forme_k::calculerProbabilites() {
+n_joue = n_test = 0;
+Pour chaque pattern p,
+p.n_match = p.n_joue = 0;
+Pour chaque partie {
+Pour chaque coup de la partie {
+n_joue++;
+Pour chaque intersection i du damier,
+test(i);
+}
+}
+Pour chaque pattern p,
+p.p_joue = p.n_joue/p.n_match;
+}
+Forme_k::test(i) {
+n_test++;
+patternMatching();
+pour chaque pattern p matchant sur i {
+p.n_match++;
+si le coup est joue sur i alors
+p.n_joue++;
+}
+}
+Un test sur une intersection i sur une position donnee d'une partie donnee repond
+aux deux questions : le coup a-t-il ete joue sur i, et quels patterns se sont apparies
+sur i ? Sur des damiers 19x19, 200 a 300 tests sont eectues par position et une partie
+contient grossierement 200 coups, donc 50,000 tests sont eectues par partie. Avec les
+2,000 parties de professionnels que nous avons aujourd'hui, cela fait environ 100,000,000
+tests.
+4.3 Eliminer les mauvais patterns
+L'idee est d'eliminer les patterns qui ne sont pas bons (P (ijp) faible) ou bien
+les patterns dont la probabilite est estimee avec un niveau de conance trop faible.
+Premierement, parce que les patterns avec une probabilite faible sont moins interessants
+le processus de generation ne garde que les patterns tels que P (ijp) > 0:01. Deuxiemement,
+le niveau de conance de P (etant P (ijp)) est calcule en phase d'apprentissage. Les
+bases des statistiques [12] donnent  =
+p
+P (1  P ). Pour la plupart des patterns on
+a P << 1, donc  =
+p
+P . La quantite adequate pour estimer le niveau de conance
+est s(ijp) = =
+p
+p:n match =
+p
+p:n joue=p:n match. Par ailleurs, on peut eliminer
+RNTI-E-3 60
+Bouzy et Chaslot
+les patterns tels que P (ijp) < threshold  s(ijp). Cependant, en pratique,nous avons
+decide d'appliquer cette regle seulement lorsque notre ensemble de parties sera plus
+grand. Avec ce choix, notre systeme a extrait des bases parametrees par K le nombre
+maximal de voisins pertinents. La table 1 donne le nombre de patterns engendres pour
+certaines valeurs de K.
+K 6 9 15
+patterns 8,000 27,000 85,000
+Tab. 1 { Nombre de patterns engendres pour K = 6; 9; 15.
+5 Experiences
+Il y a deux facons d'utiliser Forme K dans Indigo : jeu par coeur comme un
+dictionnaire d'ouvertures sans verication Monte Carlo (partie 5.1), et utilisation dans
+le pre-processeur pour verication Monte Carlo (partie 5.2). Pour chaque facon, nous
+avons fait des experiences pour evaluer l'eet de Forme K. Une experience consiste
+en une serie de 100 parties entre le programme a evaluer, Katia, et le programme
+de reference, Indigo2004 qui a participe aux olympiades d'ordinateurs 2004. Chaque
+programme joue 50 parties avec Noir. Le resultat d'une experience est un ensemble de
+scores presentes dans une table supposant que Katia est le joueur max. Une resultat
+positif dans une case de la table indique donc un succes. Etant donne que l'ecart-
+type des scores de parties jouees sur damier 19x19 par nos programmes est d'environ
+75 points, 100 parties permettent d'abaisser  a 7.5 points (seulement) et d'avoir un
+intervalle de conance a 95% avec un rayon egal a 2, soit 15 points. Nous avons utilise
+des ordinateurs a 2.4 GHz. Indigo et Katia utilisaient donc tous les deux Forme B,
+Forme C, Forme M et Forme 3x3. Et evidemment, Katia utilisait Forme K.
+5.1 Utiliser Forme K comme un livre d'ouvertures
+coup
+choisi
+Livre
+d’ouverturescoups
+légaux
+Forme_K
+utilise
+Fig. 2 { Au debut de la partie, Katia se reduit a un livre d'ouvertures utilisant la
+base Forme K.
+Pour observer rapidement l'eet de l'utilisation de Forme K, il est decide que, lors
+des debut premiers coups de la partie,Katia joue directement le meilleur coup conseille
+par Forme K. Ainsi, au debut de la partie, Katia utilise Forme K comme un livre
+RNTI-E-361
+Extraction bayesienne et integration de patterns pour le go 19x19
+d'ouvertures sans verication MC ulterieure (cf. gure 2). Le meilleur coup conseille
+par Forme K est le coup conseille par le pattern s'appariant avec la position et ayant
+la probabilite P (ijp) maximale. Pour que deux executions dierentes deKatia donnent
+des debuts de parties dierents sans perte de niveau de jeu, une legere randomisation
+a ete introduite dans le livre d'ouvertures. La gure 3 donne les 40 premiers coups
+d'un debut de partie jouee par Katia contre elle-me^me de cette maniere. Les forts
+joueurs de go reconnaissent que ce debut de partie est excellent. Ce qui reete la force
+de l'approche bayesienne associee a une representation basee sur les K plus proches
+voisins. C'est le point fort de cet article.
+Fig. 3 { Les 40 premiers coups d'une partie jouee par Katia contre elle-me^me
+Cette evaluation qualitative etant faite, il est important d'evaluer Forme K quan-
+titativement en termes de scores de n de parties. La table 2 montre les resultats
+entre Katia(k, debut) et Indigo. Pendant les debut premiers coups, le coup joue par
+Katia est celui conseille par Forme K. Apres les debut premiers coups de la partie,
+Katia utilise le me^me processus de choix que Indigo (cf. gure 1).
+Comme on s'y attendait, le resultat augmente avec K, mais jusqu'a K = 15 les
+resultats sont negatifs. La valeur convenable de debut est a determiner. begin <= 40
+donne de bons reusltats. En revanche, pour begin >= 50, le niveau de jeu diminue
+lorsque begin augmente. Cela s'explique par l'absence d'utilisation des concepts impor-
+tants du domaine dans la representation utilisee. Parce que Katia(begin=40) joue
+instantanement pendant les 40 premiers coups, elle economise environ 30% du temps
+de reexion sur une partie complete. Donc, arrive a e stade, l'integration montre deja
+un eet positif en termes de niveau de jeu et de temps de reexion.
+RNTI-E-3 62
+Bouzy et Chaslot
+6 9 15
+10 -1 +1 +1
+20 -6 +2 +5
+30 -7 -2 +2
+40 -29 -4 +4
+50 -45 -26 -11
+Tab. 2 { Resultat moyen of Katia(k, debut) contre Indigo pour k = 6, 9, 15 et
+debut = 10, 20, 30, 40, 50.
+5.2 Integrer Forme K dans le pre-processeur MC
+Ns coups coup
+choisi
+Module de pré-
+sélection basé sur
+des connaissances
+Module
+Monte
+Carlocoups
+légaux
+Forme_M, B, C, K Forme_3x3
+utilise utilise
+Fig. 4 { Apres le debut de partie, Katia utilise une architecture identique a celle de
+Indigo, avec la base Forme K en supplement.
+Le but de cette partie est de valider l'integration de Forme K dans le pre-processeur
+base sur des connaissances (cf gure 4). Il faut bien noter que Forme K est utilise par
+le pre-processeurMC mais pas par le module MC lui-me^me. Le module MC n'utilise que
+la base Forme 3x3. Nous appelons Katia(nk) la version de Katia qui selectionne nk
+coups avec Forme K et ns nk coups avec le pre-processeur existant. En 2004, Indigo
+et Katia utilisent ns = 7. Parce que Forme K ne contient pas de representation
+elaboree relative aux concepts importants du jeu de go, nous avons fait varier nk entre
+0 et 4 pour garder au moins 3 coups engendres par des connaissances incluant ces
+concepts importants. La table 3 montre ces resultats.
+0 10 20 30 40 50
+0 +1.0 +5.4 +0.6 +3.5 -11.1
+1 -1.3 +4.9 +1.8 +3.6 +2.1 -2.9
+2 +9.6 +15.8 +10.0 +6.1 +5.8 -13.0
+3 +3.9 +8.6 -0.7 -1.5 -6.7 -20.1
+4 +5.1 -2.5 +6.7 -4.2 +1.0 -16.9
+Tab. 3 { Resultat moyen de Katia(debut, nk) contre Indigo pour debut = 0, 10,
+20, 30, 40, 50 et pour nk = 0, 1, 2, 3, 4.
+RNTI-E-363
+Extraction bayesienne et integration de patterns pour le go 19x19
+Plusieurs de ces resultats sont positifs. Katia(debut=10,nk=2) est 15 points
+meilleure que Indigo en moyenne. Il est interessant de commenter la ligne de resultats
+correspondant a Katia(nk=2). Premierement, Katia(debut=0,nk=2) montre le
+resultat de l'integration de Forme K avec verication MC sans livre d'ouvertures. Il
+faut noter l'amelioration de 10 points causee par l'insertion de 2 coups Forme K au
+sein des 7 coups selectionnes. Ce fait traduit le manque connu de patterns dans les bases
+construites manuellement et la presence de patterns importants dans la base construite
+automatiquement. Deuxiemement, le resultat de Katia(debut=10,nk=2) est aussi
+surprenant. Il montre que les 5 premiers coups joues en reexe donne une amelioration
+de 5 points en moyenne. Troisiemement, le resultat de Katia(debut=20,nk=2) tra-
+duit un bon compromis : le niveau de jeu obtenu et le me^me que celui pour debut = 0
+et le temps de reexion est economise de 20% sur le temps total sur une partie. Fi-
+nalement, Katia(debut=30 ou 40,nk=2) peuvent e^tre consideres comme des com-
+promis raisonnables entre le temps de reexion economise et le niveau de jeu. En re-
+vancheKatia(debut=50,nk=2) n'est pas raisonnable, la perte de niveau de jeu etant
+trop importante. Enn, il est possible de commenter la table colonne par colonne. Les
+meilleurs resultats sont obtenus pour nk = 2. Forme K n'incluant pas de concepts
+importants du jeu de go, il est normal que nk ne soit pas tres eleve en regard de
+ns nk. En resume, en copiant la version appropriee de Katia dans Indigo, peut-e^tre
+Katia(debut=20,nk=2), nous pouvons conclure que Forme K peut e^tre integree
+avec succes dans Indigo, et nous attendons la prochaine competition d'ordinateurs
+pour mesurer les eventuels progres contre des programmes concus dieremment.
+6 Perspectives
+Nous avons prevu de re-engendrer Forme K avec un nombre de parties superieur
+a 2,000. Par exemple, le CDROM GoGod contient 30,000 parties de professionnels et a
+la bonne taille pour evaluer le gain en niveau de jeu en fonction du nombre de parties
+utilisees pour la generation. Cela permettra d'aner les estimations des probabilites et
+par consequent d'aner les urgences de coups en phase de jeu. Une amelioration devrait
+e^tre observee. Prendre en compte les symetries, rotations et inversions noir-blanc est
+aussi un travail a faire pour mieux estimer les probabilites. Nous souhaitons egalement
+etendre la representation pour que les coups puissent e^tre conseilles non seulement au
+centre du pattern mais aussi sur des intersections voisines du centre.
+A moyen terme, nous avons deux perspectives vraiment interessantes. D'abord,
+integrer Forme K avec la fonction d'evaluation conceptuelle pour eventuellement rem-
+placer Forme M. Ensuite, integrer un sous-ensemble de Forme K dans le moteur
+de parties aleatoires pour eventuellement remplacer Forme 3x3 dans le module MC
+lui-me^me. La premiere integration pose un probleme de genie logiciel, Forme M etant
+speciquement utilisee par la fonction d'evaluation conceptuelle de Indigo. La seconde
+integration pose un probleme de performance d'abord. Les parties aleatoires devant e^tre
+tres rapides, l'appariement eectue a chaque coup d'une partie aleatoire doit e^tre limite
+a un voisinage tres restreint du coup precedent. Un probleme d'ajustement automa-
+tique des urgences des patterns se pose ensuite. L'apprentissage par renforcement [16]
+est la solution envisagee.
+RNTI-E-3 64
+Bouzy et Chaslot
+7 Conclusion
+Nous avons presente une methode pour extraire automatiquement des patterns avec
+des parties de professionnels. Cette methode utilise des estimations de probabilites et ne
+presuppose pas de connaissances dependantes du domaine. A ce titre, c'est une bonne
+continuation d'un programme de go base sur Monte Carlo. La representation utilisee
+est celle des K plus proches voisins. La generation bayesienne sur cette representation
+a produit une base de patterns donnant des debuts de parties excellents. Ce travail
+demontre par l'experience que cette representation est tres adaptee au go. C'est le
+point fort de cet article. Sa faiblesse reside dans l'absence prevue de comprehension
+de concepts importants du jeu de go tels que la vie et de la mort des groupes. Donc
+cette approche ne devait pas e^tre utilisee telle quelle et devait e^tre combinee avec des
+techniques existantes, ce qui a ete fait.
+Nous avons integre la base de patterns dans le programme Indigo. Le resultat est
+positif. Ajouter la base de patterns dans le pre-processeur du module MC permet a
+Indigo d'augmenter son niveau de jeu de 15 points en moyenne sur des damiers 19x19,
+ce qui est signicatif au go. Qui plus est, au debut de la partie, la qualite des coups
+produits permet au programme de jeu de jouer ces coups en reexe sans verication
+MC. Par consequent, 20% du temps de reexion est economise et laisse de la place
+pour d'autres ameliorations.
+References
+[1] C. Bishop. Neural networks and pattern recognition. Oxford University Press,
+1995.
+[2] M. Boon. A pattern matcher for Goliath. Computer Go, 13 :13{23, 1990.
+[3] B. Bouzy. Go patterns generated by retrograde analysis. In Computer Olympiad
+Workshop, Maastricht, 2001.
+[4] B. Bouzy. Associating knowledge and Monte Carlo approaches within a go pro-
+gram. In 7th Joint Conference on Information Sciences, pages 505{508, Raleigh,
+2003.
+[5] B. Bouzy. Mathematical morphology applied to computer go. International Jour-
+nal of Pattern Recognition and Articial Intelligence, 17(2) :257{268, March 2003.
+[6] B. Bouzy. The move decision process of Indigo. International Computer Game
+Association Journal, 26(1) :14{27, March 2003.
+[7] B. Bouzy. Indigo home page. www.math-info.univ-
+paris5.fr/bouzy/INDIGO.html, 2004.
+[8] B. Bouzy and T. Cazenave. Computer go : an AI oriented survey. Articial
+Intelligence, 132 :39{103, 2001.
+[9] B. Bouzy and B. Helmstetter. Monte Carlo go developments. In Ernst A. Heinz
+H. Jaap van den Herik, Hiroyuki Iida, editor, 10th Advances in Computer Games,
+pages 159{174, Graz, 2003. Kluwer Academic Publishers.
+RNTI-E-365
+Extraction bayesienne et integration de patterns pour le go 19x19
+[10] T. Cazenave. Automatic acquisition of tactical go rules. In 3rd Game Programming
+Workshop in Japan, pages 10{19, Hakone, 1996.
+[11] T. Cazenave. Generation of patterns with external conditions for the game of go.
+In B. Monien H.J. van den Herik, editor, Advances in Computer Games, volume 9,
+University of Limburg, Maastricht, 2001.
+[12] CISIA CERESTA, editor. Aide-memoire statistique. 1999.
+[13] M. Muller. Computer go. Articial Intelligence, 134 :145{179, 2002.
+[14] M. Muller. Position evaluation in computer go. ICGA Journal, 25(4) :219{228,
+December 2002.
+[15] J. Schaeer and J. van den Herik. Games, Computers, and Articial Intelligence.
+Articial Intelligence, 134 :1{7, 2002.
+[16] R. Sutton and A. Barto. Reinforcement Learning : an introduction. MIT Press,
+1998.
+[17] E. van der Werf, J. Uiterwijk, E. Postma, and J. van den Herik. Local move
+prediction in Go. In Yngvi Bjornsson J. Schaeer, M. Muller, editor, Computers
+and Games, volume 2883 of Lecture Notes in Computer Science, pages 393{412.
+Springer, 2002.
+[18] E. van der Werf, J. Uiterwijk, and J. van den Herik. Learning to score nal
+positions in the game of go. In H. Jaap van den Herik, Hiroyuki Iida, and Ernst A.
+Heinz, editors, Advances in Computer Games, Many Games, Many Challenges,
+volume 10, pages 143{158. Kluwer Academic Publishers, 2003.
+[19] E. van der Werf, M. Winands, J. van den Herik, and J. Uiterwijk. Learning to pre-
+dict life and death from go game records. In 7th Joint Conference on Information
+Sciences, pages 501{504, Raleigh, 2003.
+Summary
+This paper describes the generation and utilisation of a pattern database for 19x19
+go with the K-nearest-neighbor representation. Patterns are generated by browsing
+recorded games of professional players. Meanwhile, their matching and playing pro-
+babilities are estimated. The database created is then integrated into an existing go
+program, Indigo, either as an opening book or as an enrichment of other pre-existing
+databases used by Indigo move generator. The improvement brought about by the use
+of this pattern database is estimated at 15 points on average, which is signicant in go
+standards.
+RNTI-E-3 66

@@ -1,0 +1,775 @@
+Le logiciel SpaCEM3 pour la classification
+de donne´es complexes
+Juliette Blanchet, Florence Forbes, Sophie Chopart, Lamiae Azizi
+Equipe Mistis, INRIA Grenoble Rhoˆne-Alpes, Laboratoire Jean Kuntzmann
+Re´sume´ Le logiciel SpaCEM3 (Spatial Clustering with EM and Markov Models)
+propose une varie´te´ d’algorithmes pour la classification, supervise´e ou non super-
+vise´e, de donne´es uni ou multi-dimensionnelles en interaction, certaines de ces donne´es
+pouvant eˆtre manquantes. Les structures de de´pendances prises en compte sont celles
+pouvant eˆtre de´crites par un graphe fini quelconque. Elles incluent le cas particu-
+lier des grilles re´gulie`res utilise´es notamment en segmentation d’images. L’approche
+principale se fonde sur l’utilisation de l’algorithme EM pour une classification floue
+et sur les mode`les de champs de Markov pour la mode´lisation des de´pendances.
+L’estimation est base´e sur des de´veloppements re´cents [6, 8, 7] mettant en oeuvre
+des techniques d’approximations variationnelles de type champ moyen.
+Keywords : champs de Markov cache´s, mode`les de Markov triplets, donne´es
+manquantes, algorithmes de type EM, champ moyen, se´lection de mode`les.
+1 Introduction
+La classification consiste a` regrouper des individus en groupes homoge`nes par rapport
+aux mesures effectue´es sur ces individus. Un individu au sens large peut eˆtre un pixel
+d’une image, un ge`ne, un segment de texte, etc. Les mesures effectue´es sur les individus
+peuvent eˆtre de nature variable (re´elles, entie`res, dans l’intervalle [0, 1], etc.), uni- ou multi-
+dimensionnelles. L’approche probabiliste repose alors sur la donne´e d’un mode`le pour le
+couple des observations et des classes, ge´ne´ralement de´compose´ en un mode`le re´gissant les
+classes et un mode`le (de bruit) re´gissant la ge´ne´ration des observations lorsque les classes
+sont connues. Dans la pratique, des hypothe`ses simplificatrices sont souvent adopte´es :
+(1) au niveau de la mode´lisation, on suppose en ge´ne´ral que les classes sont inde´pen-
+dantes et que le mode`le de bruit se factorise sur les individus (on parle alors de bruit
+inde´pendant). Sous ces deux hypothe`ses, les individus sont alors implicitement suppose´s
+inde´pendants. Enfin, le bruit est suppose´ eˆtre de forme assez simple, gaussien en ge´ne´ral,
+ou au moins unimodal ;
+(2) au niveau des cas traite´s, les observations sont, en ge´ne´ral, ou bien de dimension
+raisonnable, ou bien les composantes de chaque observation sont suppose´es inde´pendantes.
+De plus, les donne´es utilise´es sont comple`tes. Lorsque, pour diffe´rentes raisons, certaines
+observations viennent a` manquer, soit ces observations ne sont pas traite´es (comme si
+aucune mesure n’avait e´te´ faite sur l’individu correspondant), soit les valeurs manquantes
+sont remplace´es de manie`re brutale (par des ze´ros, la moyenne, etc.).
+En pratique, il existe beaucoup de cas ou` ces hypothe`ses sont mises en de´faut et ne
+donnent pas de re´sultats satisfaisants. En particulier, les observations effectue´es sont sou-
+vent de´pendantes (les niveaux de gris des pixels d’une image par exemple). De plus, du
+fait des progre`s des appareils de mesure et des capacite´s de stockage, nombre de donne´es
+modernes sont en grande dimension. Sans parame´trisation particulie`re, le bruit doit alors
+c© Revue MODULAD, 2009 -147- Nume´ro 40
+eˆtre suppose´ inde´pendant -gaussien en ge´ne´ral- afin de limiter le nombre de parame`tres a`
+estimer. Or il est ave´re´ qu’une telle hypothe`se de bruit inde´pendant gaussien (ou unimo-
+dale en ge´ne´ral) est mal adapte´e a` certains cas re´els, par exemple pour la mode´lisation de
+textures. Enfin, il est tre`s fre´quent que certaines observations soient manquantes (certains
+pixels d’une image, lorsque des re´ponses a` certaines questions d’un sondage n’ont pas e´te´
+remplies, etc.). De manie`re ge´ne´rale, nous entendons dans cet article par donne´es com-
+plexes des donne´es ne suivant pas le cadre ide´al des hypothe`ses pre´ce´demment de´crites.
+Le logiciel SpaCEM3 (Spatial Clustering with EM and Markov Models) offre la possibilite´
+de mettre en œuvre des me´thodes de classification pour de telles donne´es. Le cadre sous-
+jacent au logiciel est celui d’une mode´lisation markovienne permettant de tenir compte
+des de´pendances entre les individus. Ces de´pendances sont de´finies a` l’aide d’un syste`me
+de voisinage, ou, de manie`re e´quivalente, d’un graphe (ou re´seau) d’interactions. Outre
+les outils classiques de classification a` base de me´langes gaussiens inde´pendants, les fonc-
+tionnalite´s de SpaCEM3 incluent les points suivants :
+– Classification non supervise´e d’individus, base´e sur une description des de´pendances
+a` l’aide d’un graphe non ne´cessairement re´gulier et un traitement base´ sur les champs
+de Markov cache´s et les mode`les de me´langes (voir Section 3.1). En particulier,
+– les donne´es peuvent eˆtre de grande dimension et les diffe´rentes dimensions eˆtre
+corre´le´es (voir Section 3.2) ;
+– certaines donne´es peuvent eˆtre manquantes (voir Section 4.3).
+– Classification supervise´e d’individus lorsque le mode`le de bruit n’est ni inde´pendant,
+ni unimodal. Les phases d’apprentissage et de test sont base´es sur la famille de
+mode`les de Markov triplets de´crits en Section 3.3.
+– Crite`re de se´lection de mode`les (BIC, ICL et leurs approximations en champ moyen)
+permettant de se´lectionner le meilleurmode`le de champ de Markov cache´ en fonction
+des donne´es.
+– Simulation des diffe´rents mode`les (champs de Markov, champs de Markov cache´s,
+champs de Markov triplets).
+Les applications des mode`les mis en oeuvre dans le logiciel sont tre`s nombreuses. Men-
+tionnons notamment des applications a` donne´es complexes : l’analyse d’images, me´dicales
+ou satellitaires et plus ge´ne´ralement la vision par ordinateur. Par exemple en te´le´de´tection,
+on a affaire a` des images hyperspectrales. Chaque pixel correspond a` un spectre de plu-
+sieurs centaines de longueurs d’onde. Aussi, en reconnaissance de textures le me´lange
+gaussien usuel ne suffit plus. Il peut eˆtre remplace´ avantageusement par une utilisation
+adapte´e des champs de Markov triplets. Mentionnons e´galement les applications a` l’ana-
+lyse de donne´es non images. Par exemple, les travaux [16, 7] contiennent une application
+en ge´nomique avec prise en compte de de´pendances entre les ge`nes (re´seaux).
+2 Caracte´ristiques techniques
+Le logiciel est de´veloppe´ en C++. La dernie`re version de SpaCEM3 (spacem3 2.0)
+propose une interface graphique de´veloppe´e avec la librarie QT. Il est compose´ de 52
+classes (30000 lignes de codes) pour le coeur du programme et de 20000 lignes de codes
+pour l’interface graphique. Le logiciel est disponible en te´le´chargement (http ://spa-
+cem3.gforge.inria.fr) pour les syste`mes d’exploitation Linux (package .deb et .rpm), Win-
+dows et MacOs, ainsi qu’une documentation sous forme de tutorial. Le logiciel peut eˆtre
+c© Revue MODULAD, 2009 -148- Nume´ro 40
+Fig. 1 – Affichage (zoom) d’un graphe de voisinage quelconque.
+utilise´ de deux fac¸ons : sans interface graphique en lanc¸ant directement l’exe´cutable ; avec
+interface graphique permettant de visualiser les donne´es, d’effectuer leur classification et
+de visualiser les re´sultats.
+SpaCEM3 accepte les donne´es sous forme de fichier .txt ou .dat en texte ou en binaire.
+Chaque individu est repre´sente´ par une ligne et chaque dimension ou chaque variable de
+cet individu par une colonne. Les de´pendances entre les individus sont mode´lise´es sous la
+forme d’un graphe de voisinage. Deux types de graphes peuvent eˆtre utilise´s : le type Image
+correspondant aux N plus proches voisins dans une grille re´gulie`re, et le type Structure
+pour un graphe non re´gulier (la liste des voisins est alors a` fournir dans une fichier texte,
+voir Figure 1 pour illustration). Le logiciel SpaCEM3 peut e´galement construire certains
+graphes classiques (graphe de Delaunay, graphe de Gabriel, graphe de voisinage relatif,
+graphe des -voisins, graphe des k-voisins re´ciproques ; voir Figure 2).
+3 Mode`les pour la classification
+Nous pre´sentons ici les mode`les qui sont plus spe´cifiquement propres a` SpaCEM3. Il
+s’agit des mode`les de champs de Markov cache´s (Section 3.1), des extensions de ce mode`le
+utilise´s pour traiter des donne´es de grande dimension (Section 3.2), et d’une famille de
+champs de Markov triplet pour la classification supervise´e (Section 3.3).
+3.1 Mode`le de champ de Markov cache´
+3.1.1 Champs de Markov
+La de´finition d’un champ de Markov repose sur celle d’un syste`me de voisinage syme´-
+trique, vu comme un graphe G reliant les individus. On dit que Z = {Z1, · · · , Zn} est un
+champ de Markov associe´ a` G si les deux conditions suivantes sont satisfaites :
+∀z, ∀i ∈ I, P (Zi = zi|ZI\{i} = zI\{i}) = P (Zi = zi|ZNi = zNi) (1)
+∀z, P (Z = z) > 0, (2)
+c© Revue MODULAD, 2009 -149- Nume´ro 40
+(a)
+(b) (c)
+(d) (e)
+Fig. 2 – Cre´ation des graphes de voisinage par SpaCEM3 : (a) Graphe de Gabriel, (b)
+Graphe de Delaunay, (c) Graphe de voisinage relatif, (d) Graphe des -voisins (=0.2),
+(e) Graphe de k-voisins (k=7).
+ou` I est un ensemble de site (individus) indice´s par i ∈ {1 . . . n}, I\{i} est l’ensemble
+des sites I prive´ du site i et Ni l’ensemble des sites voisins du site i, ie. relie´s a` i par
+une areˆte dans le graphe G. En pratique, on pre´fe`re souvent caracte´riser un champ de
+Markov par une distribution jointe : un champ de Markov Z est de manie`re e´quivalente
+(the´ore`me d’Hammersley-Clifford) une distribution de Gibbs PG(z) = W
+−1 exp(−H(z))
+dont la fonction e´nergie H , de´finie a` une constante additive pre`s, se de´compose en une
+somme de fonction potentiels Vc associe´ aux cliques c de G, H(z) =
+∑
+c∈C
+Vc(zc). W est
+la constante de normalisation, encore appele´e fonction de partition. Il est important de
+noter qu’une distribution markovienne n’est pas calculable de manie`re exacte. Diffe´rentes
+approximations ont e´te´ propose´es dans la litte´rature, dont l’approximation en champ
+moyen, sur laquelle nous revenons en Section 4.1.
+Mode`le de Potts et extensions. Le logiciel SpaCEM3 traite le cas des champs de
+Markov discrets en se limitant aux potentiels sur les cliques d’ordre 1 et 2 qui sont la
+plupart du temps suffisants pour mode´liser les de´pendances spatiales. Cela correspond a`
+une e´nergie de la forme :
+H(z) =
+∑
+i
+(Vi(zi) +
+∑
+j∈Ni
+Vij(zi, zj)). (3)
+Un mode`le simple est alors le mode`le d’Ising, dans lequel les variables Zi sont binaires.
+Un mode`le plus ge´ne´ral correspond a` des Zi pouvant prendre K > 2 valeurs. Ces valeurs
+correspondent aux classes dans les proble`mes de classification vise´s.
+Potentiels sur les singletons. Les potentiels sur les singletons (les cliques d’ordre 1)
+Vi(zi) permettent de mode´liser la probabilite´ d’occurrence de la classe zi au site i conside´re´
+individuellement. Lorsque les potentiels Vi(zi) de´pendent de i (et non seulement de zi),
+on parle de champ externe non stationnaire. De tels potentiels non-stationnaires peuvent
+c© Revue MODULAD, 2009 -150- Nume´ro 40
+eˆtre inte´ressants pour inte´grer de l’information a priori visant a` influencer les sites indi-
+viduellement. Dans SpaCEM3, ces fonctions potentiels sont suppose´es eˆtre les meˆmes sur
+l’ensemble des sites, c’est a` dire que Vi(zi) ne de´pend du site i qu’a` travers la valeur de zi.
+Cette hypothe`se correspond a` un champ magne´tique externe spatialement stationnaire et
+peut se traduire par la notation : Vi(zi) = −αzi Les fonctions potentiels sur les singletons
+sont alors caracte´rise´es par le vecteur des poids α = (α1, . . . , αk) associe´s aux K classes.
+En adoptant la notation vectorielle zi = ezi ou` (e1, . . . , eK) de´signe la base canonique, et
+en notant z
+′
+i la transpose´e du vecteur zi on a : Vi(zi) = −z′iα.
+Potentiels sur les paires. Les potentiels sur les paires (les cliques d’ordre 2) Vij(zi, zj)
+permettent de mode´liser la de´pendance entre les classes Zi et Zj en des sites i et j voisins.
+Dans SpaCEM3, ces fonctions potentiels sont les meˆmes sur l’ensemble des sites, ce qui
+peut se traduire par la notation : Vij(zi, zj) = V (zi, zj) = −βzi,zj . Les fonctions potentiels
+sur les paires sont donc caracte´rise´es par la matrice syme´trique β = (βkk′ )k,k′∈[1,K] associe´e
+aux K ×K interactions entre classes. En adoptant la notation vectorielle pre´ce´dente on
+a : Vij(zi, zj) = −z′iβzj. Le terme βkk′ peut s’interpre´ter comme le degre´ de compati-
+bilite´ entre les classes k et k
+′
+. Un cas particulier est lorsque la matrice β s’e´crit βIk
+ou` Ik de´signe la matrice unite´ de dimension K ×K. Son e´nergie est alors donne´e par :
+H(z) = −∑
+i∼j
+z
+′
+iβzj = −β
+∑
+i∼j
+1zi=zj = −βN(Z) ou` N(Z) de´signe le nombre de paires ho-
+moge`nes pour la classification z. C’est le mode`le de Potts. Le logiciel SpaCEM3 permet
+de conside´rer quatre cas de matrice d’interaction β : matrice pleine, matrice pleine avec
+composants diagonaux identiques, matrice diagonale et matrice proportionnelle a` l’iden-
+tite´. Il en re´sulte 8 mode`les (on parlera de mode`le de Potts e´tendu) possibles, selon
+ou non qu’on inclut des parame`tres de champ externe α.
+3.1.2 Champs de Markov cache´s
+Avant d’introduire le mode`le de champ de Markov cache´ imple´mente´ dans SpaCEM3,
+nous pre´cisons la notion de me´lange inhe´rente aux mode`les probabilistes de classification
+que nous conside´rons. Il s’agit de classer n observations re´elles D-dimensionnelles, note´es
+x = (x1, · · · , xn). Notons K = [1, K] l’ensemble des classes. Le proble`me de classification
+est d’associer a` chacune des observations xi une classe note´e zi ∈ K qui peut eˆtre vue
+comme la re´alisation d’une variable ale´atoire discre`te Zi ∈ K. En notant z = (z1, · · · , zn),
+la distribution des observations est alors donne´e par : P (x) =
+∑
+z P (z)P (x|z).
+Distribution de me´lange. On parlera de me´lange inde´pendant si le couple (X,Z) suit
+une loi de´finie par :
+P (z) =
+∏
+i∈I
+P (zi) (4)
+et P (x|z) =
+∏
+i∈I
+P (xi|zi) . (5)
+L’e´quation (4) indique que les variables cache´es Z sont inde´pendantes et l’e´quation (5) est
+appele´e hypothe`se de bruit inde´pendant. Sous les hypothe`ses (4) et (5), les x1, · · · , xn sont
+alors des re´alisations inde´pendantes et de meˆme loi. Pour retrouver la de´finition classique
+c© Revue MODULAD, 2009 -151- Nume´ro 40
+du me´lange inde´pendant, il faut encore supposer que les classes Zi sont identiquement dis-
+tribue´es, c’est-a`-dire que P (zi) ne de´pend pas de i et on peut alors noter πk la probabilite´
+P (Zi = k) (avec, pour tout k ∈ K, πk ∈ [0, 1] et
+∑
+k∈K πk = 1). De meˆme, le distribution
+de la classe k, P (.|Zi = k), est suppose´e ne de´pendre que d’un parame`tre θk ; nous la
+noterons f(.|θk). Le logiciel SpaCEM3 propose diffe´rents choix concernant la forme des
+distributions f(.|θk) : loi gaussienne a` matrice de covariance Σk diagonale, loi gaussienne
+ge´ne´rale (matrice Σk pleine), loi gaussienne adapte´e a` des donnne´es de grande dimension
+(voir Section 3.2), loi de Laplace (pour donne´es aberrantes), loi de Poisson (pour donne´es
+e´pide´miologiques). Pour ces diffe´rentes lois, les parame`tres peuvent eˆtre estime´s ou fixe´s.
+On peut e´galement me´langer ces diffe´rentes familles entre elles mais cette option n’est pas
+disponible dans l’interface.
+Distribution de champ de Markov cache´. Dans un mode`le de champ de Markov
+cache´, la classification non observe´e z est suppose´e eˆtre la re´alisation d’un champ de
+Markov Z (Section 3.1.1). Dans le logiciel SpaCEM3 le bruit est suppose´ eˆtre inde´pendant
+(e´quation (5)) ; on parle de champ de Markov cache´ a` bruit inde´pendant. On a
+alors de manie`re e´quivalente que le couple (X,Z) est un champ de Markov d’e´nergie
+H(z;φ)−∑i∈I log f(xi|θzi) ou` H(z;φ) est l’e´nergie du champ de Markov Z suppose´e ici
+de´pendre d’un parame`tre φ. Il s’en suit, en appliquant la re`gle de Bayes, que le champ
+Z|x des classes Z conditionnellement aux observations X = x est e´galement un champ de
+Markov d’e´nergie : H(z|x;ψ) = H(z;φ)−∑i∈I log f(xi|θzi).
+En pratique, c’est cette distribution a posteriori markovienne qui est utilise´e par les
+me´thodes baye´siennes classiques pour estimer les parame`tres et classer les individus. No-
+tons ne´anmoins que l’hypothe`se de champ de Markov cache´ a` bruit inde´pendant est suf-
+fisante mais non ne´cessaire pour que P (z|x) soit markovienne. Une hypothe`se moins
+forte est de supposer directement que le couple (X,Z) est markovien (sans que Z soit
+ne´cessairement markovien). On parle alors de champ de Markov couple [13]. Nous revien-
+drons sur ce mode`le, ainsi que sur son extension par champ de Markov triplet dans la
+Section 3.3.
+3.2 Mode`le gaussien pour donne´es de grande dimension
+Lorsque les donne´es observe´es sont en grande dimension, de nombreux algorithmes
+sont limite´s par la quantite´ de parame`tres a` estimer. Pour faire face a` ce proble`me, des
+mode`les parcimonieux peuvent eˆtre utilise´s, comme l’un des 14 mode`les particuliers pro-
+pose´s dans [1] pour le cas gaussien. Ne´anmoins de tels mode`les n’ont pas e´te´ spe´cifiquement
+e´labore´s pour les donne´es de grande dimension et, en particulier, ne tiennent pas compte
+du phe´nome`ne de l’espace vide. Une deuxie`me solution est d’utiliser des me´thodes de
+re´duction de dimension (ACP, se´lection de variables...). En classification, ces me´thodes
+de re´duction de dimension se font au prix d’une perte d’information car, certes, toutes
+les variables ne sont peut eˆtre pas informatives, mais l’ensemble des variables est souvent
+ne´cessaire pour discriminer les classes les unes par rapport aux autres.
+Pour classer les donne´es de grande dimension, la me´thode imple´mente´e dans SpaCEM3
+se base donc sur un mode`le diffe´rent de´veloppe´ dans [8] et e´tendu au cas markovien dans
+[7]. Il s’agit d’une re-parame´trisation du mode`le gaussien prenant en compte le fait que
+les donne´es de chaque classe vivent dans des sous-espaces diffe´rents dont les dimensions
+intrinse`ques peuvent varier. Conside´rons la de´composition spectrale de la matrice de co-
+c© Revue MODULAD, 2009 -152- Nume´ro 40
+variance de la classe k, Σk = QkΔkQ
+′
+k ou` Qk est la matrice orthogonale de taille D ×D
+des vecteurs propres de Σk, Q
+′
+k sa transpose´e et Δk est la matrice diagonale des valeurs
+propres. [8] propose de mode´liser le fait que les donne´es de chacune des classes vivent
+dans des sous-espaces de dimensions infe´rieures en e´crivant Δk sous la forme :
+Δk =
+⎛
+⎜⎜⎜⎝
+ak1 0
+.
+.
+.
+0 akDk
+(0)
+(0)
+bk 0
+.
+.
+.
+0 bk
+⎞
+⎟⎟⎟⎠
+ 
+
+
+Dk
+ 
+
+
+(D −Dk)
+ou`, pour tout d = 1, ..., Dk, akd > bk, et Dk < D. Notons que cela revient a` supposer
+que les D − Dk plus petites valeurs propres sont e´gales. Il est toujours possible de faire
+cette hypothe`se quitte a` prendre Dk = D − 1. Ne´anmoins en pratique, et c’est tout
+l’inte´reˆt de cette mode´lisation, on a Dk << D. Deux de ces mode`les gaussiens de grande
+dimension sont disponibles dans SpaCEM3 : le mode`le ge´ne`ral et un mode`le plus simple
+ou` ak1 = ak2 = akDk (voir illustration Figure 3).
+3.3 Mode`le de Markov triplet pour la classification supervise´e
+Dans de nombreux cas pratiques, et notamment en mode´lisation de textures et plus
+ge´ne´ralement de classes non unimodales, l’hypothe`se largement utilise´e de bruit inde´-
+pendant (e´quation (5)) est trop restrictive et la relacher est indispensable. De manie`re
+ge´ne´rale, le succe`s des mode`les de Markov cache´s a` bruit inde´pendant est du au fait
+que sous une telle mode´lisation, la distribution des classes conditionnellement aux ob-
+servations (loi a posteriori) est aussi markovienne, ce qui rend possible l’utilisation des
+me´thodes baye´siennes classiques pour estimer les parame`tres et classer les individus. Or,
+la double hypothe`se de champ de Markov cache´ (sous laquelle les classes suivent un champ
+de Markov) et de bruit inde´pendant est suffisante mais non ne´cessaire pour que la dis-
+tribution a posteriori soit markovienne. A partir de cette observation fondamentale, un
+mode`le plus ge´ne´ral, le champs de Markov couple [13] a e´te´ propose´, puis e´tendu par la
+suite au champs de Markov triplet [2] permettant de mode´liser un bruit plus riche avec
+des couˆts algorithmiques similaires. Les mode`les de Markov triplets disponibles dans le
+logiciel SpaCEM3 sont ceux de´veloppe´s dans les travaux [6] diffe´rents de ceux utilise´s
+dans [2, 3]. Les mode`les imple´mente´s ont e´te´ initialement construits avec pour objectif la
+classification supervise´e d’individus issus de classes complexes ou soumis a` des mode`les
+de bruits non standards (non unimodaux et non inde´pendants). Le terme supervise´ si-
+gnifie que nous disposons d’individus e´tiquete´s (nous connaissons leurs classes). A partir
+des observations correspondantes (formant la base d’apprentissage), nous de´sirons classer
+d’autres individus (la base de test) dans ces meˆmes classes. Pour une telle proble´matique,
+le logiciel propose des mode`les base´s sur les mode`les de Markov triplets et adapte´s a` un
+cadre supervise´. Les e´tapes d’apprentissage et de test imple´mente´es sont base´es sur l’ap-
+plication de l’algorithme de type NREM propose´ dans [9] et de´taille´ en Section 4.2. Nous
+renvoyons a` [6, 5] pour plus de details.
+Mode`le triplet. Dans le cadre d’une classification supervise´e, on dispose de deux
+ensembles d’observations, que nous noterons I1 et I2. Les observations x1 = (xi)i∈I1
+c© Revue MODULAD, 2009 -153- Nume´ro 40
+(a) (b)
+(c) (d)
+Fig. 3 – Segmentation d’une image hyperspectrale de Mars avec SpaCEM3 : (a) Image
+a` segmenter (128*400 pixels de dimension 184), (b) Spectre du pixel (13,16), (c) Image
+segmente´e (4 classes), (d) Spectres moyens des 4 classes.
+c© Revue MODULAD, 2009 -154- Nume´ro 40
+de I1 sont e´tiquete´es, nous connaissons donc leurs classes z1 = (zi)i∈I1. Les donne´es
+x2 = (xi)i∈I2 de I2 sont non-e´tiquete´es. L’objectif est alors, a` partir des observations
+d’apprentissage x1 et z1 d’apprendre certains parame`tres du mode`le, de manie`re a` pou-
+voir classer dans un second temps les observations de test x2. On suppose que les donne´es
+d’apprentissage et de test suivent le meˆme mode`le et dans les deux cas, on notera X les
+observations et Z les classes.
+Nous nous plac¸ons dans un cadre ou` le bruit P (x|z) n’est ni inde´pendant, ni assez
+simple pour eˆtre mode´lise´ par une distribution unimodale (gaussienne par exemple). Une
+ide´e naturelle pour classer de telles donne´es est alors de de´composer chaque classe k ∈ K
+en sous-classes. Supposons par exemple que chacune des K classes puisse eˆtre de´compose´e
+en L sous-classes. Pour cela, introduisons un champ auxiliaireY = (Yi)i∈I discret a` valeurs
+dans Ln (∀i ∈ I, Yi ∈ L = [1, L]). Les sous-classes de la classe k ∈ K sont alors les couples
+(l, k), l ∈ L. L’ensemble des LK sous-classes correspond alors a` l’ensemble des couples
+(l, k) ∈ L ×K.
+Pour tenir compte des de´pendances entre sites, a` la fois pour l’apprentissage et pour
+le test, nous conside´rons un mode`le de champ de Markov triplet c’est-a`-dire un triplet
+(X,Y,Z) dont la loi jointe est markovienne. Plus pre´cise´ment, les triplets conside´re´s dans
+SpaCEM3 sont de la forme :
+PG(x,y, z) ∝ exp(−
+∑
+i∼j
+Vij(yi, zi, yj, zj) +
+∑
+i∈I
+log f(xi|θyizi)) (6)
+ou` les Vij sont des potentiels sur les paires. De plus, les potentiels Vij sont suppose´s eˆtre les
+meˆme sur l’ensemble des sites de sorte que nous pouvons e´crire sans perte de ge´ne´ralite´ :
+Vij(yi, zi, yj, zj) = −Bzizj (yi, yj)− C(zi, zj)
+ou` les Bkk′ sont K
+2 fonctions de L × L → R et C est une fonction de K × K → R.
+En utilisant la notation vectorielle zi = k ⇔ zi = ek (le k-ie`me vecteur canonique en
+dimension K) et yi = l ⇔ yi = e′l (le l-ie`me vecteur canonique en dimension L), on peut
+encore e´crire :
+Vij(yi, zi,yj , zj) = −y′iBzizjyj − z′iCzj (7)
+ou` les Bkk′ sont K
+2 matrices de taille L × L et C est une matrice de dimension K ×K.
+Remarquons que l’e´criture (7) est toujours possible. Cela revient simplement a` voir Vij
+sous la forme d’une matrice V de dimension LK × LK, elle-meˆme de´compose´e comme
+L × L blocs de matrices de dimension K × K. En notant (ckk′)k,k′∈K les coefficients de
+C, la matrice V a la forme donne´e dans la figure ??. Par syme´trie des interactions, V est
+syme´trique, et donc les matrices Bkk le sont aussi. Dans SpaCEM
+3, C est de plus suppose´e
+syme´trique, si bien que toutes les matrices Bkk′ le sont aussi.
+Signalons que le terme z′iCzj de l’e´quation (7) aurait pu eˆtre inte´gre´ directement dans
+celui y′iBzizjyj mais l’inte´reˆt d’une telle mode´lisation apparaˆıtra ulte´rieurement (e´tape de
+classification). La composante (l, l′) de la matrice Bkk′ s’interpre`te comme un coefficient
+de compatibilite´ entre les sous-classes l et l′ des classes k et k′. Plus ce terme est grand,
+plus il est vraisemblable que deux sites voisins soient dans les sous-classes l et l′ des classes
+k et k′. De meˆme, le coefficient ckk′ de la matrice C s’interpre`te comme un coefficient de
+compatibilite´ entre les classes k et k′. Plus ce terme est grand, plus il est vraisemblable
+que les classes k et k′ soient voisines. Lorsque C = c IK est parame´tre´ par un unique
+c© Revue MODULAD, 2009 -155- Nume´ro 40
+Fig. 4 – Matrice −V
+coefficient spatial c ∈ R+, le terme∑i∼j z′iCzj = c
+∑
+i∼j 1zi=zj agit alors comme un terme
+de re´gularisation favorisant les re´gions homoge`nes (c’est-a`-dire les re´gions de meˆme classe).
+Remarquons que, en notant U le couple (Y,Z) (i.e. ∀i ∈ [1, LK], Ui = (Yi, Zi)),
+l’e´quation (6) implique que U est un champ de Markov et que (X,U) est un champ de
+Markov cache´ a` bruit inde´pendant. Il sera utilise´ dans la phase de classification (voir
+Section 4.2). Notons encore que, sous (6), P (y|z) est e´galement markovien :
+P (y|z) = 1
+W (z)
+exp(
+∑
+i∼j
+y′iBzizjyj) (8)
+ou` la constante de normalisation W (z) de´pend de z. D’apre`s (6), on a encore
+PG(x,y|z) = 1
+W (z)
+exp(
+∑
+i∼j
+y′iBzizjyj + log f(xi|θyizi)), (9)
+si bien que le couple (X,Y) est, conditionnellement a` Z = z, un champ de Markov cache´
+a` bruit inde´pendant, sur lequel peuvent donc eˆtre applique´es les me´thodes d’estimation
+et classification de´crites en Section 4.1. Il sera utilise´ dans la phase d’apprentissage (voir
+Section 4.2).
+L’inte´reˆt d’un tel mode`le triplet est qu’il est bien adapte´ au cadre de la classification
+supervise´e. Les traitements baye´siens classiques pourront eˆtre applique´s sur (X,Y) condi-
+tionnellement a` Z = z pour la phase d’apprentissage. La classification d’observations non
+e´tiquete´es pourra ensuite eˆtre obtenue par application de ces meˆmes me´thodes sur (X,U).
+Notons que le mode`le ne requiert pas que chaque classe k comporte le meˆme nombre de
+sous-classe et conside´rer diffe´rents nombre de sous-classes est possible dans SpaCEM3.
+Illustration. Un exemple simple de champ de Markov triplet est donne´ par
+P (x,y, z) ∝ exp(b
+∑
+i∼j
+1yi=yj1zi=zj + c
+∑
+i∼j
+1zi=zj +
+∑
+i∈I
+log f(xi|θyizi)) (10)
+parame´tre´ par les re´els b et c, ainsi que les parame`tres θlk = (μlk,Σlk) des distributions
+gaussiennes f(.|θlk), pour l ∈ L et k ∈ K. Le couple (Y,Z) est alors markovien, de
+distribution :
+P (y, z) ∝ exp(b
+∑
+i∼j
+1yi=yj1zi=zj + c
+∑
+i∼j
+1zi=zj) (11)
+c© Revue MODULAD, 2009 -156- Nume´ro 40
+(a) (b) (c) (d)
+b = −2
+c = 2
+b = 2
+c = −2
+Fig. 5 – Simulations d’un triplet a` deux parame`tres (b et c) de´fini par (10) pour L = K = 2
+avec respectivement b = −2, c = 2 (premie`re ligne) et b = 2, c = −2 (deuxie`me ligne) :
+(a) Re´alisations de (Y,Z), (b) re´alisations de Z, (c) re´alisations de X, (d) re´alisations
+d’un champ de Markov cache´ a` bruit inde´pendant obtenu en ajoutant aux images (b) un
+bruit gaussien de moyenne 0 et d’e´cart-type 0.3.
+En comparaison avec l’e´quation (7) cela revient a` supposer que :
+– pour tout k ∈ K, Bkk = bIL et pour tout k′ = k, Bkk′ = 0L (la matrice nulle)
+– la matrice C est diagonale, ses termes diagonaux sont e´gaux a` c.
+Plusieurs cas particuliers sont a` souligner :
+– Pour L = 1, le mode`le (11) est un mode`le de Potts a` K classes et coefficient de
+re´gularite´ e´gal a` b+ c.
+– Pour K = 1, il s’agit d’un mode`le de Potts a` L classes et coefficient de re´gularite´ b.
+– Pour c = 0, il s’agit d’un mode`le de Potts a` LK classes et coefficient de re´gularite´
+b.
+En Figure 5, on peut voir des simulations de champ de Markov triplet de´fini par l’e´quation (10)
+pour K = L = 2 et diffe´rentes valeurs de b et c. Chacune des LK = 4 valeurs possible du
+couple (yi, zi) est associe´e a` un niveau de gris.
+4 Algorithmes de classification
+Les algorithmes disponibles dans SpaCEM3 peuvent eˆtre re´pertorie´s dans deux grandes
+classes :
+– Les algorithmes dits usuels qui sont : ICM, Kmeans et l’algorithme EM et ses
+diffe´rentes versions (CEM,NEM et NCEM).
+– Les algorithmes base´s sur une approche variationnelle de l’algorithme EM sous
+mode´lisation markovienne : l’algorithme NREM (Section 4.1) et ses variantes pour
+mode`les triplets (Section 4.2) et avec donne´es manquantes (Section 4.3).
+4.1 Algorithme NREM
+Dans le mode`le de champ de Markov cache´ a` bruit inde´pendant, Z et Z|x sont tous
+deux markoviens. Leurs distributions respectives PG(z|φ) et PG(z|x,ψ) ne peuvent donc
+eˆtre calcule´es de manie`re exacte et l’algorithme EM [10] applique´ au champ de Markov
+c© Revue MODULAD, 2009 -157- Nume´ro 40
+cache´ (X,Z) n’est pas re´alisable exactement. Parmi les nombreuses solutions propose´es
+pour rendre les e´tapes (E) et (M) re´alisables, SpaCEM3 met en oeuvre l’algorithme NREM
+[9] fonde´ sur une approximation de type champ moyen. Il s’agit de remplacer le mode`le de
+champ de Markov cache´ de loi PG(x, z|ψ) par une approximation de type champ moyen
+de´finie par l’e´quation :
+PG(x, z|ψ) ≈
+∏
+i∈I
+Pz˜x(xi, zi|ψ) =
+∏
+i∈I
+PG(zi|z˜xNi,φ)f(xi|θzi) (12)
+ou` z˜x est le champ des voisins, de´termine´ conditionnellement aux observations x. Le prin-
+cipe de l’algorithme NREM consiste alors a` alterner une e´tape (NR) de choix du voisinage
+(neighborhood restoration), puis une e´tape (EM) d’estimation des parame`tres du mode`le
+par application de l’algorithme EM sur le me´lange inde´pendant de´fini par l’approximation.
+Partant de valeurs initiales z˜x du champ des voisins et ψ(0) des parame`tres, l’ite´ration
+(q + 1) de l’algorithme est la suivante :
+(EM) Estimation :mettre a` jour les estimateurs ψ(q+1) des parame`tres en appliquant
+l’algorithme EM sur le mode`le de me´lange inde´pendant de´fini par la loi jointe
+Pz˜x(x, z|ψ) =
+∏
+i∈I
+π˜izif(xi|θzi) ou` π˜izi = PG(zi|z˜xNi,φ) (13)
+(NR) Choix des voisins : cre´er, a` partir des observations x et de l’estimation cou-
+rante ψ(q+1) des parame´tres, un nouveau champ des voisins z˜x.
+En pratique, l’e´tape M, dans le cas de densite´s gaussiennes f(.|θk) ∼ N (μk,Σk), conduit
+a` une mise a` jour explicite des parame`tres μk et Σk. En revanche, meˆme dans le cas simple
+du mode`le de Potts, il n’y a pas de formule explicite pour la mise a` jour des parame`tres
+markoviens φ. Ne´anmoins, dans le cas du mode`le de Potts e´tendu, ces parame`tres peuvent
+eˆtre obtenus par une descente de gradient.
+Pour l’e´tape (NR), trois choix sont disponibles dans SpaCEM3, pour la mise a` jour du
+champ des voisins, conduisant aux algorithmes en champ moyen, en champ modal et en
+champ simule´ :
+– Algorithme en champ moyen : fixe z˜x a` l’estimation en champ moyen de l’espe´rance
+de la distribution conditionnelle PG(z|x,ψ(q+1))
+– Algorithme en champ modal : fixe z˜x a` l’estimation en champ modal du mode de la
+distribution conditionnelle PG(z|x,ψ(q+1))
+– Algorithme en champ simule´ : simule z˜x selon la loi conditionnelle PG(z|x,ψ(q+1)),
+via l’e´chantillonneur de Gibbs.
+Classer les donne´es suite a` l’algorithme NREM. L’algorithme NREM permet
+donc d’estimer les parame`tres d’un champ de Markov cache´ sous approximation de type
+champ moyen. Dans un second temps, comme dans le cas de l’algorithme EM pour
+me´lange inde´pendant, la classification par MAP ou MPM peut-eˆtre restaure´e sans cal-
+cul supple´mentaire : en chaque site i, on choisit la classe la plus probable connaissant
+l’observation xi :
+∀i ∈ I, zmapi = argmax
+zi∈K
+Pz˜x(zi|xi) = argmax
+zi∈K
+π˜izif(xi|θzi). (14)
+c© Revue MODULAD, 2009 -158- Nume´ro 40
+4.2 Sche´ma de classification pour les mode`les triplets
+Plus qu’un algorithme, nous de´crivons un sche´ma ge´ne´ral pour traiter des donne´es
+issues de classes complexes (bruit non inde´pendant, distributions des classes non unimo-
+dales) sous mode´lisation par champ de markov triplet. L’estimation des parame`tres est
+base´e sur l’algorithme NREM. La classification supervise´e est effectue´e en deux e´tapes,
+l’une d’apprentissage, l’autre de classification.
+1) Etape d’apprentissage. Nous supposons que, pour un certain nombre de sites i ∈
+I1, nous observons a` la fois xi et sa classe zi. Avec le mode`le introduit en Section 3.3, seul yi
+est donc manquant. Puisque, conditionnellement a` Z = z, (X,Y) est un champ de Markov
+cache´ a` bruit inde´pendant, nous pouvons appliquer NREM pour estimer les parame`tres
+du mode`le conditionnellement aux classes z, a` savoir les matrices Bkk′, k, k
+′ ∈ K et les
+θlk, l ∈ L et k ∈ K. Signalons ne´anmoins qu’il n’est pas toujours possible d’apprendre
+toutes les matrices Bkk′. En particulier, lorsque la structure de voisinage est telle qu’il
+n’y a pas de voisins dans les classes k et k′, les termes en Bkk′ n’apparaˆıtront pas dans
+les formules du mode`le et cette matrice ne pourra eˆtre estime´e. C’est par exemple le cas
+avec les images uni-textures d’apprentissage de l’application de´taille´e dans [6, 5]). D’apre`s
+l’e´quation (8), l’apprentissage de la classe k revient alors simplement a` estimer un mode`le
+de Potts e´tendu a` L classes de matrice de compatibilite´ Bkk.
+2) Etape de classification. Lors de cette phase, les observations x2 aux sites i ∈ I2
+sont non e´tiquete´es, si bien que les champs Y et Z sont manquants. Avec U = (Y,Z),
+le couple (X,U) est un champ de Markov cache´ a` bruit inde´pendant sur lequel on peut
+appliquer les traitements baye´siens. Les parame`tres du mode`le (e´quation (6)) sont alors
+les K2 matrices Bkk′ de dimension L×L, les LK parame`tres θlk, ainsi que la matrice addi-
+tionnelle C de dimension K×K. Lors de cette e´tape, les θlk doivent eˆtre fixe´s aux valeurs
+estime´es lors de la phase d’apprentissage, et non re´estime´s, afin d’e´viter un proble`me de
+label-switching. Concernant les Bkk′, plusieurs strate´gies sont envisageables selon la base
+d’apprentissage et du type d’interaction que l’on souhaite conside´rer : les fixer entie`rement
+aux valeurs estime´es, en partie, ou les re´-estimer totalement. La matrice C, elle, de-
+vra eˆtre estime´e pour re´soudre un proble`me d’identifiabilite´ duˆ au fait que les matrices
+Bkk′ ne peuvent eˆtre estime´es qu’a` un coefficient additif pre`s lors de l’apprentissage (voir
+e´quation (8)).
+Illustration. La Figure 6 illustre les performances et la flexibilite´ des mode`les de
+Markov triplets par rapport aux mode`les de Markov cache´s classiques sur une image
+synthe´tique a` deux classes, bruite´e selon diffe´rents bruits complexes (bruit non unimodal
+et/ou non inde´pendant). Une application a` un proble`me de reconnaissance de textures a
+e´galement e´te´ effectue´e dans [6, 5].
+4.3 Sche´ma de classification avec donne´es manquantes
+Il est tre`s courant en pratique de ne pas disposer de toutes les mesures pour tous
+les individus. Par exemple, l’appareil de mesure peut eˆtre de´faillant et les pixels les plus
+brillants de l’image ne pas eˆtre mesure´s. Ou bien une expe´rience biologique peut avoir
+e´choue´ sur certains ge`nes (parce qu’ils n’ont pas ou mal re´agit). La me´thode la plus simple
+c© Revue MODULAD, 2009 -159- Nume´ro 40
+Vraie segmentation (a) (b) (c) (d)
+HMF-IN
+Classification rates 51.2% 80.7% 66.3% 74.5%
+TMF
+Taux de classification 96.6% 91.7% 95.8% 88.4%
+K se´lectionne´ 2 3 4 4
+Fig. 6 – Segmentation d’une image synthe´tique a` l’aide d’un mode`le de champ de mar-
+kov cache´ (HMF-IN, deuxie`me ligne) et d’un champ de Markov triplet (TMF, troisie`me
+ligne) : vraie segmentation en 2 classes dans le coin supe´rieur gauche et 4 mode`les de bruit
+diffe´rents sont conside´re´s. Image (a) les distributions de chaque classe sont des me´langes
+de deux gaussiennes, en (c) les observations issues de la classe 1 sont ge´ne´re´es a` partir
+d’une loi Gamma(1,2) et celles de la classe 2 sont obtenues en ajoutant 1 aux re´alisations
+d’une loi exponentielle de parame`tre 1. En (b) et (d) les images bruite´es sont obtenues
+en remplacant chaque pixel de (a) et (c) par sa moyenne avec ses 4 plus proches voisins.
+Les taux de classification sont donne´s sous chaque segmentation. Pour le mode`le triplet,
+la valeur de K se´lectionne´e a` l’aide de BICw (voir Section 5) est donne´e dans la dernie`re
+ligne.
+c© Revue MODULAD, 2009 -160- Nume´ro 40
+pour faire face a` un tel proble`me est d’e´liminer brutalement les individus pour lesquels
+certaines observations sont manquantes. On comprend aise´ment qu’une telle technique
+soit a` e´viter. Une deuxie`me technique tre`s populaire est de remplacer les donne´es man-
+quantes par des valeurs (des ze´ros, la moyenne, etc...) en pre´-traitement (on parle encore
+d’imputation), puis d’effectuer la classification a` partir des observations ainsi comple´te´es.
+Cette technique, si elle est tre`s couramment utilise´e du fait de sa simplicite´, tend a` in-
+troduire un biais. De plus, concernant le choix des valeurs impute´es, aucune solution
+universelle n’existe et des choix diffe´rents peuvent conduire a` des re´sultats tre`s diffe´rents.
+Des me´thodes plus perfectionne´es ont e´te´ propose´es dans le cadre du mode`le de me´lange
+inde´pendant, notamment d’appliquer l’algorithme EM pour estimer un tel mode`le (voir
+[14] par exemple). Dans le logiciel, les me´thodes mises en oeuvre sont celles developpe´es
+dans [5, 7] pour classer de telles observations non comple`tes sous mode´lisation marko-
+vienne.
+L’algorithme de´veloppe´ dans le logiciel SpaCEM3 se place dans le cas ou` les donne´es
+sont absentes ale´atoirement (Missing At Random, MAR, voir [12]). Le fait qu’une donne´e
+soit manquante est alors inde´pendante de la valeur non observe´e de cette donne´e. Dans
+les application re´elles, l’hypothe`se MAR peut eˆtre fausse, par exemple lorsque les donne´es
+sont censure´es du fait des limitations de la machine de mesure. On parle alors de donne´es
+manquantes non ale´atoirement (Not Missing At Random, NMAR, voir [12]). Les me´thodes
+base´es sur l’hypothe`se MAR donnent ne´anmoins des re´sultats satisfaisants dans le cas de
+donne´es NMAR si les valeurs observe´es contiennent assez d’information pour estimer le
+maximum de vraisemblance.
+Comme pre´ce´demment, on note I un ensemble de sites (individus) indice´s par i ∈
+{1, · · · , n} et x = {xi ∈ RD} la matrice n × D des observations, dont certaines va-
+leurs sont manquantes. On note encore, pour chaque site i ∈ I, oi ⊂ {1, . . . , D} les
+indices correspondant aux valeurs observe´es xid and mi son comple´mentaire correspon-
+dant aux valeurs manquantes (oi ∪mi = {1, . . . , D}). Le vecteur des valeurs observe´es au
+site i s’e´crit alors xoii = {xid, d ∈ oi} et le vecteur des valeurs manquantes au site i,
+xmii = {xid, d ∈ mi}. Enfin, xo = {xoii , i ∈ I} de´note l’ensemble des valeurs observe´es
+sur les n individus et xm = {xmii , i ∈ I} l’ensemble des valeurs manquantes.
+Le but de la classification est, comme pre´ce´demment, d’assigner une valeur zi ∈ K = [1, K]
+a` chaque site i ∈ I. On se place dans le cas d’un champs de Markov cache´ a` bruit
+inde´pendant. Comme en Section 3.1.1, le champs cache´ Z est donc markovien et les
+donne´es X sont inde´pendantes conditionnellement aux classes. Ne´anmoins, a` la diffe´rence
+de la Section 3.1.1, cette distribution conditionnelle s’e´crit :
+P (xo,xm|z) =
+∏
+i∈I
+P (xoii , x
+mi
+i |zi).
+Il y a alors 2 champs cache´s a` conside´rer : le champ markovien des classes Z, ainsi que le
+champ des donne´es manquantes Xm.
+L’algorithme de classification de´veloppe´ dans le logiciel SpaCEM3 est base´ sur l’algo-
+rithme NREM. La diffe´rence avec le cas de donne´es comple`tes x de la Section 4.1 re´side
+dans le fait que seules xo est observe´, et non x tout entier. Partant de valeurs initiales z˜x
+o
+pour le champ des voisins (de´termine´ contionnellement aux valeurs observe´es xo) et ψ(0)
+des parame`tres, l’ite´ration (q + 1) de l’algorithme est la suivante :
+(EM) Estimation :Mettre a` jour les estimateurs ψ(q+1) des parame`tres en appliquant
+c© Revue MODULAD, 2009 -161- Nume´ro 40
+l’algorithme EM sur le mode`le de me´lange inde´pendant de´fini par la loi jointe
+Pz˜xo (x
+o,xm, z|ψ) =
+∏
+i∈I
+π˜oizif(x
+oi
+i , x
+mi
+i |θzi) ou` π˜oizi = PG(zi|z˜x
+o
+Ni
+,φ)
+(NR) Choix des voisins : cre´er, a` partir des valeurs observe´s xo et de l’estimation
+courante ψ(q+1) des parame`tres, un nouveau champ des voisins z˜x
+o
+.
+L’application de EM sur un me´lange inde´pendant avec observations manquantes est
+de´crit dans [12]. Dans le cas ou` f(.|θk) est gaussien N (μk,Σk), les estimateurs de μk
+et Σk sont explicites. Ils diffe`rent naturellement des estimateurs obtenus avec donne´es
+comple`tes. Pour plus de de´tails sur l’algorithme NREM avec donne´es incomple`tes, on
+pourra se re´fe´rer a` [5, 7].
+Classer les donne´s et estimer les observations manquantes suite a` l’algorithme
+NREM. La classification par MAP ou MPM revient a` classer un site i dans la classe la
+plus probable connaissant les valeurs observe´es xoii pour ce site :
+∀i ∈ I, zˆi = argmax
+zi∈K
+Pz˜xo (zi|xoii ) = argmax
+zi∈K
+π˜oizif(x
+oi
+i |θzi). (15)
+Notons que, contrairement a` l’e´quation (14), seul xo intervient dans (15). Une fois la
+classification z obtenue, les valeurs manquantes xm peuvent e´galement eˆtre reconstruites :
+la re`gle du MAP ou MPM revient a` imputer les observations manquantes xmii au site i
+par les valeurs les plus vraisemblables conditionnellement aux valeurs observe´es xoii et a`
+la classe zˆi :
+∀i ∈ I, xˆmii = argmax
+x
+mi
+i
+P (xmii |xoii , zˆi). (16)
+L’e´quation (16) peut eˆtre vue comme un imputation par la moyenne. Elle diffe`re ne´anmoins
+de la classique imputation par la moyenne effectue´e en pre´-traitement dans la mesure ou`
+elle est effectue´e en post-traitement et de´pend donc de la classe a` laquelle appartient le
+site i, ainsi que de ses voisins. On peut e´galement montrer que c’est une estimation non
+biaise´e, contrairement a` l’imputation effectue´e en pre´-traitement (voir [5, 7]).
+Illustration. A titre d’exemple, se trouvent en Figure 7 les classifications obtenues
+sur une image synthe´tique a` 4 classes bruite´e par un bruit blanc gaussien en dimension
+D = 4, puis censure´es a` droite (les r% des valeurs les plus e´leve´es sont manquantes, avec
+r ∈ {30, 50, 60, 70} pour la Figure 7). Les re´sultats de classification sont tre`s satisfai-
+sants jusque 60% de donne´es manquantes, et ce bien que les donne´es manquantes soient
+de type NMAR (du fait de la censure), et non MAR comme suppose´ dans le mode`le.
+Nous renvoyons a` [5, 7] pour d’autres expe´riences, notamment pour une application a` la
+classification de donne´es d’expression ge´nomique.
+4.4 Utilisation des algorithmes en pratique
+Pour l’utilisation pratique, deux points sont importants : le choix de l’initialisation et
+le choix du crite`re d’arreˆt.
+c© Revue MODULAD, 2009 -162- Nume´ro 40
+30% 50% 60% 70%
+Fig. 7 – Experience sur image simule´e : visualisation des classifications obtenues pour
+diffe´rents pourcentages of donne´es manquantes (30%, 50%, 60% et 70% de donne´es cen-
+sure´es a` droite).
+Techniques d’initialisation. Dans SpaCEM3, trois techniques d’initialisation de la
+classification sont propose´es : une initialisation ale´atoire, une initialisation par KMeans,
+ou encore une initialisation fixe´e par l’utilisateur via un fichier texte.
+Crite`res d’arreˆt. SpaCEM3 peut calculer trois crite`res permettant de s’assurer de la
+bonne convergence des algorithmes de segmentation :
+– un crite`re base´ sur la diffe´rence des vraisemblances comple´te´es entre deux ite´rations.
+– un crite`re base´ sur la plus grande diffe´rence entre les probabilite´s conditionnelles de
+classification de chaque individu, entre deux ite´rations successives.
+– un crite`re base´ sur la proportion d’individus pour lesquels la classification a change´e
+entre deux ite´rations.
+Pour areˆter les algorithmes, on peut e´galement fixer un nombre d’ite´rations a` effectuer.
+SpaCEM3 permet en outre de visualiser l’e´volution de ces crite`res et le comportement des
+parame`tres au cours des ite´rations (Figure 8).
+5 Se´lection de mode`les
+Nous avons pre´sente´ un ensemble de mode`les pour la classification de donne´es. Se pose
+alors le proble`me de savoir quel mode`le choisir pour mode´liser et classer au mieux un jeu
+de donne´es spe´cifique. Le “meilleur” mode`le choisi devra pre´senter un bon compromis
+entre complexite´ et ade´quation aux donne´es. De nombreux crite`res ont e´te´ propose´s pour
+choisir entre diffe´rents mode`les dans un cadre non-supervise´. Les crite`res disponibles dans
+SpaCEM3 sont Le Bayesian Information Criterion (BIC) [15] qui est certainement le plus
+re´pandu et le crite`re Integrated Completed Likelihood (ICL) [4] qui permet de tenir compte
+de la pertinence de la classification obtenue.
+Cas d’une distribution markovienne. Lorsque le mode`le est celui d’un champ de
+Markov cache´, le crite`re BIC ne peut eˆtre calcule´ sans approximation. Deux approxi-
+mations du crite`re BIC de´finis dans [11] sont disponibles dans le logiciel, l’une (BICp)
+utilise l’approximation en champ moyen de la distribution de Gibbs PG, l’autre (BIC
+w)
+l’approximation en champ moyen de la fonction de partition W . Les auteurs de [11]
+remarquent qu’en the´orie comme en pratique, l’approximation BICw est plus fine que
+c© Revue MODULAD, 2009 -163- Nume´ro 40
+(a)
+(b)
+Fig. 8 – Visualisation des sorties dans SpaCEM3 : (a) valeur du parame`tre β au cours
+des ite´rations, (b) valeur du crite`re de proportion de changements au cours des ite´rations.
+c© Revue MODULAD, 2009 -164- Nume´ro 40
+Fig. 9 – Courbe des valeurs de BIC approche´es par champ moyen pour un mode`le de
+champ de Markov cache´.
+l’approximation BICp. Une illustration est donne´e dans la Figure 9. De la meˆme manie`re
+des approximations du crite`re ICL sont disponibles.
+Re´fe´rences
+[1] J. D. Banfield and A. E. Raftery. Model-based Gaussian and non Gaussian clustering.
+Biometrics, 49 :803–821, 1993.
+[2] D. Benboudjema and W. Pieczynski. Unsupervised image segmentation using Triplet
+Markov fields. Comput. Vision Image Underst., 99 :476–498, 2005.
+[3] D. Benboudjema and W. Pieczynski. Unsupervised statistical segmentation of non
+stationary images using triplet Markov Fields. IEEE Trans. PAMI, 29(8) :367–1378,
+2007.
+[4] C. Biernacki, G. Celeux, and G. Govaert. Assessing a mixture model for clustering
+with the integrated complete lieklihood. IEEE trans. PAMI, 22 :719–725, 2000.
+[5] J. Blanchet. Modeles markoviens et extension pour la classification de donnees com-
+plexe. PhD thesis, Universite Grenoble 1, october 2007.
+[6] J. Blanchet and F. Forbes. Triplet Markov fields for the supervised classification of
+complex structure data. IEEE trans. on Pattern Analyis and Machine Intelligence,
+30(6) :1055–1067, 2008.
+[7] J. Blanchet and M. Vignes. A model-based approach to gene clustering with mis-
+sing observation reconstruction in a Markov random field framework. Journal of
+Computational Biology, 16(3) :475–486, 2009.
+c© Revue MODULAD, 2009 -165- Nume´ro 40
+[8] C. Bouveyron, S. Girard, and C. Schmid. High dimensional data clustering. Comput.
+Statist. Data Analysis, 2007.
+[9] G. Celeux, F. Forbes, and N. Peyrard. EM procedures using mean field-like approxi-
+mations for Markov model-based image segmentation. Pat. Rec., 36(1) :131–144,
+2003.
+[10] A. Dempster, N. Laird, and D. Rubin. Maximum likelihood from incomplete data
+via the EM algorithm. J. Roy. Statist. Soc. Ser. B, 39 :1–38, 1977.
+[11] F. Forbes and N. Peyrard. Hidden Markov random field model selection criteria
+based on mean field-like approximations. IEEE trans. PAMI, 25(8), 2003.
+[12] R.J. Little and D.B. Rubin. Statistical analysis with missing data. New-York : Wiley,
+second edition, 2002.
+[13] W. Pieczynski and A. Tebbache. Pairwise Markov Random Fields and segmentation
+of textured images. Machine Graph. Vision, 9 :705–718, 2000.
+[14] D. Rubin. Inference and missing data. Biometrika, 63 :581–592, 1976.
+[15] G. Schwarz. Estimating the dimension of a model. Ann. Stat., 6 :461–464, 1978.
+[16] M. Vignes and F. Forbes. Gene clustering via integrated Markov models combining
+individual and pairwise features. IEEE trans. Comput. Biol. Bioinform., 2007.
+c© Revue MODULAD, 2009 -166- Nume´ro 40

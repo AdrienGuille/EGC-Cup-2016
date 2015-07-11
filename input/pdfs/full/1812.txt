@@ -1,0 +1,550 @@
+Vers l’auto-administration des entrepoˆts de donne´es
+Kamel Aouiche∗, Je´roˆme Darmont∗
+Le Gruenwald∗∗
+∗Laboratoire ERIC, E´quipe BDD
+Universite´ Lumie`re – Lyon 2
+5 avenue Pierre Mende`s-France
+69676 BRON Cedex
+{kaouiche, jdarmont}@eric.univ-lyon2.fr
+∗∗School of Computer Science
+University of Oklahoma
+Norman, OK 73019, USA
+ggruenwald@ou.edu
+Re´sume´. Avec le de´veloppement des bases de donne´es en ge´ne´ral et des
+entrepoˆts de donne´es (data warehouses) en particulier, il est devenu pri-
+mordial de re´duire la fonction d’administration de base de donne´es. L’ide´e
+d’utiliser des techniques de fouille de donne´es (data mining) pour extraire
+des connaissances utiles des donne´es elles-meˆmes pour leur administration
+est avance´e depuis quelques anne´es. Pourtant, peu de travaux de recherche
+ont e´te´ entrepris dans ce domaine. L’objectif de cette e´tude est de recher-
+cher une fac¸on d’extraire, a` partir des donne´es stocke´es, des connaissances
+utilisables pour appliquer de manie`re automatique des techniques d’op-
+timisation des performances, et plus particulie`rement d’indexation. Nous
+avons re´alise´ un outil qui effectue une recherche de motifs fre´quents sur
+une charge donne´e afin de calculer une configuration d’index permettant
+d’optimiser le temps d’acce`s aux donne´es. Les expe´rimentations que nous
+avons mene´es ont montre´ que les configurations d’index ge´ne´re´es par notre
+outil permettent des gains de performance de l’ordre de 15% a` 25% sur
+une base et un entrepoˆt de donne´es tests.
+1 Introduction
+L’utilisation courante de bases de donne´es requiert un administrateur qui a pour
+roˆle principal la gestion des donne´es au niveau logique (de´finition de sche´ma) et phy-
+sique (fichiers et disques de stockage), ainsi que l’optimisation des performances de
+l’acce`s aux donne´es. Avec le de´ploiement a` grande e´chelle des syste`mes de gestion de
+bases de donne´es (SGBD), minimiser la fonction, d’administration est devenu indis-
+pensable (Weikum et al. 2002).
+L’une des taˆches importantes d’un administrateur est la se´lection d’une structure
+physique approprie´e pouvant ame´liorer les performances du syste`me en minimisant
+les temps d’acce`s aux donne´es (Finkelstein et al. 1988). Les index sont des structures
+physiques permettant un acce`s direct aux donne´es. Le travail d’optimisation des per-
+formances de l’administrateur se porte en grande partie sur la se´lection d’index et de
+Vers l’auto-administration des entrepoˆts de donne´es
+vues mate´rialise´es (Agrawal et al. 2001, Gupta 1999). Ces structures jouent un roˆle
+particulie`rement important dans les bases de donne´es de´cisionnelles (BDD) tels que les
+entrepoˆts de donne´es, qui pre´sentent une volume´trie tre`s importante et sont interroge´s
+par des requeˆtes complexes.
+Depuis quelques anne´es, l’ide´e est avance´e d’utiliser les techniques de fouille de
+donne´es (data mining) pour extraire des connaissances utiles des donne´es elles-meˆme
+pour leur administration (Chaudhuri 1998). Cependant, peu de travaux de recherche
+ont e´te´ entrepris dans ce domaine jusqu’ici. C’est pourquoi nous avons conc¸u et re´alise´
+un outil qui utilise la fouille de donne´es pour proposer une se´lection (configuration)
+d’index pertinente.
+Partant de l’hypothe`se que l’utilite´ d’un index est fortement corre´le´e a` la fre´quence
+de l’utilisation des attributs correspondants dans l’ensemble des requeˆtes d’une charge
+donne´e, la recherche de motifs fre´quents (Agrawal et al. 1993) nous a semble´ approprie´e
+pour mettre en e´vidence cette corre´lation et faciliter le choix des index a` cre´er. L’outil
+que nous pre´sentons dans cet article exploite le journal des transactions (ensemble de
+requeˆtes re´solues par le SGBD) pour proposer une configuration d’index.
+Dans la suite de cet article, nous pre´sentons tout d’abord brie`vement les prin-
+cipales me´thodes de se´lection automatique d’index existantes dans la Section 2. Nous
+de´taillons ensuite notre proposition dans la Section 3, avant d’exposer quelques re´sultats
+expe´rimentaux dans la Section 4. Nous concluons finalement cet article et pre´sentons
+nos perspectives de recherche dans la Section 5.
+2 E´tat de l’art
+Le proble`me de la se´lection d’un ensemble d’index optimal pour une base de donne´es
+a e´te´ e´tudie´ depuis les anne´es 70. Trois grandes approches ont e´te´ propose´es (Chaudhuri
+et al. 1997). La premie`re exploite le sche´ma de la base de donne´es (cle´s primaires et
+e´trange`res) et des statistiques rudimentaires (“petite” ou “grande” table), sans prendre
+en compte la charge supporte´e par le syste`me. La deuxie`me approche est base´e sur
+l’utilisation de syste`mes experts, la base de re`gles de´finissant un “bon” mode`le physique.
+Cette approche souffre de la complexite´ de mode´lisation de cette base de re`gles. Enfin,
+la troisie`me approche utilise l’optimiseur de requeˆtes du SGBD pour estimer le couˆt
+de diffe´rentes configurations d’index candidats.
+Les travaux les plus re´cents en matie`re de se´lection d’index utilisent cette dernie`re
+approche. (Frank et al. 1992) propose un outil d’aide a` la de´cision pour l’administrateur
+qui, a` partir d’une charge et d’une configuration d’index donne´es, fournit une estimation
+du couˆt global de chaque index graˆce a` un dialogue constant avec l’optimiseur de
+requeˆtes. L’outil de se´lection d’index IST - Index Selection Tool (Chaudhuri et al. 1997,
+Chaudhuri 1998, Agrawal et al. 2000), de´veloppe´ par Microsoft au sein du SGBD SQL
+Server, exploite une charge et en extrait une configuration d’index candidats mono-
+attribut. Un algorithme glouton permet de se´lectionner les meilleurs index de cette
+configuration graˆce a` des estimations de couˆt effectue´es par l’optimiseur de requeˆtes.
+Le processus est ensuite re´ite´re´ pour ge´ne´rer des index sur deux attributs a` partir
+des index mono-attributs, et ainsi de suite pour les index multi-attributs de taille
+supe´rieure.
+RNTI - 1
+Kamel Aouiche et al.
+3 Extraction de motifs fre´quents pour la se´lection
+d’index
+3.1 Principe
+L’approche que nous proposons, dont le principe est repre´sente´ a` la Figure 1, ex-
+ploite le journal des transactions (fichier log) pour extraire une configuration d’index.
+Les requeˆtes pre´sentes dans le journal constituent une charge, qui est traite´e par un
+analyseur de requeˆtes SQL qui extrait tous les attributs susceptibles d’eˆtre indexe´s
+(attributs indexables).
+Nous construisons ensuite une matrice dite “requeˆtes-attributs” qui repre´sente le
+contexte d’extraction des motifs fre´quents. Pour obtenir ces derniers, nous avons choisi
+l’algorithme Close (Pasquier et al. 1999a), car il calcule l’ensemble des ferme´s (au sens
+de la connexion de Galois (Pasquier et al. 1999b)) fre´quents, qui est un ge´ne´rateur
+pour tous les motifs fre´quents et leur support. Dans la plupart des cas, le nombre des
+ferme´s fre´quents est sensiblement moins important que la totalite´ des motifs fre´quents
+obtenue en sortie des algorithmes classiques tels qu’Apriori (Agrawal et al. 1994). Dans
+notre contexte, l’utilisation de Close nous permet d’obtenir une configuration d’index
+candidats moins volumineuse (tout en demeurant aussi significative) en un temps de
+calcul plus court. Finalement, nous se´lectionnons au sein de la configuration d’index
+candidats les plus pertinents et les cre´ons.
+3.2 Extraction de la charge
+Nous supposons que nous disposons d’une charge similaire a` celle pre´sente´e dans
+la Figure 2. Cette charge peut normalement eˆtre obtenue a` partir du journal des tran-
+sactions du SGBD hoˆte ou bien graˆce a` une application externe telle que Log Explo-
+rer (Lumigent Technologies 2002).
+3.3 Extraction des attributs indexables
+Pour re´duire le temps de re´ponse d’une recherche dans une base de donne´es, il est
+judicieux de construire des index sur les attributs utilise´s pour effectuer cette recherche.
+Ces attributs sont ceux qui font partie des clauses WHERE, ORDER BY, GROUP BY
+et HAVING des requeˆtes SQL (Chaudhuri et al. 1997).
+L’analyseur syntaxique que nous avons conc¸u ope`re sur tous types de requeˆte SQL
+(se´lection et mise a` jour) imbrique´e ou non, et en extrait tous les attributs indexables.
+Par exemple, l’analyse de la requeˆte de la Figure 3 renvoie comme re´sultat les at-
+tributs suivants : part.partkey, lineitem.partkey, part.brand, part.container, et linei-
+tem.quantity. Ce processus est applique´ a` toutes les requeˆtes de la charge.
+3.4 Construction du contexte d’extraction des ferme´s fre´quents
+Nous construisons ensuite une matrice “requeˆtes-attributs” (Figure 4) dont les
+lignes repre´sentent les diffe´rentes requeˆtes de la charge et les colonnes repre´sentent l’en-
+semble de tous les attributs indexables identifie´s a` l’e´tape pre´ce´dente. Cette matrice
+RNTI - 1
+Vers l’auto-administration des entrepoˆts de donne´es
+Base de données et 
+charge  
+Fichier log des 
+transactions 
+Ensemble d’attributs 
+indexables 
+Matrice requêtes-attributs 
+Ensemble des motifs fermés 
+fréquents (index candidats) 
+Analyseur syntaxique de 
+requêtes SQL 
+Construction de la matrice 
+requêtes-attributs 
+Application de Close 
+Extraction du fichier log 
+Sélection et construction 
+des index 
+Fig. 1 – Principe de la se´lection des index en utilisant les motifs fre´quents
+sert a` associer a` chaque requeˆte les attributs indexables qu’elle comporte. L’existence
+d’un attribut dans une requeˆte est symbolise´e par 1 et son absence par 0.
+3.5 Extraction des motifs fre´quents ferme´s
+L’algorithme Close re´alise un parcours en largeur du treillis des ferme´s pour en
+extraire les ferme´s fre´quents et leurs supports. Il utilise en entre´e un contexte d’ex-
+traction tel que celui de la Figure 4, sur lequel sont re´alise´s des balayages successifs.
+Un parame`tre re´gulateur (seuil), le support minimal (minsup), permet de de´terminer
+quels sont les ferme´s fre´quents (c’est-a`-dire, de support supe´rieur ou e´gal a` minsup).
+L’application de Close sur le contexte de la Figure 4 fournit en sortie l’ensemble de
+ferme´s fre´quents (et leurs supports) suivant, pour un support minimal de 2/6 : {(AC,
+3/6), (BE, 5/6), (C, 5/6), (ABCE, 2/6), (BCE, 4/6)}.
+RNTI - 1
+Kamel Aouiche et al.
+Q1 : SELECT * FROM T1, T2 WHERE A BETWEEN 1 AND 10 AND C=D
+Q2 : SELECT * FROM T1, T2 WHERE B LIKE ’%this%’ AND C=5 AND E<100
+Q3 : SELECT * FROM T1, T2 WHERE A=30 AND B>3 GROUP BY C HAVING
+SUM(E)>2
+Q4 : SELECT * FROM T1 WHERE B>2 AND E IN (3, 2, 5)
+Q5 : SELECT * FROM T1, T2 WHERE A=30 AND B>3 GROUP BY C HAVING
+SUM(E)>2
+Q6 : SELECT * FROM T1, T2 WHERE B>3 GROUP BY C HAVING SUM(E)>2
+Fig. 2 – Exemple de charge
+SELECT SUM(lineitem.extendedprice) / 7.0 FROM lineitem, part
+WHERE part.partkey = lineitem.partkey
+AND part.brand = ’ :1’ AND part.container = ’ :2’
+AND lineitem.quantity < (
+SELECT 0.2 * AVG(lineitem.quantity) FROM lineitem
+WHERE lineitem.partkey = part.partkey )
+Fig. 3 – Exemple de requeˆte SQL
+3.6 Construction des index
+Le nombre d’index candidats obtenu avec notre approche est d’autant plus impor-
+tant que la charge en entre´e est volumineuse. En pratique, il est donc impossible de
+construire tous les index propose´s. Le temps de construction, puis plus tard de mise
+a` jour de tous ces index serait pe´nalisant. Il faut donc pre´voir des me´thodes ou des
+proce´de´s de filtrage permettant de re´duire le nombre d’index a` ge´ne´rer.
+Dans le contexte des bases de donne´es de´cisionnelles, plus particulie`rement dans
+celui des entrepoˆts de donne´es, la construction d’un index est un proble`me fondamental
+vue la volume´trie importante des tables. Il semble donc plus inte´ressant de construire
+des index sur les tables volumineuses, l’apport d’un index sur une table de petite taille
+Attributs
+Requeˆtes A B C D E
+Q1 1 0 1 1 0
+Q2 0 1 1 0 1
+Q3 1 1 1 0 1
+Q4 0 1 0 0 1
+Q5 1 1 1 0 1
+Q6 0 1 1 0 1
+Fig. 4 – Contexte d’extraction pour la charge de la Figure 2
+RNTI - 1
+Vers l’auto-administration des entrepoˆts de donne´es
+s’ave´rant peu significatif.
+Certaines connaissances statistiques comme la cardinalite´ des attributs a` indexer
+peuvent e´galement eˆtre exploite´es pour construire les index. La cardinalite´ d’un attribut
+est le nombre de valeurs distinctes de cet attribut dans une relation donne´e. Si la
+cardinalite´ est tre`s grande, l’index de´ge´ne`re a` un parcours se´quentiel et si elle est
+tre`s petite, l’indexation n’apporte pas d’ame´lioration significative (Vanichayobon et al.
+1999). Il faut donc construire des index sur des attributs a` cardinalite´ “moyenne”.
+Dans cette premie`re e´tude, nous nous inte´ressons plus particulie`rement au volume
+des tables. Pour cela, nous avons e´tabli deux strate´gies pour construire les index. La
+premie`re consiste a` construire syste´matiquement tous les index propose´s (me´thode
+na¨ıve, qui demeure applicable quand le nombre d’index est re´duit). Dans ce cas,
+chaque ferme´ fre´quent correspond a` un index a` cre´er. La seconde strate´gie prend en
+conside´ration le volume des tables auxquelles se re´fe`re l’index propose´. Dans ce cas,
+l’administrateur de la base de donne´es de´fini des tables dites volumineuses et seuls les
+index portant sur des attributs de ces tables sont construits.
+3.7 Comparaison avec les me´thodes existantes
+Contrairement aux me´thodes de se´lection d’index de´veloppe´es re´cemment (Sec-
+tion 2), l’outil que nous proposons pre´sente l’originalite´ de ne pas communiquer avec
+l’optimiseur de requeˆtes du SGBD. Habituellement, les dialogues entre l’outil de se´lection
+des index et l’optimiseur sont pe´nalisants et doivent eˆtre minimise´s. En effet, le temps
+de calcul du couˆt d’une configuration d’index est d’autant plus important que la charge
+est conse´quente, ce qui est typiquement le cas. Notre me´thode a` base de recherche de
+motifs fre´quents est e´galement gourmande en temps de calcul, mais il nous est actuelle-
+ment difficile de de´terminer quelle approche engendre la surcharge la plus lourde pour
+le syste`me.
+Cependant, nous nous inte´ressons plus encore a` la qualite´ des index ge´ne´re´s. En
+utilisant la recherche des fre´quents ferme´s, notre outil extrait directement un ensemble
+d’index mono-attribut et multi-attributs. Nous ne construisons donc pas a priori une
+configuration d’index mono-attribut initiale et n’avons pas besoin d’utiliser une heu-
+ristique pour construire par ite´rations successives les index candidats multi-attributs,
+comme c’est le cas avec IST (Chaudhuri et al. 1997). Nous pensons que cette approche
+e´vite la ge´ne´ration et l’e´valuation du couˆt d’index non pertinents.
+4 Expe´rimentations
+Afin de valider notre de´marche, nous l’avons applique´e sur une base et un en-
+trepoˆt de donne´es tests. Notre objectif est ici de ve´rifier si nos propositions s’ave`rent
+inte´ressantes en pratique, plus que d’effectuer de ve´ritables tests de performance. Nous
+avons choisi le banc d’essais de´cisionnel TPC-R (TPC 1999) pour nos expe´rimentations
+sur base de donne´es relationnelle, car c’est un standard qui nous permettra par la suite
+de comparer aise´ment notre approche aux autres me´thodes existantes. Nous l’avons
+configure´ pour ge´ne´rer une base de donne´es de 1 Go.
+RNTI - 1
+Kamel Aouiche et al.
+En revanche, il n’existe pas a` notre connaissance de banc d’essais standard pour
+les entrepoˆts de donne´es. Aussi avons-nous travaille´ sur un petit magasin de donne´es
+de´veloppe´ par ailleurs au sein de notre laboratoire. Nous avons de plus conc¸u une charge
+de´cisionnelle spe´cialement adapte´e pour l’appliquer sur ce magasin (Aouiche 2002). Le
+magasin de donne´es d’accidentologie est compose´ d’une table de faits Accidents et
+des tables dimensions : Lieux, Conditions, Dates et Responsables. Il occupe une place
+disque de 15 Mo.
+// Exe´cution a` froid (sans chronome´trage)
+POUR Chaque reque^te de la charge FAIRE
+Exe´cuter la reque^te courante
+FIN POUR
+// Exe´cution a` chaud
+POUR i = 1 A nombre de re´pe´titions FAIRE
+POUR Chaque reque^te de la charge FAIRE
+Exe´cuter la reque^te courante
+Calculer le temps de re´ponse de la reque^te courante
+FIN POUR
+FIN POUR
+Calculer le temps de re´ponse moyen global
+Fig. 5 – Protocole de test
+La base de donne´es de TPC-R et le magasin de donne´es d’accidentologie ont e´te´
+implante´s au sein du SGBD SQL Server 2000. Le protocole de test que nous avons
+adopte´ est pre´sente´ a` la Figure 5. Cet algorithme est exe´cute´ pour diffe´rentes valeurs
+du parame`tre minsup (support minimal) de Close. En pratique, ce parame`tre nous
+permet de limiter le nombre d’index a` ge´ne´rer en ne se´lectionnant que ceux qui sont
+les plus fre´quemment sollicite´s par la charge.
+4.1 Expe´rimentations avec base TPC-R
+Les re´sultats obtenus sont repre´sente´s a` la Figure 6 et 7. Elles montrent que nous
+re´alisons un gain de performance quelle que soit la valeur de minsup. Le gain maximum
+en temps de re´ponse est la diffe´rence entre le temps de re´ponse moyen sans index et le
+plus petit temps de re´ponse moyen avec index. Il est proche de 22% dans le premier cas
+et de 25% dans le deuxie`me cas. Les gains moyens en temps de re´ponse sont de 14,4%
+et 13,7%, respectivement. Dans le premier cas, le temps de re´ponse s’ame´liore jusqu’a`
+ce que minsup atteigne 15%, puis se de´grade de manie`re continue. Dans le deuxie`me
+cas, il reste a` sa valeur minimale dans un large intervalle (valeur de minsup comprise
+entre 20% et 50%) avant de se de´grader brutalement. Le nombre important d’index a`
+ge´ne´rer dans le premier cas peut expliquer ce comportement. Conside´rer uniquement les
+index associe´s a` des tables volumineuses permet de re´duire le nombre d’index ge´ne´re´s
+et e´vite la cre´ation d’index sur les “petites” tables (puisqu’ils n’apportent qu’un faible
+be´ne´fice).
+RNTI - 1
+Vers l’auto-administration des entrepoˆts de donne´es
+Finalement, pour les grandes valeurs de minsup, le temps de re´ponse moyen dans
+les deux cas est proche de celui obtenu sans ge´ne´rer aucun index. Ce cas de figure est
+pre´visible, dans le sens ou`, pour un minsup tre`s grand, aucun index ou tre`s peu d’index
+sont ge´ne´re´s. Dans le deuxie`me cas, cet e´tat est atteint rapidement car tre`s peu d’index
+sont construits, ce qui explique le gain moyen infe´rieur.
+1:55
+2:02
+2:09
+2:16
+2:24
+2:31
+2:38
+2:45
+0% 20% 40% 60% 80% 100%
+minsup
+T
+e
+m
+p
+s
+ d
+e
+ r
+é
+p
+o
+n
+s
+e
+ m
+o
+y
+e
+n
+ 
+(m
+in
+u
+te
+s
+)
+avec index sans index
+Fig. 6 – Re´sultats avec TPC-R — Tous les index
+01:55
+02:02
+02:09
+02:16
+02:24
+02:31
+02:38
+02:45
+0% 20% 40% 60% 80% 100%
+minsup
+T
+e
+m
+p
+s
+ d
+e
+ r
+é
+p
+o
+n
+s
+e
+ m
+o
+y
+e
+n
+ 
+(m
+in
+u
+te
+s
+)
+avec index sans index
+Fig. 7 – Re´sultats avec TPC-R — Index sur des tables volumineuses
+4.2 Expe´rimentations sur le magasin de donne´es
+Pour cette se´rie de tests, nous avons applique´ le meˆme protocole (Figure 5). Ce-
+pendant, nous n’avons pas employe´ la strate´gie de cre´ation d’index sur des tables
+RNTI - 1
+Kamel Aouiche et al.
+volumineuses, e´tant donne´ que toutes les tables de notre magasin de donne´es test ont
+une taille similaire.
+1,1
+1,2
+1,3
+1,4
+1,5
+1,6
+0% 20% 40% 60% 80% 100%
+minsup
+T
+e
+m
+p
+s
+ d
+e
+ r
+é
+p
+o
+n
+s
+e
+ m
+o
+y
+e
+n
+ 
+(s
+e
+c
+o
+n
+d
+e
+s
+)
+avec index sans index
+Fig. 8 – Re´sultats avec le magasin de donne´es d’accidentologie
+Les re´sultats obtenus sont repre´sente´s a` la Figure 8. Le gain de performance maxi-
+mum est proche de 15%. Le gain moyen est de 6,4%. La Figure 8 montre que construire
+les index est plus couˆteux que de ne pas le faire pour les valeurs de minsup comprises
+entre 10% et 25%. Ceci peut s’expliquer par le nombre important d’index a` ge´ne´rer, qui
+induit une surcharge importante. En outre, comme le magasin de donne´es (de 15 Mo)
+tient entie`rement en me´moire centrale, les index ne sont utiles qu’a` son premier char-
+gement. Dans ce contexte, de nombreux index peu utilise´s doivent eˆtre charge´s, ce qui
+pe´nalise les performances globales.
+Le meilleur gain en temps de re´ponse apparaˆıt pour les valeurs de minsup comprises
+entre 30% et 85%, quand le nombre d’index est tel que la surcharge due a` la ge´ne´ration
+d’index est moins importante que le gain de performance obtenu au chargement du
+magasin de donne´es. Pour les plus grandes valeurs de minsup, le temps de re´ponse se
+de´grade et devient proche de celui obtenu sans index car aucun ou peu d’index sont
+ge´ne´re´s.
+Une autre explication possible aux performances infe´rieures dans le cas du magasin
+de donne´es par rapport a` la base de donne´es de TPC-R peut venir de la structure de
+l’index cre´e´. Les index bitmap et les index de jointure en e´toile sont les plus adapte´s
+pour un entrepoˆt de donne´es (O’Neil et al. 1995). Or, les index cre´e´s par de´faut dans
+SQL Server sont des variantes des B-arbres.
+5 Conclusions et perspectives
+Nous avons pre´sente´ dans cet article une nouvelle approche pour la se´lection auto-
+matique d’index dans un SGBD. L’originalite´ de notre travail repose sur l’extraction de
+motifs fre´quents pour de´terminer une configuration d’index. Nous nous basons en effet
+RNTI - 1
+Vers l’auto-administration des entrepoˆts de donne´es
+sur l’intuition que l’importance d’un attribut a` indexer est fortement corre´le´e avec sa
+fre´quence d’apparition dans les requeˆtes pre´sentes dans une charge. Par ailleurs, l’utili-
+sation d’un algorithme d’extraction de fre´quents tel que Close nous permet de ge´ne´rer
+des index mono-attribut et multi-attributs a` la vole´e, sans avoir a` mettre en œuvre un
+processus ite´ratif permettant de cre´er successivement des index multi-attributs de plus
+en plus gros a` partir d’un ensemble d’index mono-attribut.
+Nos premiers re´sultats expe´rimentaux montrent que notre technique permet effec-
+tivement d’ame´liorer le temps de re´ponse de 20% a` 25% pour une charge de´cisionnelle
+applique´e a` une base de donne´es relationnelle (banc d’essais TPC-R). Nous avons par
+ailleurs propose´ deux strate´gies effectuer une se´lection parmi les index candidats : la
+premie`re cre´e syste´matiquement tous les index candidats et la deuxie`me ne cre´e que
+les index associe´s a` des tables dites volumineuses. La deuxie`me strate´gie apporte une
+meilleure ame´lioration car elle propose un compromis entre l’espace occupe´ par les
+index (le nombre d’index cre´e´s est limite´ a` ceux qui sont de´finis sur des attributs de
+tables volumineuses) et l’inte´reˆt de la cre´ation d’un index (il est peu inte´ressant de
+cre´er un index sur une petite table).
+Nous avons e´galement re´alise´ des tests sur un petit magasin de donne´es d’acciden-
+tologie auquel nous avons applique´ une charge de´cisionnelle ad hoc. Le gain en temps
+de re´ponse, de l’ordre de 14%, est moins important que dans le cas de TPC-R. Cela
+peut eˆtre explique´ par le fait que les index cre´e´s par de´faut par SQL Server sont des
+variantes des B-arbres et non des index bitmap et des index de jointure en e´toile, qui
+seraient plus adapte´s pour un entrepoˆt de donne´es.
+Notre travail de´montre que l’ide´e d’utiliser des techniques de fouille de donne´es pour
+l’auto-administration des SGBD est prometteuse. Il n’est cependant qu’une premie`re
+approche et ouvre de nombreuses perspectives de recherche. Une premie`re voie consis-
+terait a` ame´liorer la se´lection des index en concevant des strate´gies plus e´labore´es que
+l’utilisation exhaustive d’une configuration ou l’exploitation de renseignements relative-
+ment basiques concernant la taille des tables. Un mode`le de couˆt plus fin au regard des
+caracte´ristiques des tables (autres que la taille), ou encore une strate´gie de ponde´ration
+des requeˆtes de la charge (par type de requeˆte : se´lection ou mise a` jour), pourraient
+nous aider dans cette optique. L’utilisation d’autres me´thodes de fouille de donne´es
+non-supervise´es telles que le regroupement (clustering) pourraient e´galement fournir
+des ensembles de fre´quents moins volumineux.
+Par ailleurs, il paraˆıt indispensable de continuer a` tester notre me´thode pour mieux
+e´valuer la surcharge qu’elle engendre pour le syste`me, que ce soit en terme de ge´ne´ration
+des index ou de leur maintenance. Il est notamment ne´cessaire de l’appliquer pour des
+entrepoˆts de donne´es de grande taille et en tirant partie d’index adapte´s. Il serait
+e´galement tre`s inte´ressant de la comparer de manie`re plus syste´matique avec l’outil
+IST de´veloppe´ par Microsoft, que ce soit par des calculs de complexite´ des heuristiques
+de ge´ne´ration de configurations d’index (surcharge) ou des expe´rimentations visant a`
+e´valuer la qualite´ de ces configurations (gain en temps de re´ponse et surcharge due a`
+la maintenance des index).
+Finalement, e´tendre ou coupler notre approche a` d’autres techniques d’optimisa-
+tion des performances (vues mate´rialise´es, gestion de cache, regroupement physique,
+etc.) constitue e´galement une voie de recherche prometteuse. En effet, dans le contexte
+RNTI - 1
+Kamel Aouiche et al.
+des entrepoˆts de donne´es, c’est principalement en conjonction avec d’autres structures
+physiques (principalement les vues mate´rialise´es) que l’indexation permet d’obtenir
+des gains de performance significatifs (Gupta 1999, Agrawal et al. 2000, Agrawal et al.
+2001).
+Re´fe´rences
+Agrawal R., Imielinski T. et Swami A.N. (1993), Mining Association Rules between
+Sets of Items in Large Databases, SIGMOD Record, 22(2), pp 207-216.
+Agrawal R. et Srikant R. (1994), Fast Algorithms for Mining Association Rules, Pro-
+ceedings of the 20th International Conference on Very Large Data Bases, Santiago,
+Chile, pp 487-499.
+Agrawal S., Chaudhuri S. et Narasayya V.R. (2000), Automated Selection of Materia-
+lized Views and Indexes in SQL Databases, Proceedings of the 26th International
+Conference on Very Large Data Bases, Cairo, Egypt, pp 496-505.
+Agrawal S., Chaudhuri S. et Narasayya V.R. (2001), Materialized View and Index
+Selection Tool for Microsoft SQL Server 2000, Proceedings of the ACM SIGMOD
+International Conference on Management of Data, Santa Barbara, USA.
+Aouiche K. (2002), Accidentology datamart schema and workload, http ://bdd.univ-
+lyon2.fr/download/charge-accidentologie.pdf.
+Chaudhuri. et Narasayya V.R. (1997), An Efficient Cost-Driven Index Selection Tool
+for Microsoft SQL Server, Proceedings of the 23rd International Conference on
+Very Large Data Bases, Athens, Greece, pp 146-155.
+Chaudhuri S. (1998), Data Mining and Database Systems : Where is the Intersection ?,
+Data Engineering Bulletin, 21(1), pp 4-8.
+Chaudhuri S. et Narasayya V.R. (1998), AutoAdmin ’What-if’ Index Analysis Utility,
+Proceedings of the ACM SIGMOD International Conference on Management of
+Data, Seattle, USA, pp 367-378.
+De Marchi F., Lopes S. et Petit J.M. (2002), Efficient Algorithms for Mining Inclu-
+sion Dependencies, Proceedings of the 8th International Conference on Extending
+Database Technology, Prague, Czech Republic, LNCS, Vol. 2287, pp 464-476.
+Finkelstein S. J., Schkolnick M. et Tiberion P. (1988), Physical Database Design for
+Relational Databases, TODS, (13)1, pp 91-128.
+Frank M. R., Omiecinski E. et Navathe S.B. (1992), Adaptive and Automated Index
+Selection in RDBMS, Proceedings of the 3rd International Conference on Extending
+Database Technology, Vienna, Austria, LNCS, Vol. 580, pp 277-292.
+Gupta H. (1999), Selection and maintenance of views in a data warehouse, PhD thesis,
+Stanford University.
+Lopes S., Petit J.M. et Lakhal L. (2000), Efficient Discovery of Functional Dependen-
+cies and Armstrong Relations, Proceedings of the 7th International Conference on
+Extending Database Technology, Konstanz, Germany, LNCS, Vol. 1777, pp 350-
+364.
+RNTI - 1
+Vers l’auto-administration des entrepoˆts de donne´es
+Lumigent Technologies (2002), Log Explorer for SQL Server, http ://www.lumigent.com.
+O’neil P. et Graefe G. (1995), Multi-table joins through bitmapped join indices, SIG-
+MOD Record, (24)3, pp 8-11.
+O’neil P. et Quass D. (1997), Improved Query Performance with Variant Indexes,
+SIGMOD Record, (26)2, pp 38-49.
+Pasquier N., Bastide Y., Taouil R. et Lakhal L. (1999), Discovering Frequent Closed
+Itemsets for Association Rules, Proceedings of the 7th International Conference on
+Database Theory, Jerusalem, Israel, LNCS, Vol. 1540, pp 398-416.
+Pasquier N., Bastide Y., Taouil R. et Lakhal L. (1999), Efficient mining of association
+rules using closed itemset lattices, Information Systems, (24)1, pp 25-46.
+TPC Transaction Processing Council (1999), TPC Benchmark R Standard Specifica-
+tion.
+Vanichayobon S. et Gruenwald L. (1999), Indexing Techniques for Data Warehouses’s
+Queries, Technical repport, University of Oklahoma, School of Computer Science.
+Weikum G., Monkeberg A., Hasse C. et Zabback P. (2002), Self-tuning Database Tech-
+nology and Information Services : from Wishful Thinking to Viable Engineering,
+Proceedings of the 28th International Conference on Very Large Data Bases, Hong
+Kong, China.
+Summary
+With the wide development of databases in general and data warehouses in parti-
+cular, it is important to reduce the tasks that a database administrator must perform
+manually. The idea of using data mining techniques to extract useful knowledge for
+administration from the data themselves has existed for some years. However, little
+research has been achieved. The aim of this study is to search for a way of extracting
+useful knowledge from stored data to automatically apply performance optimization
+techniques, and more particularly indexing techniques. We have designed a tool that
+extracts frequent itemsets from a given workload to compute an index configuration
+that helps optimizing data access time. The experiments we performed showed that
+the index configurations generated by our tool allowed performance gains of 15% to
+25% on a test database and a test data warehouse.
+RNTI - 1

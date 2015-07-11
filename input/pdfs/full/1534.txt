@@ -1,0 +1,194 @@
+Mode`les de Markov cache´s pour l’estimation
+de plusieurs fre´quences fondamentales
+Francis Bach∗, Michael I. Jordan∗∗
+∗ Centre de Morphologie Mathe´matique
+Ecole des Mines de Paris
+35, rue Saint Honore´
+77305 Fontainebleau, France
+francis.bach@mines.org
+∗∗ Computer Science Division
+and Department of Statistics
+University of California
+Berkeley, CA 94720, USA
+jordan@cs.berkeley.edu
+1 Introduction
+Le suivi de la fre´quence fondamentale est un proble`me important du traitement
+de la parole et de la musique, et le de´veloppement d’algorithmes robustes pour la
+de´termination d’une ou plusieurs fre´quences fondamentales est un sujet actif de re-
+cherches en traitement du signal acoustique (Gold et Morgan, 1999). La plupart des
+algorithmes d’extraction de la fre´quence fondamentale commencent par construire un
+ensemble de caracte´ristiques non line´aires (comme le corre´logramme ou le “cepstrum”)
+qui ont un comportement spe´cial lorsqu’une voyelle est prononce´e. Ensuite, ces al-
+gorithmes mode´lisent ce comportement afin d’extraire la fre´quence fondamentale. En
+pre´sence de plusieurs signaux mixe´s additivement, il est naturel de vouloir mode´liser
+directement le signal ou une repre´sentation line´aire de ce signal (comme le spectro-
+gramme), afin de pre´server l’additivite´ et de rendre possible l’utilisation de mode`les
+destine´s a` une seule fre´quence fondamentale pour en extraire plusieurs.
+L’utilisation directe du spectrogramme ne´ce´ssite cependant un mode`le probabili-
+tiste de´taille´ afin de caracte´riser la fre´quence fondamentale. Dans cet article, nous
+conside´rons une variante de mode`le de Markov cache´ et utilisons le cadre des mode`les
+graphiques afin de construire le mode`le, apprendre les parame`tres a` partir de donne´es
+et de´velopper des algorithmes efficaces d’infe´rence. En particulier, nous utilisons des
+de´veloppments re´cents en apprentissage automatique (machine learning) pour caracte´-
+riser les proprie´te´s ade´quates des signaux de parole et de musique ; nous utilisons des
+probabilite´s a priori non-parame´triques afin de caracte´riser la re´gularite´ de l’enveloppe
+spectrale et nous ame´liorons la proce´dure d’apprentissage graˆce a` l’apprentissage dis-
+criminatif du mode`le.
+- 53 - RNTI-E-5
+Mode`les de Markov cache´s pour l’estimation de plusieurs fre´quences fondamentales
+2 Mode`le graphique pour l’extraction de la fre´quence
+fondamentale
+Dans cet article, nous utilisons des signaux sonores e´chantillonne´s a` 5.5 KHz. Etant
+donne´ un signal uni-dimensionnel xt, t = 1, . . . , T , le spectrogramme s est de´fini comme
+la transforme´e de Fourier a` feneˆtres de x ; i.e., le signal x est de´coupe´ en N morceaux de
+longueurM qui se recouvrent, et le spectogramme s est de´fini comme la matrice N×P
+dont la n-ie`me colonne sn ∈ R
+P est la FTT a` P points du n-ie`me morceaux. Dans
+cet article nous mode´lisons le module du spectrogramme et re´fe´rons a` ce module du
+spectrogramme simplement comme le spectrogramme. Comme les signaux sonores sont
+re´els, la FFT est syme´trique et nous utilisons seulement les P/2 premie`res fre´quences.
+2.1 Mode`le additif
+La variable d’entre´e de notre mode`le de recherche de fre´quence fondamentale est la
+suite sn ∈ R
+P , n = 1, . . . , N , ou` N est le nombre de feneˆtres, e´gal a` une constante fois
+la dure´e T du signal x. Nous utilisons un mode`le additif du spectrogramme, i.e., si K
+personnes sont pre´sentes, nous mode´lisons la n-ie`me feneˆtre comme la superposition
+des K signaux ukn ∈ R
+P plus du bruit, i.e., sn =
+∑K
+k=1 u
+k
+n + εn.
+2.2 Mode`le harmonique
+Nous utilisons un mode`le harmonique dans le domaine des fre´quences, ce qui cor-
+respond a` mode´liser le spectrogramme comme un peigne de Dirac avec modulation
+d’amplitude. Nous mode´lisons chaque personne k a` l’instant n a` l’aide de quatre va-
+riables
+– Voyelles : vkn est une variable binaire qui est e´gale a` un si la personne k prononce
+une voyelle a` l’instant n, et e´gale a` ze´ro sinon.
+– Fre´quence fondamentale : ωkn est la fre´quence fondamentale, de´finie de telle sorte
+qu’elle est e´gale a` la distance entre deux pics dans le spectrogramme.
+– Harmoniques : hkn est un ensemble de vecteurs d’amplitudes harmoniques lorsque
+vkn = 1. Il y a un vecteur h
+k
+nω pour chaque valeur ω. La dimension de h
+k
+nω est
+e´gale a` ⌊P/2ω⌋.
+– Terme constant : ckn est l’amplitude constante des portions sans voyelle (v
+k
+n = 1).
+Le mode`le graphique pour une personne est un simple mode`le de Markov cache´ (voir
+figure 1). Les probabilite´s conditionnelles, qui sont ne´cessaires pour de´finir comple`tement
+le mode`le, refle`tent les proprie´te´s psycho-acoustiques et statistiques connues des fre´quences
+fondamentales (Gold et Morgan, 1999). En particulier, la proprie´te´ de re´gularite´ de
+l’enveloppe spectrale est explicitement prise en compte a` l’aide d’outils de statistique
+non parame´trique. Pour plus de de´tails, voir Bach et Jordan (2005).
+2.3 Mode`le de Markov cache´s factoriel
+Les mode`les pour chaque personne peuvent eˆtre combine´s en un unique mode`le gra-
+phique, un mode`le de Markov cache´ “factoriel”, ou` les 2K chaˆınes de Markov e´voluent
+inde´pendamment (voir figure 1 pour deux personnes). Le parame`tre λn est la variance
+- 54 -RNTI-E-5
+Bach et Jordan
+n+1
+ch
+u
+ω
+vv
+ω
+u
+h c
+n
+n
+2
+2
+2
+22
+2
+2
+2 2
+2
+1
+1
+1
+11
+1
+1
+11
+1
+u
+ch
+ω
+vv
+ω
+h c
+u
+u
+h c
+ω
+v
+h c
+ω
+v
+u
+λλ ss
+n+1
+Fig. 1 – (Gauche) Mode`le pour une personne pour deux feneˆtres n et n+ 1. (Droite)
+Mode`le pour deux personnes pour deux feneˆtres n et n + 1. les indices de temps sont
+omis.
+du bruit Gaussien εn au temps n. Nous faisons l’hypothe`se que λn a une distribution
+uniforme et est discre´tise´e sur une grille logarithmique a` nλ = 10 e´le´ments.
+3 Infe´rence
+Dans les sections suivantes, nous utilisons le raccourci x pour de´noter l’ensemble les
+variables (xkn)k,n pour tous k et n, et le raccourci x
+k pour de´noter l’ensemble des va-
+riables (xkn)n pour tous n. Si nous de´finissons z = (ω, v, h, c, λ), alors la taˆche d’infe´rence
+est de calculer, e´tant donne´ s, argmaxz p(z|s). La minimisation par rapport a` (h, λ)
+peut s’effectuer en formule ferme´e, donc nous sommes ramene´s a` l’optimisation par
+rapport a` (ω, v).
+Avec une personne, nous sommes face a` l’infe´rence classique dans un mode`le de
+Markov cache´, ou` le nombre d’e´tats cache´s est proportionnel a` nω, et la complexite´
+pour un signal de dure´e T est O(Tn2ω) pour l’agorithme de Viterbi (Ghahramani et
+Jordan, 1997). Avec m personnes, nous avons un mode`le factoriel avec 2m chaˆınes
+de´couple´es, chacune avec nω ou 2 e´tats ; la complexite´ d’un algorithme de Viterbi
+structure´ est alors O(Tnm+1ω ) (Ghahramani et Jordan, 1997). Comme nω est grand,
+nous utilisons la proce´dure d’approximation suivante :
+1. Estimer re´cursivement les m fre´quences en estimant une fre´quence a` la fois et
+soustrayant le mode`le harmonique correspondant.
+2. Construire un ensemble de pω candidats pour la fre´quence, pour chaque instant,
+constitue´ des minimas locaux dans chaque algorithme de Viterbi de l’e´tape 1.
+3. Effectuer l’infe´rence exacte en utilisant le petit nombre de candidats.
+- 55 - RNTI-E-5
+Mode`les de Markov cache´s pour l’estimation de plusieurs fre´quences fondamentales
+La complexite´ de l’algorithme pre´ce´dent est O(mn2ωT + Tp
+m+1
+ω ). En pratique pω est
+choisi assez petit (autour de 10), de telle sorte que la complexite´ est O(mn2ωT ), mais
+assez grand pour que l’approximation par rapport a` l’infe´rence exacte soit minime (i.e.,
+tre`s peu de diffe´rences avec pω = nω).
+4 Apprentissage des parameˆtres
+Si z est de´fini comme z = (ω, v), alors notre mode`le pour s est un mode`le avec
+variable latente z. En pre´sence de donne´es de´ja` annote´es, pour lesquelles a` la fois s
+et z sont disponibles, nous puvons utiliser un apprentissage discriminatif, i.e., nous
+optimisons la vraisemblance conditionelle p(z|s) au lieu de la vraisemblance jointe
+p(s, z) (Bach et Jordan, 2005).
+Nous utilisons la base de donne´es annote´es de Keele (Plante et al., 1995), qui est
+compose´e de 10 personnes diffe´rentes, enregistre´es se´pare´ment. Nous pouvons mixer ar-
+tificiellement les enregistrement de deux personnes diffe´rentes pour obtenir des donne´es
+mixe´es.
+5 Conclusion
+Nous avons pre´sente´ un algorithme pour l’extraction de plusieurs fre´quences fonda-
+mentales, a` base de mode`les graphiques. L’utilisation de probabilite´s a priori appro-
+prie´es et d’apprentissage discriminatif permet d’obtenir une meilleure performance. Le
+temps de calcul de notre algorithme est fonction line´aire de la dure´e du signal initial.
+Bien que notre imple´mentation en Matlab soit 10 fois plus lente que le temps re´el, il n’y
+pas d’obstacles majeurs pour une imple´mentation en temps re´el de notre algorithme.
+Re´fe´rences
+Bach, F. R. et Jordan, M. I. (2005). Discriminative training of hidden Markov models
+for multiple pitch tracking. In ICASSP.
+Ghahramani, Z. et Jordan, M. I. (1997). Factorial hidden Markov models. Machine
+Learning, 29 :245–273.
+Gold, B. et Morgan, N. (1999). Speech and Audio Signal Processing. Wiley Press.
+Plante, F., Meyer, G. F., et Ainsworth, W. A. (1995). A pitch extraction reference
+database. In Proc. EUROSPEECH.
+- 56 -RNTI-E-5

@@ -1,0 +1,842 @@
+Le Graphe Ge´ne´ratif Gaussien
+Pierre Gaillard1, Michae¨l Aupetit2, Ge´rard Govaert3
+1 CEA, DAM, DIF, F-91297 Arpajon, France
+2 CEA, LIST, F-91191 Gif-sur-Yvette cedex, France
+3 UTC, U.M.R. C.N.R.S. 6599 Heudiasyc, F-60205 Compie`gne Cedex, France
+Re´sume´ Un nuage de points est plus qu’un ensemble de points isole´s. La distri-
+bution des points peut eˆtre gouverne´e par une structure topologique cache´e, et du
+point de vue de la fouille de donne´es, mode´liser et extraire cette structure est au
+moins aussi important que d’estimer la seule densite´ de probabilite´ du nuage. Dans
+cet article, nous proposons un mode`le ge´ne´ratif base´ sur le graphe de Delaunay
+d’un ensemble de prototypes repre´sentant le nuage de points, et supposant un bruit
+gaussien. Nous de´rivons un algorithme pour la maximisation de la vraisemblance
+des parame`tres, et nous utilisons le crite`re BIC pour se´lectionner la complexite´ du
+mode`le. Ce travail a pour objectif de poser les premie`res pierres d’un cadre the´orique
+base´ sur les mode`les ge´ne´ratifs statistiques, permettant la construction automatique
+de mode`les topologiques d’un nuage de points.
+Keywords : connexite´, graphe de Delaunay, mode`le ge´ne´ratif, algorithme EM,
+crite`re BIC
+1 Introduction
+Dans les proble`mes d’apprentissage statistique, on suppose que les donne´es sont ge´ne´re´es
+par une densite´ de probabilite´ P : RD → R+. Cependant, le processus sous-jacent de
+ge´ne´ration des donne´es de´fini par la fonction P , posse`de dans de nombreux cas d’inte´reˆt
+moins de degre´s de liberte´ que l’espace d’observation de dimension D. La formalisation
+de cette intuition est de supposer que les donne´es sont suˆres ou proches d’un ensemble
+de varie´te´s, appele´es varie´te´s principales [1], chacune ayant une dimension intrinse`que
+infe´rieure a` la dimension de l’espace d’observation.
+Etant donne´ un ensemble x de M points observe´s, dans un espace euclidien a` D di-
+mensions, les me´thodes statistiques permettent de re´soudre des proble`mes tre`s ge´ne´raux
+de discrimination, classification ou re´gression, en estimant la densite´ de probabilite´ de cet
+ensemble (mode`les de me´lange [2], me´thodes a` noyau [3]). Bien que la fonction densite´ de
+probabilite´ contienne la totalite´ de l’information extractible de la population dont le nuage
+de points est un e´chantillon, celle-ci ne rend pas explicite l’information ge´ome´trique et
+topologique relatives aux varie´te´s principales. Pourtant, si l’on suppose qu’une structure
+existe dans les donne´es, l’extraire et la caracte´riser a` partir de la densite´ sont aussi impor-
+tants que d’estimer la densite´ de probabilite´ elle-meˆme. Par exemple, dans le contexte d’un
+proble`me de classification, la connexite´ de cette structure semble eˆtre le moyen naturel
+pour de´finir des groupes homoge`nes. L’inte´reˆt d’utiliser cette structure sous-jacente qui
+gouverne la distribution des donne´es est majeur, puisque celle-ci peut eˆtre aussi utilise´e
+pour analyser [4], visualiser [5], discriminer les donne´es [6].
+De manie`re ge´ne´rale, on pourrait extraire des caracte´ristiques ge´ome´triques de cette
+structure telles que la position relative de ses diffe´rentes parties, mais aussi des ca-
+racte´ristiques dites topologiques telles que la dimension intrinse`que ou la connexite´.
+c© Revue MODULAD, 2009 -103- Nume´ro 40
+L’Apprentissage de la Topologie est un domaine re´cent en Apprentissage Automatique
+[7], dont l’objectif est de de´velopper des me´thodes base´es sur les statistiques pour retrouver
+les invariants topologiques de ces varie´te´s a` partir du nuage de points. La connexite´ ou la
+dimension intrinse`que sont de tels invariants topologiques et dans ces travaux nous nous
+focalisons sur l’extraction de la connexite´ des varie´te´s principales d’un nuage de points.
+Dans la Section 2, nous proposons un bref e´tat de l’art du domaine de l’Apprentissage
+de la Topologie. Dans la Section 3 et 4, nous pre´sentons respectivement le mode`le du
+Graphe Ge´ne´ratif Gaussien (GGG) et un algorithme pour extraire la connexite´ de varie´te´s
+principales. Dans la Section 5 et 6, nous utilisons ce mode`le pour analyser un ensemble
+de donne´es ainsi que pour le de´bruitage de donne´es.
+2 Etat de l’art
+Les approches d’Apprentissage de la Topologie sont ge´ne´ralement base´es sur la construc-
+tion d’un espace dont la topologie n’est pas contrainte a priori mais au contraire apprise
+des donne´es, cela au prix de la visualisabilite´ (possibilite´ de structures non connexes et de
+dimensions intrinse`ques non homoge`nes non pre´servables par projection). Par exemple,
+Martinetz [8] ou Aupetit [9] se sont base´s sur la construction d’un graphe ayant pour
+sommets des prototypes, et dont la connexite´ tendait a` reproduire celle de la structure
+sous-jacente aux donne´es.
+Martinetz et Schulten [8] ont propose´ un algorithme de construction d’un graphe appele´
+Triangulation de Delaunay Induite (TDI). Cet algorithme appele´ Competitive Hebbian
+Learning (CHL), consiste a` localiser N0 sommets w = {wn ∈ RD}N0n=1 sur la distribution
+des donne´es puis a` connecter deux sommets wi et wj s’il existe une donne´e x ∈ x dont ils
+sont les premier et deuxie`me plus proches voisins. Une telle donne´e est appele´ te´moin de
+l’arc {i, j}, et cet arc fait partie du graphe de Delaunay DG(w) des sommets w.
+D’un point de vue de l’apprentissage statistique, nous observons que le CHL [8] et la
+TDI re´sultante ont certaines limites.
+1. Sensibilite´ au bruit. Une donne´e est suffisante pour que le CHL cre´e un lien de la
+TDI, le rendant ainsi peu robuste au bruit. Un processus de veillissement des aˆges
+a e´te´ propose´ pour filtrer le bruit [10, 11]. Ce processus est e´quivalent a` supprimer
+les liens cre´e´s par un nombre de donne´es te´moins infe´rieur a` un seuil fixe´. Ceci peut
+eˆtre vu comme un filtre base´ sur la densite´ de probabilite´ des donne´es dans la re´gion
+d’influence des liens. Cependant aucun crite`re n’a e´te´ propose´ pour re´gler le seuil.
+2. Non-consistance du mode`le. Meˆme une infinite´ de donne´es e´chantillonne´es aussi
+finement que voulues sur la re´alisation ge´ome´trique de la TDI ne garantissent pas
+d’eˆtre te´moins de tous les liens de la TDI. Ainsi la re´alisation ge´ome´trique du mode`le
+n’est pas force´ment repre´sentable par le mode`le lui-meˆme.
+3. Aucune mesure de qualite´. Il n’existe pas de mesures de qualite´ du graphe
+obtenu et donc pas de crite`res permettant de comparer et se´lectionner un graphe
+parmi une collection de graphes. Ceci est proble´matique lorsque la dimension de
+l’espace d’observation est supe´rieure a` trois puisque la visualisation est impossible.
+c© Revue MODULAD, 2009 -104- Nume´ro 40
+3 Le Graphe Ge´ne´ratif Gaussien
+Afin de de´passer les limites du Competitive Hebbian Learning (CHL), nous avons
+change´ de point de vue. Si nous conside´rons la densite´ de probabilite´ de la population
+dont le nuage de points est un e´chantillon, nous souhaitons de´tecter les re´gions de faible
+densite´ qui se´parent les re´gions de forte densite´, et surtout rendre explicite le re´sultat de
+cette se´paration en termes de connexite´. Il nous faut donc un mode`le de densite´ parti-
+culier en ce qu’il rend extractible (calculable) l’information sur la connexite´. A cette fin,
+nous proposons un un mode`le de graphe ge´ne´ratif qui combine des approches statistiques
+et ge´ome´triques en de´finissant un mode`le de me´lange gaussien construit a` partir de la
+re´alisation ge´ome´trique d’un graphe.
+Le graphe est un moyen efficace de de´finir un mode`le flexible permettant de caracte´riser
+la connexite´ de varie´te´s meˆme tre`s complique´es. De plus, l’on sait facilement extraire la
+connexite´ de la structure discre`te d’un graphe. Le mode`le de me´lange permet quant a`
+lui d’inscrire rigoureusement le mode`le dans le cadre de l’apprentissage statistique. En
+particulier, l’introduction d’une densite´ de probabilite´ de´finit un mode`le de bruit pour les
+donne´es et permet l’utilisation de crite`res statistiques pour mesurer la qualite´ du mode`le.
+3.1 Hypotheses du mode`le
+Le mode`le que nous proposons repose sur les hypothe`ses suivantes. Elles sont repre´sente´es
+par la figure 1.
+– Les varie´te´s principales sont inconnues : nous supposons qu’il existe un graphe
+G engendre´ par des des points w de RD qui a la meˆme connexite´ que les varie´te´s
+principales.
+– La densite´ de probabilite´ le long des varie´te´s est inconnue : on suppose que
+la densite´ est uniforme sur chaque lien de la re´alisation ge´ome´trique du graphe G.
+– La nature du bruit est inconnue : nous supposons que le bruit κ est de´fini par
+une densite´ gaussienne de moyenne 0 et de variance σ2. Ceci a pour conse´quence
+d’inscrire rigoureusement le mode`le dans le cadre de l’apprentissage statistique.
+3.2 Description des composants du mode`le
+Etant donne´ un ensemble de N0 sommets w = {wn ∈ RD}N0n=1 et un graphe G(w,E) les
+connectant, le mode`le utilise´ pour extraire la connexite´ des varie´te´s principales est base´
+sur deux types de composants que l’on appelle le point-gaussien et le segment-gaussien.
+La valeur de la densite´ pour une donne´e xi ∈ x ge´ne´re´e par un point-gaussien centre´
+sur un sommet wn ∈ w et de variance σ2 est :
+g0(xi|wn;σ2) = 1
+(2piσ2)
+D
+2
+exp
+(
+−(xi − wn)
+2
+2σ2
+)
+(1)
+Un segment-gaussien est de´fini comme une somme infinie de points-gaussiens uni-
+forme´ment distribue´s le long d’un segment : c’est l’inte´grale d’un point-gaussien le long
+d’un segment. La valeur de la densite´ d’une donne´e xi ∈ x ge´ne´re´e par un segment-gaussien
+c© Revue MODULAD, 2009 -105- Nume´ro 40
+Fig. 1 – Illustration des hypothe`ses menant au Graphe Ge´ne´ratif Gaussien.
+Hypothe`se 1 : la connexite´ des varie´te´s principales Mp est inconnue (1a) ; on suppose
+qu’il existe un graphe de meˆme connexite´ (1b). Hypothe`se 2 : la densite´ pf sur la varie´te´
+principale est inconnue ; on suppose que la densite´ pf est uniforme sur la re´alisation
+ge´ome´trique des liens du graphe et qu’elle est de´finie par un Dirac sur ses sommets.
+Hypothe`se 3 : le bruit  est inconnu (3a) ; il est mode´lise´ par une densite´ gaussienne
+isovarie´e (3b).
+[wanwbn ] de longueur non-nulle Ln et de variance σ
+2 est :
+g1(xi|{wan , wbn};σ2) =
+1
+Ln
+∫ wbn
+wan
+g0(xi|t;σ2)dt
+=
+1
+(2piσ2)
+D
+2 Ln
+∫ wbn
+wan
+exp
+(
+−(xi−t)
+2
+2σ2
+)
+dt
+(2)
+ou` Ln=‖wbn−wan‖.
+Les fonctions g0 et g1 sont positives et on peut prouver que leur inte´grale sur RD est
+e´gale a` un, de telle sorte qu’elles de´finissent toutes deux des densite´s de probabilite´. Des
+exemples de densite´s aossice´es a` un point-gaussien et un segment-gaussien sont illustre´es
+par la figure 2.
+Le calcul de la densite´ ge´ne´re´e par un segment-gaussien peut eˆtre de´compose´e en deux
+parties : une partie qui correspond au bruit gaussien orthogonal au segment passant par
+le lien et l’autre correspond au bruit gaussien inte´gre´ le long du lien. Pour cela, on de´finit
+qin ∈ RD, la projection orthogonale de la donne´e xi sur la droite passant par les sommets
+wan et wbn :
+qin=wan+(wbn−wan)
+Qin
+Ln
+(3)
+avec Qin =
+(xi−wan )T (wbn−wan )
+Ln
+. Le scalaire Qin est la coordonne´e du point qin sur un axe
+dont l’origine est wan et de vecteur unitaire :
+wbn−wan
+||wbn−wan || .
+c© Revue MODULAD, 2009 -106- Nume´ro 40
+(a) (b)
+Fig. 2 –Du point gaussien au segment gaussien : (a) Densite´ ge´ne´re´e par un segment
+gaussien unidimensionnel de variance σ2 = 0.01 de´fini sur [0; `], avec ` = 0 (bleu), ` = 0.5
+(rouge), ` = 1 (vert), ` = 2 (violet). Lorsque la longueur du segment est nulle (` = 0) la
+densite´ d’un segment-gaussien e´quivaut a` celle d’un point-gaussien. (b) Repre´sentation de
+la densite´ ge´ne´re´e par deux segments-gaussiens et un point-gaussien de variance σ2 = 0.01
+dans R2.
+En utilisant cette projection et le the´ore`me de Pythagore on obtient :
+g1(xi|{wan , wbn};σ2) = 1
+(2piσ2)
+D
+2 Ln
+∫ wbn
+wan
+exp
+(
+−(xi−qin)
+2 + (qin−t)2
+2σ2
+)
+dt
+= g
+0(xi|qin;σ2)
+Ln
+∫ Ln
+0
+exp
+(
+−(Qin−t)
+2
+2σ2
+)
+dt
+= g0(xi|qin;σ2)
+√
+pi
+2
+σ
+Ln
+·
+[
+erf
+(
+Qin
+σ
+√
+2
+)
+− erf
+(
+Qin−Ln
+σ
+√
+2
+)] (4)
+Ainsi, la densite´ g1(x) s’exprime analytiquement a` l’aide de la fonction erf , puisque
+cette dernie`re admet une expansion en se´rie de Taylor. La de´composition (4) met en
+e´vidence une fac¸on de ge´ne´rer des donne´es suivant la densite´ d’un segment-gaussien
+[wan , wbn ] (2).
+– On tire un point q ∈ RD sur le segment [wan , wbn ] suivant une loi uniforme : p(q) =
+1
+Ln
+;
+– On tire une donne´e x suivant une distribution gaussienne centre´e sur q et de variance
+σ2.
+3.3 Description du mode`le de me´lange
+Etant donne´ un graphe G(w,E), chaque sommet du graphe et chaque lien du graphe
+sont alors la base d’un mode`le ge´ne´ratif. Un point-gaussien est associe´ a` chaque sommet
+et un segment gaussien est associe´ a` chaque lien du graphe G(w,E). Le mode`le est donc
+base´ sur les composants e´le´mentaires du graphes, ses sommets et ses liens, qui ont chacun
+une dimension intrinse`que d diffe´rente, valant 0 pour les sommets et 1 pour les liens. Par
+la suite, on note N0 le nombre de sommets et N1 le nombre de liens du graphe.
+Soit z = {zdn ∈ {0, 1}|n = 1, ..., Nd; d = 0, 1} la donne´e manquante qui indique quel
+composant du mode`le a ge´ne´re´ la donne´e observe´e x : zdn vaut 1 si le n
+e composant de
+dimension d a ge´ne´re´ la donne´e x et vaut 0 sinon. On de´finit la densite´ de probabilite´
+c© Revue MODULAD, 2009 -107- Nume´ro 40
+associe´e a` ces donne´es manquantes comme e´tant :
+p(z) =
+1∏
+d=0
+Nd∏
+n=1
+(pidn)
+zdn (5)
+pi0n (resp. pi
+1
+n) est la probabilite´ qu’une donne´e observe´e x soit issue du point-gaussien
+associe´ au sommet wn (resp. un segment-gaussien associe´ au n
+e lien du graphe).
+Enfin si la donne´e manquante z est connue, on tire la donne´e observe´e x suivant la loi
+de ce composant :
+p(x|z) =
+{
+g0n(x;σ
+2) si z0n = 1
+g1n(x;σ
+2) si z1n = 1
+(6)
+Si l’on cherche a` ajuster ce mode`le, comme on ne dispose que des donne´es observe´es, les
+valeurs de la variable z e´tant manquantes, l’estimation des parame`tres du mode`le devra
+se faire a` partir de la densite´ p(x). En utilisant les e´quations (5) et (6), on peut de´finir la
+densite´ jointe du mode`le p(x, z) = p(z)p(x|z) puis marginaliser par rapport a` toutes les
+valeurs des donne´es manquantes afin d’exprimer la densite´ p(x).
+p(x; θ|G(w,E)) =
+1∑
+d=0
+Nd∑
+n=1
+p(x, zdn; θ)
+=
+1∑
+d=0
+Nd∑
+n=1
+p(zdn)p(x|zdn; θ)
+=
+1∑
+d=0
+Nd∑
+n=1
+pidng
+d
+n(x;σ
+2)
+(7)
+ou` θ de´note l’ensemble des parame`tres du mode`le.
+La densite´ des donne´es p(x) s’exprime donc comme un mode`le de me´lange qui est
+de´finie comme la somme ponde´re´e de N0 points-gaussiens et N1 segments-gaussiens. Ainsi,
+les proportions pi ve´rifient naturellement les deux contraintes suivantes :
+1∑
+d=0
+Nd∑
+n=1
+pidn = 1 et 0 ≤ pidn ≤ 1 ∀ n, d (8)
+On appelle ce mode`le le Graphe Ge´ne´ratif Gaussien (GGG).
+Cette interpre´tation du mode`le de me´lange consiste a` conside´rer que connaissant la
+position des sommets w, le graphe G(w,E), les proportions pi et la variance du bruit σ2,
+les donne´es observe´es sont ge´ne´re´es suivant un me´canisme a` deux e´tapes.
+1. On tire un composant du me´lange (un sommet ou un lien) suivant la distribution
+donne´e par l’e´quation (5).
+2. On tire une donne´e observe´e x suivant la loi du composant (6). Comme on l’a vu,
+des donne´es issues d’un segment gaussien peuvent eˆtre ge´ne´re´e a` l’aide d’une donne´e
+manquante q uniforme´ment distribue´e le long du segment.
+4 Caracteriser la connexite´
+Ayant introduit un mode`le ge´ne´ratif, la question centrale demeure : comment de´terminer
+le graphe G final mode´lisant la connexite´ des varie´te´s principales ? Pour cela, nous pro-
+posons l’algorithme 1 dont l’ide´e principale est double :
+c© Revue MODULAD, 2009 -108- Nume´ro 40
+– de´finir un mode`le GGG sur G(w,E+) tel que G(w,E) ⊆ G(w,E+) ;
+– e´laguer les liens de G(w,E+) qui n’explique pas la connexite´ des varie´te´s principales
+pour en de´duire G(w,E).
+Algorithme 1 (Principe)
+Entre´es : x, N0
+Initialiser la position des sommets : w
+Intialiser le graphe ge´ne´ratif : construire un sur-graphe G(w,E+) et fixer les pa-
+rame`tres pi et σ2.
+Apprendre les parame`tres du graphe ge´ne´ratif : pi, σ2 et w
+Elaguer le graphe ge´ne´ratif : supprimer les composants associe´s a` une ponde´ration
+ne´gligeable, pidn ≤ γ, ou` γ ∈ R+ est le seuil d’e´lagage.
+Sortie : G(w,E).
+Dans cet algorithme, on peut diffe´rencier 3 proble`mes qui seront traite´es dans les
+paragraphes suivants : (1) l’initialisation (Comment positionner les sommets ? Quel sur-
+graphe choisir ?), (2) l’apprentissage des parame`tres du mode`le GGG et (3) la se´lection de
+mode`le (Combien de sommet ? Comment choisir le seuil d’e´lagage ?).
+4.1 Initialisation
+Nous proposons la me´thode suivante pour de´buter l’algorithme avec un bon graphe.
+– Nous utilisons un mode`le de me´lange gaussien sphe´rique dont la variance est com-
+mune a` chaque composant pour positionner les sommets w.
+– Nous initialisons la variance σ2 du bruit gaussien a` la valeur obtenue par le mode`le
+de me´lange.
+– Nous initialisons les proportions de fac¸on e´quiprobable : pidn =
+1
+N0+N1
+∀ n , d.
+Ayant localiser les sommets w, il nous faut enfin choisir le graphe G(w,E+). On
+peut e´videmment conside´rer le cas du graphe complet des sommets w, car il est simple
+a` construire et il est le plus a` meˆme de contenir la connexite´ des varie´te´s principales.
+Cependant, l’e´tat de l’art nous incite a` envisager une autre alternative. Le graphe de
+Delaunay, bien que plus long a` construire O(N30 ) [12], semble eˆtre un choix pertinent
+puisqu’il est compose´ de moins de liens que le graphe complet sans pour autant supprimer
+des liens carcte´risant la connexite´ [8]. Ainsi, on peut conside´rer que le graphe G recherche´
+pour extraire la connexite´ ve´rifie : G(w,E) ⊆ G(w,E+) ≡ GD(w).
+4.2 Maximisation de la vraisemblance
+Etant donne´ un Graphe Ge´ne´ratif Gaussien (GGG) construit sur G(w,E), la fonction
+p(xi; pi,w, σ) est la densite´ de probabilite´ au point xi sachant les parame`tres du mode`le.
+Afin de maximiser la vraisemblance par rapport aux parame`tres θ = (pi, σ2, w) , nous
+utilisons le cadre de l’algorithme EM [13]. Si l’on peut de´montrer que l’e´tape de maxi-
+misation effectue´e lors de l’algorithme EM est analytique pour les proportions pi et la
+variance du bruit σ2, celle impliquant les sommets w n’est pas directe. Nous proposons
+donc une e´tape M approche´e pour modifier leur position, et on observe empiriquement
+que la re`gle de mise a` jour approche´e augmente la plupart du temps la vraisemblance. Si
+c© Revue MODULAD, 2009 -109- Nume´ro 40
+ce n’est pas le cas, la mise a` jour n’est pas effectue´e et la position du sommet n’est pas
+modifie´e. Les e´quations de mise a` jour des parame`tres sont les suivantes :
+pi
+d[new]
+j =
+1
+M
+∑M
+i=1 z˜
+d
+ij [Etape M exacte]
+σ2[new] = 1
+DM
+∑M
+i=1 [
+∑N0
+j=1 z˜
+0
+ij(xj − wi)2
++
+∑N1
+j=1 z˜
+1
+ij
+g0(xi|qij ;σ)(I1[(xi−qij)2+σ2]+I2)
+Lj ·g1j (xi,σ)
+] [Etape M exacte]
+w
+[new]
+n =
+PM
+i=1 [z˜0inxi+
+P
+j∈En z˜
+1
+ij
+g0(xi|qij ;σ)
+Lj ·g1j (xi;σ)
+(−E2wbj+E3xi)]
+PM
+i=1 [z˜0in+
+P
+j∈En z˜
+1
+ijE1]
+[Etape M approche´e]
+(9)
+ou` z˜dij = p(d, j|xi) =
+pidj g
+d
+j (xi;σ
+2)
+P1
+d=0
+PNd
+j=1 pi
+d
+j g
+d
+j (xi;σ
+2)
+, ou` En repre´sente l’ensemble des arcs [waj , wbj ]
+ayant wn = waj comme extre´mite´, et ou`
+I1 = σ
+√
+pi
+2
+(erf(
+Qij
+σ
+√
+2
+)− erf(Qij−Lj
+σ
+√
+2
+))
+I2 = σ
+2
+(
+(Qij−Lj) exp(−
+(Qij−Lj)2
+2σ2
+)−Qij exp(−
+(Qij)
+2
+2σ2
+)
+)
+E1 =
+σ2
+L2j
+[e
+−(Qj)2
+2σ2 (Qj − 2Lj)− e
+−(Qj−Lj)2
+2σ2 (Qj − Lj)] + 1L2j ((Lj −Qj)
+2 + σ)I1
+E2 =
+σ2
+L2j
+[e−
+(Qj−Lj)2
+2σ2 Qj − e−
+(Qj)
+2
+2σ2 (Qj − Lj)]− 1L2j (Q
+2
+j − LjQj + σ2)I1
+E3 =
+1
+Lj
+[e
+−(Qj−Lj)2
+σ2 − e
+−Q2j
+σ2 + (Qj − Lj)I1]
+(10)
+4.3 Se´lection de mode`le
+En apprentissage statistique, se´lectionner un mode`le parcimonieux parmi une collec-
+tion de mode`le est un the`me re´current. En particulier, il est connu qu’un mode`le ge´ne´ratif
+ne doit pas eˆtre uniquement e´value´ en fonction de sa vraisemblance mais aussi en terme
+de complexite´. Dans notre cas, il est clair que les parame`tres N0 and γ sont lie´s a` la
+complexite´ du graphe ge´ne´ratif, de telle sorte que nous avons a` faire face a` un proble`me
+de se´lection de mode`le. Dans ce contexte, de nombreux crite`res et approches ont e´te´ pro-
+pose´s, comme par exemple le crite`re BIC [14]. Ce crite`re re´alise un compromis entre la
+vraisemblance et la complexite´ d’un mode`le et retient le mode`le M qui maximise :
+BIC(M) = L(x|θˆ)− ν
+2
+log(M) (11)
+ou` M est le nombre total de donne´es observe´es, ν est le nombre de parame`tres libres du
+mode`les, L la log-vraisemblance des parame`tres θ qui sont a` leur maximum de vraisem-
+blance θˆ.
+Nous proposons de diviser le proble`me de se´lection de mode`le en deux sous-proble`mes.
+Le premier, est la de´termination du seuil de´lagage γ lorsque N0 est connu et le second est
+la se´lection du nombre de sommets N0.
+Soit un graphe ge´ne´ratif gaussien a` N0 sommets construit sur G
++(w,E+) et soit
+Gγ(w,E
++|pidj ≥ γ) le graphe ge´ne´ratif gaussien qui ne contient que les composants ge´ne´ratifs
+dont la ponde´ration est supe´rieure a` γ : pidj ≥ γ. En faisant varier le parame`tre γ de 1
+c© Revue MODULAD, 2009 -110- Nume´ro 40
+a` 0, on obtient une se´quence emboˆıte´e de graphes4 allant de l’ensemble vide au graphe
+G(w,E+) :
+G1 = ∅ ⊆ . . . ⊆ Gγ ⊆ . . . ⊆ G0 = G(w,E+) (12)
+Pour comparer les mode`les de la se´quence a` l’aide du crite`re BIC, les parame`tres
+θγ doivent eˆtre a` leur maximum de vraisemblance. Ceci n’est e´videmment pas le cas,
+puisque ayant e´lague´ le graphe initial G(w,E+), tous les mode`les ne ve´rifient pas :∑1
+d=0
+∑N
+n=1 pi
+d
+n = 1. Il faut donc pour chaque Gγ re´-estimer les parame`tres θγ. Pour des
+raisons de complexite´, nous proposons que seules les proportions pi soient optimise´es via
+l’e´quation . Dans ce cas, la fonction de vraisemblance est convexe et l’algorithme converge
+rapidement. Ceci est aussi motive´ par le fait que la variance du mode`le se´lectionne´ ne de-
+vrait pas eˆtre tre`s diffe´rente de l’estimation obtenue par le mode`le GGG construit sur
+G(w,E+).
+Parmi la se´quence emboˆıte´e, nous supposons donc que la connexite´ des varie´te´s prin-
+cipales est repre´sente´e par le meilleur mode`le au sens du crite`re BIC.
+BIC(Gγ) = log L(θˆγ;Gγ, x)− νγ
+2
+log(M) (13)
+ou` νγ est le nombre de parame`tres libres du mode`le ge´ne´ratif associe´ a` Gγ. Le nombre de
+parame`tres libres pour un graphe ge´ne´ratif gaussien ayant N0 sommets et N1 liens est :
+ν = [N0 +N1 − 1] + [N0 ×D] + 1
+= (N0 +N1) +N0 ×D (14)
+Le premier terme correspond aux proportions5 pi, le second correspond aux coordonne´es
+des N0 sommets wn ∈ RD et la dernie`re constante correspond a` la variance σ2 ∈ R+.
+Pour se´lectionner le nombre de sommets N0, l’on peut re´pe´ter cette proce´dure pour
+diffe´rentes valeurs de N0 ∈ {N [1]0 , ..., N [k]0 , ..., N [K]0 } :
+G
+(γ∗,N [k]0 )
+≡ max
+γ
+BIC(G
+(γ,N
+[k]
+0 )
+) ∀ N [k]0 (15)
+On obtient K mode`les, chacun associe´ a` une valeur de crite`re BIC(G
+(γ∗,N [k]0 )
+). Finale-
+ment, on choisit celui dont le nombre de sommets N
+[∗]
+0 me`ne a` la plus grande valeur :
+G
+(γ∗,N [∗]0 )
+≡ max
+k
+BIC(G
+(γ∗,N [k]0 )
+) = max
+k
+max
+γ
+BIC(G
+(γ,N
+[k]
+0 )
+) (16)
+4.4 Illustration
+Les figures 3 et 4 illustrent l’algorithme propose´ avec un ensemble de donne´es simule´es :
+50 points sont gn´e´re´es par un point de coordone´es [0.5, 1.5] et 200 points sont ge´ne´re´es
+par une spirale d’e´quation [t cos(2pit), t sin(2pit)] (t ∈ [0; 1.1]), tous les deux corrompus
+par un bruit gaussien de variance σ2 = 0.01.
+Pour un nombre fixe de sommets N0 = 7 (figure 3) : (a) Les sommets sont localise´s
+a` l’aide d’un mode`le de me´lange. (b) Le graphe de Delaunay est construit et un graphe
+4Il peut s’agir d’un objet ge´ome´trique pouvant contenir un lien sans ses sommets. Par abus, nous
+dirons que Gγ est un graphe.
+5La somme des ponde´rations e´tant contrainte a` valoir 1, seules N0 + N1 − 1 ponde´rations sont
+inde´pendantes.
+c© Revue MODULAD, 2009 -111- Nume´ro 40
+(a) (b) (c)
+(d)BIC = −520.9 (e) BIC = −412.2 (f) BIC = −415.4
+Fig. 3 – Illustration de l’algorithme pour un nombre de sommets fixe N0 = 7.
+(a) BIC = −436.3 (b) BIC = −412.2 (c) BIC = −414.4
+Fig. 4 – Illustration de l’algorithme pour N0 = 6, 7, 8.
+ge´ne´ratif est associe´ a` sa re´alisation ge´ome´trique. (c) La vraisemblance des parame`tres est
+maximise´e via un algorithme EM approche´. L’objectif de l’e´tape d’e´lagage est de supprimer
+automatiquement les composants du mode`le ge´ne´ratif inutiles et en particulier, les arcs du
+graphe traversant un trou de densite´. A cette fin, on construit une se´quence de mode`les
+ge´ne´ratifs emboite´s en fonction d’un seuil γ. Les figures (d-f) montrent trois mode`les
+conse´cutifs avec en rouge le composant ajoute´ par rapport au mode`le pre´ce´dant. Notons
+que le dernier mode`le de cette se´quence (G+) est celui de la figure (c). La vraisemblance
+de chaque mode`le de la se´quance est a` nouveau optimise´e par rapport aux proportions
+et nous indiquons en dessous de chaque figure la valeur du crite`re BIC correspondant : le
+meilleur mode`le au sens du crite`re BIC est celui encadre´.
+Pour diffe´rents nombres de sommets N0 = 6, 7, 8, nous re´pe´tons l’algorithme ci-dessus
+et les mode`les correspondants sont repre´sente´s dans la figure 4(a-c). Le meilleur mode`le
+au sens du crite`re BIC est celui encadre´. Notons tout de meˆme que la conne´xite´ des deux
+varite´te´s principales est aussi correctement mode´lise´e pour N0 = 6, 8.
+5 Connexite´ des donne´es Teapot
+5.1 Donne´es
+L’ensemble de donne´es Teapot est constitue´ de 400 images, chacune de taille 101× 76.
+Les images, qui correspondent aux donne´es observe´es, repre´sentent une the´ie`re photogra-
+phie´e sous diffe´rents angles d’un plan [15]. Dix images de cet ensemble sont repre´sente´es
+c© Revue MODULAD, 2009 -112- Nume´ro 40
+Fig. 5 – Teapot. Dix images de l’ensemble Teapot original [15]. Dans l’ensemble utilise´
+[16], quelques images ont e´te´ supprime´es. Elles correspondent a` celles ou` l’anse est face
+a` la came´ra (images barre´es). La couleur des autres cadres code l’angle de rotation de la
+the´ie`re.
+par la figure 5.
+Malgre´ la grande dimensionnalite´ des images (D = 7676), le protocole mis en oeuvre
+pour les ge´ne´rer, laisse penser que dans l’espace d’observation, les donne´es sont proches
+d’une varie´te´ principale ayant la topologie d’un cercle. En effet, les images ne sont pa-
+rame´trise´es que par un seul degre´ de liberte´, l’angle de rotation de la the´ie`re.
+Dans cette expe´rience, nous utilisons l’ensemble de donne´es de´crit dans [16]. Les images
+ont e´te´ converties en niveau de gris et leur taille a e´te´ re´duite. De plus, ce nouvel ensemble
+e´tant utilise´ pour un proble`me de discrimination ou` l’objectif est d’identifier si l’anse de
+la the´ie`re est a` gauche ou a` droite de l’image, les auteurs ont retire´ les quelques images
+ou` celle-ci est a` peu pre`s au centre. A la fin, ils disposent de 365 images (M = 365) de
+taille 16×12 (D = 192). De la sorte, les auteurs cre´ent artificiellement deux varie´te´s prin-
+cipales de´connecte´es, chacune ayant la topologie d’un demi-cercle : l’une correspondant
+aux positions ou` la the´ie`re a l’anse a` droite de l’image et l’autre aux positions ou` l’anse
+est a` gauche.
+5.2 Visualisation
+Afin d’analyser la structure sous-jacente aux donne´es, les techniques de re´duction de
+dimension sont largement utilise´es. Cependant, du fait de la perte d’information qu’elles
+engendrent, la plupart des distances visualise´es sont soit comprime´es soit e´tire´es, et il
+est donc difficile de savoir si les formes observe´es existent ou non dans l’espace am-
+bient [17]. Dans les expe´riences suivantes, nous montrons que le GGG est une me´thode
+comple´mentaire aux techniques de projection ”classiques” pour analyser un ensemble de
+donne´es.
+Nous utilisons l’Analyse en Composantes Principales (ACP), le Generative Topogra-
+c© Revue MODULAD, 2009 -113- Nume´ro 40
+(a) ACP (b) GTM (c) ISOMAP [K = 15]
+Fig. 6 – Projections de l’ensemble de donne´es Teapot. La couleur des donne´es
+projete´es correspond aux couleurs de la figure 5 : elle code l’angle de rotation de la
+the´ie`re. (a) Projection des donne´es en utilisant les deux premiers axes principaux. (b)
+Projection en utilisant le GTM (c) Projection en utilisant l’algorithme ISOMAP a` l’aide
+d’un graphe des 15. Aucune de ces projections ne permet de montrer l’existence de deux
+varie´te´s principales de´connecte´es.
+phic Mapping [18] (GTM) et ISOMAP [19] pour visualiser les donne´es Teapot (figure 6) :
+aucune de ces projections n’est en mesure de montrer la structure de´connecte´e originelle.
+5.3 Extraction de la connexite´
+Nous optimisons le GGG avec l’algorithme de´crit en section 3 avec un N0 candidat
+compris entre 40 et 80, afin de retrouver la connexite´ des varie´te´s principales de cet
+ensemble. Le graphe ge´ne´ratif optimal est finalement de´fini par 67 prototypes.
+Le graphe re´sultant nous informe sur l’existence de 2 composantes connexes en de´pit
+de ce que montrent les techniques de projection classiques (figure 6). L’analyse des degre´s
+des sommets6 du graphe (les degre´s valent 2, sauf pour les 4 sommets extre´mite´s des
+deux composantes connexes, dont le degre´ vaut 1) montre que chaque composante est
+une chaˆıne de sommets, donc une varie´te´ home´omorphe a` un segment, montrant que la
+dimension intrinse`que de ces deux varie´te´s vaut 1. De plus, le mode`le e´tant ge´ne´ratif nous
+savons aussi que les deux varie´te´s ont a` peu pre`s la meˆme probabilite´ a priori : 0.507 et
+0.493, et que le long des varie´te´s, les donne´es sont a` peu pre`s uniforme´ment distribue´es,
+puisque la moyenne et la variance de la quantite´
+pi1j
+Lj
+sont respectivement : 4.5966e − 005
+et 1.5720e− 010.
+Nous construisons le CHL et le CHL filtre´ a` partir des meˆmes sommets. La figure 8
+(a) montre que le CHL ne permet pas de retrouver la connexite´ des varie´te´s principales.
+En effet, le graphe construit n’a qu’une seule composante connexe. De plus, notons qu’il
+existe des cycles : le graphe n’est donc pas home´omorphe aux varie´te´s principales ayant
+ge´ne´re´ les donne´es observe´es. Pour le CHL filtre´, on constate avec la figure 8 (b) qu’aucun
+seuil T n’est convenable pour obtenir un graphe ayant la meˆme connexite´ que les varie´te´s
+principales.
+Nous re´pe´tons cette expe´rience 10 fois afin d’e´valuer la robustesse de l’algorithme.
+Le tableau 1 pre´sente les re´sultats pour les diffe´rents algorithmes. On remarque que le
+mode`le GGG permet, a` l’exception d’une fois, de retrouver la topologie attendue. Ceci
+peut s’expliquer par trois e´le´ments : (1) en utilisant les meˆmes donne´es, le re´sultat de
+6Dans un graphe, le degre´ d’un sommet est le nombre d’arcs qui ont ce sommet comme extre´mite´
+c© Revue MODULAD, 2009 -114- Nume´ro 40
+Fig. 7 –Caracte´risation de la connexite´ de l’ensemble de donne´es Teapot avec le
+GGG. Projection par ACP du graphe GGG optimal. La couleur des sommets correspond
+a` la couleur de la donne´e la plus proche suivant le code de´fini par la figure 5. Les extre´mite´s
+des deux composantes connexes de´finies par le mode`le GGG optimal sont encercle´es.
+(a) CHL [T = 0] (b) CHL [T = 3]
+Fig. 8 – Caracte´risation de la connexite´ de l’ensemble de donne´es Teapot avec
+le CHL. Projection par ACP du graphe obtenu par l’algorithme CHL (a) et par sa version
+filtre´e (b). La couleur des sommets correspond a` la couleur de la donne´e la plus proche
+suivant le code de´fini par la figure 5. (b) Le seuil T = 3 est la premie`re valeur de´connectant
+les deux varie´te´s principales, celle e´laguant le lien violet repre´sente´ dans l’agrandissement
+de gauche de la figure (b). En utilisant un tel seuil, l’une des deux varie´te´s se trouve eˆtre
+morcele´e : la connexite´ est donc perdue.
+c© Revue MODULAD, 2009 -115- Nume´ro 40
+GGG CHL [T = 0] CHL [T ∗]
+Connexite´ 100 70 70
+Topologie 90 20 20
+Tab. 1 – Mode´lisation de la connexite´ des varie´te´s des donne´es Teapot. Le
+tableau donne en pourcentage, le nombre de fois ou` les mode`les GGG, CHL et CHL filtre´
+permettent de retrouver la connexite´ (2 composantes connexes) et la topologie (deux
+chaˆınes de sommets ayant au plus deux voisins) des donne´es Teapot.
+(a) (b) (c)
+Fig. 9 – Donne´es Teapot et distances. Trois images de l’ensemble Teapot original.
+Si la distance entre deux images est mesure´e par la somme des diffe´rences au carre´ de
+l’intensite´ lumineuse entre les pixels de deux images, alors l’image (a) est plus proche de
+l’image (c) que de l’image (b). Pourtant, l’angle de rotation se´parant les positions de´crites
+par les images (a) et (b) est plus faible qu’entre le couple d’images (a) et (c).
+l’algorithme de´pend uniquement des conditions initiales. Or, l’influence des conditions
+initiales est minimise´e puisque nous utilisons la strate´gie short EM propose´e dans [20]
+pour de´terminer la position initiale des sommets ; (2) les donne´es respectent assez bien
+les hypothe`ses ge´ne´ratives utilise´es par le mode`le GGG ; (3) l’e´chantillonnage est dense ce
+qui favorise une estimation fiable du crite`re BIC.
+Le CHL permet majoritairement de retrouver la connexite´, cependant le graphe obtenu
+pre´sente ge´ne´ralement des cycles qui faussent la topologie. La version filtre´e ne permet
+pas d’e´viter ces cycles.
+5.4 Naviguer sur la varie´te´
+Le graphe ge´ne´ratif permet aussi de naviguer aise´ment au travers des donne´es. Suppo-
+sons que l’on dispose de trois images repre´sente´es par la figure 9. On peut par exemple se
+demander laquelle des images (b) ou (c) vient naturellement apre`s l’image (a). On peut
+aussi souhaiter savoir s’il existe une se´rie continue d’images passant par ces trois images.
+Pour re´pondre a` la premie`re question, il faut de´finir une distance ade´quate entre les
+c© Revue MODULAD, 2009 -116- Nume´ro 40
+Fig. 10 –De´bruitrage des chiffres ”1”’ et ”2”. Premie`re et troisie`me ligne : les images
+MNIST orginales. Deuxie`me et quatrie`me ligne, les images de´bruite´es correspondantes.
+images. Si la distance entre deux images est mesure´e par la somme des diffe´rences au carre´
+de l’intensite´ lumineuse entre les pixels des deux images, alors l’image (a) est plus proche
+de l’image (c) que de l’image (b). Mais ceci est contradictoire avec notre perception.
+En effet, l’angle de rotation se´parant les positions de´crites par les images (a) et (b) est
+plus faible qu’entre le couple d’images (a) et (c). Il s’agit donc de mesurer les distances
+ge´ode´siques le long des varie´te´s, ce qui peut eˆtre fait a` l’aide du graphe apre´s avoir projete´
+les donne´es sur le graphe. Pour re´pondre a` la deuxie`me question, il suffit de savoir si les
+donne´es se projettent sur une meˆme composante du graphe. Dans l’exemple illustre´ par
+la figure 9, la re´ponse est ne´gative.
+6 De´bruitage
+Dans cette section, nous montrons que l’extraction des varite´te´s peut aussi permettre
+le de´bruitage de donne´es. Pour l’illustrer, nous conside´rons un ensemble d’imagettes
+repre´setant les chiffres ”1” et ”2”. On dispose d’un ensemble d’apprentissage de 1100
+exemples (550 de chaque classe) et nous souhaitons classifier un ensemble de 1100 chiffres
+qui forment l’ensemble de test. Nous utilisons l’algorithme de la section 2 pour apprendre
+les varie´te´s principales de l’ensemble d’apprentissage de manie`re non-supervise´e (sans te-
+nir compte des classes). Le graphe est de´fini par 50 sommets. Les donne´es de l’ensemble
+d’apprentissage et de test sont ensuite projete´es sur le graphe, et ces projections de´finissent
+les donne´es ”de´bruite´es”. La figure 10 montre quelques images originales et leur version
+de´bruite´e. Par exemple le ”1” original encadre´ en vert a une ”queue” qui disparaˆıt avec
+le de´bruitage. De manie`re similaire, le de´bruitage a tendance a` reformer la boucle du ”2”
+encadre´ en rouge.
+Ensuite, on classifie les deux ensembles de test (donne´es originales et de´bruite´es) a`
+l’aide du classifieur des K plus proches voisins (classement par vote majoritaire) par
+c© Revue MODULAD, 2009 -117- Nume´ro 40
+Donne´es MNIST Donne´es de´bruite´es Prototypes
+K = 3 98.8 99.0 98.6
+K = 5 98.6 99.0 98.4
+K = 10 98.0 99.1 93.4
+K = 15 97.9 99.1 91.9
+K = 30 96.8 99.0 83.7
+Tab. 2 – Classification de donne´es MNIST ”1” et ”2”. Le tableau donne le pour-
+centage de taux de bonne classification en utilisant le classifieur des k plus proches voisins
+pour les diffe´rents ensembles.
+rapport aux ensembles d’apprentissage respectifs. Le tableau 2 donne le re´sultat pour
+diffe´rentes valeurs de K. On compare aussi le re´sultat par rapport a` l’algorithme super-
+vise´ des k-means construit sur les donne´es orginales : on repre´sente chaque classe (de
+l’ensemble d’apprentissage des donne´es originales) par 25 prototypes et on classifie les
+donne´es orginales de l’ensemble de test en utilisant ces prototypes (qui sont affecte´s a` une
+seule classe). Le tableau 2 montre qu’en utilisant les donne´es de´bruite´es, le classifieur est
+moins sensible au parame`tre de voisinage.
+7 Conclusion
+Nous avons propose´ un cadre dans lequel le proble`me de l’apprentissage de la topologie
+d’un nuage de points peut eˆtre pose´ comme un proble`me d’apprentissage statistique. Nous
+avons de´fini un mode`le ge´ne´ratif base´ sur le graphe de Delaunay, permettant d’apprendre
+la connexite´ des varie´te´s principales d’un nuage de points. Le Graphe Ge´ne´ratif Gaussien
+(GGG) permet de contourner les limites de l’algorithme Competitive Hebbian Learning
+(CHL) pour mode´liser la connexite´. En particulier, il permet de prendre en compte le bruit,
+et de mesurer la qualite´ du mode`le, meˆme lorsqu’aucune visualisation n’est possible.
+Nous avons montre´ que le mode`le e´tait utile pour l’analyse exploratoire de donne´es
+en fournissant une vue des donne´es comple´mentaire des me´thodes de visualisation par
+projection. Nous avons aussi montre´ que le graphe ge´ne´ratif, en mode´lisant les varie´te´s
+principales permet le de´bruitage des donne´es.
+Nous e´tudions de´sormais l’utilisation de ce mode`le comme support d’un apprentissage
+semi-supervise´ ou` la structure des donne´es non e´tiquete´es joue un roˆle dans la construction
+d’un classifieur [6]. Nous montrons7 que la propagation des e´tiquettes le long des arcs d’un
+GGG en tenant compte de la densite´ de ces arcs (propagation d’autant plus forte que la
+densite´ est forte) est aussi efficace que les autres approches de l’e´tat de l’art ge´ne´ralement
+base´es sur le graphe des K plus proches voisins, mais ne ne´cessite aucun re´glage arbitraire
+de me´ta-parame`tres (K par exemple).
+D’un point de vue plus ge´ne´ral, ce travail se veut une contribution au rapproche-
+ment des domaines de l’Apprentissage Statistique et de la Topologie Algorithmique, a` la
+frontie`re desquels nous pensons qu’il ouvre de nombreuses perspectives.
+7Soumission en cours
+c© Revue MODULAD, 2009 -118- Nume´ro 40
+Re´fe´rences
+[1] R. Tibshirani. Principal curves revisited. Statistics and Computing, 2 :183–190, 1992.
+[2] G. McLachlan and D. Peel. Finite Mixture Models. John Wiley & Sons, New York,
+2000.
+[3] E. Parzen. On estimation of a probability density function and mode. The Annals
+of Mathematical Statistics, 33(3) :1065–1076, 1962.
+[4] P. Gaillard, M. Aupetit, and G. Govaert. Learning topology of a labeled data set
+with the supervised generative gaussian graph. Neurocomputing (in press), 2008.
+[5] J. Lee, A. Lendasse, N. Donckers, and M. Verleysen. A robust nonlinear projection
+method. Eighth European Symposium on ArtiHcial Neural Networks, 2000.
+[6] O. Chapelle, B. Scho¨lkopf, and A. Zien, editors. Semi-Supervised Learning. MIT
+Press, Cambridge, MA, 2006.
+[7] M. Aupetit, F. Chazal, G. Gasso, D. Cohen-Steiner, and P. Gaillard. Topology lear-
+ning : New challenges at the crossing of machine learning, computational geometry
+and topology, 2007.
+[8] T. Martinetz and K. Schulten. Topology representing networks. Neural Networks,
+Elsevier London, 7 :507–522, 1994.
+[9] M. Aupetit. Robust topology representing networks. In Proceedings of the European
+Symposium on Artificial Neural Networks, pages 45–50, Bruges (Belgium), 2003. d-
+side.
+[10] T. Martinetz, S. Berkovitch, and K. Schulten. Neural-gas network for vector quan-
+tization and its application to time-series prediction. IEEE Transactions on Neural
+Networks, 4(4) :558–569, 1993.
+[11] B. Fritzke. A growing neural gas network learns topologies. In G. Tesauro, D. Tou-
+retzky, and T. Leen, editors, Advances in Neural Information Processing Systems 7,
+Cambridge, MA, 1995. MIT Press.
+[12] E. Agrell. A method for examining vector quantizer structures. Proceedings of IEEE
+International Symposium on Information Theory, pages 394–394, 1993.
+[13] A. Dempster, N. Laird, and D. Rubin. Maximum likelihood from incomplete data
+via the em algorithm. Journal of the Royal Statistical Society, Series B, 39(1) :1–38,
+1977.
+[14] G. Schwartz. Estimating the dimension of a model. The Annals of Statistics, 6 :461–
+464, 1978.
+[15] K. Weinberger and L. Saul. Unsupervised learning of image manifolds by semidefinite
+programming. International Journal of Computer Vision, 70(1) :77–90, 2006.
+[16] X. Zhu and J. Lafferty. Harmonic mixtures : combining mixture models and graph-
+based methods for inductive and scalable semi-supervised learning. In Proceedings
+of the 22nd International Conference on Machine Learning, pages 1052–1059, New
+York, USA, 2005. ACM.
+[17] M. Aupetit. Visualizing distortions and recovering topology in continuous projection
+techniques. Neurocomputing, Elsevier, 70 :1304–1330, 2007.
+c© Revue MODULAD, 2009 -119- Nume´ro 40
+[18] C. Bishop, M. Svense´n, and C. Williams. GTM : the generative topographic mapping.
+Neural Computation, MIT Press, 10(1) :215–234, 1998.
+[19] V. de Silva and J. Tenenbaum. Global versus local methods in nonlinear dimensio-
+nality reduction. In S. Thrun S. Becker and K. Obermayer, editors, Advances in
+Neural Information Processing Systems 15, pages 705–712. MIT Press, Cambridge,
+MA, 2003.
+[20] C. Biernacki, G. Celeux, and G. Govaert. Choosing starting values for the em al-
+gorithm for getting the highest likelihood in multivariate gaussian mixture models.
+Computational Statistics and Data Analysis, 41 :561–575, 2003.
+c© Revue MODULAD, 2009 -120- Nume´ro 40

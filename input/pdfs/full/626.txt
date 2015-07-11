@@ -1,0 +1,472 @@
+Allier CSPs et motifs locaux pour la découverte de motifs
+sous contraintes n-aires
+Mehdi Khiari, Patrice Boizumault, Bruno Crémilleux
+GREYC, CNRS - UMR 6072, Université de Caen,
+Campus Côte de Nacre,
+F-14032 Caen Cedex, France
+{Prenom.Nom}@info.unicaen.fr
+Résumé. Dans cet article, nous étudions la relation entre la découverte de mo-
+tifs sous contraintes et les CSPs (Constraint Satisfaction Problems) afin de défi-
+nir des contraintes de plus haut niveau qui sont précieuses pour mener à bien des
+tâches de fouille de données. Pour cela, nous proposons une approche de mo-
+délisation et d’extraction de motifs sous contraintes n-aires exploitant les motifs
+locaux. L’utilisateur définit un ensemble de contraintes n-aires et un solveur de
+CSP génère l’ensemble des solutions. Notre approche profite des progrès récents
+sur l’extraction de motifs locaux et permet de modéliser de manière concise et
+élégante tout ensemble de contraintes combinant plusieurs motifs locaux, per-
+mettant ainsi la découverte de motifs répondant mieux aux buts finaux de l’uti-
+lisateur. Les expériences menées montrent la faisabilité de notre approche.
+1 Introduction
+Un problème majeur dans les processus d’Extraction de Connaissances dans les Bases de
+Données (ECBD) est le nombre conséquent de motifs produits rendant leur utilisation difficile.
+Ainsi, les motifs les plus significatifs sont souvent noyés au milieu d’informations triviales
+ou redondantes. D’autre part, l’intérêt d’un motif dépend souvent d’autres motifs et beaucoup
+de modèles comme les classifieurs ou les méthodes de clustering requièrent d’exploiter et de
+considérer simultanément plusieurs motifs. Contribuer à la découverte de motifs de plus haut
+niveau, fondés sur la combinaison de motifs tels que les motifs locaux (cf. section 2.1), permet
+ainsi la découverte de motifs plus proches des buts finaux de l’utilisateur.
+Il existe plusieurs approches visant à réduire les motifs produits, telles que le paradigme de
+l’extraction sous contraintes Ng et al. (1998), l’utilisation des représentations condensées Cal-
+ders et al. (2005) ou encore la compression des jeux de données en exploitant le principe du
+MDL Siebes et al. (2006). En ciblant la recherche de l’information à extraire suivant les centres
+d’interêt de l’utilisateur, le paradigme des motifs contraints a pour but d’améliorer la qualité
+des motifs extraits Ng et al. (1998). Ce problème est plutôt bien maîtrisé via des approches
+génériques de découverte de motifs locaux sous contraintes De Raedt et al. (2002); Soulet et
+Crémilleux (2005). On appelle contraintes locales les contraintes visant à extraire les motifs
+locaux. Le caractère local de la contrainte provient du fait que, vérifier si un motif satisfait
+ou pas une contrainte donnée, ne dépend pas des autres motifs. Dans la pratique, même si le
+RNTI-E-19- 199 -
+Découverte de motifs sous contraintes n-aires alliant CSPs et motifs locaux
+nombre de motifs produits est réduit grâce aux contraintes, ce nombre demeure trop important
+pour une analyse par l’utilisateur. D’autre part, les contraintes locales s’avèrent insuffisantes
+pour la découverte de motifs de plus haut niveau, tels que des motifs combinant plusieurs mo-
+tifs locaux. Dans la suite de cet article nous appelons contraintes n-aires les contraintes qui
+portent simultanément sur plusieurs motifs. Ces contraintes permettent d’obtenir des motifs de
+plus grand intérêt pour l’utilisateur et la construction de modèles globaux issus des données.
+L’extraction de motifs sous contraintes locales demande l’exploration d’un espace de re-
+cherche de très grande taille, même lorsqu’il s’agit de motifs simples tels que des itemsets.
+Bien évidemment, l’extraction sous contraintes n-aires est encore plus complexe puisque nous
+devons prendre en considération et comparer plusieurs motifs à la fois. Certains problèmes par-
+ticuliers portant sur des contraintes n-aires sont déjà traités Suzuki (2002); Lakshmanan et al.
+(1998) à l’aide d’algorithmes dédiés à chaque contrainte, mais aucune méthode générique n’est
+proposée. En parallèle, les problèmes de satisfaction de contraintes (CSPs) permettent de mo-
+déliser de façon naturelle des contraintes portant sur plusieurs variables Apt et Wallace (2007).
+Cet article propose une approche combinant la fouille de motifs locaux et la programmation
+par contraintes (PPC) pour la résolution de contraintes n-aires. Plus généralement, il explore les
+relations entre l’extraction de motifs contraints et la PPC. Nous montrons qu’on peut modéliser
+un problème d’extraction de motifs sous contraintes n-aires à l’aide d’un CSP en assimilant
+chaque motif recherché à une variable. Une requête d’un utilisateur correspond alors à un
+ensemble de contraintes n-aires décrivant les motifs recherchés. Le grand avantage de cette
+modélisation est sa flexibilité qui permet de traiter un large ensemble de contraintes et donc
+de motifs. D’autre part, nous souhaitons aussi profiter des avancées récentes dans le domaine
+de l’extraction de motifs locaux et de la puissance des extracteurs pour ce type de motifs.
+Ainsi, notre approche partitionne une requête de l’utilisateur en deux ensembles : le premier
+rassemble les contraintes locales qu’il est possible d’inférer de la requête, et qui sont alors
+résolues par un extracteur de motifs locaux avant et indépendamment du deuxième ensemble,
+ce dernier contenant les contraintes n-aires qui seront résolues par un solveur de CSP. C’est
+cette combinaison entre les niveaux local et n-aire qui nous permet la découverte de motifs
+sous contraintes n-aires.
+Cet article est organisé de la manière suivante. La section 2 présente le contexte et les moti-
+vations de ce travail. Un état de l’art en extraction de motifs et PPC est présenté en section 3. La
+section 4 décrit notre approche pour extraire des motifs sous contraintes n-aires. La section 5
+présente les résultats expérimentaux. La section 6 conclut et propose des perspectives.
+2 Définitions et motivations
+2.1 Definitions
+Soit I un ensemble de littéraux distincts appelés items, un motif ensembliste1 d’items
+correspond à un sous-ensemble non vide de I. Ces motifs sont regroupés dans le langage
+LI = 2I\∅. Un contexte transactionnel est alors défini comme un multi-ensemble de motifs
+de LI . Chacun de ces motifs, appelé transaction, constitue une entrée de la base de données.
+Ainsi, le tableau 1 présente un contexte transactionnel r où 9 transactions étiquetées o1, . . . , o9
+sont décrites par 6 items A, . . . ,D, c1, c2.
+1Dans cet article, nous nous intéressons au cas des motifs ensemblistes
+RNTI-E-19 - 200 -
+M. Khiari et al.
+Trans. Items
+o1 A B c1
+o2 A B c1
+o3 C c1
+o4 C c1
+o5 C c1
+o6 A B C D c2
+o7 C D c2
+o8 C c2
+o9 D c2
+TAB. 1 – Exemple de contexte transactionnel r.
+L’extraction sous contraintes cherche la collection de tous les motifs X de LI présents
+dans r et satisfaisant un prédicat appelé contrainte. Ces motifs sont appelés motifs locaux, ce
+sont des régularités observées dans certaines parties des données. Un motif local est particu-
+lièrement intéressant s’il présente un comportement déviant par rapport au modèle global des
+données Hand (2002). Plusieurs contraintes sont utilisées pour évaluer la pertinence des motifs
+locaux. La contrainte la plus classique est certainement celle de fréquence minimale qui per-
+met d’extraire des motifs dont la fréquence dans le jeu de données est plus grande qu’un seuil
+γ > 0 donné : freq(X) ≥ γ. Plusieurs travaux Ng et al. (1998) utilisent d’autres mesures d’in-
+térêt telle que par exemple la mesure d’aire (aire(X) est égale à la fréquence de X multipliée
+par sa longueur, i.e., aire(X) = freq(X)× count(X) où count(X) représente la cardinalité
+de X).
+En pratique, l’utilisateur est souvent intéressé par la découverte de motifs de plus haut
+niveau, comme par exemple les règles de classification les plus simples afin d’éviter le sur-
+apprentissage Yin et Han (2003), ou encore des paires de règles d’exception Suzuki (2002)
+capables de révéler des caractéristiques globales des données. De tels motifs reposent sur des
+propriétés impliquant plusieurs motifs locaux et sont formalisés par la notion de contrainte
+n-aire, notion qui dépasse clairement celle de contrainte locale :
+Définition 2.1 (Contrainte n-aire) Une contrainte q est dite n-aire si sa vérification nécessite
+de comparer plusieurs motifs entre eux.
+2.2 Contexte et motivations
+Cette section montre l’intérêt des contraintes n-aires en donnant des exemples de motifs
+s’exprimant à l’aide de contraintes n-aires. Ces motifs sont plus significatifs que de simples
+motifs locaux et sont ainsi plus recherchés par l’utilisateur. Par exemple, E. Suzuki s’est inté-
+ressé à la découverte de paires de règles incluant une règle d’exception Suzuki (2002) (aussi
+appelé règles d’exception). Une règle d’exception est définie comme étant une règle qui dé-
+vie d’un comportement général exprimé par une autre règle : l’intérêt de cette définition est
+d’expliciter la caractéristique d’exception par rapport à un comportement général. De façon
+plus formelle, les règles d’exception sont définies comme suit (I est un item, par exemple une
+valeur de classe, X et Y sont des motifs locaux) :
+exception(X → ¬I) ≡
+j
+vrai si ∃Y ∈ LI tel que Y ⊂ X , on a (X\Y → I) ∧ (X → ¬I)
+faux sinon
+RNTI-E-19- 201 -
+Découverte de motifs sous contraintes n-aires alliant CSPs et motifs locaux
+Dans une telle paire de règles, X → ¬I est une règle d’exception, puisque on a généra-
+lement X\Y → I . La règle d’exception révèle ainsi une information inattendue. Cette défi-
+nition suppose que la règle générale est de forte fréquence et de forte confiance tandis que la
+règle d’exception est rare mais de très forte confiance (la confiance d’une règle X → Y est
+freq(X ∪Y )/freq(X)). La comparaison entre règles d’une paire signifie qu’une telle paire ne
+peut pas être modélisée par une approche uniquement à base de motifs locaux, alors que nous
+verrons qu’elle se modélise aisément avec des contraintes n-aires. Donnons un exemple de
+règle d’exception à partir du tableau 1 : en prenant 2/3 comme seuil de confiance d’une règle,
+la règle AC → ¬c1 est une règle d’exception puisque nous avons conjointement A → c1
+et AC → ¬c1. Suzuki a proposé une méthode fondée sur une estimation probabiliste Suzuki
+(2002) pour extraire de telles paires de règles, mais elle demeure dédiée à ce type de motifs.
+Considérons maintenant le domaine de l’analyse d’expression de gènes pour donner un
+autre exemple de motifs définis par des contraintes n-aires. Dans ce contexte, les motifs locaux
+composés de tags (ou gènes) et satisfaisants la contrainte d’aire (cf. section 2.1) sont au cœur de
+la recherche de groupes de synexpression Kléma et al. (2008). Néanmoins, dans des données
+réelles telles que celles du transcriptome, la recherche de motifs tolérants aux erreurs y est
+capitale afin de tenir compte de l’incertain qui est présent dans les données Besson et al. (2006).
+Les contraintes n-aires sont une façon naturelle de concevoir des motifs tolérants aux erreurs
+candidats à être des groupes de synexpression : ceux-ci sont définis par l’union de plusieurs
+motifs locaux satisfaisant la contrainte d’aire et ayant un fort recouvrement entre eux. Plus
+précisément, à partir de deux motifs locaux X et Y , on définit la contrainte n-aire suivante
+aire(X) > minaire∧aire(Y ) > minaire∧ (aire(X ∩Y ) > α×minaire) oùminaire est le
+seuil d’aire minimale et α est un paramètre donné par l’utilisateur pour fixer le recouvrement
+minimal entre motifs locaux. Cette contrainte n-aire peut être étendue à un nombre indéfini de
+motifs par l’utilisation du quantificateur universel (cf. section 6). La section 4 présente notre
+approche pour modéliser les motifs satisfaisant de telles contraintes et comment on peut les
+extraire combinant l’extraction de motifs locaux et PPC.
+3 État de l’art et programmation par contraintes
+3.1 Motifs locaux et découverte de motifs en fouille de données
+Plusieurs travaux traitent de la découverte de motifs locaux sous contraintes. Leur idée cen-
+trale est d’exploiter la propriété de monotonie entre motifs qui permet de puissants élagages
+dans les espaces de recherche Mannila et Toivonen (1997). Nous utilisons ici le prototype
+MUSIC-DFS2 parce qu’il permet d’extraire efficacement l’ensemble correct et complet des mo-
+tifs selon un large éventail de contraintes locales, telle que par exemple la contrainte d’aire. Les
+motifs locaux sont produits sous forme de représentation condensée composée d’intervalles
+disjoints où chaque intervalle synthétise un ensemble de motifs satisfaisants la contrainte Sou-
+let et al. (2006).
+Il existe quelques approches qui considèrent simultanément plusieurs motifs locaux : les
+“patterns teams” Knobbe et Ho (2006), les ensembles sous contraintes de motifs De Raedt et
+Zimmermann (2007) ou encore la sélection de motifs selon leur apport compte tenu des autres
+2http://www.info.univ-tours.fr/~soulet/music-dfs/music-dfs.html
+RNTI-E-19 - 202 -
+M. Khiari et al.
+motifs déjà sélectionnés Bringmann et Zimmermann (2007). Même si ces approches comparent
+explicitement les motifs entre eux, elles sont principalement fondées sur la réduction de la
+redondance entre motifs ou poursuivent des objectifs spécifiques tels que la classification. De
+part leur flexibilité, les contraintes n-aires permettent à l’utilisateur, avec un même cadre de
+modélisation, d’exprimer des biais de recherche variés et donc des types de motifs très divers.
+Notons qu’il existe des cadres génériques pour la construction de modèles globaux à partir de
+motifs locaux Knobbe et al. (2008); Giacometti et al. (2009), mais ces cadres ne proposent pas
+de méthode, ils permettent de mieux comparer celles existantes. De façon plus générale, nous
+pensons que notre approche illustre l’intérêt de la PPC dans cette problématique générale de
+construction de modèles globaux à partir de motifs locaux.
+La PPC est un puissant paradigme déclaratif pour la modélisation et la résolution de pro-
+blèmes combinatoires. Une première approche utilisant la PPC pour l’extraction de motifs
+locaux a été proposée dans De Raedt et al. (2008) pour modéliser des contraintes telles que
+la fréquence, la fermeture, ou d’autres contraintes monotones et anti-monotones ou des com-
+binaisons de telles contraintes. Les motifs satisfaisants de telles contraintes sont obtenus avec
+le solveur de contraintes Gecode3 en utilisant la programmation linéaire en 0/1. Mais cette ap-
+proche ne traite pas le cas des motifs provenant de relations entre plusieurs motifs locaux tels
+que ceux décrits dans la section 2.
+3.2 CSP Ensembliste
+Un CSP est un triplet (X ,D, C) où X est un ensemble fini de variables, D est un ensemble
+de domaines finis et C est l’ensemble des contraintes qui restreignent les valeurs que peuvent
+prendre simultanément les variables. Il existe plusieurs types de CSPs : numériques, booléens,
+ensemblistes, etc. Ils diffèrent principalement par la nature de leurs domaines et leurs algo-
+rithmes de filtrage. Dans cette section nous présentons les CSPs ensemblistes (CSPEs) qui
+seront utilisés dans notre modélisation ainsi qu’un bref aperçu des règles de filtrage associées.
+Définition 3.1 (Intervalle ensembliste) Soient lb et ub deux ensembles tels que lb ⊂ ub, l’in-
+tervalle ensembliste [lb..ub] est défini comme suit : [lb..ub] = {E tel que lb ⊆ E et E ⊆ ub}.
+Les intervalles ensemblistes permettent de remédier aux problèmes de stockage de données en
+condensant la représentation des valeurs possibles des variables. Par exemple : [{1}..{1, 2, 3}]
+est égal à {{1}, {1, 2}, {1, 3}, {1, 2, 3}} et [{}..{1, 2, 3}] est égal à 2{1,2,3}.
+Définition 3.2 (CSP ensembliste) Un CSPE est un triplet (X ,D, C) où C = {c1, ..., cm} est
+un ensemble de contraintes associées à un ensemble de variables X = {X1, ..., Xn}. Chaque
+variable Xi admet un domaine initial DXi de valeurs sous forme d’intervalle ensembliste (ou
+union d’intervalles ensemblistes) et D = {DX1 , ..., DXn}.
+Règles de filtrage pour les CSPE : Pour les CSPs, le filtrage consiste à réduire les do-
+maines des variables en supprimant des valeurs qui ne peuvent appartenir à une solution. Dès
+qu’un domaine DXi est vide (il n’y a pas de valeur viable pour Xi), un échec est généré pour
+la recherche. Les règles de filtrage pour les CSPs numériques et les CSPEs sont présentés
+dans Lhomme (1993); Gervet (1997).
+3http://www.gecode.org
+RNTI-E-19- 203 -
+Découverte de motifs sous contraintes n-aires alliant CSPs et motifs locaux
+A titre d’exemple, la règle de filtrage pour les intervalles ensemblistes pour la contrainte
+d’intersection est la suivante : Soient Dx = [ax..bx], Dy = [ay .. by] et Dz = [az .. bz]
+trois domaines représentés par des intervalles ensemblistes, leurs domaines filtrés par rapprort
+à la contrainte Z = X ∩ Y sont respectivement D′x = [ax ∪ az .. bx \ ((bx ∩ ay) \ bz],
+D′y = [ay ∪ az .. by \ ((by ∩ ax) \ bz] etD′z = [az ∪ (ax ∩ ay) .. bz ∩ bx ∩ by] si ((bx ∩ by) ⊂
+bz ∧ (bx ∩ by) = ∅) et D′x = D′y = D′z = ∅ sinon.
+Outil de programmation : ECLiPSe 4 est un outil de PPC supportant les techniques les
+plus connues pour la résolution des problèmes de satisfaction et d’optimisation de contraintes.
+ECLiPSe est basé sur le paradigme de la programmation logique par contraintes Apt et
+Wallace (2007). Différents types de contraintes tels que les contraintes ensemblistes et les
+contraintes numériques peuvent être utilisées simultanément. Pour la résolution de CSPs en-
+semblistes, ECLiPSe propose différentes librairies tels que ic-sets et conjunto Gervet (1997).
+4 La PPC pour la découverte de motifs
+Notre approche se base sur trois points clés : (i)les larges possibilités de modélisation et
+de résolution offertes par les CSPs, en particulier les CSPEs et les CSPs numériques, (ii)les
+récents progrès dans le domaine de la fouille de motifs locaux, et (iii)le fait que les contraintes
+locales peuvent être résolues avant et indépendamment des contraintes n-aires. Dans cette sec-
+tion, nous donnons une vue d’ensemble de notre approche avant de détailler chacune de ces
+trois étapes en considérant l’exemple des règles d’exception (section 2.2).
+4.1 Vue d’ensemble de notre approche
+La figure 1 présente une vue d’ensemble des trois étapes de notre approche :
+1. Modéliser la requête sous forme de CSPs puis diviser les contraintes en locales et n-aires.
+2. Résoudre les contraintes locales à l’aide d’un extracteur de motifs locaux (MUSIC-DFS,
+cf. section 3.1) qui produit une représentation condensée par intervalles de tous les motifs
+satisfaisant les contraintes locales.
+3. Résoudre les contraintes n-aires à l’aide d’un solveur de contraintes (ECLiPSe, cf.
+section 3.2). Le domaine de chaque variable résulte de la représentation condensée par
+intervalles (calculée dans Etape-2).
+4.2 Etape-1 : Modélisation de la requête sous forme de CSPs
+Soit r un jeu de données ayant nb transactions et I l’ensemble de ses items. On modélise
+le problème à l’aide de deux CSPs P et P ′ inter-reliés :
+1. CSP ensembliste P = (X ,D, C) où :
+– X = {X1, ..., Xn}. Chaque variable Xi représente un motif inconnu.
+– D = {DX1 , ..., DXn}. Le domaine initial de chaque variable Xi est [{} .. I].
+– C est une conjonction de contraintes ensemblistes formulées à l’aide d’opérateurs en-
+semblistes (∪, ∩, \, ∈, /∈, ...).
+4http://www.eclipse-clp.org
+RNTI-E-19 - 204 -
+M. Khiari et al.
+FIG. 1 – Vue d’ensemble des 3 étapes de la résolution
+2. CSP numérique P ′ = (F ,D′, C′) où :
+– F = {F1, ..., Fn}. Chaque variable Fi est la fréquence du motif Xi.
+– D′ = {DF1 , ..., DFn}. Le domaine initial de chaque variable Fi est [1 .. nb].
+– C′ est une conjonction de contraintes numériques formulées à l’aide d’opérateurs nu-
+mériques (<, ≤, =,+, ...).
+L’ensemble de toutes les contraintes (C ∪ C′) est divisé en deux sous ensembles :
+– Cloc est l’ensemble des contraintes locales à résoudre (par MUSIC-DFS). Les solutions
+seront sous la forme de représentation condensée par intervalles.
+– Cn−aire est l’ensemble des contraintes n-aires à résoudre (par ECLiPSe), où les do-
+maines des variablesXi et Fi sont déduits de la représentation condensée par intervalles
+calculée dans l’étape précédente.
+Les contraintes locales sont résolues avant et indépendamment des contraintes n-aires.
+L’espace de recherche pour les contraintes n-aires est ainsi réduit à l’espace des solutions issu
+des contraintes locales.
+4.3 Exemple : modélisation des règles d’exception
+4.3.1 Reformulation :
+Soit freq(X) la valeur de la fréquence du motifX . Soient I et ¬I ∈ I deux items (dans cet
+exemple, I et ¬I sont deux classes du jeu de données). Soient γ1, γ2, δ1, δ2 ∈ N. La contrainte
+des règles d’exception (section 2.2) peut être formulée comme suit :
+– X\Y → I peut être exprimée par la conjonction : freq((X \ Y )unionsq5I) ≥ γ1 ∧
+(freq(X \ Y )− freq((X \ Y ) unionsq I)) ≤ δ1 qui signifie que X\Y → I est une règle
+fréquente et de forte confiance.
+– X → ¬I peut être exprimée par la conjonction : freq(X unionsq ¬I) ≤ γ2 ∧ (freq(X) −
+freq(X unionsq ¬I)) ≤ δ2 qui signifie que X → ¬I est une règle rare et de forte confiance.
+Pour résumer :
+exception(X → ¬I) ≡
+8<
+:
+∃Y ⊂ X tel que :
+freq((X \ Y ) unionsq I) ≥ γ1 ∧ (freq(X \ Y )− freq((X \ Y ) unionsq I)) ≤ δ1 ∧
+freq(X unionsq ¬I) ≤ γ2 ∧ (freq(X)− freq(X unionsq ¬I)) ≤ δ2
+5le symbole unionsq est l’opérateur d’union disjointe
+RNTI-E-19- 205 -
+Découverte de motifs sous contraintes n-aires alliant CSPs et motifs locaux
+4.3.2 Modélisation sous forme de CSP :
+Les variables des CSPs correspondants sont définies comme suit :
+– Variables ensemblistes {X1, X2, X3, X4}représentant les motifs recherchés :
+– X1 : X \ Y ,
+– X2 : (X \ Y ) unionsq I (règle générale),
+– X3 : X ,
+– X4 : X unionsq ¬I (règle d’exception).
+Variables numériques {F1, F2, F3, F4} représentant les valeurs des fréquences des mo-
+tifs recherchés (la variable Fi correspond à la fréquence du motif représenté par Xi).
+Le tableau 2 décrit l’ensemble des contraintes modélisant les règles d’exception.
+Contraintes Formulation CSP Locales N-aires
+F2 ≥ γ1 ×
+freq((X \ Y ) unionsq I) ≥ γ1 ∧ I ∈ X2 ×
+∧ X1  X3 ×
+freq(X \ Y )− freq((X \ Y ) unionsq I) ≤ δ1 F1 − F2 ≤ δ1 ×
+∧ X2 = X1 unionsq I ×
+freq(X unionsq ¬I) ≤ γ2 F4 ≤ γ2 ×
+∧ ¬I ∈ X4 ×
+freq(X)− freq(X unionsq ¬I) ≤ δ2 F3 − F4 ≤ δ2 ×
+∧ X4 = X3 unionsq ¬I ×
+TAB. 2 – La modélisation des règles d’exception
+4.3.3 Récapitulatif :
+– CSPE : C = {(I ∈ X2), (X2 = X1 unionsq I), (¬I ∈ X4), (X4 = X3 unionsq ¬I), (X1  X3})
+– CSP numérique : C′ = {(F2 ≥ γ1), (F1 − F2 ≤ δ1), (F4 ≤ γ2), (F3 − F4 ≤ δ2)}
+– Cloc = {(I ∈ X2), (F2 ≥ γ1), (F4 ≤ γ2), (¬I ∈ X4)}
+– Cn−aire = {(F1−F2 ≤ δ1), (X2 = X1 unionsq I), (F3−F4 ≤ δ2), (X4 = X3 unionsq¬I), (X1  X3)}
+4.4 Etape-2 : Résolution des contraintes locales
+Dans le but de bénéficier pleinement de l’efficacité de la fouille de motifs locaux, l’en-
+semble des contraintes locales Cloc est divisé en une union disjointe de Ci (pour i ∈ [1..n]) où
+chaque Ci est l’ensemble des contraintes portant surXi et Fi. Chaque Ci peut être résolu sépa-
+rément (nous utilisons MUSIC-DFS, cf. section 3.1). Soit CRi la représentation condensée par
+intervalles de toutes les solutions de Ci. CRi =
+⋃
+p(fp, Ip) où Ip est un intervalle ensembliste
+vérifiant : ∀x ∈ Ip, freq(x) = fp. Ensuite, les domaines réduits (voir section 4.3.2) pour les
+variables Xi et Fi sont :
+– DFi : l’ensemble de tous les fp dans CRi
+– DXi : l’union de tous les Ip dans CRi
+RNTI-E-19 - 206 -
+M. Khiari et al.
+4.5 Etape-3 : Résolution des contraintes n-aires
+Les domaines des variables Xi et Fi (pour i ∈ {1, 2, 3, 4}) sont obtenus à partir de la
+représentation condensée des motifs satisfaisant toutes les contraintes locales. La résolution par
+ECLiPSe permet ainsi d’obtenir toutes les solutions satisfaisant l’intégralité des contraintes
+(locales et n-aires).
+5 Expérimentations
+L’étude expérimentale porte sur le jeu de données postoperative-patient-data de UCI re-
+pository6. Ce jeu de données comporte 90 transactions décrites par 23 items et est caractérisé
+par deux classes (deux transactions appartenant à une troisième classe n’ont pas été considé-
+rées). Nous testons notre approche avec la contrainte des règles d’exception (dans ce qui suit,
+l’item I donné dans la définition des règles d’exception représente une des deux classes du jeu
+de données). Toutes les expériences ont été effectuées sur une machine dotée d’un processeur
+Intel Centrino Duo 2 GHz et de 2GB de mémoire RAM sous Linux. De façon générale, ces
+expériences montrent la faisabilité de notre approche.
+FIG. 2 – Nombre de paires de règles en fonction de γ1 (gauche) et δ1 (droite)
+La figure 2 donne le nombre de paires de règles d’exception en fonction de γ1 (partie
+gauche de la figure) et de δ1 (partie droite de la figure). Plusieurs combinaisons de paramètres
+ont été testées. Comme attendu, en baissant la valeur de γ1 on obtient un nombre plus élevé de
+paires de règles. On constate un comportement similaire en faisant varier δ1 (partie droite de la
+figure 2) : le nombre de paires de règles augmente en fonction de δ1 (quand δ1 croit, la valeur de
+la confiance des règles générales décroît, d’où l’obtention d’un plus grand nombre de paires). Il
+est intéressant de noter que ces courbes mettent aussi en valeur la facilité de contrôle de qualité
+des règles en modifiant les valeurs des paramètres. Par exemple, pour (γ1 = 20, δ1 = 5, γ2 =
+1, δ2 = 0), on obtient 25 paires où la confiance de la règle générale est supérieure ou égale
+à 83% et des règles d’exception exactes (confiance égale à 100%) : on constate qu’on obtient
+ainsi des paires de règles de très bonne qualité. De plus, notre approche permet aisément l’ajout
+6www.ics.uci.edu/~mlearn/MLRepository.html
+RNTI-E-19- 207 -
+Découverte de motifs sous contraintes n-aires alliant CSPs et motifs locaux
+de nouvelles propriétés, toujours sous forme de contraintes, comme par exemple le contrôle de
+la taille des règles générales relativement à celle des règles d’exception (par exemple, au plus
+3 items supplémentaires pour la règle d’exception par rapport à la règle générale).
+FIG. 3 – Temps d’exécution en fonction du nombre d’intervalles par domaine
+La figure 3 montre l’évolution du temps d’exécution de notre approche en fonction du
+nombre d’intervalles par domaine. Pour chaque point de la courbe, les quatre variables ont le
+même domaine, et par conséquent le même nombre d’intervalles par domaine. Evidemment,
+le temps d’exécution augmente en fonction du nombre d’intervalles (on utilise une échelle al-
+gorithmique pour l’axe Y ). Il est intéressant de noter que le temps d’exécution diminue quand
+on cherche des paires de règles de meilleure qualité. En effet, la recherche de règles géné-
+rales de haute fréquence et des règles d’exception rares permet un meilleur élagage de l’es-
+pace de recherche et par suite un nombre d’intervalles moins important. Le tableau 3 décrit le
+nombre d’intervalles du domaine de la variableX2 (voir section 4.3.2) par rapport à différentes
+contraintes locales. Ceci montre l’intérêt de la résolution séparée des contraintes locales.
+Contrainte locale Nombre d’intervalles dansDX2
+- 3002
+I ∈ X2 1029
+I ∈ X2 ∧ freq(X2) >= 20 52
+I ∈ X2 ∧ freq(X2) >= 25 32
+TAB. 3 – Nombre d’intervalles pour différentes contraintes locales (cas de DX2)
+Discussion Dans le but d’établir la consistance aux bornes, les solveurs de CSPE approxi-
+ment l’union de deux intervalles par leur enveloppe convexe. L’enveloppe convexe de [lb1 .. ub1]
+et [lb2 .. ub2] est définie par [lb1 ∩ lb2 .. ub1 ∪ ub2]. Ainsi, si le filtrage s’applique de nom-
+breuses fois sur le domaine d’une même variable, ce domaine peut rapidement être approximé
+par l’ensemble de tous les motifs possibles [∅ .. I]. Pour contourner ce problème, pour chaque
+variable Xi dont la représentation condensée de motifs satisfaisant les contraintes locales est
+CRi =
+⋃
+p(fp, Ip), la recherche est établie successivement dans chaque Ip. Cette approche est
+correcte et complète. En revanche, on ne profite pas pleinement du filtrage puisque la suppres-
+sion d’une valeur est propagée uniquement dans les intervalles traités et non dans la totalité
+RNTI-E-19 - 208 -
+M. Khiari et al.
+des domaines. Ceci explique les résultats de la section 5 qui montrent que les temps d’exécu-
+tion augmentent fortement en fonction du nombre d’intervalles. Une première solution serait
+d’implémenter un opérateur d’union ensembliste plus adapté au cœur du solveur de CSPE.
+Une autre possibilité serait d’utiliser une représentation condensée non exacte dans le but de
+réduire le nombre d’intervalles produits.
+6 Conclusions et perspectives
+Nous avons présenté une approche générale pour la découverte de motifs sous contraintes
+n-aires. Celle-ci permet de modéliser, de façon flexible, tout ensemble de contraintes combi-
+nant plusieurs motifs locaux. L’ensemble correct et complet de toutes les solutions satisfaisant
+ces contraintes est ainsi obtenu grâce à une résolution en deux phases dont la première pro-
+fite de l’efficacité des extracteurs de motifs locaux pour la résolution des contraintes locales,
+tandis que la deuxième bénéficie de la puissance des solveurs de CSPs pour la résolution des
+contraintes n-aires. La combinaison de ces deux approches permet de formuler aisément des
+contraintes permettant la découverte de motifs de plus haut niveau et répondant mieux aux buts
+finaux de l’utilisateur. Les expérimentations montrent la faisabilité de notre approche.
+Dans les CSPs classiques, toutes les variables sont quantifiées existentiellement. Or la for-
+mulation de contraintes importantes telle que la contrainte de peak (un motif est considéré
+comme peak si tous ses voisins ont une valeur, par rapport à une mesure, inférieure à un seuil
+donné) nécessite l’usage de quantificateurs universels. Nous pensons que les CSPs quantifiées
+(QCSP) Benhamou et Goualard (2000) sont une voie prometteuse.
+Remerciements. Nous remercions Arnaud Soulet pour les discussions fructueuses et MUSIC-
+DFS. Ce travail est partiellement financé par l’ANR (projet Bingo 2 ANR-07-MDCO-014).
+Références
+Apt, K. R. et M. Wallace (2007). Constraint Logic Programming using Eclipse. New York,
+NY, USA : Cambridge University Press.
+Benhamou, F. et F. Goualard (2000). Universally quantified interval constraints. In proceedings
+of CP’00, London, UK, pp. 67–82. Springer-Verlag.
+Besson, J., C. Robardet, et J.-F. Boulicaut (2006). Mining a new fault-tolerant pattern type as
+an alternative to formal concept discovery. In ICCS’06, Aalborg, Denmark, pp. 144–157.
+Bringmann, B. et A. Zimmermann (2007). The chosen few : On identifying valuable patterns.
+In proceedings of ICDM-07, Omaha, NE, pp. 63–72.
+Calders, T., C. Rigotti, et J.-F. Boulicaut (2005). A survey on condensed representations for
+frequent sets. In Constraint-Based Mining and Inductive Databases, Volume 3848 of LNAI.
+De Raedt, L., T. Guns, et S. Nijssen (2008). Constraint Programming for Itemset Mining. In
+KDD’08, Las Vegas, Nevada, USA.
+De Raedt, L., M. Jäger, S. D. Lee, et H. Mannila (2002). A theory of inductive query answering.
+In proceedings of ICDM’02, Maebashi, Japan, pp. 123–130.
+De Raedt, L. et A. Zimmermann (2007). Constraint-based pattern set mining. In Proceedings
+of the Seventh SIAM International Conference on Data Mining, Minneapolis, USA.
+RNTI-E-19- 209 -
+Découverte de motifs sous contraintes n-aires alliant CSPs et motifs locaux
+Gervet, C. (1997). Interval Propagation to Reason about Sets : Definition and Implementation
+of a Practical Language. Constraints 1(3), 191–244.
+Giacometti, A., E. Khanjari Miyaneh, P. Marcel, et A. Soulet (2009). A framework for pattern-
+based global models. In 10th IDEAL Int. Conf., Burgos, Spain, pp. 433–440.
+Hand, D. J. (2002). ESF exploratory workshop on Pattern Detection and Discovery in Data
+Mining, Volume 2447 of LNCS, Chapter Pattern detection and discovery, pp. 1–12. Springer.
+Kléma, J., S. Blachon, A. Soulet, B. Crémilleux, et O. Gandrillon (2008). Constraint-based
+knowledge discovery from sage data. In Silico Biology 8(0014).
+Knobbe, A., B. Crémilleux, J. Fürnkranz, et M. Scholz (2008). From local patterns to global
+models : The lego approach to data mining. In International Workshop "From Local Patterns
+to Global Models" co-located with ECML/PKDD’08, Antwerp, Belgium, pp. 1–16.
+Knobbe, A. et E. Ho (2006). Pattern teams. In J. Fürnkranz, T. Scheffer, et M. Spiliopoulou
+(Eds.), proceedings of PKDD’06, Berlin, Germany, pp. 577–584. Springer-Verlag.
+Lakshmanan, L. V., R. Ng, J. Hah, et A. Pang (1998). Optimization of constrained frequent set
+queries with 2-variable constraints.
+Lhomme, O. (1993). Consistency Techniques for Numeric CSPs. In Proc. of the 13th IJCAI,
+Chambery, France, pp. 232–238.
+Mannila, H. et H. Toivonen (1997). Levelwise search and borders of theories in knowledge
+discovery. Data Mining and Knowledge Discovery 1, 241–258.
+Ng, R. T., V. S. Lakshmanan, J. Han, et A. Pang (1998). Exploratory mining and pruning
+optimizations of constrained associations rules. In proceedings of ACM SIGMOD’98.
+Siebes, A., J. Vreeken, et M. van Leeuwen (2006). Item sets that compress. In Proceedings of
+the Sixth SIAM International Conference on Data Mining, Bethesda, MD, USA. SIAM.
+Soulet, A. et B. Crémilleux (2005). An efficient framework for mining flexible constraints. In
+Proceedings of PAKDD’05, Volume 3518 of LNAI, Hanoi, Vietnam, pp. 661–671. Springer.
+Soulet, A., J. Kléma, et B. Crémilleux (2006). Efficient mining under rich constraints derived
+from various datasets. In KDID, Volume 4747 of LNCS, pp. 223–239. Springer.
+Suzuki, E. (2002). Undirected Discovery of Interesting Exception Rules. International Journal
+of Pattern Recognition and Artificial Intelligence 16, 1065–1086.
+Yin, X. et J. Han (2003). CPAR : classification based on predictive association rules. In
+proceedings of SDM’03, San Fransisco, CA.
+Summary
+In this paper, we investigate the relationship between local constraint-based mining and
+constraint satisfaction problems and we propose an approach to model and mine patterns com-
+bining several local patterns, i.e., patterns defined by n-ary constraints. The user specifies a set
+of n-ary constraints and a constraint solver generates the whole set of solutions. Our approach
+takes benefit from the recent progress on mining local patterns by pushing with a solver on
+local patterns all local constraints which can be inferred from the n-ary ones. Our approach
+enables to model in a flexible way any set of constraints combining several local patterns.
+Experiments show the feasibility of our approach.
+RNTI-E-19 - 210 -

@@ -1,0 +1,805 @@
+HYPE : Prise en compte des hiérarchies lors de l’extraction
+de motifs séquentiels multidimensionnels
+Marc Plantevit, Anne Laurent, Maguelonne Teisseire
+LIRMM, Université Montpellier 2, CNRS, 161 Rue Ada 34392 Montpellier, France
+nom.prenom@lirmm.fr
+http://www.lirmm.fr/ p˜lantevi
+http://www.lirmm.fr/ l˜aurent
+http://www.lirmm.fr/ t˜eisseir
+Résumé. Les entrepôts de données contiennent de grosses masses de données
+historisées stockées à des fins d’analyse. Si les méthodes et outils d’analyse sont
+maintenant bien connus (OLAP), il reste difficile de fournir aux utilisateurs des
+outils de fouille de données permettant la prise en compte des spécificités de ces
+contextes (e.g. multidimensionnalité, hiérarchies, données historisées). Dans cet
+article, nous proposons une méthode originale d’extraction de motifs séquentiels
+prenant en compte les hiérarchies. Cette méthode extrait des connaissances plus
+précises et étend notre approche précédenteM2SP. Nous définissons les concepts
+liés à notre problématique ainsi que les algorithmes associés. Les expérimenta-
+tions que nous avons menés montrent l’intérêt de notre proposition.
+1 Introduction
+La technologie OLAP et la fouille de données ne sont pas incompatibles (Han (1997)). Les
+techniques d’extraction de connaissances peuvent apporter une aide non négligeable dans le
+contexte OLAP où l’utilisateur doit désormais prendre les décisions les mieux adaptées en un
+minimum de temps. De façon plus précise, la fouille de données constitue une étape clef dans
+le processus de décision face à de gros volumes de données multidimensionnelles. En effet, les
+motifs ou règles obtenues permettent une autre appréhension des données sources. Cependant
+leur découverte nécessite certains paramètres dont en particulier le support minimal. Celui-ci
+correspond à la fréquence minimale d’apparition des motifs au sein de la base considérée. Si
+le support minimal choisi est trop élevé, le nombre de règles découvertes est faible mais si le
+support est trop bas, le nombre de règles obtenues est très important et rend difficile l’analyse
+de celles-ci. Le décideur est alors confronté au problème suivant : comment baisser le support
+minimal sans générer la découverte de règles non pertinentes ? Ou comment augmenter le sup-
+port minimal sans perdre les règles utiles ? Est-il alors nécessaire de faire un compromis entre
+qualité des connaissances extraites et support ?
+L’utilisation des hiérarchies dans l’extraction de connaissances représente un excellent
+moyen de résoudre ce dilemme. Elle permet de découvrir des règles au sein de plusieurs ni-
+veaux de hiérarchies. Ainsi, même si un support élevé est utilisé, les connaissances importantes
+- 155 -
+Hiérarchies & motifs séquentiels multidimensionnels
+dont le support est faible dans les données sources peuvent être incluses dans des connais-
+sances plus générales qui, elles, seront comptabilisées comme fréquentes. Nous souhaitons
+ainsi étendre notre proposition précédente de recherche de motifs séquentiels multidimension-
+nels (Plantevit et al. (2005)) par la prise en compte des hiérarchies.
+L’extraction de motifs séquentiels est devenue depuis son introduction par Agrawal et Sri-
+kant (1995), une technique majeure du domaine de l’extraction de connaissances. Ils sont ainsi
+apparus afin de permettre la découverte de connaissances intégrant la notion de temporalité et
+séquentialité. Ils permettent de mettre en exergue des corrélations entre évènements en fonction
+de leur chronologie d’apparition. Même si quelques approches permettent la prise en compte
+des hiérarchies dans l’extraction de motifs séquentiels, il n’existe pas, à notre connaissance,
+de travaux conciliant extraction de motifs séquentiels multidimensionnels et prise en compte
+des hiérarchies. Aucune méthode actuelle ne peut extraire des connaissances du type : Quand
+les ventes de boissons gazeuses augmentent en Europe, les exportations de perrier augmentent
+en France et les exportations de soda augmentent aux USA où différents niveaux de hiérar-
+chies sont présents dans la séquence multidimensionnelle. Nous proposons donc une approche
+originale HYPE , extension de notre proposition M2SP (Plantevit et al. (2005)), permettant
+d’extraire de telles règles. L’originalité de notre approche réside dans l’idée qu’on ne fixe pas
+un unique niveau de hiérarchie mais que les motifs séquentiels extraits sont automatiquement
+associés aux niveaux les plus adéquats.
+Dans cet article, nous introduisons les concepts associés aux motifs séquentiels classiques
+et multidimensionnels ainsi que les approches s’attachant à la prise en compte des hiérarchies
+lors de l’extraction de connaissances. Nous présentons ensuite les concepts fondamentaux re-
+latifs à notre approche HYPE ainsi que les algorithmes permettant sa mise en œuvre. Des
+expérimentations effectuées sur des données synthétiques sont reportées et confirment l’interêt
+de notre approche. Nous montrons aussi que la prise en compte des hiérarchies permet une
+gestion plus fine des valeurs jokers définies dans l’approche M2SP.
+2 Les hiérarchies dans la fouille de données
+Dans cette section, nous présentons les motifs séquentiels ainsi que les approches de la
+littérature ayant traité le problème de l’extraction de motifs séquentiels dans un contexte mul-
+tidimensionnel (plusieurs dimensions d’analyse). Ensuite, nous soulignons pourquoi il est per-
+tinent d’utiliser les hiérarchies lors du processus d’extraction de motifs séquentiels et faisons
+un panorama des travaux associés.
+2.1 Motifs séquentiels
+L’extraction de motifs séquentiels est devenue depuis son introduction par Agrawal et Sri-
+kant (1995), une technique majeure du domaine de l’extraction de connaissances. Ces motifs
+permettent de mettre en exergue des corrélations entre évènements en prenant compte de leur
+chronologie d’apparition. Nous présentons ici très brièvement les concepts fondamentaux liés
+aux motifs séquentiels. Le lecteur désirant plus de détails se réfèrera à Masseglia et al. (2004).
+Les bases de données sur lesquelles s’appuient l’extraction de motifs séquentiels comportent
+- 156 -
+Plantevit et al.
+trois données étroitement liées au problème du panier de la ménagère : la première représente
+un identifiant (souvent appelé client), le deuxième représente une liste de valeurs (souvent
+appelée produits), la troisième représente la date à laquelle ce client a acheté cet ensemble
+de produits. On appelle item une valeur prise par l’attribut produit. Par exemple, DVD ou
+encore magnetoscope sont deux items possibles. On appelle itemset un ensemble d’items.
+Par exemple (DVD;magnetoscope) est un itemset. La base de données est donc composée
+d’itemsets identifiés par une date et un identifiant de client. On appelle séquence une liste
+ordonnée (selon la date) d’itemsets. La base de données peut donc être vue comme un en-
+semble de séquences identifiées par le client. On appelle motif séquentiel une séquence qu’un
+nombre suffisant (au sens du support) de clients partagent au sein de la base de données. Étant
+donnée une valeur minimale de support (spécifiée par l’utilisateur), on dit qu’un motif sé-
+quentiel est fréquent si un nombre de clients supérieur au seuil minimal de support ont réalisé
+cette séquence d’achats. L’enjeu des méthodes de fouille de données est donc l’extraction la
+plus efficace possible des motifs féquents. Pour cela, plusieurs algorithmes existent dont PSP
+Masseglia (2002) ou encore PrefixSpan Pei et al. (2004). Ces techniques sont fondées sur le
+paradigme générer/élaguer où des candidats sont générés puis ensuite élagués s’ils ne sont pas
+fréquents.
+Dans le contexte classique (une seule dimension d’analyse) d’extraction de règles d’asso-
+ciation ou motifs séquentiels, il existe plusieurs travaux qui prennent en compte les hiérarchies
+afin de permettre une extraction de connaissances plus fines.
+Dans Srikant et Agrawal (1996), les prémisses de la gestion des hiérarchies dans l’extrac-
+tion de règles d’association et de motifs séquentiels sont proposées. Les auteurs supposent que
+les relations hiérarchiques entre les items sont représentées par un ensemble de taxonomies
+sous forme d’un graphe orienté sans cycle. Ils permettent d’extraire des règles d’association
+ou desmotifs séquentiels suivant plusieurs niveaux de hiérarchies. Ils modifient les transactions
+en ajoutant pour chaque item l’ensemble de ses ancêtres dans la taxonomie associée. Ensuite,
+ils génèrent les séquences fréquentes tout en essayant de filtrer au maximun l’information re-
+dondante et en optimisant le processus à l’aide de plusieurs propriétés. Cette approche peut être
+difficilement adaptée dans un contexte multidimensionnel. En effet, pour chaque transaction,
+ajouter sur chaque dimension la liste des ancêtres d’un item dans la taxonomie est impensable.
+Cela reviendrait, dans le pire des cas, à multiplier la taille de la base de données que l’on
+souhaite étudier par la profondeur maximale d’une hiérarchie et ceci pour chaque dimension
+d’analyse, un parcours sur cette base serait alors beaucoup trop coûteux.
+L’approche de J. Han est sensiblement différente. Il s’est lui aussi attaché à prendre en
+compte les hiérarchies dans les processus d’extraction de connaissances. Elle s’applique à la
+problématique d’extraction de règles d’association, mais cette approche peut être adaptée pour
+l’extraction de motifs séquentiels. Ainsi, en partant du plus haut niveau de la hiérarchie, il
+va extraire les règles à chaque niveau tout en abaissant le support lorsqu’il descend d’un ni-
+veau dans la hiérarchie. Le processus est itéré jusqu’à ce que l’on ne puisse plus extraire de
+règles ou que l’on soit au niveau le plus bas de la hiérarchie. Cette méthode ne permet pas
+d’extraire des règles où des items de niveaux différents cohabiteraient comme par exemple
+vin et boisson alcoolisee. Cette méthode propose donc l’extraction de règles d’association
+intra niveau de hiérarchie. Elle ne permet donc pas de répondre à la problématique générale
+d’extraction des séquences sur différents niveaux de hiérarchies. De plus la mise en œuvre de
+- 157 -
+Hiérarchies & motifs séquentiels multidimensionnels
+cette approche dans un contexte multidimensionnel peut susciter des débats. Dans le cas où
+plusieurs taxonomies existent (une par dimension), doit-on se déplacer sur les mêmes niveaux
+de hiérarchies sur les différentes taxonomies ou combiner ces niveaux ? Ce type d’extraction
+peut être coûteux en temps, car le mécanisme d’extraction de connaissances peut être réitéré
+plusieurs fois (profondeur de la taxonomie), ce qui n’est pas négligeable.
+Nous avons présenté les motifs séquentiels ainsi que des travaux permettant la prise en
+compte des hiérarchies dans le processus d’extraction de connaissances. Néanmoins les motifs
+séquentiels sont parfois pauvres par rapport aux données qu’ils décrivent. En effet, les corréla-
+tions sont extraites au sein de la seule dimension1 produit alors qu’une base de données peut
+contenir plusieurs autres dimensions. C’est pourquoi plusieurs travaux tentent de combiner
+plusieurs dimensions d’analyse dans l’extraction de motifs séquentiels multidimensionnels.
+2.2 Motifs séquentiels multidimensionnels
+Combiner plusieurs dimensions d’analyse permet d’extraire des connaissances qui dé-
+crivent mieux les données. Dans Pinto et al. (2001) les auteurs sont les premiers à rechercher
+des motifs séquentiels multidimensionnels. Ainsi, les achats ne sont plus décrits en fonction
+des seuls date et identifiant du client, mais en fonction d’un ensemble de dimensions telles que
+Type de consommateur, Ville, Age. Cette approche permet d’extraire des séquences d’items sur
+la dimension produits et de les caractériser à l’aide des informations fréquentes sur les clients
+(Patterns) qui tendent à supporter les séquences. Cette méthode ne permet pas d’avoir des
+séquences où plusieurs patterns sont présents. Elle ne permet donc pas d’extraire des connais-
+sances de la forme : hf(business; ; ; a)(; chicago; ; b)g; f(; ; young; c)gi alliant différents
+patterns multidimensionnels.
+L’approche M2SP que nous avons proposée Plantevit et al. (2005) permet, quant à elle, l’ex-
+traction de motifs séquentiels multidimensionnel inter pattern. Nous décrivons plus en détail
+les concepts associés dans le paragraphe 3.
+Dans Yu et Chen (2005), les auteurs proposent d’étendre la recherche de motifs séquentiels
+au contexte des bases de données décrivant les informations au moyen de plusieurs attributs.
+Cependant cette approche est restreinte au cas particulier où les dimensions étudiées entre-
+tiennent entre elles un très fort lien. En effet, ces dimensions sont organisées en hiérarchie.
+Ainsi, dans l’exemple pris par les auteurs, les différentes dimensions sont liées au compor-
+tement d’internautes dont les visites de pages sont organisées en transactions (dimension 1),
+elles-mêmes organisées en sessions (dimension 2), elles-mêmes organisées en jours (dimen-
+sion 3). Ces différentes dimensions sont imbriquées au sein des motifs trouvés et il est im-
+possible de retrouver les valeurs fréquentes le long de ces dimensions, celles-ci n’intervenant
+que pour organiser le temps de manière hiérarchique. Yu et Chen (2005) propose d’extraire
+des séquences au sein de séquence de données multidimensionnelles organisées en différents
+1Nous utilisons le terme de dimension à la place du terme d’attribut car une base de données relationnelle peut être
+vue comme une table de faits dans un base de données multidimensionnelles.
+- 158 -
+Plantevit et al.
+D B Pl P
+(Date) (BlocID) (Lieu) (Produit)
+1 1 Allemagne Bière
+1 1 Allemagne Cacahuètes
+2 1 Allemagne Aspirine
+3 1 Allemagne Chocolat
+4 1 Allemagne Smecta
+1 2 France coca
+2 2 France Vin
+2 2 France Cacahuètes
+3 2 France Aspirine
+1 3 UK Whisky
+1 3 UK Cacahuètes
+2 3 UK Aspirine
+1 4 LA Chocolat
+2 4 LA Smecta
+3 4 NY Whisky
+4 4 NY Coca
+FIG. 1 – Base de données exempleDB
+niveaux de hiérarchie. Néanmoins, les séquences de données ne sont pas réellement multidi-
+mensionnelles dans la mesure où les différentes dimensions entretiennent un lien hiérarchique
+très strict (un jour comporte des sessions qui sont elles-mêmes composées de pages visitées).
+Nous pouvons encore citer les travaux de de Amo et al. (2004) qui proposent une approche
+basée sur la logique temporelle du premier ordre pour l’extraction de motifs séquentiels mul-
+tidimensionnels, Lee (2005) proposent également une nouvelle méthode de génération des
+séquences multidimensionnelles présentes dans des bases de transactions.
+A notre connaissance, il n’existe aucune approche proposant de prendre en compte les
+hiérarchies dans l’extraction de motifs séquentiels multidimensionnels. Nous proposons donc
+d’intégrer la gestion des hiérarchies à M2SP (Plantevit et al. (2005)) afin de permettre une
+extraction de connaissances plus complète et dont l’utilisation dans le contexte OLAP peut
+être envisageable.
+2.3 Base exemple
+Pour illustrer les différents concepts et définitions, nous proposons la base exemple fig. 1
+qui décrit les achats de produit réalisés dans différentes villes du monde. Pour les hiérarchies,
+nous choisissons deux dimensions, les villes et les produits, dont les taxonomies respectives
+sont indiquées fig. 2 et fig. 3.
+- 159 -
+Hiérarchies & motifs séquentiels multidimensionnels
+FIG. 2 – Taxonomie sur la dimension
+Lieu
+FIG. 3 – Taxonomie sur la dimension
+Produit
+3 Contributions
+Dans cette section, nous présentons notre approche permettant la prise en compte des hié-
+rarchies dans l’extraction de motifs séquentiels multidimensionnels. Nous définissons d’abord
+les concepts relatifs à notre approche. Nous proposons ensuite les algorithmes permettant la
+mise en œuvre de notre approche.
+3.1 Définitions
+Partition des dimensions
+Nous considérons que tout est ensemble dans un contexte multidimensionnel. Les trois
+données nécessaires pour l’extraction de motifs séquentiels dans un contexte classique (Client,
+produits, date) deviennent dans un contexte multidimensionnel des ensembles2.
+Ainsi, comme dans M2SP (Plantevit et al. (2005)), nous considérons que l’ensembleDB
+des transactions définies sur un ensemble D de n dimensions est partitionné en trois sous-
+ensembles :
+– l’ensemble des dimensions de référence DR (client dans contexte classique) qui per-
+mettent de déterminer si une séquence est fréquente.
+– l’ensemble des dimensions DT (date dans contexte classique) permettant d’introduire
+une relation d’ordre.
+– l’ensemble des dimensions d’analyse DA = fD1; : : : ; Dm où Di  Dom(Di)g (pro-
+duits dans contexte classique) où sont extraites les corrélations.
+Chaque n-uplet c = (d1; : : : ; dn) peut s’écrire sous la forme d’un triplet c = (r; a; t) où r; a et
+t sont les restrictions de c sur respectivementDR; DA etDT .
+Définition 1 (Bloc) Etant donnée une baseDB, l’ensemble des n-uplets qui ont la même res-
+triction r sur DR constitue un bloc.
+Chaque bloc B est identifié par un n-uplet r. Nous notons BDB;DR , l’ensemble des blocs
+constituant la baseDB.
+2Dans un contexte classique, ces données sont des singletons.
+- 160 -
+Plantevit et al.
+D B Pl P
+1 1 Allemagne Bière
+1 1 Allemagne Cacahuètes
+2 1 Allemagne Aspirine
+3 1 Allemagne Chocolat
+4 1 Allemagne Smecta
+FIG. 4 – bloc (1)
+D B Pl P
+1 2 France Coca
+2 2 France Vin
+2 2 France Cacahuètes
+3 2 France Aspirine
+FIG. 5 – bloc (2)
+D B Pl P
+1 3 UK Whisky
+1 3 UK Cacahuètes
+2 3 UK Aspirine
+FIG. 6 – bloc (3)
+D B Pl P
+1 4 LA Chocolat
+2 4 LA Smecta
+3 4 NY Whisky
+4 4 NY Coca
+FIG. 7 – bloc (4)
+FIG. 8 – Partition deDB (figure 1) en fonction deDR = fBg
+Cette définition des blocs est nécessaire pour définir le support d’une séquencemultidimen-
+sionnelle. Son application dans notre base exemple est simple puisque jDRj = 1, les différents
+blocs obtenus sont décrits fig 8.
+Taxonomies
+Dans le contexte dans lequel nous nous situons, nous considérons qu’il existe des relations
+hiérarchiques sur chaque dimension d’analyse3. Nous considérons que ces relations hiérar-
+chiques sont matérialisées sous la forme de taxonomie. Une taxonomie est un arbre orienté
+dans lequel les arcs sont des relations de type is-a. La relation de généralisation/spécialisation
+s’effectue ainsi de la racine vers les feuilles. Chaque dimension d’analyse possède donc une
+taxonomie qui permet de représenter les relations hiérarchiques entre les éléments de son do-
+maine.
+Soit TDA = fT1; : : : ; Tmg l’ensemble des taxonomies associées aux dimensions d’analyse
+où :
+– Ti est la taxonomie représentant les relations hiérarchiques entre les éléments de la di-
+mension d’analyseDi.
+– Ti est un arbre orienté.
+– 8 nœud ni 2 Ti; label(ni) 2 Dom(Di).
+On note x^ un ancêtre de x dans la taxonomie et x un de ses descendants. Par exemple,
+boisson = [soda signifie que boisson est un ancêtre de soda dans la relation Généralisa-
+tion/Spécialisation. Plus précisement, boisson est une instance plus générale que soda.
+3Dans le pire des cas la hiérarchie minimale se représente par un arbre de profondeur 1 où la racine est etiquetée
+par * (gestion des valeurs jokers dansM2SP ).
+- 161 -
+Hiérarchies & motifs séquentiels multidimensionnels
+Hiérarchies et Données
+Chaque dimension d’analyseDi d’une transaction b deDB ne peut être instanciée qu’avec
+une valeur di dont le nœud associé à l’étiquette di dans la taxonomie Ti est une feuille. Plus
+formellement, 8di 2 Di(B); 8 nœud ni tq label(ni) = di@nœud n0 tq n0 = ni (ni feuille).
+Par exemple, la base de transactionsDB ne peut pas contenir la valeurBoisson s’il existe
+des instances plus spécifiques dans la taxonomie comme soda.
+Item, Itemset, Séquence multidimensionnels h-généralisés
+Dans cette section, nous définissons les concepts fondamentaux d’items, d’itemsets et de
+séquences multidimensionnels h-généralisés.
+Définition 2 (Item multidimensionnel h-généralisé)
+Un item multidimensionnel h-généralisé e = (d1; : : : ; dm) est un m-uplet défini sur les dimen-
+sions d’analyseDA telles que di 2 flabel(Ti)g.
+Contrairement aux transactions deDB, un item multidimensionnel h-généralisé peut être
+défini avec n’importe quelle valeur di dont le nœud associé dans la taxonomie n’est pas néces-
+sairement une feuille.
+Exemple 1 (boisson; USA); (soda; F rance) sont des items multidimensionnels h-généralisés.
+Comme les items multidimensionnels h-généralisés sont instanciés sur différents niveaux
+de hiérarchies, il est possible que deux items soient comparables, c’est-à-dire qu’un item soit
+plus spécifique ou général qu’un autre.
+Par abus de langage et afin de ne pas alourdir les notations, nous utilisons directement la
+notion d’ancêtre sur l’item et la transaction sans nous situer dans la taxonomie correspondante.
+Définition 3 (Inclusion hiérarchique d’items)
+Soient deux items multidimensionnels h-généralisés e = (d1; : : : ; dm) et e0 = (d01; : : : ; d0m),
+on dit que :
+– e est plus général que e0 (e >h e0) si 8di; di = d^0i ou di = d0i
+– e est plus spécifique que e0 (e <h e0) si 8di; di = d0i ou di = d0i
+– e et e0 sont incomparables s’il n’existe pas de relation entre eux (e h e0 et e0 h e)
+Exemple 2 (relations hiérarchiques entre items multidimensionnels h-généralisés)
+– (USA; boisson) >h (USA; soda).
+– (France; vin) <h (UE;Alcool).
+– (France; vin) et (USA; soda) sont incomparables.
+Définition 4 Une transaction b supporte un item e si DA(b) <h e.
+Exemple 3 La transaction (1; 1; F rance; vin) supporte l’item (UE; alcool).
+Définition 5 (Itemset multidimensionnel h-généralisé)
+Un itemset multidimensionnel h-généralisé i = fe1; : : : ; ekg est un ensemble non vide d’items
+multidimensionnels h-généralisés où tous les items sont incomparables entre eux.
+- 162 -
+Plantevit et al.
+Deux items comparables ne peuvent pas être présents dans le même itemset. Nous adoptons
+un point de vue ensembliste et préférons ainsi représenter l’information la plus précise possible
+au sein d’un itemset.
+Exemple 4 f(France; vin); (USA; soda)g est un itemset multidimensionnel h-généralisé
+alors que f(France; vin); (UE;Alcool)g n’est pas un itemset multidimensionnel h-généralisé
+car (France; vin) <h (UE;Alcool).
+La notion de séquence multidimensionnelle h-généralisée découle de la notion d’itemset.
+Définition 6 (Séquence multidimensionnelle h-généralisée) Une séquence multidimension-
+nelle h-généralisée s = hi1; : : : ; iji est une liste ordonnée non vide d’itemsets multidimen-
+sionnels h-généralisés.
+Exemple 5 hf(France; vin); (USA; soda)g; f(Allemagne; biere)gi est une séquence mul-
+tidimensionnelle h-généralisée.
+Définition 7 (Inclusion de séquences) Une séquence multidimensionnelle h-généralisée & =
+ha1; : : : ; ali est une sous-séquence de la séquence & 0 = hb1; : : : ; bl0i s’il existe des entiers
+1  j1  j2  : : :  jl  l0 tel que a1  bj1 ; a2  bj2 ; : : : ; al  bjl .
+Remarque 1 L’inclusion des itemsets multidimensionnels doit respecter l’inclusion hiérar-
+chique des items multidimensionnels h-généralisés.
+Exemple 6
+– La séquence hf(France; vin)g; f(Allemagne; biere)gi est une sous-séquence de la sé-
+quence hf(France; vin); (USA; soda)g; f(Allemagne; biere)gi.
+– La séquence hf(France; vin)g; f(Allemagne; biere)gi est une sous-séquence de la sé-
+quence hf(France;Alcool); (USA; boisson)g; f(UE;Alcool)gi.
+– La séquence hf(UE; vin)g; f(Allemagne; biere)gi n’est pas une sous-séquence de la
+séquence hf(France; vin); (USA; soda)g; f(Allemagne; biere)gi car (UE; vin) h
+(France; vin), l’inclusion hiérarchique n’étant pas respectée.
+Support
+Calculer le support d’une séquence multidimensionnelle h-généralisée revient à compter
+le nombre de blocs définis par les dimensions de référence DR qui supportent la séquence.
+Un bloc supporte une séquence multidimensionnelle h-généralisée s’il est possible de trouver
+un ensemble de n-uplets qui la satisfasse. Pour chaque itemset de la séquence, nous devons
+exhiber une date du domaine de Dt telle que tous les items multidimensionnels h-généralisés
+de l’itemset sont supportés par des n-uplets relatifs à cette date. Tous les itemsets doivent
+être retrouvés à différentes dates appartenant au domaine de Dt tels que l’ordre des itemsets
+respecte la séquentialité.
+Définition 8 Un bloc supporte une séquence hi1; : : : ; ili si 8j = 1 : : : l; 9dj 2 Dom(Dt);
+pour chaque item e de ij ; 9t = (r; e; dj) ou t = (r; e; dj) 2 T avec d1 < d2 < : : : < dl.
+- 163 -
+Hiérarchies & motifs séquentiels multidimensionnels
+Définition 9 (Support d’une séquence) Soient DR l’ensemble des dimensions de référence
+et DB l’ensemble des transactions partitionné en un ensemble de blocs BT;DR : Le support
+d’une séquence & est : support(&) = jfB2BDB;DR t:q: B supporte &gjjBDB;DR j
+Exemple 7 Par rapport à notre base de données exemple DB, considérons DR = fBidg,
+DA = fLieu; Produitg et DT = fDateg, support = 2, et & = hf(UE;Alcool); (UE; caca
+-huetes)g f(UE; aspirine)gi. Pour que la séquence soit fréquente, au moins deux blocs de
+la partition deDB doivent supporter la séquence.
+1. bloc (1) (Fig. 4). Si l’on se réfère au taxonomies relatives aux dimensions d’analyse (LA-
+BEL), Allemagne est une instance plus spécifique de UE et bière est un alcool. Ainsi à la date
+1, nous avons bien le premier itemset f(UE;Alcool); (UE; cacahuetes)g de & . A une date
+postérieure (2), le dernier itemset f(UE; aspirine)g est présent. La séquence & est supportée
+par ce bloc.
+2. bloc (2) (Fig. 5). France est une instance de UE et vin est une instance d’alcool. Nous
+retrouvons bien la séquence & dans ce bloc
+3. bloc (3) (Fig. 6). UK est une instance de UE et whisky est une instance d’alcool. Ce bloc
+supporte la séquence & .
+4. bloc (4) (Fig. 7). Ce bloc ne supporte pas la séquence & puisque la dimension Lieu ne
+contient aucune instance de UE.
+Le support de & est donc égal à 3. La séquence est fréquente.
+3.2 HYPE : Les algorithmes
+Fonctionnement général
+Avant de présenter les algorithmes permettant l’extraction de motifs séquentiels multidi-
+mensionnels h-généralisés, nous détaillons brièvement le fonctionnement de notre approche.
+Le processus d’extraction de motifs séquentiels multidimensionnels h-généralisés se divise
+en deux phases. Dans un premier temps, les items multidimensionnels h-généralisés maxi-
+malement spécifiques sont extraits. Nous pensons que les items maximalement spécifiques
+sont une alternative à la surabondance de connaissances extraites. En effet, ils permettent de
+factoriser les connaissances, les connaissances plus générales pouvant être inférées en post
+traitement par l’utilisateur. Ensuite, la deuxième étape vise à extraire les séquences multidi-
+mensionnelles h-généralisées fréquentes. Ces séquences sont générées à partir de l’ensemble
+des items maximalement spécifiques.
+Néanmoins, le fait d’utiliser des items maximalement spécifiques pour générer les sé-
+quences fréquentes ne nous permet pas d’extraire toutes les connaissances présentes dans la
+base. En effet, des séquences dont les premiers items ne sont pas maximalement spécifiques
+ne pourront pas être extraites. Les séquences plus longues ne sont donc pas extraites (les blocs
+supportent plus rapidement des connaissances plus générales). Toutefois, cette carence est re-
+lative car ces séquences non extraites représentent souvent des connaissances trop générales
+qui n’apportent aucun intérêt à l’utilisateur.
+Il n’est pas forcément nécessaire d’effectuer une phase de prétraitement afin d’élaguer les
+taxonomies. En effet, cette opération peut être facilement effectuée lors de l’extraction des
+items multidimensionnels h-généralisés fréquents.
+- 164 -
+Plantevit et al.
+Génération des items fréquents
+Les items multidimensionnels h-généralisés fréquents sont la base de l’extraction demotifs
+séquentiels multidimensionnels h-généralisés. Ils représentent les fréquents de taille 1 puis-
+qu’ils correspondent à des séquences composées d’un seul item contenu dans un seul itemset.
+L’extraction d’items multidimensionnels h-généralisés en une seule passe sur la base n’est pas
+concevable dans un souci de passage à l’echelle. En effet, considérer le produit cartésien des
+domaines de chaque dimension d’analyse n’est pas envisageable dans des applications où le
+nombre de dimensions et leurs domaines peuvent être très grands. Si le nombre de dimensions
+d’analyse estm, alors le nombre d’items générés  est exponentiel par rapport àm :
+2m   
+mX
+i=1
+m
+i
+
+ik ou k = max jDom(Di)j
+Nous conviendrons donc qu’avec une telle approche, le passage à l’echelle peut être mis en
+doute.
+Il est donc nécessaire de définir une méthode qui limite à la fois le nombre d’items candi-
+dats générés et le nombre de passes sur la base. Afin de limiter le nombre d’items candidats
+aux seuls items dont la probabilité d’être fréquents est non nulle, nous adoptons une méthode
+de génération par niveau.
+Tout d’abord, nous considérons les items multidimensionnels h-généralisés pour lesquels
+une seule dimension d’analyse est spécifiée4, les autres dimensions n’étant pas spécifiées. Les
+items multidimensionnels fréquents sont alors joints entre eux pour obtenir l’ensemble des
+items candidats pour lesquels deux dimensions d’analyse sont spécifiées. Seuls les fréquents
+sont retenus. Cette procédure est réitéréem fois jusqu’à l’obtention des items multidimension-
+nels h-généralisés (toutes lesm dimensions d’analyse sont instanciées). Parmi ces items, seuls
+les plus spécifiques seront retenus.
+L’opération de jointure entre deux items fréquents suppose que les items soienton-compati-
+bles, c’est-à-dire qu’ils partagent un nombre suffisant de valeurs de dimensions d’analyse (voir
+définition 10). Pour être on-compatibles, deux items multidimensionnels définis sur n dimen-
+sions doivent partager n  2 valeurs de dimension. Par exemple, (a; ; c) et (; b; c) sont deux
+items définis sur 3 dimensions d’analyse et partagent 3   2 = 1 valeur sur la dimension C.
+Ils sont donc on-compatibles. En revanche, les items (a1; b1; ) et (a2; b2; ) ne sont pas on-
+compatibles.
+Définition 10 (on-Compatibilité) Soient deux items multidimensionnels e1 = (d1;    ; dn) et
+e2 = (d
+0
+1
+;    ; d0n) où di et d0i 2 dom(Di) [ fg. On dit que e1 et e2 sont on-compatibles si
+– e1 et e2 sont distincts
+– 9 = fDi1 ; : : : ; Din 2g  fD1; : : : ; Dng t.q. di1 = d0i1 6=  et di2 = d
+0
+i2
+6=  . . . et
+din 2 = d
+0
+in 2
+6= 
+– Pour fDin 1 ; Ding = fD1; : : : ; Dngn, on a din 1 =  et d0in 1 6=  et din 6=  et
+d0in = 
+4Par définition, un item multidimensionnel h-généralisé est instancié sur la totalité de ses dimensions. Par abus de
+langage, nous utiliserons aussi item pour les n-uplets fréquents qui seront instanciés niveau par niveau afin d’obtenir
+des items multidimensionnels h-généralisés conformément à la définition.
+- 165 -
+Hiérarchies & motifs séquentiels multidimensionnels
+L’opération de jointure mise en œuvre pour générer les items multidimensionnels h-
+généralisés potentiellement fréquents se définit de la façon suivante :
+Définition 11 (Jointure) Soient 2 items multidimensionnelson-compatibles e1 = (d1;    ; dn)
+et e2 = (d01;    ; d
+0
+n). On définit e1 on e2 = (v1;    ; vn) avec :
+– vi = di si di = d0i
+– vi = di si d0i = 
+– vi = d
+0
+i si di = 
+La génération des items multidimensionnels s’effectue donc à l’aide d’un treillis. Néan-
+moins le nombre de candidats générés reste important, on peut imaginer utiliser la recherche
+d’items multidimensionnels dérivables pour limiter le calcul du support à un nombre réduit
+d’items (recherche équivalente à la recherche d’itemsets dérivables).
+Génération des séquence fréquentes
+Les items multidimensionnels h-généralisés sont donc des séquencesmultidimensionnelles h-
+généralisées de taille 1. Ils sont donc des 1-fréquents.
+Pour extraire les séquences fréquentes, nous adoptons la philosophie Générer/Elaguer. En
+effet, nous conservons la propriété d’antimonotonie du support dans le contexte multidimen-
+sionnel (Tout sous-ensemble d’un ensemble fréquent est fréquent, tout sur ensemble d’un
+ensemble non fréquent est non fréquent).
+Une fois les 1-fréquents extraits (items multidimensionnels h-généralisés les plus spéci-
+fiques), les k-candidats (k  2) sont générés et testés afin de savoir s’ils sont fréquents. Cette
+opération est itérée tant que des k-candidats fréquents sont extraits.
+Pour stocker les séquences candidates, nous utilisons une structure d’arbre préfixé (Mas-
+seglia et al. (1998)) afin d’éviter toute redondance.
+Calcul du support d’une séquence
+Les dimensions de référence permettent d’identifier tous les blocs de l’ensemble des don-
+nées susceptibles de supporter une séquence & . L’énumération de tous les blocs définis par
+les dimensions de référence DR est indispensable pour calculer le support d’une séquence et
+définir ainsi si la séquence est fréquente ou non.
+L’algorithme 1 vérifie pour chaque bloc de DB si la séquence est supportée ou non. Si la
+séquence est supportée, alors le support est incrémenté. L’algorithme retourne ensuite le ratio
+des blocs supportant & .
+L’algorithme 2 permet de vérifier si le bloc B supporte la séquence & . Pour cela, cet al-
+gorithme cherche à instancier la séquence itemset par itemset en conjuguant récursivité et
+ancrage. L’ancrage correspond à une n-uplet du blocB à partir duquel la séquence pourra être
+instanciée. Cet n-uplet correspond donc à une date à laquelle le premier item du premier item-
+set de la séquence est trouvé. À partir de cet n-uplet, seuls les n-uplets pertinents sont retenus,
+c’est-à-dire ceux qui partagent la même date. On ne retient donc que les n-uplets partageant la
+même date. Si le sous-bloc résultant de l’ancrage supporte l’itemset alors on appelle la fonc-
+tion sur les autres itemsets de & . Cet appel est effectué en réduisant l’espace de recherche aux
+seuls n-uplets dont la date est supérieure à la date de l’ancrage précédent, puisque l’on passe
+- 166 -
+Plantevit et al.
+à l’itemset suivant, donc à une date ultérieure. Si l’ancrage échoue, on continue la recherche
+du premier itemset en tentant d’autres ancrages. L’appel récursif s’arrête dès que la séquence
+placée en paramètre d’entrée est vide. Une telle propriété signifie en effet que tous les itemsets
+de la séquence ont été trouvés. On retourne donc la valeur vrai. La valeur faux est retournée
+si aucun ancrage n’a réussi et si tout le bloc a été parcouru sans succès.
+Complexité
+Afin de faciliter l’étude de complexité des algorithmes, nous posons les notations sui-
+vantes :
+– nB est le nombre de cellules du bloc B
+– m = jDAj est le nombre de dimensions des items multidimensionnels.
+– Pmax, la profondeur maximale des taxonomies.
+supportBloc (algorithme 2)
+– Le bloc B étant ordonné par rapport à la dimension Dt, l’opération d’ancrage est réa-
+lisable en O(log nC). En effet, il suffit de réaliser une recherche à l’aide d’un parcours
+dichotomique pour trouver tous les n-uplets respectant une certaine condition sur la date.
+– Vérifier si un n-uplet supporte un item est réalisable en O(Pmax m). Il suffit de com-
+parer lesm dimensions de l’item avec celles du n-uplet.
+– Dans le pire des cas, la complexité de l’algorithme est deO(nB Pmaxm lognB).
+compterSupport (algorithme 1)
+On appelle la fonction précedente pour tous les l blocs Bi de fBDB;DRg, l’ensemble des
+bloc deDB définis suivantDR. Soit nmax = maxnBi . La complexité dans le pire des cas est
+donc : O(l)O(nmax  Pmax m lognmax) = O(l  nmax  Pmax m log nmax)
+Fonction compterSupport Données : &;DB;DR
+Résultat : le support de la séquence &
+début
+Entier support   0;
+Booleen seqSupportee;
+BDB;DR    fbloc de DB identifies sur DRg;
+pour chaque B 2 BDB;DR faire
+seqSupportee   supportBloc(&; B) ;
+si seqSupportee alors
+support   support+ 1;
+retourner
+
+support
+jBDB;DR j
+
+fin
+Algorithme 1: Calcul du support d’une séquence (compterSupport)
+- 167 -
+Hiérarchies & motifs séquentiels multidimensionnels
+Fonction supportBloc
+Données : &; B
+Résultat : Booléen
+début
+*–initialisation–*
+booleen ItemSetTrouve   faux
+sequence   &
+itemset   sequence:first()
+item   itemset:first()
+*–condition d’arrêt de la recursivité –*
+si & = ; alors
+retourner (vrai)
+*–parcours du bloc –*
+tant que tuple   B:next 6= ; faire
+si supporte(tuple; item) alors
+itemSuivant   itemset:second()
+si itemSuivant = ; alors
+itemsetT rouve   vrai
+*–Recherche de tous les items de l’itemset–*
+sinon
+*– On ancre par rapport à l’item (date)–*
+B0    date=cell:date(B)
+tant que tuple0    B0:next() 6= ; ^ itemsetT rouve = faux faire
+si supporte(cell0; itemSuivant) alors
+itemSuivant   itemset:next()
+si itemSuivant = ; alors
+itemsetT rouve   vrai
+si itemsetT rouve = vrai alors
+*– recherche des autres itemsets–*
+retourner (supportBloc(sequence:tail(); date>tuple:date(B)))
+sinon
+itemset   sequence:first()
+*–réduction de l’espace de recherche–*
+C    date>cell:date(B)
+*– & non supportée –*
+retourner (faux)
+fin
+Algorithme 2: supportBloc : (Vérifie si une séquence est supportée par un bloc donné)
+- 168 -
+Plantevit et al.
+3.3 Pourquoi les hiérarchies permettent une gestion plus fine de la valeur
+joker
+La prise en compte des hiérarchies peut être vue comme un moyen plus fin de gérer les
+valeurs jokers. En effet, dans l’approche M2SP, la racine d’une taxonomie représente la valeur
+joker * sur la dimension associée. Ainsi, si aucune instanciation n’est possible, aucune étiquette
+feuille ne peut donc convenir, alors on passe directement à la racine de la taxonomie (figure 9).
+La prise en compte des hiérarchies, permet d’extraire des connaissances plus fines. En
+effet, les taxonomies proposent plusieurs alternatives par rapport à l’approcheM2SP quand on
+n’arrive pas à instancier une dimension. En effet, on ne passe pas directement de la feuille à la
+racine, on essaie d’instancier par l’ancêtre le plus spécifique de la feuille (figure 10).
+FIG. 9 – Gestion de la va-
+leur joker (*)
+FIG. 10 – Gestion des hié-
+rarchies
+Exemple 8 (Comparaison avec M2SP) Pour un support fixé à 2, la prise en compte des hié-
+rarchies permet d’extraire des connaissances qui ne peuvent pas être extraite parMSP .
+M2SP
+– (; Chocolat), (; Cacahuetes), (; Smecta), (; Coca), (; Aspirine), (;Whisky)
+– hf(; Chocolat)gf(; Smecta)gi, hf(; Cacahuetes)gf(; Aspirine)gi
+Prise en compte des hiérarchies
+– (Lieu; Chocolat),(UE;Cacahuetes), (Lieu; Smecta), (Lieu; Coca), (UE;Aspirine),
+(Lieu;Whisky), (UE;Alcool),
+– hf(Lieu; chocolat)gf(Lieu; Smecta)gi
+hf(UE;Cacahuetes)gf(UE;Aspirine)gi
+hf(UE;Alcool)gf(UE;Aspirine)gi
+– hf(UE;Alcool); (UE;Cacahuetes)gf(UE;Aspirine)gi
+Le prise en compte des hiérarchies permet ainsi d’extraire des séquences plus complètes
+que l’approche M2SP.
+- 169 -
+Hiérarchies & motifs séquentiels multidimensionnels
+4 Expérimentations
+Des expérimentations ont été effectuées sur des données synthétiques. La base de données
+générée est composée de 5000 n-uplets. Les tests sont effectués sur 5 dimensions d’analyse.
+Ces premières expérimentations comparent les résultats obtenus en terme de nombre de fré-
+quents extraits en fonction de la profondeur des taxonomies (degré de spécialisation) et du
+seuil de support considéré. Nous établissons une comparaison avec M2SP(-) afin d’étudier la
+qualité des connaissances extraites.
+0
+200
+400
+600
+800
+1000
+2 3 4 5 6 7
+SE
+QU
+EN
+CE
+S
+DEPTH
+M2SP-alpha
+HYPE
+FIG. 11 – Nombre de séquences fré-
+quentes par rapport à la profondeur de
+la taxonomie (minsup=0:3, nb_dim=5,
+deg = 3)
+0
+50
+100
+150
+200
+250
+300
+2 2.5 3 3.5 4 4.5 5
+SE
+QU
+EN
+CE
+S
+DEPTH
+M2SP-alpha
+HYPE
+FIG. 12 – Nombre de séquences fré-
+quentes par rapport à la profondeur de
+la taxonomie (minsup=0:4, nb_dim=5,
+deg = 4)
+0
+500
+1000
+1500
+2000
+2500
+3000
+0.20.30.40.50.60.70.80.91
+SE
+QU
+EN
+CE
+S
+SUPPORT
+M2SP-alpha
+HYPE
+FIG. 13 – Nombre de séquences fré-
+quentes par rapport au support (
+nb_dim=5, deg = 3, données denses)
+0
+200
+400
+600
+800
+1000
+0.20.30.40.50.60.70.80.91
+SE
+QU
+EN
+CE
+S
+SUPPORT
+M2SP-alpha
+HYPE
+FIG. 14 – Nombre de séquences fré-
+quentes par rapport au support (
+nb_dim=5, deg = 4, profondeur = 4)
+Les figures 11 et 12 montrent le nombre de fréquents extraits en fonction de la profon-
+deur des taxonomies pour un seuil de support fixé. Etendre la taxonomie d’un niveau engendre
+une spécialisation supplémentaire des données (Boisson devient Bois:Alcoolise ou Coca).
+Ainsi, quand les données se spécialisent, l’approche M2SP extrait moins de fréquents jusqu’à
+ne plus en extraire à partir d’un certain niveau de spécialisation. La prise en compte des hié-
+- 170 -
+Plantevit et al.
+rarchies apporte une certaine robustesse face à ce phénomène de spécialisation. En effet des
+connaissances sont extraites sur plusieurs niveaux de hiérarchies.
+La figure 13 montre le nombre de fréquents extraits en fonction du support dans une base
+de données denses (faible cardinalité des dimensions d’analyse). Quand le support devient trop
+faible, la méthode M2SP extrait trop de fréquents. En effet beaucoup d’items ont une seule
+dimension instanciée (différente de *), et ainsi cette méthode supporte rapidemment des 2-
+séquences trop générales. La prise en compte des hiérarchies introduit une forte capacité de
+subsomption qui permet de ne pas extraire un trop grand nombre de séquences inutiles.
+Par contre quand les données sont moins denses, figure 14 (plus grande cardinalité des
+dimensions d’analyse dûe à une spécilisation plus importante des transactions), le nombre de
+fréquents extraits est similaire aux nombres de fréquents extraits dans des données plus denses
+alors que l’approche M2SP extrait très peu de fréquents. Ceci souligne bien la robustesse de
+notre approche face à la qualité des données (denses, spécialisées).
+5 Conclusion et perspectives
+Dans cet article, nous définissons les motifs séquentiels multidimensionnels h-généralisés.
+Nous intégrons la prise en compte des hiérarchies à l’aide de taxonomies présentes sur chaque
+dimension d’analyse. Ceci permet la construction de séquences multidimensionnelles , de
+la forme hf(UE;Alcool); (UE; cacahuetes)gf(UE; aspirine)gi, définies sur différents ni-
+veaux de hiérarchies indiquant que les personnes ayant acheté dans l’union européenne des ca-
+cahuètes et des boissons alcoolisées en même temps achètent ensuite dans l’union européenne
+de l’aspirine.
+Nous définissons les différents concepts (item, itemset, motifs séquentiels multidimension-
+nels h-généralisés) et les algorithmes permettant la mise en œuvre de notre approche sont pré-
+sentés et validés par des expérimentations effectuées sur des jeux de données synthétiques.
+Ces expérimentations montrent l’intérêt de HYPE, en particulier sa capacité à subsumer les
+connaissances ainsi que sa robustesse lors de l’extraction de connaissances devant la diver-
+sité des données (densité, spécialisation, ...). Notre approche peut s’appliquer dans le contexte
+OLAP en représentant un excellent outil pour le décideur.
+Ce travail offre de nombreuses perspectives. L’efficacité de l’extraction peut être amélio-
+rée en s’appuyant sur des représentations condensées des connaissances extraites (clos, libres).
+L’utilisation de formes condensées peut permettre des élagages supplémentaire et ainsi amélio-
+rer la robustesse de l’extraction. D’autres propositions peuvent être effectuées pour la gestion
+des hiérarchies. Nous pouvons imaginer une gestion modulaire des hiérarchies où certaines
+dimensions n’auraient pas le même comportement que les autres afin s’adapter aux besoins de
+l’utilisateur (interdiction de dépasser le niveau de hiérarchie  sur la dimension , : : : ). La
+gestion des hiérarchies peut nous amener à définir une nouvelle méthode automatisée d’aide à
+la navigation dans les cubes de données.
+Références
+Agrawal, R. et R. Srikant (1995). Mining sequential patterns. In P. S. Yu et A. L. P. Chen
+(Eds.), Proceedings of the Eleventh International Conference on Data Engineering, March
+- 171 -
+Hiérarchies & motifs séquentiels multidimensionnels
+6-10, 1995, Taipei, Taiwan, pp. 3–14. IEEE Computer Society.
+de Amo, S., D. A. Furtado, A. Giacometti, et D. Laurent (2004). An apriori-based approach
+for first-order temporal pattern mining. In XIX Simpósio Brasileiro de Bancos de Dados,
+18-20 de Outubro, 2004,Brasília, Distrito Federal, Brasil, Anais/Proceedings, pp. 48–62.
+Han, J. (1997). Olap mining : Integration of olap with data mining. In S. Spaccapietra et
+F. J. Maryanski (Eds.), Data Mining and Reverse Engineering : Searching for Semantics,
+IFIP TC2/WG2.6 Seventh Conference on Database Semantics (DS-7), October 7-10, 1997,
+Leysin, Switzerland, Volume 124 of IFIP Conference Proceedings, pp. 3–20. Chapman &
+Hall.
+Lee, C.-H. (2005). An entropy-based approach for generating multi-dimensional sequential
+patterns. In A. Jorge, L. Torgo, P. Brazdil, R. Camacho, et J. Gama (Eds.), Knowledge
+Discovery in Databases : PKDD 2005, 9th EuropeanConference on Principles and Practice
+of Knowledge Discovery in Databases, Porto, Portugal, October 3-7, 2005, Proceedings,
+Volume 3721 of Lecture Notes in Computer Science, pp. 585–592. Springer.
+Masseglia, F. (2002). Algorithmes et applications pour l’extraction de motifs séquentiels dans
+le domaine de la fouille de données : de l’incrémental au temps réel. Thèse de doctorat,
+Université de Versailles.
+Masseglia, F., F. Cathala, et P. Poncelet (1998). The psp approach for mining sequential pat-
+terns. In J.M. Zytkow etM. Quafafou (Eds.),Principles of DataMining andKnowledgeDis-
+covery, Second European Symposium, PKDD ’98, Nantes, France, September 23-26, 1998,
+Proceedings, Volume 1510 of Lecture Notes in Computer Science, pp. 176–184. Springer.
+Masseglia, F., M. Teisseire, et P. Poncelet (2004). Recherche des motifs séquentiels. Revue
+Ingénierie des Systèmes d’Information (ISI), numéro spécial “Extraction de motifs dans les
+bases de données” 9(3-4), pp. 183–210.
+Pei, J., J. Han, B. Mortazavi-Asl, J. Wang, H. Pinto, Q. Chen, U. Dayal, et M.-C. Hsu (2004).
+Mining sequential patterns by pattern-growth : The prefixspan approach. IEEE Transactions
+on Knowledge and Data Engineering 16(10).
+Pinto, H., J. Han, J. Pei, K. Wang, Q. Chen, et U. Dayal (2001). Multi-dimensional sequential
+pattern mining. In Proceedings of the 2001 ACM CIKM International Conference on In-
+formation and Knowledge Management, Atlanta, Georgia, USA, November 5-10, 2001, pp.
+81–88. ACM.
+Plantevit, M., Y. W. Choong, A. Laurent, D. Laurent, et M. Teisseire (2005). M2sp : Mining
+sequential patterns among several dimensions. In A. Jorge, L. Torgo, P. Brazdil, R. Cama-
+cho, et J. Gama (Eds.), Knowledge Discovery in Databases : PKDD 2005, 9th European
+Conference on Principles and Practice of Knowledge Discovery in Databases, Porto, Portu-
+gal, October 3-7, 2005, Proceedings, Volume 3721 of Lecture Notes in Computer Science.
+Springer.
+Srikant, R. et R. Agrawal (1996). Mining sequential patterns : Generalizations and perfor-
+mance improvements. In Advances in Database Technology - EDBT’96, 5th International
+Conference on Extending Database Technology, Avignon, France, March 25-29, 1996, Pro-
+ceedings, pp. 3–17.
+Yu, C.-C. et Y.-L. Chen (2005). Mining sequential patterns from multidimensional sequence
+data. IEEE Transactions on Knowledge and Data Engineering 17(1), pp. 136–140.
+- 172 -
+Plantevit et al.
+Summary
+Data warehouses contain large volume of historized data stored at the end of analysis.
+Despite the evolution of OLAP analysis tools and methods, it is too difficult to provide data
+mining tools taking into account the specificities of these contexts (e.g. multidimensionnality,
+hierarchies, data historized). In this article, we propose an original method of extraction of
+sequential patterns taking into account the hierarchies. This method extracts frommore precise
+knowledge and extends our preceding approach M2SP. We define the concepts related to our
+problems as well as the associated algorithms. The experiments which we carried out show the
+interest of our proposal.
+- 173 -
+- 174 -
