@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 #/bin/bash
 
+#location of the input folders
+dir=$1
 #parameters
-num_topics=10
+num_topics=$2
 
 #globals
-dates_EN=`ls input_en/ | cut -f 1-1 -d \. | sort | uniq`
-INPUT='input_en'
+INPUT=$dir'input_en'
+OUTPUT=$dir'output-en-'
 first=1
 LANG=EN
 prev=""
+dates_EN=`ls $INPUT | cut -f 1-1 -d \. | sort | uniq`
 for date in $dates_EN
 do
     echo "processing datetime = $date (previous datetime = $prev)"
@@ -17,23 +20,23 @@ do
     then
         #run the first one without online
         out_dir=`echo $date | cut -f 2-2 -d-`
-        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -o output-EN-$out_dir -k $num_topics --language $LANG
+        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -o $OUTPUT$out_dir -k $num_topics --language $LANG
         prev=$out_dir
     else
-        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -m output-EN-$prev/model.dat -o output-EN-$date --language $LANG
+        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -m $OUTPUT$prev/model.dat -o $OUTPUT$date --language $LANG
         prev=$date
     fi
-    
     first=0
 done
 
 
 #globals
-dates_FR=`ls input_fr/ | cut -f 1-1 -d \. | sort | uniq`
-INPUT='input_fr'
+INPUT=$dir'input_fr'
+OUTPUT=$dir'output-fr-'
 first=1
 LANG=FR
 prev=""
+dates_FR=`ls $INPUT | cut -f 1-1 -d \. | sort | uniq`
 for date in $dates_FR
 do
     echo "processing datetime = $date (previous datetime = $prev)"
@@ -41,12 +44,11 @@ do
     then
         #run the first one without online
         out_dir=`echo $date | cut -f 2-2 -d-`
-        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -o output-FR-$out_dir -k $num_topics --language $LANG
+        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -o $OUTPUT$out_dir -k $num_topics --language $LANG
         prev=$out_dir
     else
-        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -m output-FR-$prev/model.dat -o output-FR-$date --language $LANG
+        time python lda.py -f $INPUT/$date.text -t $INPUT/$date.time -m $OUTPUT$prev/model.dat -o $OUTPUT$date --language $LANG
         prev=$date
     fi
-
     first=0
 done
