@@ -85,8 +85,9 @@ def main():
     # pdf2txt("../input/pdfs/1page")
     # pdf2txt("../input/pdfs/full")
     # add_index_column(df)
-    df = add_lang_column(df)
+    # df = add_lang_column(df)
     # do_OCR(df, "../input/pdfs/full", 3000)
     # do_OCR(df, "../input/pdfs/1page", 1000)
+    pass
 if __name__ == "__main__":
     main()
