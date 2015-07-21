@@ -6,6 +6,7 @@ from langdetect import detect
 import networkx as nx
 import codecs
 import pickle
+import os
 
 def load(file_path, year_a=2004, year_b=2014, enforce_language=None):
     input_file = codecs.open(file_path, 'r', encoding='utf-8')
@@ -21,8 +22,30 @@ def load(file_path, year_a=2004, year_b=2014, enforce_language=None):
             if enforce_language is None or language == enforce_language:
                 for i in range(0, len(authors)):
                     authors[i] = authors[i].strip()
-                article_list.append({'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4], 'language': language})
+                article_list.append({'id': article[9].strip(), 'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4], 'language': language})
     return article_list
+
+def language_precision(corpus):
+    total = 0.
+    test_articles = 0.
+    language_matches = 0.
+    miss_matches = []
+    for article in corpus:
+        total += 1
+        language = article.get('language')
+        article_id = str(article.get('id'))
+        file_path = 'input/pdfs/1page/'+article_id+'.txt'
+        if os.path.isfile(file_path):
+            test_articles += 1
+            text_file = codecs.open(file_path, 'r', encoding='utf-8')
+            first_page = text_file.read()
+            french_keyword = 'Résumé.'
+            english_keyword = 'Abstract.'
+            if (french_keyword.decode('utf-8') in first_page and language == 'fr' and english_keyword not in first_page) or (english_keyword.decode('utf-8') in first_page and language == 'en' and french_keyword not in first_page):
+                language_matches += 1
+            else:
+                miss_matches.append(article_id)
+    return [test_articles, language_matches, total, miss_matches]
 
 def serialize(corpus, file_path):
     pickle.dump(corpus, open(file_path, 'wb'))
