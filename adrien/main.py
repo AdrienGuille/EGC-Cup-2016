@@ -11,7 +11,7 @@ import miscellaneous as misc
 
 update_data = False
 text_analytics = True
-graph_analytics = True
+graph_analytics = False
 
 if update_data:
     # Load data from the text file and serialize various corpora w.r.t language and year
@@ -48,10 +48,12 @@ if text_analytics:
     num_topics = 8
     for i in range(2004, 2016):
         print i
-        lda_topics = text_mining.train_lda(corpus.title_list(french_article_dict.get(str(i))), num_topics)
+        current_corpus = french_article_dict.get(str(i))
+        print 'Language detection precision:', corpus.language_precision(current_corpus)
+        lda_topics = text_mining.train_lda(corpus.title_list(current_corpus), num_topics)
         print 'LDA'
         text_mining.print_topics(lda_topics)
-        lsi_topics = text_mining.perform_lsi(corpus.title_list(french_article_dict.get(str(i))), num_topics)
+        lsi_topics = text_mining.perform_lsi(corpus.title_list(current_corpus), num_topics)
         print 'LSI'
         text_mining.print_topics(lsi_topics)
         print ''
