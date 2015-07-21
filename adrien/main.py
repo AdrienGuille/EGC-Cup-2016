@@ -9,7 +9,7 @@ import plotting
 import drawing
 import miscellaneous as misc
 
-update_data = False
+update_data = True
 text_analytics = True
 graph_analytics = False
 
@@ -44,6 +44,8 @@ for i in range(2004, 2016):
     english_article_dict[str(i)] = corpus.deserialize('output/corpora/english_articles_'+str(i)+'.pickle')
 
 if text_analytics:
+    corpus.pretty_print(french_articles)
+    corpus.pretty_print(english_articles)
     # Extract latent topics using LDA and LSI
     num_topics = 8
     for i in range(2004, 2016):
