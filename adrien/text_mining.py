@@ -8,11 +8,10 @@ from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 from collections import defaultdict
 
-
-def train_lda(abstracts, num_topics=10, stemming=False):
+def compute_vector_space(abstracts, stemming=False):
     stop_word_list = stopwords.words('french')
     stop_word_list.extend(stopwords.words('english'))
-    stop_word_list.extend([',', '.', '\'', '"', '(', ')', '-', ').'])
+    stop_word_list.extend([',', '.', '\'', '"', '(', ')', '-', ').', ':'])
     snowball_stemmer = SnowballStemmer('french')
     if stemming:
         formatted_abstracts = [[snowball_stemmer.stem(word) for word in wordpunct_tokenize(abstract.lower()) if word not in stop_word_list] for abstract in abstracts]
@@ -27,6 +26,19 @@ def train_lda(abstracts, num_topics=10, stemming=False):
     formatted_corpus = [dictionary.doc2bow(formatted_abstract) for formatted_abstract in formatted_abstracts]
     tfidf = models.TfidfModel(formatted_corpus)
     corpus_tfidf = tfidf[formatted_corpus]
+    return [corpus_tfidf, dictionary]
+
+def perform_lsi(abstracts, num_topics=10, stemming=False):
+    vector_space_model = compute_vector_space(abstracts=abstracts, stemming=stemming)
+    corpus_tfidf = vector_space_model[0]
+    dictionary = vector_space_model[1]
+    lsi = models.LsiModel(corpus=corpus_tfidf, id2word=dictionary, num_topics=num_topics)
+    return lsi.show_topics(num_topics=num_topics, num_words=10, formatted=False)
+
+def train_lda(abstracts, num_topics=10, stemming=False):
+    vector_space_model = compute_vector_space(abstracts=abstracts, stemming=stemming)
+    corpus_tfidf = vector_space_model[0]
+    dictionary = vector_space_model[1]
     lda = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, iterations=10000, num_topics=num_topics)
     return lda.show_topics(num_topics=num_topics, num_words=10, formatted=False)
 

@@ -9,19 +9,19 @@ import pickle
 
 
 def load(file_path, year_a=2004, year_b=2014, enforce_language=None):
-    input_file = codecs.open(file_path, 'r', encoding='latin-1')
+    input_file = codecs.open(file_path, 'r', encoding='utf-8')
     count = 0
     article_list = []
     for line in input_file:
         article = line.split('\t')
-        if len(article) == 8 and article[1] == 'EGC' and int(article[2]) in range(year_a, year_b):
-            authors = article[5].split(',')
-            language = detect(article[3])
+        if len(article) == 10 and 'EGC' in article[2] and int(article[3]) in range(year_a, year_b):
+            authors = article[6].split(',')
+            language = detect(article[4])
             if enforce_language is None or language == enforce_language:
                 count += 1
                 for i in range(0, len(authors)):
                     authors[i] = authors[i].strip()
-                article_list.append({'title': article[3], 'year': article[2], 'authors': authors, 'abstract': article[4], 'language': language})
+                article_list.append({'title': article[4], 'year': article[3], 'authors': authors, 'abstract': article[5], 'language': language})
     return article_list
 
 def serialize(corpus, file_path):
@@ -48,6 +48,10 @@ def author_set(corpus):
         for author in article.get('authors'):
             authors.add(author)
     return authors
+
+def pretty_print(corpus):
+    print len(corpus), 'articles'
+    print len(author_set(corpus)), 'authors'
 
 def collaboration_graph(corpus, name=''):
     graph = nx.Graph(name=name)
