@@ -11,7 +11,7 @@ import miscellaneous
 
 update_data = False
 text_analytics = True
-graph_analytics = False
+graph_analytics = True
 
 if update_data:
     # Load data from the text file and serialize various corpora w.r.t language and year
@@ -91,7 +91,7 @@ if graph_analytics:
             plotting.scatter_plot(data_x=year,
                                   data_y=authors,
                                   plot_name='Number of distinct authors vs. time '+mode,
-                                  file_path='output/plots/number_authors_vs_time.png'+mode+'.png')
+                                  file_path='output/plots/number_authors_vs_time'+mode+'.png')
             plotting.scatter_plot(data_x=year,
                                   data_y=average_clustering,
                                   plot_name='Clustering coefficient vs. time '+mode,
@@ -99,11 +99,11 @@ if graph_analytics:
             plotting.scatter_plot(data_x=year,
                                   data_y=density,
                                   plot_name='Density vs. time '+mode,
-                                  file_path='output/plots/density_vs_time.png'+mode+'.png')
+                                  file_path='output/plots/density_vs_time'+mode+'.png')
             plotting.scatter_plot(data_x=year,
                                   data_y=connected_components,
                                   plot_name='Number of connected components vs. time '+mode,
-                                  file_path='output/plots/connected_components_vs_time.png'+mode+'.png')
+                                  file_path='output/plots/connected_components_vs_time'+mode+'.png')
             if mode == '':
                 mode = '(cumulative)'
             else:
