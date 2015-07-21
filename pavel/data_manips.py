@@ -80,12 +80,12 @@ def do_OCR(df, path_txt_files, min_size):
 
 
 def main():
-    df = load_data("../input/RNTI_articles_export_fixed1347_ids.txt")
+    df = load_data("../input/RNTI_articles_export_original2.txt")
     # download_pdfs(df)
     # pdf2txt("../input/pdfs/1page")
     # pdf2txt("../input/pdfs/full")
     # add_index_column(df)
-    # df = add_lang_column(df)
+    df = add_lang_column(df)
     # do_OCR(df, "../input/pdfs/full", 3000)
     # do_OCR(df, "../input/pdfs/1page", 1000)
     pass
