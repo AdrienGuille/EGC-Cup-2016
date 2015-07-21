@@ -7,7 +7,7 @@ import graph_mining
 import text_mining
 import plotting
 import drawing
-import miscellaneous
+import miscellaneous as misc
 
 update_data = False
 text_analytics = True
@@ -84,9 +84,9 @@ if graph_analytics:
                 average_clustering.append(graph_mining.average_clustering_coefficient(graph))
                 connected_components.append(len(graph_mining.connected_components(graph)))
                 page_rank = graph_mining.page_rank(graph)
-                print page_rank[:10]
+                print 'Top 10 collaborative people (Page Rank)', misc.to_simple_ranking(page_rank[:10])
                 k_core = graph_mining.k_core_decomposition(graph)
-                print k_core[:10]
+                print 'Top 10 collaborative people (K-core)', misc.to_simple_ranking(k_core[:10])
                 print ''
             plotting.scatter_plot(data_x=year,
                                   data_y=authors,

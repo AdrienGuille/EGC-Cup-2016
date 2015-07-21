@@ -46,6 +46,7 @@ def print_basic_properties(graph):
     print 'Number of edges:', nx.number_of_edges(graph)
     print 'Average degree:', 2*nx.number_of_edges(graph)/nx.number_of_nodes(graph)
     print 'Max degree:', sorted(nx.degree(graph).values(), reverse=True)[0]
+    print 'Density:', nx.density(graph)
     print 'Number of connected components:', len(connected_components(graph))
 
 def degree_analysis(graph, plot=False):
