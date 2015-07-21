@@ -23,20 +23,6 @@ def connected_components(graph):
 
 def patterns(graph):
     graphs = connected_components(graph)
-    all_isomorphic_graphs = []
-    # for i in range(0, len(graphs)):
-    #     isomorphic_graphs = []
-    #     for j in range(0, len(graphs)):
-    #         if nx.number_of_nodes(graphs[i]) == nx.number_of_nodes(graphs[j]) and nx.is_isomorphic(graphs[i], graphs[j]):
-    #             isomorphic_graphs.append(1)
-    #         else:
-    #             isomorphic_graphs.append(0)
-    #     all_isomorphic_graphs.append(isomorphic_graphs)
-    #     print isomorphic_graphs
-    #
-    # for i in all_isomorphic_graphs:
-    #     for j in i:
-    #         drawing.draw_graph(graphs[j])
     pattern_dict = {}
     pattern_count = {}
     for i in range(0, len(graphs)):
@@ -55,20 +41,23 @@ def patterns(graph):
     print pattern_dict
 
 def print_basic_properties(graph):
-    print nx.number_of_nodes(graph), 'distinct authors'
-    print nx.number_of_edges(graph), 'distinct collaborations'
-    print 2*nx.number_of_edges(graph)/nx.number_of_nodes(graph), 'average degree'
-    print len(connected_components(graph)), 'connected components'
+    print 'Name:', graph.name
+    print 'Order:', nx.number_of_nodes(graph)
+    print 'Number of edges:', nx.number_of_edges(graph)
+    print 'Average degree:', 2*nx.number_of_edges(graph)/nx.number_of_nodes(graph)
+    print 'Max degree:', sorted(nx.degree(graph).values(), reverse=True)[0]
+    print 'Number of connected components:', len(connected_components(graph))
 
-def degree_analysis(graph):
+def degree_analysis(graph, plot=False):
     degree_sequence = sorted(nx.degree(graph).values(), reverse=True)
-    plotting.scatter_plot(data_y=degree_sequence,
-                          plot_name='Degree distribution ('+graph.name+')',
-                          file_path='output/plots/degree_distribution('+graph.name+').png',
-                          ymax=100,
-                          xmax=1000,
-                          loglog=True)
-    return [degree_sequence, nx.density(graph)]
+    if plot:
+        plotting.scatter_plot(data_y=degree_sequence,
+                              plot_name='Degree distribution ('+graph.name+')',
+                              file_path='output/plots/degree_distribution('+graph.name+').png',
+                              ymax=100,
+                              xmax=1000,
+                              loglog=True)
+    return nx.density(graph)
 
 def average_clustering_coefficient(graph):
     return nx.average_clustering(graph)
