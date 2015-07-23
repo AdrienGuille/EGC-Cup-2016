@@ -81,7 +81,7 @@ def add_lang_column(df):
     return df
 
 
-def do_OCR(df, path_txt_files, min_size):
+def do_OCR(df, path_txt_files, min_size, list_files=None):
     """
 
     :param df: I need the complete df to get the language cause the program that does the OCR needs the supposed language
@@ -94,9 +94,13 @@ def do_OCR(df, path_txt_files, min_size):
     import os
     from subprocess import call
 
-    text_files = get_files(path_txt_files, "txt")
+    if list_files:
+        text_files = list_files
+    else:
+        text_files = get_files(path_txt_files, "txt")
+
     for f in text_files:
-        if os.path.getsize(f) < min_size:
+        if os.path.getsize(f) < min_size or list_files:
             lang = df.loc[df["id"] == int(os.path.basename(f)[:-4])]["lang"].tolist()[0]
             call("convert -density 300 {0}[0] -depth 8 -background white -alpha remove  {0}.tiff".format(
                 f.replace(".txt", ".pdf")), shell=True)
@@ -107,18 +111,59 @@ def do_OCR(df, path_txt_files, min_size):
 def download_EGC_papers(df):
     df = df[df["booktitle"] == "EGC"]
     logging.info("Number of EGC articles: {}".format(len(df)))
-    download_pdfs(df, what_to_download="all")
+    download_pdfs(df, what_to_download="1page")
+
+
+def detect_garbage_text(text_path):
+    import re
+
+    garbage_files = []
+    txt_files = get_files(text_path, "txt")
+    # txt_files = ["../input/pdfs/1page/1695.txt"]
+    for t in txt_files:
+        with open(t, "r") as f:
+            content = f.read().replace("\n", "")
+            words = re.findall("\w{2,}", content)
+            if len(words) < 10:
+                logging.info("Garbage text!! File {}".format(t))
+                logging.debug(content)
+                garbage_files.append(t)
+    return garbage_files
+
+
+
+    pass
+
+
+def get1page_pdfs(df):
+    # Get pdfs from the interwebz
+    # download_pdfs(df, what_to_download="1page")
+    # Convert pdfs to txt
+    # pdf2txt("../input/pdfs/1page")
+    # Do OCR to those pdfs that seem to be images. Do it with those text files smaller than 17bytes (
+    # do_OCR(df, "../input/pdfs/1page", 17)
+    # Detect those pdfs that have garbage text and try to obtain the text through OCR
+    gt = detect_garbage_text("../input/pdfs/1page")
+    if not gt:
+        logging.info("Good. No garbage files.")
+    # Do OCR on those detected as shitty text
+    else:
+        logging.info("Not good. We have garbage files.")
+        do_OCR(df, "", 0, list_files=gt)
+
 
 
 def main():
     df = load_data("../input/RNTI_articles_export_fixed1347_ids.txt")
     # download_pdfs(df)
+    get1page_pdfs(df)
+    # detect_garbage_text("../input/pdfs/1page")
     # pdf2txt("../input/pdfs/1page")
     # pdf2txt("../input/pdfs/full")
     # add_index_column(df)
     # df = add_lang_column(df)
     # do_OCR(df, "../input/pdfs/full", 3000)
-    do_OCR(df, "../input/pdfs/1page", 17)
+    # do_OCR(df, "../input/pdfs/1page", 17)
     # download_EGC_papers(df)
 
     pass
