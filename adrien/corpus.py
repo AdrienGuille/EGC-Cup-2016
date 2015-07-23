@@ -13,7 +13,7 @@ def load(file_path, year_a=2004, year_b=2014, enforce_language=None):
     article_list = []
     for line in input_file:
         article = line.split('\t')
-        if len(article) == 10 and 'EGC' in article[1] and int(article[2]) in range(year_a, year_b):
+        if len(article) == 10 and article[1] == 'EGC' and int(article[2]) in range(year_a, year_b):
             authors = article[5].split(',')
             if len(article[4]) > 10:
                 language = detect(article[4])
