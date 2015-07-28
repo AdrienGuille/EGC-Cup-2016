@@ -2,60 +2,36 @@
 __author__ = "Adrien Guille"
 __email__ = "adrien.guille@univ-lyon2.fr"
 
-import corpus
-import graph_mining
+from corpus import Corpus
+from graph_mining import GraphMining
 import text_mining
 import plotting
 import drawing
 import miscellaneous as misc
 
-update_data = True
 text_analytics = True
-graph_analytics = False
+graph_analytics = True
 
-if update_data:
-    # Load data from the text file and serialize various corpora w.r.t language and year
-    all_articles = corpus.load('input/RNTI_articles_export_fixed1347_ids.txt', 2004, 2016)
-    corpus.serialize(all_articles, 'output/corpora/all_articles.pickle')
-    french_articles = corpus.load('input/RNTI_articles_export_fixed1347_ids.txt', 2004, 2016, 'fr')
-    corpus.serialize(french_articles, 'output/corpora/all_french_articles.pickle')
-    english_articles = corpus.load('input/RNTI_articles_export_fixed1347_ids.txt', 2004, 2016, 'en')
-    corpus.serialize(english_articles, 'output/corpora/all_english_articles.pickle')
-    for i in range(2004, 2016):
-        french_article_corpus = corpus.load('input/RNTI_articles_export_fixed1347_ids.txt', i, i+1, 'fr')
-        corpus.serialize(french_article_corpus, 'output/corpora/french_articles_'+str(i)+'.pickle')
-        english_article_corpus = corpus.load('input/RNTI_articles_export_fixed1347_ids.txt', i, i+1, 'en')
-        corpus.serialize(english_article_corpus, 'output/corpora/english_articles_'+str(i)+'.pickle')
-        french_english_article_corpus = corpus.load('input/RNTI_articles_export_fixed1347_ids.txt', i, i+1)
-        corpus.serialize(french_english_article_corpus, 'output/corpora/all_articles_'+str(i)+'.pickle')
-
-# Deserialize corpora
-all_articles = corpus.deserialize('output/corpora/all_articles.pickle')
-french_articles = corpus.deserialize('output/corpora/all_french_articles.pickle')
-english_articles = corpus.deserialize('output/corpora/all_english_articles.pickle')
-article_dict = {}
-for i in range(2004, 2016):
-    article_dict[str(i)] = corpus.deserialize('output/corpora/all_articles_'+str(i)+'.pickle')
-french_article_dict = {}
-for i in range(2004, 2016):
-    french_article_dict[str(i)] = corpus.deserialize('output/corpora/french_articles_'+str(i)+'.pickle')
-english_article_dict = {}
-for i in range(2004, 2016):
-    english_article_dict[str(i)] = corpus.deserialize('output/corpora/english_articles_'+str(i)+'.pickle')
+# Update data and load the complete corpus
+corpus = Corpus(True)
 
 if text_analytics:
-    corpus.pretty_print(french_articles)
-    corpus.pretty_print(english_articles)
-    # Extract latent topics using LDA and LSI
+    print 'Complete corpus'
+    corpus.pretty_print()
+    # Extract latent topics
     num_topics = 8
     for i in range(2004, 2016):
-        print i
-        current_corpus = french_article_dict.get(str(i))
-        print 'Language detection precision:', corpus.language_precision(current_corpus)
-        lda_topics = text_mining.train_lda(corpus.title_list(current_corpus), num_topics)
+        # Load sub-corpus
+        current_corpus = Corpus(False, title_lang='fr', year_a=i, year_b=i+1)
+        print i, 'corpus'
+        current_corpus.pretty_print()
+        # Latent Dirichlet Allocation
+        titles = current_corpus.title_list()
+        lda_topics = text_mining.train_lda(titles, num_topics)
         print 'LDA'
         text_mining.print_topics(lda_topics)
-        lsi_topics = text_mining.perform_lsi(corpus.title_list(current_corpus), num_topics)
+        # Latent Semantic Analysis
+        lsi_topics = text_mining.perform_lsi(titles, num_topics)
         print 'LSI'
         text_mining.print_topics(lsi_topics)
         print ''
@@ -77,19 +53,19 @@ if graph_analytics:
                     if i == 2004:
                         graph = graphs[0]
                     else:
-                        graph = graph_mining.merge(graph, graphs[i-2004])
+                        graph = graph.merge(graphs[i-2004])
                 else:
-                    graph = corpus.collaboration_graph(article_dict.get(str(i)))
+                    current_corpus = Corpus(False, title_lang='fr', year_a=i, year_b=i+1)
+                    graph = GraphMining(current_corpus.collaboration_graph(str(i)+mode))
                     graphs.append(graph)
-                graph.name = str(i)+mode
-                graph_mining.print_basic_properties(graph)
+                graph.print_basic_properties()
                 authors.append(graph.number_of_nodes())
-                density.append(graph_mining.degree_analysis(graph, plot=True))
-                average_clustering.append(graph_mining.average_clustering_coefficient(graph))
-                connected_components.append(len(graph_mining.connected_components(graph)))
-                page_rank = graph_mining.page_rank(graph)
+                density.append(graph.degree_analysis(plot=True))
+                average_clustering.append(graph.average_clustering_coefficient())
+                connected_components.append(len(graph.connected_components()))
+                page_rank = graph.page_rank()
                 print 'Top 10 collaborative people (Page Rank)', misc.to_simple_ranking(page_rank[:10])
-                k_core = graph_mining.k_core_decomposition(graph)
+                k_core = graph.k_core_decomposition()
                 print 'Top 10 collaborative people (K-core)', misc.to_simple_ranking(k_core[:10])
                 print ''
             plotting.scatter_plot(data_x=year,
