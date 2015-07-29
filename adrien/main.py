@@ -9,8 +9,8 @@ import plotting
 import drawing
 import miscellaneous as misc
 
-text_analytics = True
-graph_analytics = True
+text_analytics = False
+graph_analytics = False
 
 # Update data and load the complete corpus
 corpus = Corpus(True)
@@ -53,7 +53,7 @@ if graph_analytics:
                     if i == 2004:
                         graph = graphs[0]
                     else:
-                        graph = graph.merge(graphs[i-2004])
+                        graph.merge(graphs[i-2004])
                 else:
                     current_corpus = Corpus(False, title_lang='fr', year_a=i, year_b=i+1)
                     graph = GraphMining(current_corpus.collaboration_graph(str(i)+mode))

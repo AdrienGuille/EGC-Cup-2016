@@ -5,10 +5,21 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 import networkx as nx
 import codecs
 import pickle
+import os
+import miscellaneous as misc
 
 
-def load(file_path):
-        input_file = codecs.open(file_path, 'r', encoding='utf-8')
+def extract_author_affiliation(author_name, text):
+    index_start = text.find(author_name)
+    if index_start > -1:
+        author_in_text = text[index_start: index_start+len(author_name)+6]
+        author_asterisk = author_in_text[len(author_name):]
+        references = set(misc.references(author_asterisk))
+        print author_name, references
+
+
+def load():
+        input_file = codecs.open('input/RNTI_articles_export_fixed1347_ids.txt', 'r', encoding='utf-8')
         article_dictionary = {}
         for line in input_file:
             line = line.replace('\n', '')
@@ -19,12 +30,21 @@ def load(file_path):
                 title = article[3]
                 abstract = article[4]
                 authors = article[5].split(',')
+                article_path = 'input/pdfs/1page/'+article_id+'.txt'
+                if os.path.isfile(article_path):
+                    article_input_file = codecs.open(article_path, 'r', encoding='utf-8')
+                    first_page = article_input_file.read()
+                else:
+                    first_page = ''
                 for i in range(0, len(authors)):
                     authors[i] = authors[i].strip()
+                    extract_author_affiliation(authors[i], first_page)
                 title_lang = article[9]
                 abstract_lang = article[10].replace('\n','')
-                article_dictionary[article_id] = {'year': int(year), 'title': title, 'abstract': abstract, 'authors': authors,
-                                                  'title_lang': title_lang, 'abstract_lang': abstract_lang}
+                article_dictionary[article_id] = {'year': int(year), 'title': title, 'abstract': abstract,
+                                                  'authors': authors,'title_lang': title_lang,
+                                                  'abstract_lang': abstract_lang,
+                                                  'first_page': first_page}
         return article_dictionary
 
 
@@ -32,7 +52,7 @@ class Corpus:
 
     def __init__(self, update_data=False, title_lang=None, abstract_lang=None, year_a=None, year_b=None):
         if update_data:
-            self.articles = load('input/RNTI_articles_export_fixed1347_ids.txt')
+            self.articles = load()
             pickle.dump(self.articles, open('output/corpus.pickle', 'wb'))
         else:
             self.articles = pickle.load(open('output/corpus.pickle', 'rb'))
@@ -62,7 +82,7 @@ class Corpus:
         authors = set()
         for article in self.articles.values():
             for author in article.get('authors'):
-                authors.add(author)
+                authors.add(unicode(author))
         return authors
 
     def pretty_print(self):
@@ -76,5 +96,5 @@ class Corpus:
             authors = article.get('authors')
             for i in range(0, len(authors)):
                 for j in range(i+1, len(authors)):
-                    graph.add_edge(authors[i], authors[j])
+                    graph.add_edge(unicode(authors[i]), unicode(authors[j]))
         return graph
