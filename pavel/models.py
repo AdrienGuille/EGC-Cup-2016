@@ -1,11 +1,11 @@
-from sklearn.cluster import KMeans
-from sklearn.pipeline import Pipeline
-
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
 
+from sklearn.cluster import KMeans
+from sklearn.pipeline import Pipeline
+
+
 from sklearn.feature_selection import SelectPercentile, chi2
-from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 1
