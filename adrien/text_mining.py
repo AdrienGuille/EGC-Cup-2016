@@ -29,6 +29,7 @@ def compute_vector_space(abstracts, stemming=False):
     corpus_tfidf = tfidf[formatted_corpus]
     return [corpus_tfidf, dictionary]
 
+
 def perform_lsi(abstracts, num_topics=10, stemming=False):
     vector_space_model = compute_vector_space(abstracts=abstracts, stemming=stemming)
     corpus_tfidf = vector_space_model[0]
@@ -36,12 +37,14 @@ def perform_lsi(abstracts, num_topics=10, stemming=False):
     lsi = models.LsiModel(corpus=corpus_tfidf, id2word=dictionary, num_topics=num_topics)
     return lsi.show_topics(num_topics=num_topics, num_words=10, formatted=False)
 
+
 def train_lda(abstracts, num_topics=10, stemming=False):
     vector_space_model = compute_vector_space(abstracts=abstracts, stemming=stemming)
     corpus_tfidf = vector_space_model[0]
     dictionary = vector_space_model[1]
     lda = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, iterations=10000, num_topics=num_topics)
     return lda.show_topics(num_topics=num_topics, num_words=10, formatted=False)
+
 
 def print_topics(topics):
     count = 0
