@@ -8,6 +8,7 @@ from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 from collections import defaultdict
 
+
 def compute_vector_space(abstracts, stemming=False):
     stop_word_list = stopwords.words('french')
     stop_word_list.extend(stopwords.words('english'))

@@ -1,10 +1,8 @@
 # Data
 
 ## Original data: 
-- RNTI_articles_export_fixed1347_ids.txt + language detection
-
-## Cleaned data:
-- TODO: typo correction, author affiliation extraction
+- Title, authors, year, abstract (might be missing) + title language + abstract language (might be missing)
+- Authors' affiliations
 
 # Graph mining
 
@@ -26,7 +24,7 @@ Using the collaboraiton graph (simple undirected graph)
 
 # Text mining
 
-Using either abstracts of titles
+Using either abstracts or titles
 
 ## Preprocessing
 - Stemming
