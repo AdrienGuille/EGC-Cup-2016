@@ -5,10 +5,11 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 import networkx as nx
 import codecs
 import pickle
+import os
 
 
-def load(file_path):
-        input_file = codecs.open(file_path, 'r', encoding='utf-8')
+def load():
+        input_file = codecs.open('input/RNTI_articles_export_fixed1347_ids.txt', 'r', encoding='utf-8')
         article_dictionary = {}
         for line in input_file:
             line = line.replace('\n', '')
@@ -23,8 +24,16 @@ def load(file_path):
                     authors[i] = authors[i].strip()
                 title_lang = article[9]
                 abstract_lang = article[10].replace('\n','')
-                article_dictionary[article_id] = {'year': int(year), 'title': title, 'abstract': abstract, 'authors': authors,
-                                                  'title_lang': title_lang, 'abstract_lang': abstract_lang}
+                article_path = 'input/pdfs/1page/'+article_id+'.txt'
+                if os.path.isfile(article_path):
+                    article_input_file = codecs.open(article_path, 'r', encoding='utf-8')
+                    first_page = article_input_file.read()
+                else:
+                    first_page = ''
+                article_dictionary[article_id] = {'year': int(year), 'title': title, 'abstract': abstract,
+                                                  'authors': authors,'title_lang': title_lang,
+                                                  'abstract_lang': abstract_lang,
+                                                  'first_page': first_page}
         return article_dictionary
 
 
@@ -32,7 +41,7 @@ class Corpus:
 
     def __init__(self, update_data=False, title_lang=None, abstract_lang=None, year_a=None, year_b=None):
         if update_data:
-            self.articles = load('input/RNTI_articles_export_fixed1347_ids.txt')
+            self.articles = load()
             pickle.dump(self.articles, open('output/corpus.pickle', 'wb'))
         else:
             self.articles = pickle.load(open('output/corpus.pickle', 'rb'))

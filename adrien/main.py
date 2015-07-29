@@ -10,7 +10,7 @@ import drawing
 import miscellaneous as misc
 
 text_analytics = False
-graph_analytics = True
+graph_analytics = False
 
 # Update data and load the complete corpus
 corpus = Corpus(True)
