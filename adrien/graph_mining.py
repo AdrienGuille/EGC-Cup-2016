@@ -14,12 +14,9 @@ class GraphMining:
         self.graph = source_graph
 
     def merge(self, graph2):
-        graph = nx.Graph(name=self.graph.name+'+'+graph2.graph.name)
-        graph.add_nodes_from(self.graph)
-        graph.add_nodes_from(graph2)
-        graph.add_edges_from(self.graph.edges())
-        graph.add_edges_from(graph2.edges())
-        return graph
+        self.graph.name = self.graph.name+'+'+graph2.graph.name
+        self.graph.add_nodes_from(graph2.graph)
+        self.graph.add_edges_from(graph2.graph.edges())
 
     def draw(self):
         nx.draw_graphviz(self.graph, name=self.graph.name)
