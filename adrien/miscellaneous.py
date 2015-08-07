@@ -6,14 +6,10 @@ import re
 
 
 def references(string):
-    string = string.replace(u'∗', u'*')
     m = re.findall('\*{1,5}[\s|,]+', string)
     for i in range(len(m)):
         m[i] = m[i].replace(' ', '').replace('\n', '').replace(',', '')
     return m
-
-def find_affiliation(reference, text):
-    print 'test'
 
 
 def to_simple_ranking(weighted_list):

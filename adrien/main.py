@@ -13,7 +13,8 @@ text_analytics = False
 graph_analytics = False
 
 # Update data and load the complete corpus
-corpus = Corpus(True)
+corpus = Corpus(False)
+corpus.print_article('18')
 
 if text_analytics:
     print 'Complete corpus'
