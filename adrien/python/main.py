@@ -15,13 +15,13 @@ graph_analytics = False
 
 lexicon = Lexicon(update_data=True)
 
-corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2016)
+corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2010)
 corpus.pretty_print()
 
 titles = corpus.lemmatized_title_list()
 lda_topics = text_mining.train_lda(titles, 15, stemming=False)
 text_mining.print_topics(lda_topics)
-text_mining.save_topics(lda_topics, '../../output/topic models/lda_fr_all.txt')
+text_mining.save_topics(lda_topics, '../../output/topic models/lda_fr_2004-2009.txt')
 
 if text_analytics:
     print 'Complete corpus'

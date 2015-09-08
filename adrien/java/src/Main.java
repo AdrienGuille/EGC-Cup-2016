@@ -12,6 +12,7 @@
 public class Main {
     
     public static void main(String[] args) throws Exception {
-        GraphVisualization graphViz = new GraphVisualization("/Users/adrien/GitHub/EGC-Cup-2016/output/topic models/lda_fr_all.txt");
+        GraphVisualization first6conferences = new GraphVisualization("/Users/adrien/GitHub/EGC-Cup-2016/output/topic models/lda_fr_2004-2009.txt");
+        GraphVisualization last6conferences = new GraphVisualization("/Users/adrien/GitHub/EGC-Cup-2016/output/topic models/lda_fr_2010-2015.txt");
     }
 }

@@ -1,10 +1,13 @@
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import static org.graphstream.algorithm.Toolkit.averageClusteringCoefficient;
+import static org.graphstream.algorithm.Toolkit.degreeDistribution;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.DefaultGraph;
@@ -52,7 +55,7 @@ public class GraphVisualization {
                 String word1 = words.get(j);
                 if(graph.getEdge(word0+"-"+word1)==null && graph.getEdge(word1+"-"+word0)==null){
                     graph.addEdge(word0+"-"+word1, word0, word1);
-                    Thread.sleep((long) (200));
+                    //Thread.sleep((long) (50));
                 }
             }
             org.graphstream.algorithm.BetweennessCentrality bcb = new org.graphstream.algorithm.BetweennessCentrality();
@@ -63,5 +66,9 @@ public class GraphVisualization {
                 node.setAttribute("ui.size", 10*Math.log(bc));
             }
         }
+        System.out.println("degree distribution: "+Arrays.toString(degreeDistribution(graph))); 
+        System.out.println("max degree: "+(degreeDistribution(graph).length-1));
+        System.out.println("order: "+graph.getNodeCount());
+        System.out.println("average clustering coefficient: "+averageClusteringCoefficient(graph));
     }
 }

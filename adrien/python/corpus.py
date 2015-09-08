@@ -28,6 +28,7 @@ def load(limit=None, lexicon=None):
                 title = article[3]
                 title = title.replace(u'non supervisé', u'nonsupervisé')
                 title = title.replace(u'non-supervisé', u'nonsupervisé')
+                title = title.replace(u'partir', u'')
                 abstract = article[4]
                 authors = article[5].split(',')
                 article_path = '../../input/pdfs/1page/'+article_id+'.txt'
