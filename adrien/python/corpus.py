@@ -25,11 +25,11 @@ def load(limit=None, lexicon=None):
             if len(article) == 11 and article[1] == 'EGC':
                 article_id = article[8]
                 year = article[2]
-                title = article[3]
+                title = article[3].lower()
                 title = title.replace(u'non supervisé', u'nonsupervisé')
                 title = title.replace(u'non-supervisé', u'nonsupervisé')
                 title = title.replace(u'partir', u'')
-                abstract = article[4]
+                abstract = article[4].lower()
                 authors = article[5].split(',')
                 article_path = '../../input/pdfs/1page/'+article_id+'.txt'
                 if os.path.isfile(article_path):
@@ -43,6 +43,7 @@ def load(limit=None, lexicon=None):
                 title_lang = article[9]
                 abstract_lang = article[10].replace('\n', '')
                 lemmatized_title = title
+                lemmatized_abstract = abstract
                 if lexicon:
                     lemmatized_title = ''
                     for word in wordpunct_tokenize(title.lower()):
@@ -51,10 +52,18 @@ def load(limit=None, lexicon=None):
                             if lemmatized_word is None or lemmatized_word == '=':
                                 lemmatized_word = word
                             lemmatized_title += lemmatized_word+' '
+                    lemmatized_abstract = ''
+                    for word in wordpunct_tokenize(abstract.lower()):
+                        if word not in stop_word_list:
+                            lemmatized_word = lexicon.get_lem(word)
+                            if lemmatized_word is None or lemmatized_word == '=':
+                                lemmatized_word = word
+                            lemmatized_abstract += lemmatized_word+' '
                 article_dictionary[article_id] = {'year': int(year),
                                                   'title': title,
                                                   'lemmatized_title': lemmatized_title,
                                                   'abstract': abstract,
+                                                  'lemmatized_abstract': lemmatized_abstract,
                                                   'authors': authors,
                                                   'authors_affiliation': authors_affiliations,
                                                   'title_lang': title_lang,
@@ -156,6 +165,15 @@ class Corpus:
         if article is not None:
             if lemmatized_title_only:
                 print article.get()
+
+    def get_frequency_in_abstracts(self, word):
+        frequency = 0
+        count = 0
+        for article in self.articles.values():
+            count += 1
+            if word in article.get('lemmatized_abstract'):
+                frequency += 1
+        return float(frequency)/float(count)
 
     def print_articles(self, article_ids):
         for article_id in article_ids:

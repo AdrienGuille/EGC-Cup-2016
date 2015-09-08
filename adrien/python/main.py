@@ -13,15 +13,24 @@ import miscellaneous as misc
 text_analytics = False
 graph_analytics = False
 
-lexicon = Lexicon(update_data=True)
+lexicon = Lexicon(update_data=False)
 
-corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2010)
+corpus = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2016)
 corpus.pretty_print()
 
-titles = corpus.lemmatized_title_list()
-lda_topics = text_mining.train_lda(titles, 15, stemming=False)
-text_mining.print_topics(lda_topics)
-text_mining.save_topics(lda_topics, '../../output/topic models/lda_fr_2004-2009.txt')
+keywords = [u'règle', u'cluster']
+frequency_matrix = [keywords]
+for i in range(2004, 2016):
+    sub_corpus = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=i, year_b=i+1)
+    line = []
+    for j in range(len(keywords)):
+        line.append(sub_corpus.get_frequency_in_abstracts(keywords[j]))
+    frequency_matrix.append(line)
+for row in frequency_matrix:
+    string_row = ''
+    for elem in row:
+        string_row += unicode(elem) + '\t'
+    print string_row
 
 if text_analytics:
     print 'Complete corpus'
