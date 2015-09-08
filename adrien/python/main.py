@@ -12,9 +12,11 @@ import miscellaneous as misc
 text_analytics = False
 graph_analytics = False
 
-# Update data and load the complete corpus
-corpus = Corpus(False)
-corpus.print_article('18')
+corpus = Corpus(update_data=False, title_lang='fr', year_a=2004, year_b=2016)
+corpus.pretty_print()
+titles = corpus.title_list()
+lda_topics = text_mining.train_lda(titles, 15, stemming=True)
+text_mining.print_topics(lda_topics)
 
 if text_analytics:
     print 'Complete corpus'

@@ -120,9 +120,9 @@ class Corpus:
     def __init__(self, update_data=False, title_lang=None, abstract_lang=None, year_a=None, year_b=None):
         if update_data:
             self.articles = load()
-            pickle.dump(self.articles, open('output/corpus.pickle', 'wb'))
+            pickle.dump(self.articles, open('../../output/corpus.pickle', 'wb'))
         else:
-            self.articles = pickle.load(open('output/corpus.pickle', 'rb'))
+            self.articles = pickle.load(open('../../output/corpus.pickle', 'rb'))
         ids = []
         for article_id, article in self.articles.iteritems():
             test_title_lang = title_lang is None or title_lang == article.get('title_lang')
@@ -157,8 +157,24 @@ class Corpus:
                 authors.add(unicode(author))
         return authors
 
+    def earliest_paper(self):
+        min_year = 3000
+        for article in self.articles.values():
+            year = int(article.get('year'))
+            if year < min_year:
+                min_year = year
+        return min_year
+
+    def latest_paper(self):
+        max_year = 0
+        for article in self.articles.values():
+            year = int(article.get('year'))
+            if year > max_year:
+                max_year = year
+        return max_year
+
     def pretty_print(self):
-        print len(self.articles), 'articles'
+        print len(self.articles), 'articles published between', self.earliest_paper(), 'and', self.latest_paper()
         print len(self.author_set()), 'authors'
 
     def collaboration_graph(self, name=''):
