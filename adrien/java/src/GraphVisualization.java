@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.graphstream.graph.Graph;
+import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.DefaultGraph;
 
 /**
@@ -23,7 +24,7 @@ public class GraphVisualization {
         String css = ""
             + "graph { fill-mode: plain; fill-color : #f4f4f4;}"
             + "edge  { fill-mode: plain; fill-color: rgba(0,0,0,85); size:0.25px; z-index: 1;}" 
-            + "node  { fill-mode: dyn-plain; fill-color: burlywood,cadetblue,chocolate,cornflowerblue,cornsilk,crimson,brown,aqua,aquamarine,black,blueviolet,chartreuse,dodgerblue,forestgreen,darkseagreen; size: 12px ;z-index : 2; stroke-mode: plain;}"
+            + "node  { fill-mode: dyn-plain; fill-color: burlywood,cadetblue,chocolate,cornflowerblue,cornsilk,crimson,brown,aqua,aquamarine,black,blueviolet,chartreuse,dodgerblue,forestgreen,darkseagreen; size-mode: dyn-size; size: 3px ;z-index : 2; stroke-mode: plain;}"
             + "node:clicked   { fill-color: black;}";
         graph.addAttribute("ui.stylesheet", css);
         List<String> lines = FileUtils.readLines(new File(source));
@@ -53,6 +54,13 @@ public class GraphVisualization {
                     graph.addEdge(word0+"-"+word1, word0, word1);
                     Thread.sleep((long) (200));
                 }
+            }
+            org.graphstream.algorithm.BetweennessCentrality bcb = new org.graphstream.algorithm.BetweennessCentrality();
+            bcb.init(graph);
+            bcb.compute();
+            for(Node node : graph){
+                double bc = node.getAttribute("Cb");
+                node.setAttribute("ui.size", 10*Math.log(bc));
             }
         }
     }
