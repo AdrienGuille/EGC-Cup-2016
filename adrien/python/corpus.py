@@ -8,6 +8,61 @@ import pickle
 import os
 import miscellaneous as misc
 import re
+from nltk import wordpunct_tokenize
+from nltk.corpus import stopwords
+
+
+def load(limit=None, lexicon=None):
+        input_file = codecs.open('../../input/RNTI_articles_export_fixed1347_ids.txt', 'r', encoding='utf-8')
+        article_dictionary = {}
+        count = 0
+        stop_word_list = stopwords.words('french')
+        stop_word_list.extend(stopwords.words('english'))
+        stop_word_list.extend([',', '.', '\'', '"', '(', ')', '-', ').', ':', 'approche', 'dans'])
+        for line in input_file:
+            line = line.replace('\n', '')
+            article = line.split('\t')
+            if len(article) == 11 and article[1] == 'EGC':
+                article_id = article[8]
+                year = article[2]
+                title = article[3]
+                title = title.replace(u'non supervisé', u'nonsupervisé')
+                title = title.replace(u'non-supervisé', u'nonsupervisé')
+                abstract = article[4]
+                authors = article[5].split(',')
+                article_path = '../../input/pdfs/1page/'+article_id+'.txt'
+                if os.path.isfile(article_path):
+                    article_input_file = codecs.open(article_path, 'r', encoding='utf-8')
+                    first_page = article_input_file.read()
+                else:
+                    first_page = ''
+                for i in range(0, len(authors)):
+                    authors[i] = authors[i].strip()
+                authors_affiliations = extract_authors_affiliations(authors, first_page)
+                title_lang = article[9]
+                abstract_lang = article[10].replace('\n', '')
+                lemmatized_title = title
+                if lexicon:
+                    lemmatized_title = ''
+                    for word in wordpunct_tokenize(title.lower()):
+                        if word not in stop_word_list:
+                            lemmatized_word = lexicon.get_lem(word)
+                            if lemmatized_word is None or lemmatized_word == '=':
+                                lemmatized_word = word
+                            lemmatized_title += lemmatized_word+' '
+                article_dictionary[article_id] = {'year': int(year),
+                                                  'title': title,
+                                                  'lemmatized_title': lemmatized_title,
+                                                  'abstract': abstract,
+                                                  'authors': authors,
+                                                  'authors_affiliation': authors_affiliations,
+                                                  'title_lang': title_lang,
+                                                  'abstract_lang': abstract_lang,
+                                                  'first_page': first_page}
+                count += 1
+                if limit is not None and count >= limit:
+                    break
+        return article_dictionary
 
 
 def extract_authors_affiliations(author_list, text):
@@ -77,49 +132,11 @@ def extract_author_affiliation(author_name, text):
         return [pos, references]
 
 
-def load(limit=None):
-        input_file = codecs.open('input/RNTI_articles_export_fixed1347_ids.txt', 'r', encoding='utf-8')
-        article_dictionary = {}
-        count = 0
-        for line in input_file:
-            line = line.replace('\n', '')
-            article = line.split('\t')
-            if len(article) == 11 and article[1] == 'EGC':
-                article_id = article[8]
-                year = article[2]
-                title = article[3]
-                abstract = article[4]
-                authors = article[5].split(',')
-                article_path = 'input/pdfs/1page/'+article_id+'.txt'
-                if os.path.isfile(article_path):
-                    article_input_file = codecs.open(article_path, 'r', encoding='utf-8')
-                    first_page = article_input_file.read()
-                else:
-                    first_page = ''
-                for i in range(0, len(authors)):
-                    authors[i] = authors[i].strip()
-                authors_affiliations = extract_authors_affiliations(authors, first_page)
-                title_lang = article[9]
-                abstract_lang = article[10].replace('\n', '')
-                article_dictionary[article_id] = {'year': int(year),
-                                                  'title': title,
-                                                  'abstract': abstract,
-                                                  'authors': authors,
-                                                  'authors_affiliation': authors_affiliations,
-                                                  'title_lang': title_lang,
-                                                  'abstract_lang': abstract_lang,
-                                                  'first_page': first_page}
-                count += 1
-                if limit is not None and count > limit:
-                    break
-        return article_dictionary
-
-
 class Corpus:
 
-    def __init__(self, update_data=False, title_lang=None, abstract_lang=None, year_a=None, year_b=None):
+    def __init__(self, limit=None, update_data=False, lexicon=None, title_lang=None, abstract_lang=None, year_a=None, year_b=None):
         if update_data:
-            self.articles = load()
+            self.articles = load(limit=limit, lexicon=lexicon)
             pickle.dump(self.articles, open('../../output/corpus.pickle', 'wb'))
         else:
             self.articles = pickle.load(open('../../output/corpus.pickle', 'rb'))
@@ -133,10 +150,15 @@ class Corpus:
         for article_id in ids:
             del self.articles[article_id]
 
-    def print_article(self, article_id):
+    def print_article(self, article_id, lemmatized_title_only=False):
         article = self.articles.get(article_id)
         if article is not None:
-            print article
+            if lemmatized_title_only:
+                print article.get()
+
+    def print_articles(self, article_ids):
+        for article_id in article_ids:
+            self.print_article(article_id)
 
     def title_list(self):
         titles = []
@@ -144,10 +166,23 @@ class Corpus:
             titles.append(article.get('title'))
         return titles
 
+    def lemmatized_title_list(self):
+        titles = []
+        for article in self.articles.values():
+            titles.append(article.get('lemmatized_title'))
+        return titles
+
+    def articles_authored_by(self, author_name):
+        article_ids = []
+        for article_id, article in self.articles.iteritems():
+            if author_name in article.get('authors'):
+                article_ids.append(article_id)
+        return article_ids
+
     def abstract_list(self):
         abstracts = []
         for article in self.articles.values():
-            abstracts.append(article.get('title'))
+            abstracts.append(article.get('abstract'))
         return abstracts
 
     def author_set(self):

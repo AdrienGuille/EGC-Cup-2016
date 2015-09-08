@@ -2,6 +2,7 @@
 __author__ = "Adrien Guille"
 __email__ = "adrien.guille@univ-lyon2.fr"
 
+from lexicon import Lexicon
 from corpus import Corpus
 from graph_mining import GraphMining
 import text_mining
@@ -12,11 +13,15 @@ import miscellaneous as misc
 text_analytics = False
 graph_analytics = False
 
-corpus = Corpus(update_data=False, title_lang='fr', year_a=2004, year_b=2016)
+lexicon = Lexicon(update_data=True)
+
+corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2016)
 corpus.pretty_print()
-titles = corpus.title_list()
-lda_topics = text_mining.train_lda(titles, 15, stemming=True)
+
+titles = corpus.lemmatized_title_list()
+lda_topics = text_mining.train_lda(titles, 15, stemming=False)
 text_mining.print_topics(lda_topics)
+text_mining.save_topics(lda_topics, '../../output/topic models/lda_fr_all.txt')
 
 if text_analytics:
     print 'Complete corpus'
