@@ -11,14 +11,29 @@ import re
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
 
+stop_word_list = stopwords.words('french')
+stop_word_list.extend(stopwords.words('english'))
+stop_word_list.extend([u',', u'.', u'\'', u'"', u'(', u')', u'-', u').', u':'])
+specific_stop_words = [u'cadrer',u'approcher',u'méthode']
+
+
+def lemmatize_text(text, lexicon):
+    lemmatized_text = ''
+    for word in wordpunct_tokenize(text.lower()):
+        if word not in stop_word_list:
+            lemmatized_word = lexicon.get_lem(word)
+            if lemmatized_word is None or lemmatized_word == '=':
+                lemmatized_word = word
+            if lemmatized_word not in specific_stop_words:
+                lemmatized_text += lemmatized_word+' '
+    lemmatized_text = lemmatized_text.replace(u'baser donnée', u'BDD')
+    return lemmatized_text
+
 
 def load(limit=None, lexicon=None):
         input_file = codecs.open('../../input/RNTI_articles_export_fixed1347_ids.txt', 'r', encoding='utf-8')
         article_dictionary = {}
         count = 0
-        stop_word_list = stopwords.words('french')
-        stop_word_list.extend(stopwords.words('english'))
-        stop_word_list.extend([u',', u'.', u'\'', u'"', u'(', u')', u'-', u').', u':'])
         for line in input_file:
             line = line.replace('\n', '')
             article = line.split('\t')
@@ -45,25 +60,8 @@ def load(limit=None, lexicon=None):
                 lemmatized_title = title
                 lemmatized_abstract = abstract
                 if lexicon:
-                    specific_stop_words = [u'cadrer',u'approcher',u'méthode']
-                    lemmatized_title = ''
-                    for word in wordpunct_tokenize(title.lower()):
-                        if word not in stop_word_list:
-                            lemmatized_word = lexicon.get_lem(word)
-                            if lemmatized_word is None or lemmatized_word == '=':
-                                lemmatized_word = word
-                            if lemmatized_word not in specific_stop_words:
-                                lemmatized_title += lemmatized_word+' '
-                    lemmatized_title = lemmatized_title.replace(u'baser donnée', u'BDD')
-                    lemmatized_abstract = ''
-                    for word in wordpunct_tokenize(abstract.lower()):
-                        if word not in stop_word_list:
-                            lemmatized_word = lexicon.get_lem(word)
-                            if lemmatized_word is None or lemmatized_word == '=':
-                                lemmatized_word = word
-                            if lemmatized_word not in specific_stop_words:
-                                lemmatized_abstract += lemmatized_word+' '
-                    lemmatized_abstract = lemmatized_abstract.replace(u'baser donnée', u'BDD')
+                    lemmatized_title = lemmatize_text(title, lexicon)
+                    lemmatized_abstract = lemmatize_text(abstract, lexicon)
                 article_dictionary[article_id] = {'year': int(year),
                                                   'title': title,
                                                   'lemmatized_title': lemmatized_title,

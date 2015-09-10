@@ -9,6 +9,7 @@ from collections import defaultdict
 import codecs
 import json
 import networkx as nx
+import math
 
 
 def compute_vector_space(documents, stemming=False, remove_singleton=True):
@@ -68,25 +69,28 @@ def construct_and_save_word_topic_graph(topics, file_path):
                 nodes_array.append(weighted_word[1])
     nx_graph.add_nodes_from(nodes_array)
     for topic in topics:
-        main_word = topic[0][1]
-        main_word_id = nodes_array.index(main_word)
-        for i in range(1, len(topic)):
-            this_word_id = nodes_array.index(topic[i][1])
-            json_links.append({'source': main_word_id, 'target': this_word_id})
-            nx_graph.add_edge(unicode(main_word), unicode(topic[i][1]))
+        for j in range(0, len(topic)):
+            main_word = topic[j][1]
+            main_word_id = nodes_array.index(main_word)
+            for i in range(j, len(topic)):
+                this_word_id = nodes_array.index(topic[i][1])
+                json_links.append({'source': main_word_id, 'target': this_word_id})
+                nx_graph.add_edge(unicode(main_word), unicode(topic[i][1]))
     nodes_array = []
     group = 0
+    page_rank = nx.pagerank(nx_graph, alpha=0.85, max_iter=300)
+    print page_rank
     for topic in topics:
         for weighted_word in topic:
             if weighted_word[1] not in nodes_array:
                 nodes_array.append(weighted_word[1])
                 if word_is_unique(weighted_word[1], topics):
                     json_nodes.append({'name': weighted_word[1],
-                                       'weight': nx_graph.degree(weighted_word[1]),
+                                       'weight': page_rank.get(weighted_word[1])*10,
                                        'group': group})
                 else:
                     json_nodes.append({'name': weighted_word[1],
-                                       'weight': nx_graph.degree(weighted_word[1]),
+                                       'weight': page_rank.get(weighted_word[1])*10,
                                        'group': -1})
         group += 1
     json_graph['nodes'] = json_nodes
@@ -111,4 +115,4 @@ def word_is_unique(word, topics):
         for weighted_word in topic:
             if weighted_word[1] == word:
                 count += 1
-    return word == 1
+    return count == 1
