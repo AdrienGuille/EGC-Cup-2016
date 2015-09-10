@@ -1,3 +1,5 @@
+from networkx.algorithms.flow.mincost import min_cost_flow
+
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
 
@@ -94,7 +96,7 @@ def add_lang_column(df):
 
 def do_OCR(df, path_txt_files, min_size, list_files=None):
     """
-
+    NEEDS imagemagick and tesseract-ocr
     :param df: I need the complete df to get the language cause the program that does the OCR needs the supposed language
     of the image
     :param path_txt_files:
@@ -129,17 +131,20 @@ def download_EGC_papers(df):
     download_pdfs(df, what_to_download="1page")
 
 
-def detect_garbage_text(text_path):
+def detect_garbage_text(text_path, min_chars=2):
     import re
 
     garbage_files = []
     txt_files = get_files(text_path, "txt")
-    # txt_files = ["../input/pdfs/1page/1695.txt"]
+    # txt_files = ["../input/pdfs/1page/1630.txt"]
+    stop_words = set([l.strip("\n").decode("utf-8") for l in open("ngrams/stopwords.txt").readlines() if l])
     for t in txt_files:
         with open(t, "r") as f:
             content = f.read().replace("\n", "")
-            words = re.findall("\w{2,}", content)
-            if len(words) < 10:
+            search_re = "\w{{{min},}}".format(min=str(min_chars))
+            words = re.findall(search_re, content)
+            all_words = re.findall("\w+", content)
+            if len(words) < 10 or len(stop_words.intersection(all_words)) < 5:
                 logging.info("Garbage text!! File {}".format(t))
                 logging.debug(content)
                 garbage_files.append(t)
@@ -184,7 +189,7 @@ def get1page_pdfs(df):
     # do_OCR(df, "../input/pdfs/1page", 17)
 
     # Detect those pdfs that have garbage text and try to obtain the text through OCR
-    gt = detect_garbage_text("../input/pdfs/1page")
+    gt = detect_garbage_text("../input/pdfs/1page", 5)
     if not gt:
         logging.info("Good. No garbage files.")
 
@@ -196,14 +201,15 @@ def get1page_pdfs(df):
 
 def main():
     df = load_data("../input/RNTI_articles_export_fixed1347_ids.txt")
+
     # download_pdfs(df)
-    # get1page_pdfs(df)
+    get1page_pdfs(df)
     # detect_garbage_text("../input/pdfs/1page")
     # pdf2txt("../input/pdfs/1page")
     # pdf2txt("../input/pdfs/full")
     # add_index_column(df)
     # df = get_EGC_articles(df)
-    df = add_lang_column(df)
+    # df = add_lang_column(df)
     # do_OCR(df, "../input/pdfs/full", 3000)
     # do_OCR(df, "../input/pdfs/1page", 17)
     # download_EGC_papers(df)

@@ -4,7 +4,7 @@ Created on 27/03/2012
 Module: File input & output
 @author: Pavel
 '''
-
+from pavel.utils import get_files
 
 def sort_dict(dicto, decrease=True, by_key=True):
     """
@@ -42,7 +42,7 @@ def get_texts(path):
             filename = ntpath.basename(f)
             text, _ = import_text_lines(f, "utf8")
             text = text.replace('None', '')
-            dict_file_text[filename] = text.lower()
+            dict_file_text[filename] = text
         return dict_file_text
     else:
         # Path is a file
@@ -97,7 +97,7 @@ def import_text_lines(filename, encode=None):
     lines = text.readlines()
     items_lines = [line.strip(u'\xef\xbb\xbf\r\n').replace(u'\n', u" ") for line in lines]
     text.seek(0)
-    string = text.read()  # .strip('\xef\xbb\xbf\r\n').replace('\n', " ")
+    string = text.read()#.replace('\n', " ")
     # string = text.read()
     return string, items_lines
 

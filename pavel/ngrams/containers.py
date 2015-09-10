@@ -1,4 +1,4 @@
-# -*- coding: latin-1 -*-
+# -*- coding: utf-8 -*-
 '''
 Created on Feb 3, 2014
 
@@ -65,18 +65,30 @@ class Document(nltk.Text):
                     concordances_found += 1
                     concordance_tokens = [t for t in
                                           self._tokens[self.find_point(idx, "bwd"):self.find_point(idx)]]
-                    self.list_concordance.append([t.decode("latin-1") for t in concordance_tokens])
+                    self.list_concordance.append([t for t in concordance_tokens])
         return self.list_concordance
 
-    def preprocess(self, text=None, stem=False, stopwords=False):
+    def preprocess(self, text=None, stem=False, fix_pdf=True):
 
         if text is None:
             text = self.text
+
+        def fix_pdf2txt(texto):
+            import re
+            texto = re.sub(r'\n([^A-Z])', r' \1', texto)
+            texto = re.sub(r'([^\.])\n', r'\1.\n', texto)
+            return texto
 
         def tokenizer_fr(text):
             # Courtesy of http://www.fabienpoulard.info/post/2008/03/05/Tokenisation-en-mots-avec-NLTK
 
             return tok_fr.tokenize(text)
+
+        # Fix newline problems with pdf to txt step
+        if fix_pdf:
+            text = fix_pdf2txt(text)
+
+        text = text.lower()
 
         # Tokenization
         self._original_tokens = tokenizer_fr(text)
@@ -87,13 +99,13 @@ class Document(nltk.Text):
         if stem:
             from nltk.stem.snowball import FrenchStemmer
             fr_stemmer = FrenchStemmer()
-
             self._tokens = [fr_stemmer.stem(t) for t in self._tokens]
+
         self._concordance_index = nltk.ConcordanceIndex(self._tokens, key=lambda s: s)
 
-    def __init__(self, text=None, stem=False, stopwords=False, name=None):
-        self.text = text.encode("latin-1")
-        self.preprocess(self.text, stem=stem,
-                        stopwords=stopwords)  # en lieu de map(lambda t: t.preprocess(stem=True, stopwords=True), list_documents)
+    def __init__(self, text=None, stem=False, stopwords=False, name=None, encoding="utf-8"):
+        self.encoding = encoding
+        # self.text = text.encode(self.encoding)
+        self.text = text
+        self.preprocess(self.text, stem=stem)  # au lieu de map(lambda t: t.preprocess(stem=True, stopwords=True), list_documents)
         super(Document, self).__init__(self._tokens, name)
-        pass

@@ -101,7 +101,8 @@ class AnygramCollocationFinder(AbstractCollocationFinder):
         #             nfd['n' * i] = FreqDist()
 
         for ngram in ngrams(words, n, pad_right=True):
-            nfd['n'].inc(ngram[0])
+            # nfd['n'].inc(ngram[0])
+            nfd["n"][ngram[0]] += 1
             for idx in range(1, n):
                 if ngram[idx] is None:
                     continue
