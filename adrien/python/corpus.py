@@ -18,7 +18,7 @@ def load(limit=None, lexicon=None):
         count = 0
         stop_word_list = stopwords.words('french')
         stop_word_list.extend(stopwords.words('english'))
-        stop_word_list.extend([',', '.', '\'', '"', '(', ')', '-', ').', ':', 'approche', 'dans'])
+        stop_word_list.extend([u',', u'.', u'\'', u'"', u'(', u')', u'-', u').', u':'])
         for line in input_file:
             line = line.replace('\n', '')
             article = line.split('\t')
@@ -45,20 +45,25 @@ def load(limit=None, lexicon=None):
                 lemmatized_title = title
                 lemmatized_abstract = abstract
                 if lexicon:
+                    specific_stop_words = [u'cadrer',u'approcher',u'méthode']
                     lemmatized_title = ''
                     for word in wordpunct_tokenize(title.lower()):
                         if word not in stop_word_list:
                             lemmatized_word = lexicon.get_lem(word)
                             if lemmatized_word is None or lemmatized_word == '=':
                                 lemmatized_word = word
-                            lemmatized_title += lemmatized_word+' '
+                            if lemmatized_word not in specific_stop_words:
+                                lemmatized_title += lemmatized_word+' '
+                    lemmatized_title = lemmatized_title.replace(u'baser donnée', u'BDD')
                     lemmatized_abstract = ''
                     for word in wordpunct_tokenize(abstract.lower()):
                         if word not in stop_word_list:
                             lemmatized_word = lexicon.get_lem(word)
                             if lemmatized_word is None or lemmatized_word == '=':
                                 lemmatized_word = word
-                            lemmatized_abstract += lemmatized_word+' '
+                            if lemmatized_word not in specific_stop_words:
+                                lemmatized_abstract += lemmatized_word+' '
+                    lemmatized_abstract = lemmatized_abstract.replace(u'baser donnée', u'BDD')
                 article_dictionary[article_id] = {'year': int(year),
                                                   'title': title,
                                                   'lemmatized_title': lemmatized_title,
@@ -202,6 +207,12 @@ class Corpus:
         abstracts = []
         for article in self.articles.values():
             abstracts.append(article.get('abstract'))
+        return abstracts
+
+    def lemmatized_abstract_list(self):
+        abstracts = []
+        for article in self.articles.values():
+            abstracts.append(article.get('lemmatized_abstract'))
         return abstracts
 
     def author_set(self):

@@ -5,6 +5,7 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def scatter_plot(data_x=None, data_y=[], plot_name='', file_path='output/plots/default_plot.png', ymax=None, xmax=None, loglog=False, linear_regression=False):
     plt.clf()
     if ymax is not None:

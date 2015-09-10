@@ -15,9 +15,18 @@ graph_analytics = False
 
 lexicon = Lexicon(update_data=False)
 
-corpus = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2016)
+corpus = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2010, year_b=2016)
 corpus.pretty_print()
 
+titles = corpus.lemmatized_title_list()
+abstracts = corpus.lemmatized_abstract_list()
+lda_topics = text_mining.train_lda(documents=titles, num_topics=15, num_words=10, remove_singleton=False)
+print 'LDA'
+text_mining.print_topics(lda_topics)
+text_mining.construct_and_save_word_topic_graph(lda_topics, '../html/graph.json')
+
+
+"""
 keywords = [u'règle', u'cluster']
 frequency_matrix = [keywords]
 for i in range(2004, 2016):
@@ -31,6 +40,7 @@ for row in frequency_matrix:
     for elem in row:
         string_row += unicode(elem) + '\t'
     print string_row
+"""
 
 if text_analytics:
     print 'Complete corpus'
@@ -48,7 +58,7 @@ if text_analytics:
         print 'LDA'
         text_mining.print_topics(lda_topics)
         # Latent Semantic Analysis
-        lsi_topics = text_mining.perform_lsi(titles, num_topics)
+        lsi_topics = text_mining.perform_lsa(titles, num_topics)
         print 'LSI'
         text_mining.print_topics(lsi_topics)
         print ''
