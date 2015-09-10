@@ -7,7 +7,7 @@ import logging
 from sys import stdout
 
 import pandas as pd
-from utils import get_files, my_detect
+from utils import my_detect, get_texts
 
 # from langdetect.detector_factory import PROFILES_DIRECTORY
 # from langdetect import detect
@@ -15,7 +15,7 @@ from utils import get_files, my_detect
 logging.basicConfig(stream=stdout, level=logging.INFO)
 
 
-def load_data(data_path):
+def load_data_egc(data_path):
     egc_df = pd.read_csv(data_path, sep="\t", error_bad_lines=False, encoding="utf-8")
     return egc_df
 
@@ -23,7 +23,7 @@ def load_data(data_path):
 def pdf2txt(pdf_folder):
     from subprocess import call
 
-    pdf_files = get_files(pdf_folder, "pdf")
+    pdf_files = get_texts(pdf_folder, "pdf")
 
     for f in pdf_files:
         try:
@@ -110,7 +110,7 @@ def do_OCR(df, path_txt_files, min_size, list_files=None):
     if list_files:
         text_files = list_files
     else:
-        text_files = get_files(path_txt_files, "txt")
+        text_files = get_texts(path_txt_files, "txt")
 
     for f in text_files:
         if os.path.getsize(f) < min_size or list_files:
@@ -135,7 +135,7 @@ def detect_garbage_text(text_path, min_chars=2):
     import re
 
     garbage_files = []
-    txt_files = get_files(text_path, "txt")
+    txt_files = get_texts(text_path, "txt")
     # txt_files = ["../input/pdfs/1page/1630.txt"]
     stop_words = set([l.strip("\n").decode("utf-8") for l in open("ngrams/stopwords.txt").readlines() if l])
     for t in txt_files:
@@ -200,7 +200,7 @@ def get1page_pdfs(df):
 
 
 def main():
-    df = load_data("../input/RNTI_articles_export_fixed1347_ids.txt")
+    df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
 
     # download_pdfs(df)
     get1page_pdfs(df)

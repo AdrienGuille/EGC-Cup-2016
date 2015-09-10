@@ -4,7 +4,8 @@ Created on 27/03/2012
 Module: File input & output
 @author: Pavel
 '''
-from pavel.utils import get_files
+from pavel.utils import get_texts
+
 
 def sort_dict(dicto, decrease=True, by_key=True):
     """
@@ -28,7 +29,13 @@ def update_dict_values(orig_dict, new_dict):
     return orig_dict
 
 
-def get_texts(path):
+def load_stopword_list(path="stopwords.txt"):
+    _, stopwords_list = import_text_lines(path, encode="utf-8")
+    stopwords_list = [w.encode("utf-8") for w in stopwords_list]
+    return stopwords_list
+
+
+def load_data(path, extension="txt"):
     import os
     from collections import defaultdict
     import ntpath
@@ -37,7 +44,7 @@ def get_texts(path):
     if os.path.isdir(path):
 
         # It is a path, we load all text files in this folder
-        files_names = get_files(path, "txt")
+        files_names = get_texts(path, extension)
         for f in files_names:
             filename = ntpath.basename(f)
             text, _ = import_text_lines(f, "utf8")

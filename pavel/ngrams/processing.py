@@ -12,14 +12,14 @@ import nltk
 
 from nltk.text import TextCollection
 
-from configuration import config_path, config_stem, config_stopwords, config_bool_stopwords, config_top_k, \
+from configuration import config_path, config_stem, config_bool_stopwords, config_top_k, \
     config_min_tok_len, config_ngram, config_output, config_min_tok_freq
 from containers import Document
-from utils import import_text_lines, get_texts, \
-    update_dict_values
+from utils import import_text_lines, load_data, \
+    update_dict_values, load_stopword_list
 from n_association import AnygramAssocMeasures, AnygramCollocationFinder
 
-from pavel.data_manips import load_data, get_EGC_articles
+from pavel.data_manips import load_data_egc, get_EGC_articles
 
 
 
@@ -43,8 +43,7 @@ measure_dict = {
 }
 
 if config_bool_stopwords:
-    _, stopwords_list = import_text_lines(config_stopwords, encode="utf-8")
-    stopwords_list = [w.encode("utf-8") for w in stopwords_list]
+    stopwords_list = load_stopword_list()
 
 
 
@@ -180,13 +179,13 @@ def make_tables(scored_ngrams, results_folder="./", encoding="utf-8"):
 
 
 def main2():
-    df = load_data("../input/RNTI_articles_export_fixed1347_ids.txt")
+    df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
     df = get_EGC_articles(df)
 
 def main():
     # Get text from folder or file
     # TODO Change the folder corpus to the upper level!
-    texts = get_texts(config_path)
+    texts = load_data(config_path)
     if not texts:
         print "No texts found"
         return

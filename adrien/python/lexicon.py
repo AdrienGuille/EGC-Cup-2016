@@ -6,8 +6,8 @@ import pickle
 import codecs
 
 
-def load():
-    input_file = codecs.open('../../input/OLDlexique.txt', 'r', encoding='latin1')
+def load(lexicon_path='../../input/OLDlexique.txt'):
+    input_file = codecs.open(lexicon_path, 'r', encoding='latin1')
     table = {}
     count = 0
     for line in input_file:

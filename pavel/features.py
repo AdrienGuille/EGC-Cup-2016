@@ -1,4 +1,4 @@
-from models import build_unsup_base_model
+from clustering.models import build_unsup_base_model
 
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'

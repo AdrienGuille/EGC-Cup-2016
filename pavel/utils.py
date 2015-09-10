@@ -5,6 +5,15 @@ __mail__ = 'sorianopavel@gmail.com'
 
 factory = DetectorFactory()
 factory.load_profile(PROFILES_DIRECTORY)
+reg_words = r'''(?x)
+      \d+(\.\d+)?\s*%   # les pourcentages
+    | 's                # l'appartenance anglaise 's
+    | \w'               # les contractions d', l', j', t', s'
+    '''
+reg_words += u"| \w\u2019"  # version unicode
+reg_words += u"|\w+|[^\w\s]"  # avec les antislashs
+
+
 
 
 def my_detect(text):
@@ -16,7 +25,24 @@ def my_detect(text):
     return detector.detect()
 
 
-def get_files(folder_path, extension):
+def load_french_lexicon():
+    from adrien.python.lexicon import load
+    return load('../../input/OLDlexique.txt')
+
+
+fr_lexicon = load_french_lexicon()
+
+
+def french_tokenizer(text):
+    from nltk import RegexpTokenizer
+    tokenizer = RegexpTokenizer(r"(?u)\b\w\w+\b")
+    toks = tokenizer.tokenize(text)
+    # We also lemmatize!
+    # toks = [fr_lexicon.get(t, t) for t in toks]
+    return toks
+
+
+def get_texts(folder_path, extension):
     """
     Get the file names of all files inside 'folder_path'
     """
