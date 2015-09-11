@@ -74,7 +74,7 @@ def construct_and_save_word_topic_graph(topics, file_path):
             main_word_id = nodes_array.index(main_word)
             for i in range(j+1, len(topic)):
                 this_word_id = nodes_array.index(topic[i][1])
-                json_links.append({'source': main_word_id, 'target': this_word_id})
+                json_links.append({'source': main_word_id, 'target': this_word_id, 'value':int(len(topic)-i)})
                 nx_graph.add_edge(unicode(main_word), unicode(topic[i][1]))
     nodes_array = []
     group = 0

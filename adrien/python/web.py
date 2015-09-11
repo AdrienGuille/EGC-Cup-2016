@@ -18,7 +18,7 @@ corpus = None
 @app.route('/')
 def index():
     titles = corpus.lemmatized_title_list()
-    lda_topics = text_mining.train_lda(documents=titles, num_topics=15, num_words=10, remove_singleton=False)
+    lda_topics = text_mining.train_lda(documents=titles, num_topics=12, num_words=10, remove_singleton=False)
     text_mining.construct_and_save_word_topic_graph(lda_topics, 'static/graph.json')
     return render_template('index.html')
 
@@ -26,13 +26,20 @@ def index():
 @app.route('/', methods=['POST'])
 def index2():
     years = request.form['years']
-    print years
     year_array = years.split('_')
+    checked_source = request.form.getlist('source')
+    source = checked_source[0]
     global corpus
     print 'Loading new corpus: French article published between', int(year_array[0]), 'and', int(year_array[1]), '...'
-    corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=int(year_array[0]), year_b=int(year_array[1]))
-    titles = corpus.lemmatized_title_list()
-    lda_topics = text_mining.train_lda(documents=titles, num_topics=15, num_words=10, remove_singleton=False)
+    corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr',
+                    year_a=int(year_array[0]), year_b=int(year_array[1])+1)
+    if source == 'abstracts':
+        print 'Inferring topics from the abstracts with LDA'
+        documents = corpus.lemmatized_abstract_list()
+    elif source == 'titles':
+        print 'Inferring topics from the titles with LDA'
+        documents = corpus.lemmatized_title_list()
+    lda_topics = text_mining.train_lda(documents=documents, num_topics=12, num_words=10, remove_singleton=False)
     text_mining.construct_and_save_word_topic_graph(lda_topics, 'static/graph.json')
     return render_template('index.html', year1=int(year_array[0]), year2=int(year_array[1]))
 
