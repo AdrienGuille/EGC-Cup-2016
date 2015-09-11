@@ -50,4 +50,4 @@ if __name__ == '__main__':
     print 'Loading default corpus: French article published since EGC 2010 ...'
     corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2010, year_b=2016)
     print 'Starting Flask application...'
-    app.run(debug=True, host='localhost', port=8080)
+    app.run(debug=True, host='localhost', port=2016)
