@@ -6,6 +6,8 @@ from flask import Flask, render_template, request
 from lexicon import Lexicon
 from corpus import Corpus
 import text_mining
+import platform
+
 
 # Flask Web server
 app = Flask(__name__)
@@ -45,9 +47,13 @@ def index2():
 
 
 if __name__ == '__main__':
+    print platform.node()
     print 'Loading French lexicon for lemmatization...'
     lexicon = Lexicon(update_data=True)
     print 'Loading default corpus: French article published since EGC 2010 ...'
     corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2010, year_b=2016)
     print 'Starting Flask application...'
-    app.run(debug=True, host='localhost', port=2016)
+    host = 'localhost'
+    if 'mediamining' in platform.node():
+        host = 'mediamining.univ-lyon2.fr'
+    app.run(debug=True, host=host, port=2016)
