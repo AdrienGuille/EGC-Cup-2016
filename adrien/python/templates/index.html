@@ -2,16 +2,27 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Type" content="text/html">
-  <title>Défi EGC 2016 - Communauté EGC quelle histoire et quel avenir ?</title>
+  <title>Défi EGC 2016 - Communauté EGC : quelle histoire et quel avenir ?</title>
   <meta name="author" content="Adrien Guille">
-  <link rel="stylesheet" type="text/css" media="all" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/base/jquery-ui.css">
-  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
-  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
-  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename = 'nouislider.min.css') }}"/>
-  <link type="text/javascript" href="{{ url_for('static', filename = 'nouislider.min.js') }}"/>
+  <link href="{{ url_for('static', filename = 'nouislider.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename = 'nouislider.pips.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename = 'nouislider.min.js') }}"></script>
+  <script src="{{ url_for('static', filename = 'wnumb.min.js') }}"></script>
+  <script src="{{ url_for('static', filename = 'd3.min.js') }}"></script>
 </head>
 <style>
+.background {
+  fill: #eee;
+}
+
+line {
+  stroke: #fff;
+}
+
+p {
+  text-align: justify;
+}
+
 .node {
   stroke: #fff;
   stroke-width: 1.5px;
@@ -24,21 +35,73 @@
 
 text {
   font: 10px sans-serif;
+  text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
   pointer-events: none;
 }
-
 </style>
 <body>
-<div style="width:800px; margin: auto;">
-    <h1>Communauté EGC quelle histoire et quel avenir ?</h1>
-    <div id="rangedval">
-        Période : <span id="rangeval">2010 - 2015</span>
-    </div>
-    <div class="sliders" id="red"></div>
-    <div id="rangeslider"></div>
+<div style="width: 800px; margin: auto;">
+    <h1>Communauté EGC : quelle histoire et quel avenir ?</h1>
+    <h2>Définition du corpus</h2>
+    Période :
+    <br>
+    <br>
+    <div id="slider"></div>
+    <br>
+    <br>
+    <form action="{{ url_for('index2') }}" method="POST">
+        <input type="text" id="year-input" name="years" style="width:0px; visibility: hidden;"/>
+        <br>
+        Contenu :
+        <br>
+        <br>
+        <input type="radio" name="source" value="titles" checked> Titres des articles <input type="radio" name="source" value="abstracts"> Résumés des articles <input type="radio" name="source" value="fulltexts"> Textes intégraux des articles<br/><br/>
+        <input type="submit" value="Recharger la page"/>
+    </form>
+    <script>
+        var slider = document.getElementById('slider');
+
+        noUiSlider.create(slider, {
+            start: [{% if year1 %} {{ year1 }} {% else %} 2010 {% endif %}, {% if year2 %} {{ year2 }} {% else %} 2015 {% endif %}],
+            step: 1,
+            connect: true,
+            range: {
+                'min': 2004,
+                'max': 2015
+            },
+            pips: {
+		        mode: 'steps',
+		        density: 9
+	        },
+	        format: wNumb({
+                decimals: 0
+            })
+        });
+
+        var year_input = document.getElementById('year-input');
+
+        slider.noUiSlider.on('update', function( values, handle ) {
+            year_input.value = values[0]+"_"+values[1];
+        });
+    </script>
 
     <h2>Structuration thématique de la communauté EGC</h2>
+    <p>
+        Nous modélisons les thématiques latentes qui structurent le corpus d'articles par allocation latente de Dirichlet.
+        Une thématique est décrite par les 10 mots les plus probables au sens de l'allocation latente de Dirichlet.
+        Nous représentons les thématiques découvertes à l'aide d'un graphe défini comme suit :
+        <ul>
+            <li>Un mot correspond à un sommet;</li>
+            <li>Une arrête lie deux sommets si les deux mots associés décrivent une même thématique;</li>
+            <li>Le diamètre d'un sommet est proportionel à sa centralité d'intermédiarité;</li>
+            <li>Chaque thématique est associée à une couleur (différente du noir);</li>
+            <li>Si un mot est spécifique à une thématique, le sommet correspondant est coloré;</li>
+            <li>Si un mot intervient dans plusieurs descriptions, le sommet correspondant est coloré en noir.</li>
+        </ul>
+        Ci-dessous, un dessin du graphe et sa matrice d'adjacence :
+    </p>
     <topic-graph></topic-graph>
+    <topic-matrix></topic-matrix>
 
     <h2>Distribution des thématiques par institutions</h2>
 
@@ -59,12 +122,11 @@ $(function(){
   });
 });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
 <script>
 var width = 800;
 var height = 600;
 var base = Math.min(width, height)
-var color = d3.scale.category20();
+var color = d3.scale.category20().domain(d3.range(10));
 
 var force = d3.layout.force()
     .charge(-500)
@@ -88,7 +150,7 @@ function redraw() {
       + " scale(" + d3.event.scale + ")");
 }
 
-d3.json("graph.json", function(error, graph) {
+d3.json("{{ url_for('static', filename = 'graph.json') }}", function(error, graph) {
   if (error) throw error;
 
   force
@@ -107,7 +169,7 @@ d3.json("graph.json", function(error, graph) {
     .enter().append("circle")
       .attr("class", "node")
       .attr("r", function(d) { return d.weight; })
-      .style("fill", function(d) { return color(d.group); })
+      .style("fill", function(d) { return d.group == -1 ? null : color(d.group); })
       .call(force.drag);
 
   node.append("title")
@@ -135,5 +197,138 @@ d3.json("graph.json", function(error, graph) {
     texts.attr("x", function(d) {return d.x+10;})
         .attr("y", function(d) {return d.y;});
   });
+});
+
+var margin = {top: 80, right: 0, bottom: 10, left: 80},
+    width = 800,
+    height = 800;
+
+var x = d3.scale.ordinal().rangeBands([0, width]),
+    z = d3.scale.linear().domain([0, 4]).clamp(true),
+    c = color;
+
+var svg2 = d3.select("topic-matrix").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .style("margin-left", -margin.left + "px")
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.json("{{ url_for('static', filename = 'graph.json') }}", function(graph) {
+  var matrix = [],
+      nodes = graph.nodes,
+      n = nodes.length;
+
+  // Compute index per node.
+  nodes.forEach(function(node, i) {
+    node.index = i;
+    node.count = 0;
+    matrix[i] = d3.range(n).map(function(j) { return {x: j, y: i, z: 0}; });
+  });
+
+  // Convert links to matrix; count character occurrences.
+  graph.links.forEach(function(link) {
+    matrix[link.source][link.target].z += link.value;
+    matrix[link.target][link.source].z += link.value;
+    matrix[link.source][link.source].z += link.value;
+    matrix[link.target][link.target].z += link.value;
+    nodes[link.source].count = 1;
+    nodes[link.target].count = 1;
+  });
+
+  // Precompute the orders.
+  var orders = {
+    name: d3.range(n).sort(function(a, b) { return d3.ascending(nodes[a].name, nodes[b].name); }),
+    count: d3.range(n).sort(function(a, b) { return nodes[b].count - nodes[a].count; }),
+    group: d3.range(n).sort(function(a, b) { return nodes[b].group - nodes[a].group; })
+  };
+
+  // The default sort order.
+  x.domain(orders.name);
+
+  svg2.append("rect")
+      .attr("class", "background")
+      .attr("width", width)
+      .attr("height", height);
+
+  var row = svg2.selectAll(".row")
+      .data(matrix)
+    .enter().append("g")
+      .attr("class", "row")
+      .attr("transform", function(d, i) { return "translate(0," + x(i) + ")"; })
+      .each(row);
+
+  row.append("line")
+      .attr("x2", width);
+
+  row.append("text")
+      .attr("x", -6)
+      .attr("y", x.rangeBand() / 2)
+      .attr("dy", ".32em")
+      .attr("text-anchor", "end")
+      .text(function(d, i) { return nodes[i].name; });
+
+  var column = svg2.selectAll(".column")
+      .data(matrix)
+    .enter().append("g")
+      .attr("class", "column")
+      .attr("transform", function(d, i) { return "translate(" + x(i) + ")rotate(-90)"; });
+
+  column.append("line")
+      .attr("x1", -width);
+
+  column.append("text")
+      .attr("x", 6)
+      .attr("y", x.rangeBand() / 2)
+      .attr("dy", ".32em")
+      .attr("text-anchor", "start")
+      .text(function(d, i) { return nodes[i].name; });
+
+  function row(row) {
+    var cell = d3.select(this).selectAll(".cell")
+        .data(row.filter(function(d) { return d.z; }))
+      .enter().append("rect")
+        .attr("class", "cell")
+        .attr("x", function(d) { return x(d.x); })
+        .attr("width", x.rangeBand())
+        .attr("height", x.rangeBand())
+        .style("fill-opacity", function(d) { return z(d.z); })
+        .style("fill", function(d) { return nodes[d.x].group == nodes[d.y].group ? c(nodes[d.x].group) : null; })
+        .on("mouseover", mouseover)
+        .on("mouseout", mouseout);
+  }
+
+  function mouseover(p) {
+    d3.selectAll(".row text").classed("active", function(d, i) { return i == p.y; });
+    d3.selectAll(".column text").classed("active", function(d, i) { return i == p.x; });
+  }
+
+  function mouseout() {
+    d3.selectAll("text").classed("active", false);
+  }
+
+  d3.select("#order").on("change", function() {
+    clearTimeout(timeout);
+    order(this.value);
+  });
+
+  function order(value) {
+    x.domain(orders[value]);
+    var t = svg2.transition().duration(2500);
+    t.selectAll(".row")
+        .delay(function(d, i) { return x(i) * 4; })
+        .attr("transform", function(d, i) { return "translate(0," + x(i) + ")"; })
+      .selectAll(".cell")
+        .delay(function(d) { return x(d.x) * 4; })
+        .attr("x", function(d) { return x(d.x); });
+    t.selectAll(".column")
+        .delay(function(d, i) { return x(i) * 4; })
+        .attr("transform", function(d, i) { return "translate(" + x(i) + ")rotate(-90)"; });
+  }
+
+  var timeout = setTimeout(function() {
+    order("group");
+    d3.select("#order").property("selectedIndex", 2).node().focus();
+  }, 5000);
 });
 </script>

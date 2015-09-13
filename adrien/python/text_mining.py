@@ -72,14 +72,13 @@ def construct_and_save_word_topic_graph(topics, file_path):
         for j in range(0, len(topic)):
             main_word = topic[j][1]
             main_word_id = nodes_array.index(main_word)
-            for i in range(j, len(topic)):
+            for i in range(j+1, len(topic)):
                 this_word_id = nodes_array.index(topic[i][1])
-                json_links.append({'source': main_word_id, 'target': this_word_id})
+                json_links.append({'source': main_word_id, 'target': this_word_id, 'value':int(len(topic)-i)})
                 nx_graph.add_edge(unicode(main_word), unicode(topic[i][1]))
     nodes_array = []
     group = 0
     page_rank = nx.pagerank(nx_graph, alpha=0.85, max_iter=300)
-    print page_rank
     for topic in topics:
         for weighted_word in topic:
             if weighted_word[1] not in nodes_array:
