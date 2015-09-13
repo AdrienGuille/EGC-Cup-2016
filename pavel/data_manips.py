@@ -1,4 +1,7 @@
-from networkx.algorithms.flow.mincost import min_cost_flow
+# coding: utf-8
+from collections import defaultdict
+from external_sources.spotlight_access import get_spotlight_annotation
+from ngrams.utils import load_data
 
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
@@ -125,10 +128,6 @@ def get_EGC_articles(df):
     return df[df["booktitle"] == "EGC"]
 
 
-def download_EGC_papers(df):
-    df = get_EGC_articles(df)
-    logging.info("Number of EGC articles: {}".format(len(df)))
-    download_pdfs(df, what_to_download="1page")
 
 
 def detect_garbage_text(text_path, min_chars=2):
@@ -179,40 +178,31 @@ def get1page_pdfs(df):
     :return:
     """
 
-    # Get pdfs from the interwebz
+    # 1. Get pdfs from the interwebz
     # download_pdfs(df, what_to_download="1page")
 
-    # Convert pdfs to txt
+    # 2. Convert pdfs to txt
     # pdf2txt("../input/pdfs/1page")
 
-    # Do OCR to those pdfs that seem to be images. Do it with those text files smaller than 17bytes (
+    # 3. Do OCR to those pdfs that seem to be images. Do it with those text files smaller than 17bytes (
     # do_OCR(df, "../input/pdfs/1page", 17)
 
-    # Detect those pdfs that have garbage text and try to obtain the text through OCR
+    # 4. Detect those pdfs that have garbage text and try to obtain the text through OCR
     gt = detect_garbage_text("../input/pdfs/1page", 5)
     if not gt:
         logging.info("Good. No garbage files.")
 
-    # Do OCR on those detected as shitty text
+    # 4.1 Do OCR on those detected as shitty text
     else:
         logging.info("Not good. We have garbage files.")
         do_OCR(df, "", 0, list_files=gt)
 
 
 def main():
-    df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
-
-    # download_pdfs(df)
-    get1page_pdfs(df)
-    # detect_garbage_text("../input/pdfs/1page")
-    # pdf2txt("../input/pdfs/1page")
-    # pdf2txt("../input/pdfs/full")
+    # df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
     # add_index_column(df)
     # df = get_EGC_articles(df)
     # df = add_lang_column(df)
-    # do_OCR(df, "../input/pdfs/full", 3000)
-    # do_OCR(df, "../input/pdfs/1page", 17)
-    # download_EGC_papers(df)
 
     pass
 

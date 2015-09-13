@@ -5,14 +5,13 @@ __mail__ = 'sorianopavel@gmail.com'
 
 factory = DetectorFactory()
 factory.load_profile(PROFILES_DIRECTORY)
-reg_words = r'''(?x)
-      \d+(\.\d+)?\s*%   # les pourcentages
-    | 's                # l'appartenance anglaise 's
-    | \w'               # les contractions d', l', j', t', s'
-    '''
-reg_words += u"| \w\u2019"  # version unicode
-reg_words += u"|\w+|[^\w\s]"  # avec les antislashs
 
+
+def dict_to_csv(path, dicto, columns):
+    import pandas
+    df = pandas.DataFrame(dicto.items(), columns=columns)
+    df.to_csv(path, index_label=False, index=False)
+    return df
 
 
 
@@ -30,7 +29,7 @@ def load_french_lexicon():
     return load('../../input/OLDlexique.txt')
 
 
-fr_lexicon = load_french_lexicon()
+# fr_lexicon = load_french_lexicon()
 
 
 def french_tokenizer(text):

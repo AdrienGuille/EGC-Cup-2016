@@ -23,7 +23,7 @@ def build_unsup_base_model(level="word", ngrams=(1, 11)):
 
 def build_unsup_nmf(level="word", ngrams=(1, 3)):
     n_features = 1000
-    n_topics = 15
+    n_topics = 14
     vectorizer = TfidfVectorizer(ngram_range=ngrams, analyzer=level, max_df=0.85, min_df=5, max_features=n_features,
                                  use_idf=True, stop_words=load_stopword_list("../ngrams/stopwords.txt"),
                                  tokenizer=french_tokenizer)

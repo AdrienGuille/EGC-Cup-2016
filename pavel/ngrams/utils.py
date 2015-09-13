@@ -49,7 +49,7 @@ def load_data(path, extension="txt"):
             filename = ntpath.basename(f)
             text, _ = import_text_lines(f, "utf8")
             text = text.replace('None', '')
-            dict_file_text[filename] = text
+            dict_file_text[filename[:-4]] = text
         return dict_file_text
     else:
         # Path is a file
