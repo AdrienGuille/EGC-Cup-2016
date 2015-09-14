@@ -41,7 +41,7 @@ def index2():
     elif source == 'titles':
         print 'Inferring topics from the titles with LDA'
         documents = corpus.lemmatized_title_list()
-    lda_topics = text_mining.train_lda(documents=documents, num_topics=12, num_words=10, remove_singleton=False)
+    lda_topics = text_mining.train_lda(documents=documents, num_topics=8, num_words=10, remove_singleton=False)
     text_mining.construct_and_save_word_topic_graph(lda_topics, 'static/graph.json')
     return render_template('index.html', year1=int(year_array[0]), year2=int(year_array[1]))
 
