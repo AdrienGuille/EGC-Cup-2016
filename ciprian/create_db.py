@@ -113,23 +113,25 @@ def insert_data(dbname, corpus, remove=False):
         except pymongo.errors.DuplicateKeyError:
             pass
 
-global idx
-idx = 0
 # process one element parallel
 def process_element(elem):
     document = dict()
-    if len(elem) == 8:
+    if len(elem) == 9:
         try:
             # construct the document
-            document['rawText'] = elem[4]#.encode('latin-1').encode('string_escape').replace('\r', '').replace('\n', '')
+            # rawText = elem[4].decode('latin-1').encode('utf-8')#.encode('latin-1').encode('string_escape').replace('\r', '').replace('\n', '')
+            document['rawText'] = elem[4].encode('latin-1')#.encode('string_escape').replace('\r', '').replace('\n', '')
             document['series'] = elem[0]
             document['booktitle'] = elem[1]
             document['year'] = elem[2]
-            document['title'] = elem[3]
+            document['title'] = elem[3].encode('latin-1')
             #authors
-            document['authors'] = elem[5].split(',')
+            authors = elem[5].split(',')
+            #document['authors'] = [ {'name': author.strip(' ').decode('latin-1').encode('utf-8'), 'position': authors.index(author)} for author in authors]
+            document['authors'] = [ {'name': author.strip(' ').encode('latin-1'), 'position': authors.index(author)} for author in authors]
             document['pdf1page'] = elem[6]
             document['pdfarticle'] = elem[7]
+            document['_id'] = elem[8]
 
             try:
                 lang = detect(elem[4].decode('latin-1')).upper()
@@ -142,37 +144,42 @@ def process_element(elem):
                     print e2, 'aici try 3'
             document['language'] = lang
 
+            
             if len(elem[4])>0:
-                cleanText = ct.cleanTextSimple(elem[4], lang)
-                # if clean text exists
-                if len(ct.removePunctuation(cleanText)) > 0:
-                    # extract lemmas and part of speech
-                    lemmas = LemmatizeText(rawText=ct.removePunctuation(cleanText), language=lang)
-                    lemmas.createLemmaText()
-                    lemmaText = lemmas.cleanText
-                    if lemmaText and lemmaText != " ":
-                        lemmas.createLemmas()
-                        words = []
-                        for w in lemmas.wordList:
-                            word = dict()
-                            word['word'] = w.word
-                            word['tf'] = w.tf
-                            word['count'] = w.count
-                            word['pos'] = w.wtype
-                            words.append(word)
+                try:
+                    cleanText = ct.cleanTextSimple(elem[4].encode('latin-1'), lang)
+                    # if clean text exists
+                    # print cleanText
+                    if len(ct.removePunctuation(cleanText)) > 0:
+                        # extract lemmas and part of speech
+                        lemmas = LemmatizeText(rawText=ct.removePunctuation(cleanText), language=lang)
+                        lemmas.createLemmaText()
+                        lemmaText = lemmas.cleanText
+                        if lemmaText and lemmaText != " ":
+                            lemmas.createLemmas()
+                            words = []
+                            for w in lemmas.wordList:
+                                word = dict()
+                                word['word'] = w.word
+                                word['tf'] = w.tf
+                                word['count'] = w.count
+                                word['pos'] = w.wtype
+                                words.append(word)
 
-                        document['cleanText'] = cleanText#.encode('latin-1').encode('string_escape').replace('\r', '').replace('\n', '')
-                        document['lemmaText'] = lemmaText
-                        document['words'] = words
+                            document['cleanText'] = cleanText#.encode('latin-1').encode('string_escape').replace('\r', '').replace('\n', '')
+                            document['lemmaText'] = lemmaText
+                            document['words'] = words
+                except Exception as e:
+                    print e, 'sunt in lemmaText'
         except Exception as e:
             print e, 'aici try 1', elem
     else:
-        print 'aici in elese', elem
+        print 'aici in else', elem
     return document
 
 if __name__ == "__main__":
     dbname = 'EGCDB'
-    filename = '../input/RNTI_articles_export.csv'
+    filename = 'RNTI_articles_export.csv'
     header = False
     csv_delimiter = '\t'
     corpus = utils.readCSV(filename)

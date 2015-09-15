@@ -21,10 +21,13 @@ def determineDelimiter(character):
         return ','
     elif character == 's':
         return ';'
-
+# encoding='latin-1'
+# 'ISO-8859-1'
 def readCSV(filename, encoding='latin-1'):
     corpus = []
+    idx = 0
     with codecs.open(filename, 'r', encoding=encoding) as csvfile:
         for line in csvfile:
-            corpus.append(line.split('\t'))
+            corpus.append(line.split('\t') + [idx])
+            idx += 1
     return corpus

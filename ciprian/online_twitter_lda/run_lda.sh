@@ -7,8 +7,8 @@ dir=$1
 num_topics=$2
 
 #globals
-INPUT=$dir'input_en'
-OUTPUT=$dir'output-en-'
+INPUT=$dir'/EN/input'
+OUTPUT=$dir'/EN/output'
 first=1
 LANG=EN
 prev=""
@@ -31,8 +31,8 @@ done
 
 
 #globals
-INPUT=$dir'input_fr'
-OUTPUT=$dir'output-fr-'
+INPUT=$dir'/FR/input'
+OUTPUT=$dir'/FR/output'
 first=1
 LANG=FR
 prev=""
