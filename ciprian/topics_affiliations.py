@@ -24,6 +24,13 @@ dbname = 'EGCDB'
 client = pymongo.MongoClient()
 db = client[dbname]
 
+types = {
+	1: { 'booktitle': 'EGC', 'lemmaText': {'$exists': 'true'}, 'language': 'FR'},
+	2: { 'booktitle': 'EGC', 'lemmaText': {'$exists': 'true'}, 'language': 'EN'},
+	3: { 'lemmaText': {'$exists': 'true'}, 'language': 'FR'},
+	4: { 'lemmaText': {'$exists': 'true'}, 'language': 'EN'}
+}
+
 def extract_affiliation(text):
 	for elem in "\)\(><\{\}*|\r\n":
 		text = text.replace(elem, '')
@@ -38,36 +45,40 @@ def extract_affiliation(text):
 				list_affiliations.append(elem[elem.index('@'):])
 	return list_affiliations
 
-affiliation_articles = {}
-idx = 0
-for f in onlyfiles:
-	d_id = int(f[:-4])
-	isEGCFR = db.documents.find_one({'_id': d_id, 'booktitle': 'EGC', 'language': 'FR'})
-	if isEGCFR:
-		with codecs.open(mypath + '/' + f) as open_file:
-			l_emails = []
-			for line in open_file:
-				if '@' in line:
-					for affiliation in extract_affiliation(line):
-						if affiliation_articles.get(affiliation, -1) == -1:
-							affiliation_articles[affiliation] = [d_id]
-						else:
-							affiliation_articles[affiliation] = list(set(affiliation_articles[affiliation] + [d_id]))
+def create_topics(choise):
+	affiliation_articles = {}
+	idx = 0
+	for f in onlyfiles:
+		d_id = int(f[:-4])
+		types[choise]['_id'] = d_id
+		selected = db.documents.find_one(types[choise])
+		if selected:
+			with codecs.open(mypath + '/' + f) as open_file:
+				l_emails = []
+				for line in open_file:
+					if '@' in line:
+						for affiliation in extract_affiliation(line):
+							if affiliation_articles.get(affiliation, -1) == -1:
+								affiliation_articles[affiliation] = [d_id]
+							else:
+								affiliation_articles[affiliation] = list(set(affiliation_articles[affiliation] + [d_id]))
 
-
-for affiliation in affiliation_articles:
-	no_articles = len(affiliation_articles[affiliation])
-	print affiliation, 'topics for:', len(affiliation_articles[affiliation]), 'articles:'
-	lda = LDA(dbname=dbname, host='localhost', port=27017, language='FR')
-	query = {'_id': {'$in': affiliation_articles[affiliation]}}
-	for topic in lda.apply(query=query, num_topics=no_articles, num_words=10, iterations=1500)[0]:
-		t = ""
+	for affiliation in affiliation_articles:
+		no_articles = len(affiliation_articles[affiliation])
+		print affiliation, 'topics for:', len(affiliation_articles[affiliation]), 'articles:'
+		lda = LDA(dbname=dbname, host='localhost', port=27017, language='FR')
+		query = {'_id': {'$in': affiliation_articles[affiliation]}}
 		idx = 0
-		for elem in topic:
-			t += elem[1] + " "
-		print idx, t
-		idx += 1
+		for topic in lda.apply(query=query, num_topics=no_articles, num_words=10, iterations=1500)[0]:
+			t = ""
+			for elem in topic:
+				t += elem[1] + " "
+			print idx, t
+			idx += 1
 
 # for affiliation in affiliation_articles:
 # 	print affiliation, affiliation_articles[affiliation]
 
+if __name__ == "__main__":
+	choise = int(sys.argv[1]) # 1 EGC corpus FR, 2 EGC corpus EN, 3 all corpus FR, 4 all corpus EN
+	create_topics(choise)

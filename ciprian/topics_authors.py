@@ -23,31 +23,41 @@ db = client[dbname]
 
 
 #Extract for each author the articles written and construct topics with LDA
+types ={
+	1: { 'booktitle': 'EGC', 'lemmaText': {'$exists': 'true'}, 'language': 'FR'}, 
+	2: { 'booktitle': 'EGC', 'lemmaText': {'$exists': 'true'}, 'language': 'EN'}, 
+	3: { 'lemmaText': {'$exists': 'true'}, 'language': 'FR'}, 
+	4: { 'lemmaText': {'$exists': 'true'}, 'language': 'EN'}
 
-article_authors = db.documents.find({'booktitle': 'EGC', 'lemmaText': {'$exists': 'true'}, 'language': 'FR'}, {'_id': 1, 'authors': 1})
+}
 
-articles_by_author = {}
 
-for article in article_authors:
-	for author in article['authors']:
-		if articles_by_author.get(author['name'], -1) == -1:
-			articles_by_author[author['name']] = [article['_id']]
-		else:
-			articles_by_author[author['name']] += [article['_id']]
+def create_topics(choise):
+	articles_by_author = {}
+	article_authors = db.documents.find(types[choise], {'_id': 1, 'authors': 1})
+	for article in article_authors:
+		for author in article['authors']:
+			if articles_by_author.get(author['name'], -1) == -1:
+				articles_by_author[author['name']] = [article['_id']]
+			else:
+				articles_by_author[author['name']] += [article['_id']]
 
-for author in articles_by_author:
-	no_articles = len(articles_by_author[author])
-	print author, 'topics for:', len(articles_by_author[author]), 'articles:'
-	lda = LDA(dbname=dbname, host='localhost', port=27017, language='FR')
-	query = {'_id': {'$in': articles_by_author[author]}}
-	for topic in lda.apply(query=query, num_topics=no_articles, num_words=10, iterations=1500)[0]:
-		t = ""
+	for author in articles_by_author:
+		no_articles = len(articles_by_author[author])
+		print author, 'topics for:', len(articles_by_author[author]), 'articles:'
+		lda = LDA(dbname=dbname, host='localhost', port=27017, language='FR')
+		query = {'_id': {'$in': articles_by_author[author]}}
 		idx = 0
-		for elem in topic:
-			t += elem[1] + " "
-		print idx, t
-		idx += 1
+		for topic in lda.apply(query=query, num_topics=no_articles, num_words=10, iterations=1500)[0]:
+			t = ""
+			for elem in topic:
+				t += elem[1] + " "
+			print idx, t
+			idx += 1
 
+if __name__ == "__main__":
+	choise = int(sys.argv[1]) # 1 EGC corpus FR, 2 EGC corpus EN, 3 all corpus FR, 4 all corpus EN
+	create_topics(choise)
 
 
 
