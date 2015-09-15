@@ -17,8 +17,8 @@ query_fr = {0: {'booktitle': 'EGC', 'language': 'FR', 'lemmaText': {'$exists': '
 query_en = {0: {'booktitle': 'EGC', 'language': 'EN', 'lemmaText': {'$exists': 'true'}},
             1: {'language': 'EN', 'lemmaText': {'$exists': 'true'}}}
 
-filepath_fr = {0: 'online_twitter_lda/EGC_corpus/FR/input/', 1: 'online_twitter_lda/all_corpus/input_fr/'}
-filepath_en = {0: 'online_twitter_lda/EGC_corpus/EN/input/', 1: 'online_twitter_lda/all_corpus/input_en/'}
+filepath_fr = {0: 'online_twitter_lda/EGC_corpus/FR/input/', 1: 'online_twitter_lda/all_corpus/FR/input/'}
+filepath_en = {0: 'online_twitter_lda/EGC_corpus/EN/input/', 1: 'online_twitter_lda/all_corpus/EN/input/'}
 
 filepath = {0: 'online_twitter_lda/EGC_corpus/', 1: 'all_corpus/'}
 
