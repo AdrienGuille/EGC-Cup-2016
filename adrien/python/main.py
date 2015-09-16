@@ -13,6 +13,9 @@ import miscellaneous as misc
 text_analytics = False
 graph_analytics = False
 
+
+
+"""
 lexicon = Lexicon(update_data=False)
 
 corpus0 = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2016)
@@ -26,7 +29,6 @@ for article_id in corpus0.articles.keys():
 print count
 
 
-"""
 titles0 = corpus0.lemmatized_title_list()
 
 corpus1 = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2012, year_b=2014)
@@ -43,20 +45,19 @@ text_mining.print_topics(lda_topics1, num_words=10)
 
 text_mining.compare_models(lda_topics0, lda_topics1)
 
-keywords = [u'règle', u'cluster']
+keywords = [u' supervisé', u'nonsupervisé']
 frequency_matrix = [keywords]
 for i in range(2004, 2016):
     sub_corpus = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=i, year_b=i+1)
     line = []
     for j in range(len(keywords)):
-        line.append(sub_corpus.get_frequency_in_abstracts(keywords[j]))
+        line.append(sub_corpus.get_frequency_in_abstracts(keywords[j], lemmatized=True))
     frequency_matrix.append(line)
 for row in frequency_matrix:
     string_row = ''
     for elem in row:
         string_row += unicode(elem) + '\t'
     print string_row
-"""
 
 if text_analytics:
     # Extract latent topics
@@ -76,6 +77,7 @@ if text_analytics:
         print 'LSI'
         text_mining.print_topics(lsi_topics)
         print ''
+"""
 
 if graph_analytics:
     generate_plots = True

@@ -13,26 +13,27 @@ from nltk.corpus import stopwords
 
 stop_word_list = stopwords.words('french')
 stop_word_list.extend(stopwords.words('english'))
-stop_word_list.extend([u',', u'.', u'\'', u'"', u'(', u')', u'-', u').', u':'])
+stop_word_list.extend([u',', u'.', u'\'', u'"', u'(', u')', u'-', u').', u':', u'de', u'le'])
 specific_stop_words = [u'cadrer',u'approcher',u'méthode']
 
 
 def lemmatize_text(text, lexicon):
-    lemmatized_text = ''
+    lemmatized_text = []
     for word in wordpunct_tokenize(text.lower()):
         if word not in stop_word_list:
             lemmatized_word = lexicon.get_lem(word)
             if lemmatized_word is None or lemmatized_word == '=':
                 lemmatized_word = word
             if lemmatized_word not in specific_stop_words:
-                lemmatized_text += lemmatized_word+' '
-    lemmatized_text = lemmatized_text.replace(u'baser donnée', u'BDD')
+                lemmatized_text.append(lemmatized_word)
     return lemmatized_text
 
 
 def load(limit=None, lexicon=None):
         input_file = codecs.open('../../input/RNTI_articles_export_fixed1347_ids.txt', 'r', encoding='utf-8')
         article_dictionary = {}
+        vocabulary_abstract = set()
+        vocabulary_titles = set()
         count = 0
         for line in input_file:
             line = line.replace('\n', '')
@@ -57,16 +58,15 @@ def load(limit=None, lexicon=None):
                 authors_affiliations = extract_authors_affiliations(authors, first_page)
                 title_lang = article[9]
                 abstract_lang = article[10].replace('\n', '')
-                lemmatized_title = title
-                lemmatized_abstract = abstract
-                if lexicon:
-                    lemmatized_title = lemmatize_text(title, lexicon)
-                    lemmatized_abstract = lemmatize_text(abstract, lexicon)
+                lemmatized_title = lemmatize_text(title, lexicon)
+                lemmatized_abstract = lemmatize_text(abstract, lexicon)
+                for lem in lemmatized_abstract:
+                    vocabulary_abstract.add(lem)
                 article_dictionary[article_id] = {'year': int(year),
                                                   'title': title,
-                                                  'lemmatized_title': lemmatized_title,
+                                                  'lemmatized_title': ' '.join(lemmatized_title),
                                                   'abstract': abstract,
-                                                  'lemmatized_abstract': lemmatized_abstract,
+                                                  'lemmatized_abstract': ' '.join(lemmatized_abstract),
                                                   'authors': authors,
                                                   'authors_affiliation': authors_affiliations,
                                                   'title_lang': title_lang,
@@ -75,7 +75,7 @@ def load(limit=None, lexicon=None):
                 count += 1
                 if limit is not None and count >= limit:
                     break
-        return article_dictionary
+        return [article_dictionary, vocabulary_abstract]
 
 
 def extract_authors_affiliations(author_list, text):
@@ -149,10 +149,14 @@ class Corpus:
 
     def __init__(self, limit=None, update_data=False, lexicon=None, title_lang=None, abstract_lang=None, year_a=None, year_b=None):
         if update_data:
-            self.articles = load(limit=limit, lexicon=lexicon)
-            pickle.dump(self.articles, open('../../output/corpus.pickle', 'wb'))
+            data = load(limit=limit, lexicon=lexicon)
+            self.articles = data[0]
+            self.vocabulary = data[1]
+            pickle.dump(data, open('../../output/corpus.pickle', 'wb'))
         else:
-            self.articles = pickle.load(open('../../output/corpus.pickle', 'rb'))
+            data = pickle.load(open('../../output/corpus.pickle', 'rb'))
+            self.articles = data[0]
+            self.vocabulary = data[1]
         ids = []
         for article_id, article in self.articles.iteritems():
             test_title_lang = title_lang is None or title_lang == article.get('title_lang')
@@ -171,12 +175,16 @@ class Corpus:
             else:
                 print article.get('authors'), article.get('authors_affiliation'), article.get('lemmatized_title')
 
-    def get_frequency_in_abstracts(self, word):
+    def get_frequency_in_abstracts(self, word, lemmatized=True):
         frequency = 0
         count = 0
         for article in self.articles.values():
             count += 1
-            if word in article.get('lemmatized_abstract'):
+            if lemmatized:
+                text = article.get('lemmatized_abstract')
+            else:
+                text = article.get('abstract')
+            if word in text:
                 frequency += 1
         return float(frequency)/float(count)
 
