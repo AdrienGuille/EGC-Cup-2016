@@ -167,7 +167,9 @@ class Corpus:
         article = self.articles.get(article_id)
         if article is not None:
             if lemmatized_title_only:
-                print article.get()
+                print article.get('lemmatized_title')
+            else:
+                print article.get('authors'), article.get('authors_affiliation'), article.get('lemmatized_title')
 
     def get_frequency_in_abstracts(self, word):
         frequency = 0

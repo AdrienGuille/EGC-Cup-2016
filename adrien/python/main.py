@@ -15,8 +15,18 @@ graph_analytics = False
 
 lexicon = Lexicon(update_data=False)
 
-corpus0 = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2010, year_b=2012)
+corpus0 = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2016)
 corpus0.pretty_print()
+
+count = 0
+for article_id in corpus0.articles.keys():
+    if corpus0.articles[article_id].get('authors_affiliation') is not None:
+        print article_id, corpus0.articles[article_id].get('authors_affiliation')
+        count += 1
+print count
+
+
+"""
 titles0 = corpus0.lemmatized_title_list()
 
 corpus1 = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2012, year_b=2014)
@@ -33,7 +43,6 @@ text_mining.print_topics(lda_topics1, num_words=10)
 
 text_mining.compare_models(lda_topics0, lda_topics1)
 
-"""
 keywords = [u'règle', u'cluster']
 frequency_matrix = [keywords]
 for i in range(2004, 2016):
@@ -50,8 +59,6 @@ for row in frequency_matrix:
 """
 
 if text_analytics:
-    print 'Complete corpus'
-    corpus.pretty_print()
     # Extract latent topics
     num_topics = 8
     for i in range(2004, 2016):
