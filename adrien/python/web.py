@@ -16,8 +16,8 @@ lexicon = None
 # Default corpus (French article published since EGC 2010)
 corpus = None
 # Topic format
-num_topics = 8
-num_words = 8
+num_topics = 12
+num_words = 7
 
 
 @app.route('/')
@@ -45,6 +45,7 @@ def index2():
         print 'Inferring topics from the titles with LDA'
         documents = corpus.lemmatized_title_list()
     lda_topics = text_mining.train_lda(documents=documents, num_topics=num_topics, num_words=num_words, remove_singleton=False)
+    text_mining.print_topics(lda_topics)
     text_mining.construct_and_save_word_topic_graph(lda_topics, 'static/graph.json')
     return render_template('index.html', year1=int(year_array[0]), year2=int(year_array[1]))
 
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     print platform.node()
     print 'Loading French lexicon for lemmatization...'
     lexicon = Lexicon(update_data=True)
-    print 'Loading default corpus: French article published since EGC 2010 ...'
+    print 'Loading default corpus: French articles published since EGC 2010 ...'
     corpus = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2010, year_b=2016)
     print 'Starting Flask application...'
     host = 'localhost'

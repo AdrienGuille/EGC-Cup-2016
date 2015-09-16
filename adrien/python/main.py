@@ -15,16 +15,23 @@ graph_analytics = False
 
 lexicon = Lexicon(update_data=False)
 
-corpus = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2010, year_b=2016)
-corpus.pretty_print()
+corpus0 = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2010, year_b=2012)
+corpus0.pretty_print()
+titles0 = corpus0.lemmatized_title_list()
 
-titles = corpus.lemmatized_title_list()
-abstracts = corpus.lemmatized_abstract_list()
-lda_topics = text_mining.train_lda(documents=titles, num_topics=15, num_words=10, remove_singleton=False)
-print 'LDA'
-text_mining.print_topics(lda_topics)
-text_mining.construct_and_save_word_topic_graph(lda_topics, '../html/graph.json')
+corpus1 = Corpus(update_data=False, lexicon=lexicon, title_lang='fr', year_a=2012, year_b=2014)
+corpus1.pretty_print()
+titles1 = corpus1.lemmatized_title_list()
 
+lda_topics0 = text_mining.train_lda(documents=titles0, num_topics=15, remove_singleton=False)
+lda_topics1 = text_mining.train_lda(documents=titles1, num_topics=15, remove_singleton=False)
+
+print 'topic model 0:'
+text_mining.print_topics(lda_topics0, num_words=10)
+print 'topic model 1:'
+text_mining.print_topics(lda_topics1, num_words=10)
+
+text_mining.compare_models(lda_topics0, lda_topics1)
 
 """
 keywords = [u'règle', u'cluster']
