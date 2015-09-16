@@ -164,8 +164,16 @@ for elem in mails_authors:
 
 
 
+#extract emails for authors
+
 for author in author_email:
 	emails = ""
+	affiliations = ""
 	for email in author_email[author]:
-		emails += email + " ; "
-	print author, ";" , emails
+		emails += email + ", "
+		try:
+			affiliations += email[email.index("@"):] + ", "
+		except:
+			pass
+	print author, "; [" , emails[:-2], "] ; [", affiliations[:-2], "]"
+
