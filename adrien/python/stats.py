@@ -29,7 +29,7 @@ def compute_linear_correlation_matrix():
         freq_i = []
         for corpus in corpora:
             freq_i.append(corpus.get_frequency_in_abstracts(word=word_i, lemmatized=True))
-        for j in range(0, vocabulary_size):
+        for j in range(i+1, vocabulary_size):
             word_j = word_list[j]
             freq_j = []
             for corpus in corpora:
