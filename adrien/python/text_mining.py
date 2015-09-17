@@ -6,6 +6,8 @@ from gensim import corpora, models
 from nltk import wordpunct_tokenize
 from nltk.stem import SnowballStemmer
 from collections import defaultdict
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import NMF
 import codecs
 import json
 import networkx as nx
@@ -13,12 +15,8 @@ import miscellaneous as misc
 import math
 
 
-def compute_vector_space(documents, stemming=False, remove_singleton=True):
-    snowball_stemmer = SnowballStemmer('french')
-    if stemming:
-        formatted_documents = [[snowball_stemmer.stem(word) for word in wordpunct_tokenize(document.lower())] for document in documents]
-    else:
-        formatted_documents = [[word for word in wordpunct_tokenize(document.lower())] for document in documents]
+def compute_vector_space(documents, remove_singleton=True):
+    formatted_documents = [[word for word in wordpunct_tokenize(document.lower())] for document in documents]
     frequency = defaultdict(int)
     if remove_singleton:
         for formatted_document in formatted_documents:
@@ -32,22 +30,37 @@ def compute_vector_space(documents, stemming=False, remove_singleton=True):
     return [corpus_tfidf, dictionary]
 
 
-def perform_lsa(documents, num_topics=10, num_words=10, stemming=False, remove_singleton=True):
-    vector_space_model = compute_vector_space(documents=documents, stemming=stemming, remove_singleton=remove_singleton)
+def perform_lsa(documents, num_topics=10, num_words=10, remove_singleton=True):
+    vector_space_model = compute_vector_space(documents=documents, remove_singleton=remove_singleton)
     corpus_tfidf = vector_space_model[0]
     dictionary = vector_space_model[1]
     lsi = models.LsiModel(corpus=corpus_tfidf, id2word=dictionary, num_topics=num_topics)
     return lsi.show_topics(num_topics=num_topics, num_words=num_words, formatted=False)
 
 
-def train_lda(documents, num_topics=10, num_words=None, stemming=False, remove_singleton=True):
-    vector_space_model = compute_vector_space(documents=documents, stemming=stemming, remove_singleton=remove_singleton)
+def train_lda(documents, num_topics=10, num_words=None, remove_singleton=True):
+    vector_space_model = compute_vector_space(documents=documents, remove_singleton=remove_singleton)
     corpus_tfidf = vector_space_model[0]
     dictionary = vector_space_model[1]
     if num_words is None:
         num_words = len(dictionary)
     lda = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, iterations=30000, num_topics=num_topics)
     return lda.show_topics(num_topics=num_topics, num_words=num_words, formatted=False)
+
+
+def perform_nmf(documents, num_topics=10, num_words=10):
+    vectorizer = TfidfVectorizer(max_df=0.95, min_df=2, max_features=2000)
+    tfidf = vectorizer.fit_transform(documents)
+    nmf = NMF(n_components=num_topics, random_state=1).fit(tfidf)
+    feature_names = vectorizer.get_feature_names()
+    topics = []
+    for topic_idx, topic in enumerate(nmf.components_):
+        word_list = [feature_names[i] for i in topic.argsort()[:-num_words - 1:-1]]
+        weighted_word_list = []
+        for word in word_list:
+            weighted_word_list.append(('0.0', word))
+        topics.append(weighted_word_list)
+    return topics
 
 
 def compare_models(model0, model1):

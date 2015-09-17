@@ -29,17 +29,18 @@ def compute_linear_correlation_matrix():
         freq_i = []
         for corpus in corpora:
             freq_i.append(corpus.get_frequency_in_abstracts(word=word_i, lemmatized=True))
-        for j in range(i+1, vocabulary_size):
-            word_j = word_list[j]
-            freq_j = []
-            for corpus in corpora:
-                freq_j.append(corpus.get_frequency_in_abstracts(word=word_j, lemmatized=True))
-            if max(freq_i) > 0.10 and max(freq_j) > 0.10:
-                pearson = stats.pearsonr(freq_i, freq_j)
-                correlation_matrix[i][j] = pearson[0]
-                pvalue_matrix[i][j] = pearson[1]
-                if pearson[0] < -0.6 and pearson[1] < 0.05:
-                    print word_i, word_j, pearson[0], pearson[1]
+        if 0.05 < max(freq_i) < 0.2:
+            for j in range(i+1, vocabulary_size):
+                word_j = word_list[j]
+                freq_j = []
+                for corpus in corpora:
+                    freq_j.append(corpus.get_frequency_in_abstracts(word=word_j, lemmatized=True))
+                if 0.05 < max(freq_j) < 0.2:
+                    pearson = stats.pearsonr(freq_i, freq_j)
+                    correlation_matrix[i][j] = pearson[0]
+                    pvalue_matrix[i][j] = pearson[1]
+                    if pearson[0] < -0.5 and pearson[1] < 0.05:
+                        print word_i, word_j, pearson[0], pearson[1]
 
 if __name__ == '__main__':
     compute_linear_correlation_matrix()

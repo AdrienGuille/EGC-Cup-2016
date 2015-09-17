@@ -14,13 +14,18 @@ text_analytics = False
 graph_analytics = False
 
 
-
-"""
 lexicon = Lexicon(update_data=False)
-
 corpus0 = Corpus(update_data=True, lexicon=lexicon, title_lang='fr', year_a=2004, year_b=2016)
 corpus0.pretty_print()
+titles0 = corpus0.lemmatized_title_list()
+lda_topics0 = text_mining.train_lda(documents=titles0, num_topics=15, remove_singleton=False)
+print 'LDA'
+text_mining.print_topics(lda_topics0)
+nmf_topics0 = text_mining.perform_nmf(documents=titles0, num_topics=15)
+print 'NMF'
+text_mining.print_topics(nmf_topics0)
 
+"""
 count = 0
 for article_id in corpus0.articles.keys():
     if corpus0.articles[article_id].get('authors_affiliation') is not None:

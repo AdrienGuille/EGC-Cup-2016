@@ -4,7 +4,7 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 
 import networkx as nx
 import plotting
-import community
+#import community
 import drawing
 
 
@@ -78,4 +78,5 @@ class GraphMining:
         return sorted(k_core.items(), key=lambda x: x[1], reverse=True)
 
     def louvain_modularity(self):
-        return community.best_partition(self.graph)
+        # return community.best_partition(self.graph)
+        return None
