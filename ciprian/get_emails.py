@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# coding: utf-8
 
 __author__ = "Ciprian-Octavian Truică"
 __copyright__ = "Copyright 2015, University Politehnica of Bucharest"
@@ -6,11 +6,15 @@ __license__ = "GNU GPL"
 __version__ = "0.1"
 __email__ = "ciprian.truica@cs.pub.ro"
 
+import sys
 from os import listdir
 from os.path import isfile, join
 import codecs
 import pymongo
 from unidecode import unidecode
+
+reload(sys)  
+sys.setdefaultencoding('utf8')
 
 mypath = 'pdfs/txt'
 onlyfiles = [ f for f in listdir(mypath) if isfile(join(mypath,f)) ]
@@ -20,6 +24,50 @@ client = pymongo.MongoClient()
 db = client[dbname]
 
 mails_authors = {}
+
+diacritics = {
+	u"à": "a",
+	u"â": "a",
+	u"æ": "ae",
+	u"ç": "c",
+	u"è": "e",
+	u"é": "e",
+	u"ê": "e",
+	u"ë": "e",
+	u"î": "i",
+	u"ï": "i",
+	u"ô": "o",
+	u"œ": "oe",
+	u"ù": "u",
+	u"û": "u",
+	u"ü": "u"
+}
+
+def replace_diacritics(text):
+	text = text.encode('utf-8')
+	# try:
+	# 	text = text.decode('utf-8').encode('ascii', 'ignore')
+		
+	# except:
+	# 	text = text.decode('ISO-8859-1').encode('ascii', 'ignore')
+	
+	for elem in diacritics:
+		text.replace(elem, diacritics[elem])
+	
+	return text
+	
+
+def replace_specialchars(text):
+	# text = unidecode(text.decode('utf-8'))
+	for elem in "\)\(><\{\}*\n":
+		text.replace(elem, '')
+	addr = text[text.index('@'):]
+	# text.replace(',', ' ')
+	# text = text.split(' ')
+	# if len(text):
+	# 	for elem in text:
+	# 		text.index(elem) = elem + addr
+	return text
 
 for f in onlyfiles:
 	d_id = int(f[:-4])
@@ -46,6 +94,9 @@ for f in onlyfiles:
 						l_emails.append(email.strip().replace('\n', '').lower())
 		mails_authors[d_id] = {'authors': l_authors, 'emails': l_emails}
 
+print mails_authors
+
+#extract the authors emails
 with codecs.open('emails_authors.csv', 'w', encoding='utf-8') as f_out:
 	for elem in mails_authors:
 		for author in mails_authors[elem]['authors']:
@@ -55,18 +106,29 @@ with codecs.open('emails_authors.csv', 'w', encoding='utf-8') as f_out:
 				if lastname in email[:email.index('@')] or 'nom.nom' in email[:email.index('@')]:
 					out_str = str(elem) + ';'
 					out_str += author + ';'
-					out_str += unidecode(email[email.index('@'):].replace(')', '').replace('>', '').replace('\n', '').replace(',','').replace('}','').replace('{','').decode('utf8')) + '\n'
+					# out_str += unidecode(email[email.index('@'):].replace(')', '').replace('>', '').replace('\n', '').replace(',','').replace('}','').replace('{','').replace('*', '').decode('utf8')) + '\n'
+					if 'nom.nom' in email[:email.index('@')]:
+						author = replace_diacritics(author)
+						email = '.'.join(author.split(' ')) + email[email.index('@'):]
+					# print email
+					#email = replace_specialchars(email)
+					# print email, author
+					try:
+						out_str += unidecode(email.replace(')', '').replace('(', '').replace('>', '').replace('<', '').replace(',','').replace('}','').replace('{','').replace('*', '').replace('\n', '').decode('utf8')) + '\n'
+					except:						
+						print 'mumu', email, repalce_diacritics(email), author
 					f_out.write(out_str)
 	f_out.close()
 
 aa = {}
 
+#extract for paper university emails
 with codecs.open('id_univs.csv', 'w', encoding='utf-8') as f_out:
 	for elem in mails_authors:
 		out_str = str(elem) + ';'
 		emails_set = set()
 		for email in mails_authors[elem]['emails']:
-			n_m = unidecode(email[email.index('@'):].replace(')', '').replace('>', '').replace('\n', '').replace(',','').replace('}','').replace('{','').decode('utf8'))
+			n_m = unidecode(email[email.index('@'):].replace(')', '').replace('>', '').replace('\n', '').replace(',','').replace('}','').replace('{','').replace('*', '').decode('utf8'))
 			if '.' in n_m:
 				if aa.get(n_m, -1) == -1:
 					aa[n_m] = [elem]
@@ -101,4 +163,3 @@ for elem1 in aa:
 for elem in graph:
 	print elem[0], elem[1], len(graph[elem]), graph[elem]
 
-	

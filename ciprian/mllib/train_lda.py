@@ -10,20 +10,22 @@ __status__ = "Production"
 import pymongo
 from gensim import corpora, models
 from nltk.corpus import stopwords
+from collections import defaultdict
 
 cachedStopWords_en = stopwords.words("english")
 cachedStopWords_fr = stopwords.words("french") + ["ce", "cet", "cette", "le", "les"]
 
-class TrainLDA:
-    def __init__(self, dbname='TwitterDB', language='EN' ):
-        client = pymongo.MongoClient()
+
+class LDA:
+    def __init__(self, dbname='TwitterDB', host='localhost', port=27017, language='EN' ):
+        client = pymongo.MongoClient(host=host, port=port)
         self.db = client[dbname]
         if language == 'EN':
             self.sw = cachedStopWords_en
         elif language == 'FR':
             self.sw = cachedStopWords_fr
 
-    def fitLDA(self, query={}, num_topics=15, num_words=10, iterations=500):
+    def apply(self, query={}, num_topics=15, num_words=10, iterations=500):
         try:
             documents = []
             documentsDB = self.db.documents.find(query, {'lemmaText': 1, '_id': 0})
@@ -35,7 +37,7 @@ class TrainLDA:
             corpus_tfidf = tfidf[corpus]
             lda = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, iterations=iterations, num_topics=num_topics)
             corpus_lda = lda[corpus_tfidf]
-            return [lda.show_topics(num_topics=num_topics, num_words=num_words, formatted=False),corpus_lda]
+            return [lda.show_topics(num_topics=num_topics, num_words=num_words, formatted=False), corpus_lda]
         except Exception as e:
             print e
 

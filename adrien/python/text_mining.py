@@ -9,6 +9,7 @@ from collections import defaultdict
 import codecs
 import json
 import networkx as nx
+import miscellaneous as misc
 import math
 
 
@@ -39,20 +40,59 @@ def perform_lsa(documents, num_topics=10, num_words=10, stemming=False, remove_s
     return lsi.show_topics(num_topics=num_topics, num_words=num_words, formatted=False)
 
 
-def train_lda(documents, num_topics=10, num_words=10, stemming=False, remove_singleton=True):
+def train_lda(documents, num_topics=10, num_words=None, stemming=False, remove_singleton=True):
     vector_space_model = compute_vector_space(documents=documents, stemming=stemming, remove_singleton=remove_singleton)
     corpus_tfidf = vector_space_model[0]
     dictionary = vector_space_model[1]
+    if num_words is None:
+        num_words = len(dictionary)
     lda = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, iterations=30000, num_topics=num_topics)
     return lda.show_topics(num_topics=num_topics, num_words=num_words, formatted=False)
 
 
-def print_topics(topics):
+def compare_models(model0, model1):
+    divergence_matrix = []
+    vocabulary = set()
+    for probability, word in model0[0]:
+        vocabulary.add(word)
+    for probability, word in model1[0]:
+        vocabulary.add(word)
+    for topic0 in model0:
+        dict0 = {}
+        for probability, word in topic0:
+            dict0[word] = probability
+        distribution0 = []
+        for word in vocabulary:
+            probability = dict0.get(word)
+            if probability is None:
+                probability = 0.000001
+            distribution0.append(probability)
+        row = []
+        for topic1 in model1:
+            dict1 = {}
+            for probability, word in topic1:
+                dict1[word] = probability
+            distribution1 = []
+            for word in vocabulary:
+                probability = dict1.get(word)
+                if probability is None:
+                    probability = 0.000001
+                distribution1.append(probability)
+            jsd = misc.jensen_shannon_divergence(distribution0, distribution1)
+            distance = math.sqrt(jsd)
+            row.append(distance)
+        divergence_matrix.append(row)
+    return divergence_matrix
+
+
+def print_topics(topics, num_words=10):
     count = 0
     for topic in topics:
         word_list = []
         for weighted_word in topic:
             word_list.append(weighted_word[1])
+            if len(word_list) == num_words:
+                break
         print 'topic', count, ': ', ' '.join(word_list)
         count += 1
 
