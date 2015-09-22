@@ -15,7 +15,7 @@ from nltk.text import TextCollection
 from configuration import config_path, config_stem, config_bool_stopwords, config_top_k, \
     config_min_tok_len, config_ngram, config_output, config_min_tok_freq
 from containers import Document
-from utils import import_text_lines, load_data, \
+from utils import import_text_lines, load_text_data, \
     update_dict_values, load_stopword_list
 from n_association import AnygramAssocMeasures, AnygramCollocationFinder
 
@@ -185,7 +185,7 @@ def main2():
 def main():
     # Get text from folder or file
     # TODO Change the folder corpus to the upper level!
-    texts = load_data(config_path)
+    texts = load_text_data(config_path)
     if not texts:
         print "No texts found"
         return

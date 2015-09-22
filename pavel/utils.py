@@ -14,8 +14,7 @@ def dict_to_csv(path, dicto, columns):
     return df
 
 
-
-def my_detect(text):
+def my_language_detect(text):
     detector = factory.create()
     detector.set_prior_map({"en": 0.1, "fr": .1})
     if not text:

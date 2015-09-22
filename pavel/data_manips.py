@@ -1,7 +1,7 @@
 # coding: utf-8
 from collections import defaultdict
 from external_sources.spotlight_access import get_spotlight_annotation
-from ngrams.utils import load_data
+from ngrams.utils import load_text_data
 
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
@@ -10,7 +10,7 @@ import logging
 from sys import stdout
 
 import pandas as pd
-from utils import my_detect, get_texts
+from utils import my_language_detect, get_texts
 
 # from langdetect.detector_factory import PROFILES_DIRECTORY
 # from langdetect import detect
@@ -81,8 +81,8 @@ def add_lang_column(df):
     idx_with_abstract = [not b for b in df["abstract"].isnull().tolist()]
 
     # We dont need idx with title cause they all have title
-    langs_title = [my_detect(l[1]['title']) for l in df.iterrows()]
-    langs_abstract = [my_detect(l[1]['abstract']) for l in df.iloc[idx_with_abstract].iterrows()]
+    langs_title = [my_language_detect(l[1]['title']) for l in df.iterrows()]
+    langs_abstract = [my_language_detect(l[1]['abstract']) for l in df.iloc[idx_with_abstract].iterrows()]
 
     print "Langs Title: ", Counter(langs_title)
     print "Langs Abstract: ", Counter(langs_abstract)

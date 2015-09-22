@@ -35,7 +35,7 @@ def load_stopword_list(path="stopwords.txt"):
     return stopwords_list
 
 
-def load_data(path, extension="txt"):
+def load_text_data(path, extension="txt"):
     import os
     from collections import defaultdict
     import ntpath

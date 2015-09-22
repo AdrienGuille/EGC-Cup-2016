@@ -1,22 +1,22 @@
 from __future__ import print_function
 from collections import defaultdict
-from clustering.models import build_unsup_nmf
-from ngrams.utils import load_data
-
+from clustering.models import build_unsup_nmf_topics
+from ngrams.utils import load_text_data
+import numpy as np
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
 
 
-def nmf_clustering(data):
-    nmf = build_unsup_nmf()
-    result = nmf.fit_transform(data.values())
-    # H = nmf.transform()
-    feature_names = nmf.named_steps["vectorize"].get_feature_names()
-    components = nmf.named_steps["clust"].components_
+def nmf_clustering(data, doc_topic_mat=None, topic_token_mat=None, feature_names=None, k=15):
+    if not doc_topic_mat:
+        nmf = build_unsup_nmf_topics(n_topics=k)
+        doc_topic_mat = nmf.fit_transform(data.values())
+        feature_names = nmf.named_steps["vectorize"].get_feature_names()
+        topic_token_mat = nmf.named_steps["clust"].components_
 
-    dict_topics = defaultdict(list)
-    for topic_idx, topic in enumerate(components):
-
+    dict_topic_top_words = defaultdict(list)
+    dict_topic_top_docs = defaultdict(list)
+    for topic_idx, topic in enumerate(topic_token_mat):
         print("Topic #%d:" % topic_idx)
         # print(" ".join([feature_names[i] for i in topic.argsort()[:-10:-1]]))
         line = ""
@@ -24,14 +24,25 @@ def nmf_clustering(data):
             term = "".join(feature_names[i])
             line += term
             line += " | "
-            dict_topics[topic_idx].append(term)
+            dict_topic_top_words[topic_idx].append(term)
         print(line)
-    return dict_topics
+    dict_doc_top_topics = defaultdict(list)
+
+    doc_orig_ids = np.array(data.keys())
+    for topic_idx, topic in enumerate(np.transpose(doc_topic_mat)):
+        dict_topic_top_docs[topic_idx].extend(doc_orig_ids[topic.argsort()[:-31:-1]])
+        # print (topic[topic.argsort()[:-30:-1]])
+    for idx, doc_id in enumerate(data.keys()):
+        dict_doc_top_topics[doc_id].extend(doc_topic_mat[idx, :].argsort()[::-1][:15])
+
+    return dict_topic_top_words, dict_doc_top_topics, dict_topic_top_docs
 
 
 def run_models():
-    one_pages = load_data("../../input/pdfs/1page/", "txt")
-    nmf_clustering(one_pages)
+    one_pages = load_text_data("../../input/pdfs/1page/", "txt")
+    dict_topic_top_words, dict_doc_top_topics = nmf_clustering(one_pages)
+
+
 
 
 def main():
