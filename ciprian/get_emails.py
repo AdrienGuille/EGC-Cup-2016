@@ -55,19 +55,20 @@ def replace_diacritics(text):
 		text.replace(elem, diacritics[elem])
 	
 	return text
-	
 
-def replace_specialchars(text):
-	# text = unidecode(text.decode('utf-8'))
-	for elem in "\)\(><\{\}*\n":
-		text.replace(elem, '')
-	addr = text[text.index('@'):]
-	# text.replace(',', ' ')
-	# text = text.split(' ')
-	# if len(text):
-	# 	for elem in text:
-	# 		text.index(elem) = elem + addr
-	return text
+def extract_affiliation(text):
+	for elem in "\)\(><\{\}*|\r\n":
+		text = text.replace(elem, '')
+	unidecode(text.decode('utf8'))
+	
+	text = text.replace(',', ' ')
+	text = text.split(' ')
+	list_affiliations = []
+	for elem in text:
+		if elem and '@' in elem and '.' in elem[elem.index('@'):]:# and len(elem[elem.index('@'):]) > 3:
+			if elem[elem.index('@'):] not in list_affiliations:
+				list_affiliations.append(elem[elem.index('@'):])
+	return list_affiliations
 
 for f in onlyfiles:
 	d_id = int(f[:-4])

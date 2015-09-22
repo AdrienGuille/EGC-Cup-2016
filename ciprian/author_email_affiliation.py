@@ -165,7 +165,6 @@ for elem in mails_authors:
 
 
 #extract emails for authors
-
 for author in author_email:
 	emails = ""
 	affiliations = ""

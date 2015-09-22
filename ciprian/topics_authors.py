@@ -31,6 +31,13 @@ types ={
 
 }
 
+def number_topics(n):
+	if n == 1:
+		return 1
+	elif n>1 and n<19:
+		return int(round(n/2.0))
+	else:
+		return 10
 
 def create_topics(choise):
 	articles_by_author = {}
@@ -44,11 +51,12 @@ def create_topics(choise):
 
 	for author in articles_by_author:
 		no_articles = len(articles_by_author[author])
-		print author, 'topics for:', len(articles_by_author[author]), 'articles:'
 		lda = LDA(dbname=dbname, host='localhost', port=27017, language='FR')
 		query = {'_id': {'$in': articles_by_author[author]}}
 		idx = 0
-		for topic in lda.apply(query=query, num_topics=no_articles, num_words=10, iterations=1500)[0]:
+		no_topics = number_topics(no_articles)
+		print author, 'topics for:', len(articles_by_author[author]), 'articles, no topics', no_topics
+		for topic in lda.apply(query=query, num_topics=no_topics, num_words=10, iterations=1500)[0]:
 			t = ""
 			for elem in topic:
 				t += elem[1] + " "
