@@ -3,7 +3,9 @@
 
 import time
 import random
+import sys
 
+sys.path.append('../')
 from data_manips import get_EGC_articles, load_data_egc
 
 from scholar import query
