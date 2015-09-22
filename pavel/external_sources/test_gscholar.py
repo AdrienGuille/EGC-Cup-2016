@@ -2,7 +2,7 @@
 # coding: utf8
 
 import time
-import random
+from random import randint
 import pandas as pd
 
 from scholar import query
@@ -24,7 +24,7 @@ class GetGScholarInfo():
         pass
 
     def get_gscholar_n_citations(self, title):
-        time.sleep(random.uniform(5, 10))
+        time.sleep(randint(10, 100))
         return query(title)
 
     def load_citations_disk(self):
