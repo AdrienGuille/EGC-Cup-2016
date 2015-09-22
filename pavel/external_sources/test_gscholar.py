@@ -3,12 +3,18 @@
 
 import time
 import random
-import sys
-
-sys.path.append('../')
-from data_manips import get_EGC_articles, load_data_egc
+import pandas as pd
 
 from scholar import query
+
+
+def get_EGC_articles(df):
+    return df[df["booktitle"] == "EGC"]
+
+
+def load_data_egc(data_path):
+    egc_df = pd.read_csv(data_path, sep="\t", error_bad_lines=False, encoding="utf-8")
+    return egc_df
 
 
 class GetGScholarInfo():
