@@ -37,13 +37,25 @@ def extract_affiliation(text):
 	unidecode(text.decode('utf8'))
 	
 	text = text.replace(',', ' ')
+	text = text.replace(';', ' ')
 	text = text.split(' ')
 	list_affiliations = []
 	for elem in text:
 		if elem and '@' in elem and '.' in elem[elem.index('@'):]:# and len(elem[elem.index('@'):]) > 3:
 			if elem[elem.index('@'):] not in list_affiliations:
-				list_affiliations.append(elem[elem.index('@'):])
+				email = elem[elem.index('@'):]
+				if email[-1] == '.':
+					email = email[:-1]
+				list_affiliations.append(email)
 	return list_affiliations
+
+def number_topics(n):
+	if n == 1:
+		return 1
+	elif n>1 and n<19:
+		return int(round(n/2.0))
+	else:
+		return 10
 
 def create_topics(choise):
 	affiliation_articles = {}
@@ -65,11 +77,12 @@ def create_topics(choise):
 
 	for affiliation in affiliation_articles:
 		no_articles = len(affiliation_articles[affiliation])
-		print affiliation, 'topics for:', len(affiliation_articles[affiliation]), 'articles:'
 		lda = LDA(dbname=dbname, host='localhost', port=27017, language='FR')
 		query = {'_id': {'$in': affiliation_articles[affiliation]}}
 		idx = 0
-		for topic in lda.apply(query=query, num_topics=no_articles, num_words=10, iterations=1500)[0]:
+		no_topics = number_topics(no_articles)
+		print affiliation, 'topics for ', len(affiliation_articles[affiliation]), 'articles, no topics', no_topics
+		for topic in lda.apply(query=query, num_topics=no_topics, num_words=10, iterations=1500)[0]:
 			t = ""
 			for elem in topic:
 				t += elem[1] + " "
