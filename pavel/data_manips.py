@@ -1,7 +1,5 @@
 # coding: utf-8
-from collections import defaultdict
-from external_sources.spotlight_access import get_spotlight_annotation
-from ngrams.utils import load_text_data
+
 
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
