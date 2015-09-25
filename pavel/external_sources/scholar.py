@@ -124,7 +124,7 @@ try:
     from http.cookiejar import MozillaCookieJar
 except ImportError:
     # Fallback for Python 2
-    from urllib2 import Request, build_opener, HTTPCookieProcessor
+    from urllib2 import Request, build_opener, HTTPCookieProcessor, ProxyHandler
     from urllib import quote
     from cookielib import MozillaCookieJar
 
@@ -753,7 +753,8 @@ class ScholarQuerier(object):
             except Exception as msg:
                 ScholarUtils.log('warn', 'could not load cookies file: %s' % msg)
                 self.cjar = MozillaCookieJar()  # Just to be safe
-
+        # proxy = ProxyHandler({'http': '111.246.31.239:8888'})
+        # self.opener = build_opener(HTTPCookieProcessor(self.cjar), proxy)
         self.opener = build_opener(HTTPCookieProcessor(self.cjar))
         self.settings = None  # Last settings object, if any
 
@@ -887,8 +888,9 @@ class ScholarQuerier(object):
             err_msg = 'request failed'
         try:
             ScholarUtils.log('info', 'requesting %s' % url)
-
+            proxy = {"http_proxy": "http://181.14.245.194:8000"}
             req = Request(url=url, headers={'User-Agent': ScholarConf.USER_AGENT})
+
             hdl = self.opener.open(req)
             html = hdl.read()
 
@@ -1126,7 +1128,6 @@ scholar.py -c 5 -a "albert einstein" -t --none "quantum theory" --after 1970"""
 
     return 0
 
-
 def query(string_q):
     try:
         querier = ScholarQuerier()
@@ -1135,7 +1136,7 @@ def query(string_q):
         querier.apply_settings(settings)
         query = SearchScholarQuery()
         query.set_phrase(string_q.encode("utf-8"))
-        query.set_scope(True)
+        # query.set_scope(True)
         querier.send_query(query)
         article = querier.articles[0]
         return str(article.attrs['num_citations'][0])

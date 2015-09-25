@@ -1,8 +1,7 @@
 # coding: utf-8
-
-
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
+import re
 
 import logging
 from sys import stdout
@@ -63,6 +62,33 @@ def download_pdfs(df, what_to_download="1page"):
                 filo = open("../input/pdfs/full/{}_URL_INVALID.txt".format(f[1]["id"]), "w")
                 filo.close()
 
+
+def add_new_columns(df):
+    def add_abstract_plus_title(df):
+        df["long_content"] = df["title"] + " " + df["abstract"].fillna("")
+        return df
+
+    def add_abstract_plus_title_lemmas(df):
+        df["short_content"] = df["title"] + " " + df["abstract"].fillna("")
+        return df
+
+    def add_affiliations(df):
+        list_affiliations = []
+        for doc_id in df["id"].values:
+            temp = get_doc_emails(doc_id)
+            if isinstance(temp, list):
+                temp = ", ".join(temp)
+            list_affiliations.append(temp)
+        df["affiliations"] = list_affiliations
+        return df
+
+    df = add_abstract_plus_title(df)
+    df = add_affiliations(df)
+    df = add_abstract_plus_title_lemmas(df)
+    df.to_csv("../input/RNTI_articles_export_fixed1347_ids.txt", sep="\t", encoding="utf-8", index=False,
+              index_label=False)
+
+    return df
 
 def add_index_column(df):
     df["id"] = range(0, len(df))
@@ -169,6 +195,14 @@ def getfull_pdfs(df):
         do_OCR(df, "", 0, list_files=gt)
 
 
+def get_doc_emails(doc_id):
+    try:
+        doc_text = open("../input/pdfs/1page/{}.txt".format(doc_id)).read()
+    except:
+        return []
+    matcho = re.findall(r"@[A-Za-z0-9\._-]+\b", doc_text)
+    return matcho
+    pass
 def get1page_pdfs(df):
     """
     Get the 1page pdfs for all the papers on df
@@ -197,11 +231,11 @@ def get1page_pdfs(df):
 
 
 def main():
-    # df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
+    df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
     # add_index_column(df)
-    # df = get_EGC_articles(df)
+    df = get_EGC_articles(df)
     # df = add_lang_column(df)
-
+    df = add_new_columns(df)
     pass
 
 

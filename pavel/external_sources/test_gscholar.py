@@ -23,8 +23,9 @@ class GetGScholarInfo():
         self.df = egc_df
         pass
 
-    def get_gscholar_n_citations(self, title):
-        time.sleep(randint(10, 100))
+    def get_gscholar_n_citations(self, title, wait=True):
+        if wait:
+            time.sleep(randint(10, 20))
         return query(title)
 
     def load_citations_disk(self):
@@ -60,7 +61,8 @@ class GetGScholarInfo():
                     self.save_citations_disk(citations_dic)
             citations_list.append(n_citations)
         self.df["n_citations"] = citations_list
-        self.df.to_csv("../input/RNTI_articles_export_fixed1347_ids.txt.pba", sep="\t", encoding="utf-8", index=False,
+        self.df.to_csv("../../input/RNTI_articles_export_fixed1347_ids.txt.pba", sep="\t", encoding="utf-8",
+                       index=False,
                        index_label=False)
 
 
