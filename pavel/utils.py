@@ -1,5 +1,5 @@
 from langdetect import DetectorFactory, PROFILES_DIRECTORY
-
+import pandas as pd
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
 
@@ -29,6 +29,11 @@ def load_french_lexicon():
 
 
 # fr_lexicon = load_french_lexicon()
+
+
+def get_EGC_articles(data_path):
+    egc_df = pd.read_csv(data_path, sep="\t", error_bad_lines=False, encoding="utf-8")
+    return egc_df[egc_df["booktitle"] == "EGC"]
 
 
 def french_tokenizer(text):

@@ -1,4 +1,8 @@
 # coding: utf-8
+from collections import defaultdict
+import itertools
+from external_sources.test_gscholar import GetGScholarInfo
+
 __author__ = 'Pavel Soriano'
 __mail__ = 'sorianopavel@gmail.com'
 import re
@@ -37,9 +41,9 @@ def pdf2txt(pdf_folder):
 def download_pdfs(df, what_to_download="1page"):
     import urllib
 
-    if what_to_download == "1page" or what_to_download == "all":
+    if what_to_download == "1page" or what_to_download == "full":
         # Download 1page pdfs
-        logging.info("Downloading 1page pdf files.")
+        logging.info("Downloading {} pdf files.".format(what_to_download))
         for f in df.iterrows():
             try:
                 urllib.urlretrieve(f[1]['pdf1page'], "../input/pdfs/1page/" + str(f[1]['id']) + ".pdf")
@@ -149,7 +153,7 @@ def do_OCR(df, path_txt_files, min_size, list_files=None):
 
 
 def get_EGC_articles(df):
-    return df[df["booktitle"] == "EGC"]
+    return df[df["booktitle"] == "EGC"].copy()
 
 
 
@@ -230,13 +234,51 @@ def get1page_pdfs(df):
         do_OCR(df, "", 0, list_files=gt)
 
 
-def main():
+def add_citations_column():
+    migs = GetGScholarInfo()
+    migs.run()
+
+
+def normalize_affiliations():
     df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
-    # add_index_column(df)
     df = get_EGC_articles(df)
+    affiliations = df.affiliations.fillna("").values
+    affiliations_new = [m.split(", ") for m in affiliations]
+    affiliations_new = [m.lower() for m in list(itertools.chain.from_iterable(affiliations_new)) if len(m) > 5]
+    normalized_affiliations = {}
+    for j in affiliations_new:
+        for k in affiliations_new:
+            if j != k and j[1:] in k:
+                normalized_affiliations[k] = j
+
+    new_affiliations = []
+    for m in affiliations:
+
+        splito = m.split(", ")
+        temp = []
+        for s in splito:
+            if "bat710" in s:
+                pass
+            if len(s) < 5:
+                continue
+            temp.append(normalized_affiliations.get(s.lower(), s.lower()))
+        if not temp or not m:
+            new_affiliations.append("")
+        else:
+            new_affiliations.append(", ".join(temp))
+
+    df["affiliations"] = new_affiliations
+    df.to_csv("../input/RNTI_articles_export_fixed1347_ids.txt", sep="\t", encoding="utf-8", index=False,
+              index_label=False)
+    return new_affiliations
+
+def main():
+    # df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
+    # add_index_column(df)
+    # df = get_EGC_articles(df)
     # df = add_lang_column(df)
-    df = add_new_columns(df)
-    pass
+    # df = add_new_columns(df)
+    normalize_affiliations()
 
 
 if __name__ == "__main__":

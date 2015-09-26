@@ -8,18 +8,19 @@ import pandas as pd
 from scholar import query
 
 
-def get_EGC_articles(df):
-    return df[df["booktitle"] == "EGC"]
-
-
-def load_data_egc(data_path):
+def get_EGC_articles(data_path):
     egc_df = pd.read_csv(data_path, sep="\t", error_bad_lines=False, encoding="utf-8")
-    return egc_df
+    return egc_df[egc_df["booktitle"] == "EGC"]
+
+
+# def load_data_egc(data_path):
+#     egc_df = pd.read_csv(data_path, sep="\t", error_bad_lines=False, encoding="utf-8")
+#     return egc_df
 
 
 class GetGScholarInfo():
     def load_data(self):
-        egc_df = get_EGC_articles(load_data_egc("../../input/RNTI_articles_export_fixed1347_ids.txt"))
+        egc_df = get_EGC_articles("../../input/RNTI_articles_export_fixed1347_ids.txt")
         self.df = egc_df
         pass
 
@@ -47,21 +48,22 @@ class GetGScholarInfo():
         for row in self.df.iterrows():
             title = row[1]["title"]
             id = row[1]["id"]
-            if id in citations_dic:
-                n_citations = citations_dic[id]
-            else:
-                n_citations = self.get_gscholar_n_citations(title)
-
-                if int(n_citations) < 0:
-                    n_citations = ""
-                    print "{} not succeded".format(title.encode("utf-8"))
-                else:
-                    print "{} succeded".format(title.encode("utf-8"))
-                    citations_dic[id] = n_citations
-                    self.save_citations_disk(citations_dic)
+            n_citations = citations_dic.get(id, "")
+            # if id in citations_dic:
+            #     n_citations = citations_dic[id]
+            # else:
+            #     n_citations = self.get_gscholar_n_citations(title)
+            #
+            #     if int(n_citations) < 0:
+            #         n_citations = ""
+            #         print "{} not succeded".format(title.encode("utf-8"))
+            #     else:
+            #         print "{} succeded".format(title.encode("utf-8"))
+            #         citations_dic[id] = n_citations
+            #         self.save_citations_disk(citations_dic)
             citations_list.append(n_citations)
         self.df["n_citations"] = citations_list
-        self.df.to_csv("../../input/RNTI_articles_export_fixed1347_ids.txt.pba", sep="\t", encoding="utf-8",
+        self.df.to_csv("../../input/RNTI_articles_export_fixed1347_ids_ncits.txt", sep="\t", encoding="utf-8",
                        index=False,
                        index_label=False)
 
