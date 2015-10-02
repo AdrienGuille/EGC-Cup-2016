@@ -188,7 +188,7 @@ def getfull_pdfs(df):
     download_pdfs(df, what_to_download="full")
 
     # Convert pdfs to txt
-    pdf2txt("../input/pdfs/1page")
+    pdf2txt("../input/pdfs/full")
 
     # Detect those pdfs that have garbage text and try to obtain the text through OCR
     gt = detect_garbage_text("../input/pdfs/full")
