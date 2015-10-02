@@ -46,7 +46,7 @@ def download_pdfs(df, what_to_download="1page"):
     for f in df.iterrows():
 
         try:
-            urllib.urlretrieve(f[1][col_dict[what_to_download]], "../input/pdfs/{}/".format(col_dict[what_to_download])
+            urllib.urlretrieve(f[1][col_dict[what_to_download]], "../input/pdfs/{}/".format(what_to_download)
                                + str(f[1]['id']) + ".pdf")
             logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
         except:
