@@ -1,0 +1,457 @@
+Résumés et interrogations de logs de requêtes OLAP
+Julien Aligon∗, Patrick Marcel∗, Elsa Negre∗
+∗Université François Rabelais Tours
+Laboratoire d’Informatique
+3 place Jean Jaurès
+41000 Blois
+prénom.nom@univ-tours.fr
+Résumé. Une façon d’assister l’analyse d’entrepôt de données repose sur l’ex-
+ploitation et la fouille de fichiers logs de requêtes OLAP. Mais, à notre connais-
+sance, il n’existe pas de méthode permettant d’obtenir une représentation d’un tel
+log qui soit à la fois concise et exploitable. Dans ce papier, nous proposons une
+méthode pour résumer et interroger des logs de requêtes OLAP. L’idée de base
+est qu’une requête résume une autre requête et qu’un log, qui est une séquence
+de requêtes, résume un autre log. Notre cadre formel est composé d’une algèbre
+simple destinée à résumer des requêtes OLAP, et d’une mesure évaluant la qualité
+du résumé obtenu. Nous proposons également plusieurs stratégies pour calculer
+automatiquement des résumés de logs de bonne qualité, et nous montrons com-
+ment des propriétés simples sur les résumés peuvent être utilisées pour interroger
+un log efficacement. Des tests sur des logs de requêtes MDX ont montré l’intérêt
+de notre approche.
+1 Introduction
+Il est maintenant établi que l’exploitation des logs de requêtes peut aider l’utilisateur qui ana-
+lyse de grandes bases de données ou des entrepôts de données (Khoussainova et al., 2009). C’est
+particulièrement le cas dans un contexte collaboratif, par exemple pour proposer des recomman-
+dations (Chatzopoulou et al., 2009; Giacometti et al., 2009a,b; Stefanidis et al., 2009). Mais, à
+notre connaissance, même le simple fait de fournir à l’utilisateur une représentation concise, i.e.
+un résumé, de ce qui apparaît dans un log de grande taille n’a que très rarement été abordé dans la
+littérature (Khoussainova et al., 2009). Or un résumé aurait de nombreux avantages, comme aider
+l’administrateur à paramétrer le serveur OLAP s’il indique les membres fréquemment accédés,
+permettre à un utilisateur d’avoir une première idée du genre de requêtes lancées par d’autres
+utilisateurs, ou aider l’utilisateur à lancer de nouvelles sessions d’analyse, par exemple en ne
+refaisant pas ce qui a déjà été fait, ou à écrire de nouvelles requêtes, en partant de, ou en prenant
+exemple sur, ce qui a déjà été fait.
+Dans cet article, nous développons les travaux entrepris sur le résumé de log de requêtes
+OLAP (Aligon et al., 2010a), où nous proposions un langage de manipulation de requêtes (ap-
+pelé QSL) pour résumer des requêtes OLAP, une mesure de la qualité d’un résumé et un algo-
+rithme glouton de construction automatique de résumés de log de requêtes utilisant QSL. Sur
+Résumés et interrogations de logs de requêtes OLAP
+FIG. 1 – Les dimensions de notre exemple jouet
+cette base, nous proposons un nouvel algorithme de calcul de résumés et deux sous-langages de
+QSL dont nous étudions les propriétés. Nous indiquons comment ces propriétés sont utilisées
+pour interroger un log. Finalement, nous présentons l’implémentation de notre cadre et quelques
+tests illustrant son efficacité.
+Ce papier est organisé comme suit. La section suivante motive et présente notre approche.
+Nous rappelons notre cadre dans les sections 3 et 4, en ajoutant les propriétés des opérateurs
+de QSL. Dans la section 5, nous présentons notre nouvel algorithme de résumé et introduisons
+quelques propriétés des résumés obtenus à l’aide des sous-langages deQSL. La section 6 présente
+l’exploitation des propriétés de notre cadre pour interroger des logs. La section 7 présente notre
+implémentation et les tests conduits. Nous discutons des travaux connexes et concluons dans la
+section 8.
+2 Motivation et présentation intuitive
+Dans cette section, nous illustrons via un exemple jouet l’intérêt de notre méthode et son
+fonctionnement. L’exemple se base sur un cube de données décrivant des ventes de boissons, et
+dont les dimensions sont données Figure 1. Considérons que les requêtes déjà lancées par un
+utilisateur sur cet entrepôt sont loggées sous forme de la séquence L = ￿q1, q2, q3￿ où chaque
+requête demande respectivement :
+q1 les ventes de Pepsi et Coke pour July 2008, à Paris et Marseille,
+q2 les ventes de Coke pour July 2008, dans les régions North et South,
+q3 les ventes d’Orangina pour le second semestre 2008, dans les régions North et South.
+Tout d’abord notons que plusieurs manières de résumer sont pertinentes. Par exemple, en
+résumant le log par la seule requête mentionnant les membres les plus fréquemment interrogés, ce
+qui intéressera un administrateur souhaitant savoir quels indexes positionner. Dans notre exemple
+une telle requête demanderait les ventes de Coke dans les régions North et South pour July 2008
+(la requête q2). Une autre manière de résumer permettrait à un utilisateur de savoir grossièrement
+ce qui a été fait sur le cube, sous la forme d’une requête interrogeant les ventes de soda en France
+en 2008. Si l’utilisateur est intéressé par plus de détails, il pourra ensuite interroger le log pour
+trouver des requêtes précises. Un autre intérêt d’un résumé, plus compact qu’un log, est donc de
+pouvoir être utilisé en amont du log pour rendre l’interrogation plus efficace.
+Dans ce papier, nous proposons que les résumés soient exprimés de manière flexible et dé-
+clarative via un langage de manipulation de requêtes appelé QSL. Les expressions définies avec
+cette algèbre permettent de résumer plusieurs requêtes en les combinant sous la forme d’une
+seule requête. Pour appliquer ce principe à un log, nous proposons un algorithme construisant
+J. Aligon et al.
+des expressions de QSL pour résumer des sous-séquences du log. La qualité des résumés ainsi
+produits est évaluée par le biais d’une mesure étendant les mesures classiques de rappel et préci-
+sion.
+3 Le langage QSL
+Dans cette section, nous définissons formellement notre langage de résumé de requêtes.
+3.1 Définitions préliminaires
+Comme notre langage de résumé de requêtes est adapté aux requêtes OLAP, nous commen-
+çons par définir une requête OLAP. Notons que dans cet article, nous ne nous intéressons pas
+au résultat de la requête de sorte que la définition d’un résultat de requête n’est pas donnée. Un
+cube n-dimensionnel C = ￿D1, ..., Dn, F ￿ est défini comme les n+1 instances de relation d’un
+schéma en étoile avec une instance de relation pour chacune des n dimensionsDi et une instance
+de relation pour la table de faits F . Pour une dimension Di de schéma Si = {Li1, . . . , Lidi},
+un membre m est une constante de
+￿
+Lij∈S πLij (Di). Pour une dimension Di, nous considérons
+que les membres sont arrangés selon une hiérarchie <i et nous notons m <i m￿ (ou m < m￿
+lu m￿ couvre m) le fait que le membre m￿ est un ancêtre de m dans cette hiérarchie. Soit un
+tel cube, une référence de cellule (ou cellule par abus) est un n-uplet ￿m1, ...,mn￿ où mi est un
+membre de la dimension Di, ∀i ∈ [1, n]. Nous définissons des requêtes multidimensionnelles
+comme des ensembles de références qui peuvent être exprimés comme des produits cartésiens
+de multi-ensembles. La raison pour laquelle nous utilisons des multi-ensembles est qu’ainsi nous
+pouvons définir des opérateurs qui comptent le nombre d’occurrences des membres.
+Soit un cube n-dimensionnel C = ￿D1, . . . , Dn, F ￿ et Ri un multi-ensemble de membres
+de dimension Di, ∀i ∈ [1, n]. Une requête q sur C est un multi-ensemble de références q =
+R1 × . . .×Rn. Un log L est une séquence de requêtes notée L = ￿q1, . . . , qm￿. L’ensemble des
+requêtes apparaissant dans un log L est noté queries(L).
+Par la suite, nous considérons un cube n-dimensionnel C = ￿D1, . . . , Dn, F ￿. Dans les défi-
+nitions suivantes, i varie entre 1 et n. Pour une requête q donnée, mi(q) est son multi-ensemble
+de membres dans la dimensionDi. Une requête q sera notée×imi(q) et le multi-ensemblemi(q)
+sera noté ￿Si, fi￿ où Si est un ensemble et fi une fonction retournant les occurrences de chaque
+élément de Si.
+Exemple 3.1 Considérons les trois requêtes q1, q2 et q3 de notre exemple décrit dans la sec-
+tion précédente. Nous avons m1(q1) = {Pepsi, Coke}, m2(q1) = {July08}, m3(q1) =
+{Paris,Marseille}. Cette requête est l’ensemble de références : q1 = {Pepsi, Coke}×
+{July08} × {Paris,Marseille}. Les ensembles de références de q2 et q3 sont : q2 =
+{Coke}× {July08}× {North, South} et q3 = {Orangina}× {S2-08}× {North, South}.
+3.2 Les opérateurs de QSL
+QSL est un langage algébrique composé d’opérateurs unaires et binaires qui manipulent des
+requêtes et retournent une requête, appelée la requête résumée (ou résumé par abus). Ces opé-
+rateurs construisent une nouvelle requête à partir de celle(s) en paramètre en traitant chaque
+Résumés et interrogations de logs de requêtes OLAP
+dimension indépendamment les unes des autres. Nous présentons maintenant formellement ces
+opérateurs en commençant par les opérateurs binaires, qui sont les opérateurs ensemblistes clas-
+siques (Garcia-Molina et al., 2008) étendus à plusieurs dimensions, ainsi qu’un opérateur de
+priorité qui retourne une requête parmi ses deux paramètres.
+Définition 3.1 (Opérateurs binaires) Soient deux requêtes q1 et q2 et l’opérateur op ∈ {∪B ,
+∩B , \B}, q1 op q2 = ×i(mi(q1) op mi(q2)). Soient deux requêtes q1 et q2, q1 ￿ q2 = q1.
+Les opérateurs unaires sont au nombre de 3.mostfreq retourne, pour une requête q donnée
+en paramètre, une requête pour laquelle seuls les membres les plus fréquents de q dans chaque
+dimension sont retenus.max retourne, pour une requête q donnée en paramètre, une requête pour
+laquelle seuls les membres les plus couvrants de q dans chaque dimension sont retenus, selon la
+hiérarchie de la dimension. lca retourne, pour une requête q donnée en paramètre, une requête
+pour laquelle seuls les plus petits ancêtres communs des membres de q dans chaque dimension
+sont retenus, selon la hiérarchie de la dimension.
+Définition 3.2 (Opérateurs unaires) Soit q une requête telle que mi(q) = ￿Si, fi￿ pour tout
+i. mostfreq(q) = ×i￿S￿i = {m ∈ Si|￿m￿ ∈ Si, fi(m￿) > fi(m)}, fi|
+S￿i
+￿ (fi|X désigne
+la restriction de la fonction fi à l’ensemble X). max(q) = ×i￿S￿i = {m ∈ mi(q)|￿m￿ ∈
+mi(q),m <i m￿}, fi|
+S￿i
+￿. Soit lca la fonction qui retourne, pour un ensemble donné de membres
+M de la dimension Di, leur ancêtre commun selon <i, i.e., {m ∈ Di|∀m￿ ∈ M,m￿ <i m
+∧￿m￿￿,m￿ <i m￿￿m￿￿ <i m}. lca(q) = ×ilca(mi(q)).
+Exemple 3.2 Considérons les deux premières requêtes de l’Exemple 3.1, nous avons :
+– q4 = q1 ∪B q2 = {Pepsi, Coke, Coke} × {July08, July08} × {Paris, Marseille,
+North, South}
+– q5 = q1 ∩B q2 = {Coke}× {July08}× ∅ = ∅
+– q6 = q1 \B q2 = {Pepsi}× ∅ × {Paris,Marseille} = ∅
+– mostfreq(q4) = {Coke, Coke} × {July08, July08} × {Paris,Marseille, North,
+South}
+– max(q4) = {Pepsi, Coke, Coke} × {July08, July08} × {North, South}
+– lca(q4) = {Soda}× {S2-08}× {France}
+Considérons le log L composé des trois requêtes L = ￿q1, q2, q3￿. Si nous résumons
+ce log en ne gardant que les références communes à toutes les requêtes, nous obtenons :
+q1s = q1 ∩B q2 ∩B q3 = ∅. Si nous résumons en fonction des fréquences sur ces requêtes,
+nous obtenons : q2s = mostfreq(q1 ∪B q2 ∪B q3) = {Coke, Coke} × {July08, July08} ×
+{North,North, South, South}. Si nous résumons en fonction du lca, nous obtenons : q3s =
+lca(q1 ∪B q2 ∪B q3) = {Soda}× {2008}× {France}.
+3.3 Propriétés des opérateurs de QSL
+Nous donnons maintenant quelques propriétés simples et aisément démontrables vérifiées par
+les opérateurs de QSL. Certaines de ces propriétés, comme la distributivité de max ou la com-
+mutativité demax et lca sont utilisées dans l’implémentation de notre cadre. Soient q, q1, q2 des
+requêtes. Les opérateurs ∪B ,∩B , \B conservent leurs propriétés classiques. max et mostfreq
+sont idempotents : max(max(q)) = max(q) et mostfreq(mostfreq(q)) = mostfreq(q).
+J. Aligon et al.
+max est distributif sur ∪B et sur \B : max(q1 ∪B q2) = max(max(q1) ∪B max(q2)) et
+max(q1 \B q2) = max(q1 \B max(q2)). ￿ est associatif : q ￿ (q1 ￿ q2) = (q ￿ q1)￿ q2 = q.
+max et lca commutent :max(lca(q)) = lca(max(q)) = lca(q). Finalement,mostfreq(lca(q))
+= lca(q).
+4 Mesure de qualité d’un résumé
+Cette section présente la mesure utilisée pour évaluer la qualité d’un résumé. Nous introdui-
+sons cette mesure intuitivement puis donnons sa définition formelle, avant de conclure sur les
+propriétés des opérateurs de QSL vis-à-vis de cette mesure.
+4.1 Intuition
+Nous cherchons à évaluer si une requête (resp., un log), qui correspond à un ensemble de
+références (resp., requêtes), résume fidèlement une autre requête (resp., un autre log). Les opéra-
+teurs de QSL résument en conservant, ajoutant ou retirant des références aux requêtes à résumer
+pour constituer le résumé. Une manière d’évaluer cette fidélité est de mesurer la proportion de
+ce qui est ajouté ou enlevé par l’opérateur. Nous nous sommes donc tournés vers les mesures
+de rappel et précision classiques en recherche d’information. Dans notre cas, ces mesures de-
+vraient être étendues pour prendre en compte la relation de couverture exploitée par les opéra-
+teurs. Par exemple, considérons l’expression lca(q1 ∪ q2) de l’exemple 3.2 résumant q1 et q2 par
+{Soda}× {S2-08}× {France}. Cette expression résume en retirant toutes les références de q1
+et q2 et ajoute la référence r = {Soda}× {S2-08}× {France}, ce qui donne un rappel et une
+précision nulle. Or on pourrait considérer que ce résumé est fidèle dans le sens où la référence
+ajoutée couvre les références retirées ; le rappel serait donc excellent et la précision dépendrait
+du nombre de références couvertes par la référence ajoutée r et non présentes dans les références
+retirées de q1 ou q2.
+Ainsi, nous proposons d’étendre rappel et précision par la prise en compte d’une relation de
+couverture. Pour être le plus général possible, nous choisissons la relation de couverture définie
+sur les références puisque tant les requêtes que les logs peuvent être assimilés à des ensembles
+de références. Ainsi définie de manière générale, cette mesure présente l’intérêt de pouvoir être
+appliquée sur deux requêtes ou deux logs, ou n’importe quel couple d’ensembles de références.
+4.2 Définitions et propriétés
+Nous définissons tout d’abord la notion de couverture d’une référence par une autre et de
+couverture d’un ensemble de références.
+Définition 4.1 (Couverture) Une référence r = ￿m1, ...,mn￿ couvre une référence r￿ = ￿m￿1, ...,
+m￿n￿ si ∀i ∈ [1, n], mi >i m￿i ou mi = m￿i. Pour un ensemble de références R, cover(R) =
+{f ∈ ΠL11(D1)×ΠL21(D2)× ...×ΠLn1 (Dn) | ∃r ∈ R, r covers f}
+Reprenons l’exemple plus haut. L = q1∪q2,R = lca(q4). AppelonsK = L∩R,D = L\K
+et A = R \ K. K = ∅ et cover(A) = {Pepsi, Coke,Orangina}× {July08, August08,
+September08, October08, November08, December08} ×{Paris,Blois,Marseille} avec
+|cover(A)| = 54. cover(D) = {Pepsi, Coke}×{July08}×{Paris,Marseille}∪{Coke}×
+Résumés et interrogations de logs de requêtes OLAP
+{July08} × {Blois} et |cover(D)| = 5. Nous avons cover(D) ⊂ cover(A). Dans ce cas, on
+s’attend à un rappel maximum et une précision mauvaise.
+Ainsi, nous proposons un rappel mesurant la proportion de références de cover(D) trouvées
+dans cover(A) par rapport aux références de cover(D), tout en favorisant un K maximal. Dua-
+lement, une précision mesurera la proportion de références de cover(D) trouvées dans cover(A)
+par rapport aux références de cover(A), tout en favorisant un K maximal. Bien évidemment, si
+le résumé est l’ensemble vide, alors nous considérons que p = r = 0.
+Définition 4.2 (hf-measure) Soient L et R deux ensembles tels que K = L ∩ R, D = L \K et
+A = R \ K et {D1, ..., Dn} un ensemble de dimensions permettant de calculer la couverture.
+Le h-recall est défini par r = |K ∪ (cover(D) ∩ cover(A))||K ∪ cover(D)| et la h-precision est définie par p =
+|K ∪ (cover(D) ∩ cover(A))|
+|K ∪ cover(A)| . Ces deux mesures sont agrégées par une F-mesure classique, hf-
+measure (L,R, {D1, ..., Dn}) = 2 × p × rp + r .
+Notons que tous les opérateurs de QSL maximisent soit le h-recall ou soit la h-precision :
+l’opérateur ∪B et l’opérateur lca conduisent à un h-recall de 1, la h-precision étant entre 0 et
+1, et tous les autres opérateurs conduisent à une h-precision de 1, le h-recall étant entre 0 et 1.
+Finalement, la propriété suivante est aisément démontrable.
+Propriété 4.1 (hf-measure maximale) Soient L et R deux ensembles et {D1, ..., Dn} un en-
+semble de dimensions permettant de calculer la couverture. hf-measure (L,R, {D1, ..., Dn}) =
+1 si et seulement si R et L couvrent exactement le même ensemble de références.
+5 Résumé d’un log
+Dans cette section, nous présentons les algorithmes permettant de résumer un log en utilisant
+QSL et la mesure de qualité définie ci-dessus. Le détail de ces algorithmes est disponible dans
+(Aligon et al., 2010b).
+5.1 Algorithmes de résumé
+L’algorithme SummarizeLog est un algorithme glouton qui résume un log en résumant suc-
+cessivement des requêtes au moyen des opérateurs de QSL, jusqu’à atteindre une taille donnée.
+L’expression QSL employée est celle qui maximise la mesure de qualité tout en faisant varier le
+log. Le choix de l’expression utilise deux stratégies. La première teste pour chaque requête ou
+couple de requêtes consécutives quelle opération de QSL maximise la qualité, l’expression QSL
+est alors l’application de cette opération (stratégie 1). La seconde teste pour chaque couple de
+requêtes consécutives quelle opération binaire de QSL maximise la qualité, applique cette opé-
+ration, puis teste sur le résultat quel opérateur unaire maximise la qualité. L’expression QSL est
+alors de la forme u(q b q￿) où u est un opérateur unaire et b un opérateur binaire (stratégie 2).
+Un résumé est donc également un log. Dans ce qui suit, si S = ￿q1, . . . , qm￿ est un résumé,
+nous appelons query(qi) l’ensemble des requêtes impliquées dans l’expression QSL de qi. La
+qualité testée à chaque itération de SummarizeLog est une qualité “locale” entre la ou les
+requêtes intervenant dans l’expression QSL et le résultat de l’expression. Une qualité “globale”
+pourra être évaluée entre le log initial et son résumé.
+J. Aligon et al.
+5.2 Propriétés des résumés
+Notons tout d’abord qu’un résumé S d’un log L définit une partition de L. Par construction,
+chaque requête de S est définie par une expression QSL impliquant une sous-séquence distincte
+de requêtes de L.
+Propriété 5.1 (Partitionnement) Un résumé S = ￿s1, . . . , sm￿ d’un log L définit une partition
+de L où chaque si résume par une expression QSL une sous-séquence non vide de L, les sé-
+quences ainsi résumées étant deux à deux disjointes et recouvrant l’intégralité de L.
+En utilisant les propriétés des opérateurs de QSL, nous identifions deux sous-langages parti-
+culiers appelés respectivementQSLr etQSLp.QSLr est le langage composé des opérateurs maxi-
+misant le h-recall i.e., QSLr ={∪B , lca} et QSLp est le langage composé des opérateurs maximi-
+sant la h-precision, i.e., QSLp ={∩B , \B ,￿,mostfreq,max}. Ces deux langages conduisent à
+deux propriétés simples. Appelons pour une requête q,member(q) l’ensemble des membres ap-
+paraissant dans q, i.e.,member(q) =
+￿
+imi(q) et pour un ensemble de requêtesX ,member(X)
+=
+￿
+q∈X member(q).
+Propriété 5.2 (Requête obtenue avec QSLr) Soit qr une requête définie par une expression de
+QSLr et m un membre. S’il n’existe pas de membre m￿ ∈ member(qr) tel que m￿ ≥ m alors
+m ￿∈ member(query(qr)) et ￿m￿￿ ∈ member(query(qr)) tel que m > m￿￿. Par contre si
+∃m￿ ∈ member(qr) tel quem > m￿ alors ∃m￿￿ ∈ member(query(qr)) tel quem > m￿￿.
+Cette propriété indique notamment que si un résumé est construit uniquement à l’aide d’opé-
+rations maximisant le h-recall, tout membre non couvert par un membre du résumé n’apparaît
+pas dans les requêtes intervenant dans l’expression. Une propriété duale concerne la h-precision.
+Propriété 5.3 (Requête obtenue avec QSLp) Soit qp une requête définie par une expression de
+QSLp etm un membre. Sim ∈ member(qp) alorsm ∈ member(query(qp)).
+Ces deux propriétés s’étendent trivialement aux résumés.
+Propriété 5.4 (Résumé obtenu avec QSLr) Soit Sr un résumé construit avec des expressions
+QSLr à partir d’un log L. Si un membre m n’est pas couvert par un membre de Sr, alors ni m
+ni aucun m￿ couvert par m n’apparaît dans L. Par contre si m couvre des membres de Sr, m
+couvre des membres de L.
+Propriété 5.5 (Résumé obtenu avec QSLp) Soit Sp un résumé construit avec des expressions
+QSLp à partir d’un log L. Un membre m apparaissant dans Sp apparaît nécessairement dans
+L.
+La section suivante illustre l’intérêt de ces propriétés.
+6 Interrogation d’un log
+Dans cette section, nous illustrons l’utilisation des propriétés données ci-dessus pour interro-
+ger efficacement un log, en utilisant des résumés pour accéder uniquement à des sous-ensembles
+du log. Nous considérons des recherches simples sur un log, comme par exemple : existe t-il des
+Résumés et interrogations de logs de requêtes OLAP
+requêtes du log qui comportent le membre m, ou un membre couvert par m ? Quelles sont les
+requêtes du log qui comportent le membre m, le croisement m × m￿, ou un membre couvert
+parm ? Quelles sont les requêtes du log qui suivent une requête comportant le membrem ? Ces
+recherches sont exprimées à l’aide des opérations suivantes.
+Définition 6.1 (Recherche dans un log) Soit L un log et m un membre. lookup(m) ≡
+∃q ∈ queries(L),m ∈ members(q). lookupDescendant(m) ≡ ∃q ∈ queries(L), ∃m￿ ∈
+members(q), m > m￿. getQueries(m) = {q ∈ queries(L)|∃m ∈ members(q)}.
+getCoveredQueries(m) = {q ∈ queries(L)|∃m￿ ∈ members(q),m > m￿}.
+getSuccessors(m) = {q ∈ queries(L)|∃q￿ ∈ queries(L),m ∈ members(q￿), ￿q￿, q￿ ⊆ L}
+Supposons que deux résumés soient disponibles pour un log L, le premier Sr construit avec
+QSLr et le second Sp construit avec QSLp. Nous décrivons brièvement les deux algorithmes à
+la base de l’implémentation de ces opérations (ces algorithmes sont détaillés dans (Aligon et al.,
+2010b)).
+Considérons l’opération lookup(m). Les propriétés 5.4 et 5.5 assurent que si m est pré-
+sent dans Sp alors lookup(m) = true et si m n’est pas couvert par un membre de Sr alors
+lookup(m) = false. Dans le cas contraire, les propriétés 5.1 et 5.2 assurent qu’il est suffisant de
+chercher parmi les requêtes de L figurant dans la définition des requêtes de Sr dont un membre
+couvre m. L’algorithme de lookup, basé sur ces propriétés, est donné ci-dessous. Il sert égale-
+ment de base à l’algorithme de lookupDescendant, où il suffit d’exploiter la dernière partie de
+la propriété 5.4.
+Exemple 6.1 Soit le log de l’exemple 3.1 et ses résumés Sr = ￿q￿1, q￿2￿ et Sp = ￿q￿3￿, où q￿1 =
+lca(q1) = {Soda} × {S2-08} × {North, South}, q￿2 = q2 ∪B q3 = {Coke,Orangina} ×
+{July08, S2-08}×{North, South}, et q￿3 = q1￿q2￿q3 = q1 = {Pepsi, Coke}×{July08}×
+{Paris,Marseille}. L’appel à lookup(Pepsi) uniquement à Sp pour répondre true et l’appel
+à lookup(France) nécessite uniquement d’accéder à Sp et Sr pour répondre false. L’appel
+à lookup(Orangina) nécessite uniquement d’accéder à Sp et Sr pour répondre true. Pour
+répondre false, l’appel à lookup(August08) nécessite d’accéder à Sp, Sr et finalement q1,
+mais évite d’accéder à q2 et q3 puisque August08 ne peut pas apparaître dans les opérandes
+d’une union dont le résultat ne le contient pas.
+L’algorithme de getQueries se déduit aisément de celui de lookup, en retournant les re-
+quêtes pertinentes de candidateQueries au lieu d’un booléen. getQueries permet également
+de trouver les requêtes où un croisement de membres m × m￿ apparaît, qui correspondent à
+getQueries(m)∩getQueries(m￿), et par extension les requêtes où des références apparaissent.
+getQueries est à la base de getCoveredQueries puisqu’il suffira d’ajouter pour cet opérateur
+le cas correspondant à la dernière partie de la propriété 5.4. Finalement, getQueries sera uti-
+lisée pour l’opération getSuccessors si les requêtes du log sont stockées dans l’ordre de leur
+apparition dans le log.
+7 Implémentation et tests
+QSL, hf-measure, SummarizeLog et lookup ont été implémentés en Java 6 pour résumer
+des logs de requêtes MDX. L’implémentation a été faite en considérant que les dimensions
+J. Aligon et al.
+concernées résident en mémoire. Celles-ci sont représentées par des arbres stockant pour chaque
+membre la cardinalité de sa couverture au niveau le plus fin. Les algorithmes de calcul de hf-
+measure se trouvent dans (Aligon et al., 2010a). Les tests ont été réalisés sur un Core 2 Duo
+E8400 à 3,00 GHz, avec 3,48 Go de RAM exploitables sous windows XP pro SP3. Les logs
+utilisés proviennent de logs synthétiques sur la base de données exemple FoodMart fournie avec
+le moteur OLAP Mondrian. Par manque de place, nous ne détaillons pas comment les logs sont
+générés ; cette génération, simulant une analyse OLAP, est expliquée dans (Negre, 2009). Les
+logs générés ont une densité assez élevée (5 dimensions parmi les 13 possibles sont utilisées
+pour naviguer). Ils sont répartis en 4 fichiers de respectivement 119, 242, 437 et 905 requêtes.
+Par manque de place, seuls quelques tests sont présentés, le lecteur intéressé pourra se référer à
+(Aligon et al., 2010b). Dans ce qui suit, les tailles de résumés sont exprimées en fraction de la
+taille du log original.
+Le premier test a pour but de connaître la fréquence d’apparition de chaque opérateur de
+QSL dans les expressions construites par SummarizeLog. Le résultat de ce test montre que de
+manière générale, aucun opérateur n’est jamais utilisé, même si les fréquences d’apparitions
+sont très diverses. Pour QSL, on observe que la mesure hf-measure tend à privilégier l’opération
+d’union et le lca. Pour QSLp, mostfreq n’est pas utilisé car les opérateurs ensemblistes de QSLp
+n’engendrent pas de multi-ensembles.
+Le test suivant concerne le temps d’exécution de l’algorithme SummarizeLog dans ses deux
+stratégies présentées section 5. La figure 2 (a) montre que le temps mis par SummarizeLog évolue
+de manière polynomiale avec la taille du log à résumer et s’avère assez couteux pour des logs
+importants. Ce temps reste néanmoins bien plus acceptable pour QSLr (figure 2 (b)) puisqu’il
+suffit de 10 minutes environ avec la deuxième stratégie pour réduire le plus gros fichier log de
+80 %. De manière générale, la stratégie 2 reste plus efficace, demandant moins de tests de qualité
+(partie la plus couteuse de l’algorithme SummarizeLog).
+(a) (b)
+FIG. 2 – Efficacité de SummarizeLog
+Nous nous focalisons maintenant sur QSLr, qui est le langage permettant de générer les
+résumés à la base de la recherche dans le log. Le test suivant concerne la qualité globale des
+résumés obtenus avec QSLr, d’une part en utilisant hf-measure (en l’occurrence h-precision)
+entre toutes les références d’un log initial et celles des résumés obtenus (figure 3 (a)), et d’autre
+part en regardant la proportion de requêtes inintéressantes dans les résumés obtenus, une requête
+inintéressante ayant uniquement le membre All dans toutes les dimensions (figure 3 (b)). La
+Résumés et interrogations de logs de requêtes OLAP
+qualité globale se dégrade très vite (le rapport entre l’intersection des couvertures et la couverture
+donne une hf-measure très faible) ce qui est du à l’opération de lca, puis augmente grâce à
+l’opération d’union jusqu’à atteindre le maximum et s’y stabiliser. La dernière chute s’expliquant
+par l’utilisation d’un lca détériorant à nouveau la h-precision. On peut noter également que la
+rapidité d’atteinte de la valeur maximale de qualité est fonction du nombre de requêtes du log.
+Ceci est compréhensible car les logs ont une densité assez élevée. Ainsi, plus il y a de requêtes
+dans le log, mieux celles-ci couvrent la zone du cube visitée. Il y a donc moins de chance qu’en
+résumant par un lca la qualité soit dégradée. Le nombre de requêtes inintéressantes augmente
+tout d’abord, parce qu’elles bénéficient d’un bon h-recall, jusqu’à ce que leur présence dégrade
+trop la h-precision, elles sont alors « absorbées » par les autres requêtes. On constate finalement
+que la stratégie 1, qui utilise le lca moins systématiquement, donne de meilleurs résultats. Des
+tests menés avec QSL montrent un comportement similaire.
+(a) (b)
+FIG. 3 – Qualité des résumés obtenus avec QSLr
+Finalement, le dernier test concerne l’efficacité de lookup. La figure 4 montre le gain moyen
+en rapidité pour une recherche par lookup (3210 membres tirés aléatoirement) à partir des deux
+résumés calculés avec QSLp et QSLr de deux logs. Le gain est significatif pour de petits résumés.
+Notons toutefois que log comme résumés résident en mémoire.
+FIG. 4 – Efficacité de lookup
+J. Aligon et al.
+8 Travaux existants et perspectives
+Le résumé de données structurées est un sujet abordé dans de nombreux domaines comme
+les logs de serveurs web (Zadrozny et Kacprzyk, 2007), l’extraction de motifs (voir par exemple
+(Ndiaye et al., 2010) qui inclut un état de l’art), les séquences d’évènements (Peng et al., 2007),
+les bases de données (Saint-Paul et al., 2005), les flux de données multidimensionnelles (Pitarch
+et al., 2010) et les cubes de données (Lakshmanan et al., 2002). Plusieurs de ces travaux sont ba-
+sés sur la théorie des ensembles flous (Zadrozny et Kacprzyk, 2007; Saint-Paul et al., 2005) et/ou
+sont des techniques de compression pour lesquelles il est important que les données originales
+puissent être régénérées (Lakshmanan et al., 2002; Ndiaye et al., 2010). En outre, il peut arriver
+que le résumé ne soit pas du même type que les données qu’il résume. Dans le domaine des bases
+de données (Saint-Paul et al., 2005; Lakshmanan et al., 2002), le résumé est appliqué à l’instance
+de la base de données où, dans le cas de données OLAP, les valeurs des mesures sont prises en
+compte. Golfarelli (2003) analyse un log de requêtes OLAP, mais uniquement pour choisir des
+vues à matérialiser, non pour le résumer.
+Dans cet article, nous proposons de résumer un log de requêtes OLAP, c’est à dire une sé-
+quence de requêtes lancées sur une base de données et non une instance de la base de données.
+Pour résumer, nous nous appuyons essentiellement sur l’information directement disponible via
+les hiérarchies décrites dans les tables de dimension. Nous n’avons pas besoin de supposer des
+descriptions imprécises via, par exemple, la théorie des ensembles flous. Le type du résumé est
+le même que celui des données résumées : une requête résume une autre requête et un log résume
+un autre log. Nous ne nous intéressons pas à la régénération des données à partir du résumé, mais
+à son utilisation pour interroger efficacement un log. Nos contributions s’appuient sur un langage
+de résumé de requêtes qui permet de spécifier un résumé, une mesure pour évaluer la qualité d’un
+résumé et un algorithme pour calculer automatiquement un résumé de log de requêtes de bonne
+qualité. Notre approche est implémentée pour résumer des logs de requêtes MDX et quelques
+tests préliminaires illustrent son intérêt.
+A notre connaissance, il n’existe aucun travail traitant du problème de la représentation
+concise et exploitable d’un log de requêtes sur une base de données. Comme indiqué dans
+(Khoussainova et al., 2009), de nombreux SGBD fournissent un service de logging de requêtes
+mais principalement à des fins de tuning physique, sans visualisation conviviale adaptée à la na-
+vigation. Dans nos travaux précédents (Colas et al., 2010), nous proposons d’organiser un log de
+requêtes OLAP sous la forme d’un site Web. Mais, si le log est volumineux, naviguer dans ce site
+Web peut être fastidieux. Un outil efficace de visualisation et de navigation de log doit encore
+être développé et ce travail est un pas dans cette direction.
+Nos futurs travaux devront étudier l’efficacité du cadre pour l’analyse en ligne. Nous abor-
+derons notamment son extension à un contexte collaboratif où un log n’est pas seulement une
+séquence de requêtes mais est composé de plusieurs séquences de requêtes lancées par différents
+utilisateurs. A cette fin nous n’excluons pas de modifier le langage QSL, ce qui pourrait donner
+lieu à une véritable algèbre pour manipuler les requêtes.
+Références
+Aligon, J., P. Marcel, et E. Negre (2010a). A framework for summarizing a log of OLAP queries.
+In IEEE ICMWI, Special Track on OLAP and Data Warehousing.
+Résumés et interrogations de logs de requêtes OLAP
+Aligon, J., P. Marcel, et E. Negre (2010b). Résumé et interrogation de logs de requêtes OLAP.
+Technical report, Université François Rabelais Tours. http ://www.info.univ-tours.fr/˜aligon_j.
+Chatzopoulou, G., M. Eirinaki, et N. Polyzotis (2009). Query recommendations for interactive
+database exploration. In SSDBM, pp. 3–18.
+Colas, S., P. Marcel, et E. Negre (2010). Organisation de log de requêtes OLAP sous forme de
+site web. In EDA 2010, Volume B-6 of RNTI, Toulouse, pp. 81–95. Cépaduès.
+Garcia-Molina, H., J. D. Ullman, et J. Widom (2008). Database Systems : The Complete Book.
+Upper Saddle River, NJ, USA : Prentice Hall Press.
+Giacometti, A., P. Marcel, et E. Negre (2009a). Recommending multidimensional queries. In
+DaWaK, pp. 453–466.
+Giacometti, A., P. Marcel, E. Negre, et A. Soulet (2009b). Query recommendations for olap
+discovery driven analysis. In DOLAP, pp. 81–88.
+Golfarelli, M. (2003). Handling large workloads by profiling and clustering. In DaWaK, pp.
+212–223.
+Khoussainova, N., M. Balazinska, W. Gatterbauer, Y. Kwon, et D. Suciu (2009). A case for a
+collaborative query management system. In CIDR. www.crdrdb.org.
+Lakshmanan, L. V. S., J. Pei, et J. Han (2002). Quotient cube : How to summarize the semantics
+of a data cube. In VLDB, pp. 778–789. Morgan Kaufmann.
+Ndiaye, M., C. T. Diop, A. Giacometti, P. Marcel, et A. Soulet (2010). Cube based summaries
+of large association rule sets. In ADMA (1), pp. 73–85.
+Negre, E. (2009). Exploration collaborative de cubes de données. Ph. D. thesis, Université
+François Rabelais Tours.
+Peng, W., C. Perng, T. Li, et H. Wang (2007). Event summarization for system management. In
+P. Berkhin, R. Caruana, et X. Wu (Eds.), KDD, pp. 1028–1032. ACM.
+Pitarch, Y., A. Laurent, et P. Poncelet (2010). Summarizing multidimensional data streams : A
+hierarchy-graph-based approach. In PAKDD (2), pp. 335–342.
+Saint-Paul, R., G. Raschia, et N. Mouaddib (2005). General purpose database summarization. In
+VLDB, pp. 733–744.
+Stefanidis, K., M. Drosou, et E. Pitoura (2009). "You May Also Like" Results in Relational
+Databases. In PersDB.
+Zadrozny, S. et J. Kacprzyk (2007). Summarizing the contents of web server logs : A fuzzy
+linguistic approach. In FUZZ-IEEE, pp. 1–6. IEEE.
+Summary
+In this paper, we propose a method for summarizing OLAP query logs. The basic idea is that
+a query summarizes another query and that a log, which is a sequence of queries, summarizes
+another log. Our framework allows to declaratively specify a summary, and includes a measure
+to assess the quality of the summaries. We also propose several strategies for automatically com-
+puting a good quality summary of a query log, and we show how some simple properties on
+the summaries can be used to query the log efficiently. Tests on MDX query logs showed the
+usefulness of our approach.
