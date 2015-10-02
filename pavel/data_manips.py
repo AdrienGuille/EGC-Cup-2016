@@ -278,9 +278,9 @@ def normalize_affiliations():
 def main():
     df = load_data_egc("../input/RNTI_articles_export_original.txt")
     df = get_EGC_articles(df)
+    df = add_lang_column(df)
     df = get_french_articles(df)
     add_index_column(df)
-    df = add_lang_column(df)
     df = add_new_columns(df)
     normalize_affiliations()
     get1page_pdfs(df)
