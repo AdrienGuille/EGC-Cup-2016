@@ -156,6 +156,8 @@ def do_OCR(df, path_txt_files, min_size, list_files=None):
 def get_EGC_articles(df):
     return df[df["booktitle"] == "EGC"].copy()
 
+def get_french_articles(df):
+    return df[df["lang_title"] == "fr"].copy()
 
 
 
@@ -276,12 +278,13 @@ def normalize_affiliations():
 def main():
     df = load_data_egc("../input/RNTI_articles_export_original.txt")
     df = get_EGC_articles(df)
+    df = get_french_articles(df)
     add_index_column(df)
     df = add_lang_column(df)
     df = add_new_columns(df)
     normalize_affiliations()
     get1page_pdfs(df)
-
+    getfull_pdfs(df)
     # df = get_EGC_articles(df)
 
 
