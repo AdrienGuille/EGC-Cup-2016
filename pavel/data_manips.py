@@ -278,11 +278,11 @@ def main():
     df = get_EGC_articles(df)
     add_index_column(df)
     df = add_lang_column(df)
+    df = add_new_columns(df)
     normalize_affiliations()
     get1page_pdfs(df)
 
     # df = get_EGC_articles(df)
-    df = add_new_columns(df)
 
 
 if __name__ == "__main__":
