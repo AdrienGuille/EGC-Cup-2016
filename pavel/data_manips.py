@@ -50,7 +50,7 @@ def download_pdfs(df, what_to_download="1page"):
                 logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
             except:
                 logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
-                filo = open("../input/pdfs/1page/{}_URL_INVALID.txt".format(f[1]["id"]), "w")
+                filo = open("../input/pdfs/1page/{}_URL_INVALID.error".format(f[1]["id"]), "w")
                 filo.close()
 
     if what_to_download == "fullpdf" or what_to_download == "all":
@@ -63,7 +63,7 @@ def download_pdfs(df, what_to_download="1page"):
                 logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
             except:
                 logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
-                filo = open("../input/pdfs/full/{}_URL_INVALID.txt".format(f[1]["id"]), "w")
+                filo = open("../input/pdfs/full/{}_URL_INVALID.error".format(f[1]["id"]), "w")
                 filo.close()
 
 
@@ -274,7 +274,7 @@ def normalize_affiliations():
     return new_affiliations
 
 def main():
-    df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
+    df = load_data_egc("../input/RNTI_articles_export_original.txt")
     df = get_EGC_articles(df)
     add_index_column(df)
     df = add_lang_column(df)
