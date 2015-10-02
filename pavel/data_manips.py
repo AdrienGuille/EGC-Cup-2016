@@ -40,31 +40,32 @@ def pdf2txt(pdf_folder):
 
 def download_pdfs(df, what_to_download="1page"):
     import urllib
-
-    if what_to_download == "1page" or what_to_download == "full":
+    col_dict = {"1page": "pdf1page", "full": "pdfarticle"}
         # Download 1page pdfs
-        logging.info("Downloading {} pdf files.".format(what_to_download))
-        for f in df.iterrows():
-            try:
-                urllib.urlretrieve(f[1]['pdf1page'], "../input/pdfs/1page/" + str(f[1]['id']) + ".pdf")
-                logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
-            except:
-                logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
-                filo = open("../input/pdfs/1page/{}_URL_INVALID.error".format(f[1]["id"]), "w")
-                filo.close()
+    logging.info("Downloading {} pdf files.".format(what_to_download))
+    for f in df.iterrows():
 
-    if what_to_download == "fullpdf" or what_to_download == "all":
-
-        # Download full page pdfs
-        logging.info("Downloading full pdf files.")
-        for f in df.iterrows():
-            try:
-                urllib.urlretrieve(f[1]['pdfarticle'], "../input/pdfs/full/" + str(f[1]['id']) + ".pdf")
-                logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
-            except:
-                logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
-                filo = open("../input/pdfs/full/{}_URL_INVALID.error".format(f[1]["id"]), "w")
-                filo.close()
+        try:
+            urllib.urlretrieve(f[1][col_dict[what_to_download]], "../input/pdfs/{}/".format(col_dict[what_to_download])
+                               + str(f[1]['id']) + ".pdf")
+            logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
+        except:
+            logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
+            filo = open("../input/pdfs/1page/{}_URL_INVALID.error".format(f[1]["id"]), "w")
+            filo.close()
+            #
+            # if what_to_download == "full":
+            #
+            #     # Download full page pdfs
+            #     logging.info("Downloading full pdf files.")
+            #     for f in df.iterrows():
+            #         try:
+            #             urllib.urlretrieve(f[1]['pdfarticle'], "../input/pdfs/full/" + str(f[1]['id']) + ".pdf")
+            #             logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
+            #         except:
+            #             logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
+            #             filo = open("../input/pdfs/full/{}_URL_INVALID.error".format(f[1]["id"]), "w")
+            #             filo.close()
 
 
 def add_new_columns(df):
