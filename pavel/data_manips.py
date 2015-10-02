@@ -215,13 +215,13 @@ def get1page_pdfs(df):
     """
 
     # 1. Get pdfs from the interwebz
-    # download_pdfs(df, what_to_download="1page")
+    download_pdfs(df, what_to_download="1page")
 
     # 2. Convert pdfs to txt
-    # pdf2txt("../input/pdfs/1page")
+    pdf2txt("../input/pdfs/1page")
 
     # 3. Do OCR to those pdfs that seem to be images. Do it with those text files smaller than 17bytes (
-    # do_OCR(df, "../input/pdfs/1page", 17)
+    do_OCR(df, "../input/pdfs/1page", 17)
 
     # 4. Detect those pdfs that have garbage text and try to obtain the text through OCR
     gt = detect_garbage_text("../input/pdfs/1page", 5)
@@ -273,12 +273,15 @@ def normalize_affiliations():
     return new_affiliations
 
 def main():
-    # df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
-    # add_index_column(df)
-    # df = get_EGC_articles(df)
-    # df = add_lang_column(df)
-    # df = add_new_columns(df)
+    df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
+    df = get_EGC_articles(df)
+    add_index_column(df)
+    df = add_lang_column(df)
     normalize_affiliations()
+    get1page_pdfs(df)
+
+    # df = get_EGC_articles(df)
+    df = add_new_columns(df)
 
 
 if __name__ == "__main__":
