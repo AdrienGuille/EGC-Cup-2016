@@ -146,7 +146,8 @@ def do_OCR(df, path_txt_files, min_size, list_files=None):
     for f in text_files:
         if os.path.getsize(f) < min_size or list_files:
             lang = df.loc[df["id"] == int(os.path.basename(f)[:-4])]["lang_title"].tolist()[0]
-            call("convert -density 300 {0}[0] -depth 8 -background white -alpha remove  {0}.tiff".format(
+            call(
+                "convert -density 300 {0}[0] -depth 8 -background white -alpha remove -flatten +matte  {0}.tiff".format(
                 f.replace(".txt", ".pdf")), shell=True)
             call("tesseract -l {0} {1}.tiff {2}".format(lang_map[lang], f.replace(".txt", ".pdf"), f[:-4]), shell=True)
             call("rm {0}.tiff".format(f.replace(".txt", ".pdf")), shell=True)
