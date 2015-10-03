@@ -1,596 +1,462 @@
-PGP-mc : extraction parallèle efficace de motifs graduels
-Anne Laurent∗, Benjamin Negrevergne∗∗∗, Nicolas Sicard∗∗, Alexandre Termier∗∗∗
-∗LIRMM - UM2- CNRS UMR 5506 - 161 rue Ada - 34392 Montpellier Cedex 5
-laurent@lirmm.fr
-http://www.lirmm.fr
-∗∗LRIE - EFREI - 30-32 av. de la République, 94 800 Villejuif
-nicolas.sicard@efrei.fr
-http://www.efrei.fr
-∗∗∗LIG - UJF-CNRS UMR 5217 - 681 rue de la Passerelle, B.P. 72, 38402 Saint Martin d’Hères
-{benjamin.Negrevergne@imag.fr,Alexandre.Termier@imag.fr}
-http://www.liglab.fr
-Résumé. Initialement utilisés pour les systèmes de commande, les règles et mo-
-tifs graduels (de la forme “plus une personne est âgée, plus son salaire est éle-
-vé”) trouvent de très nombreuses applications, par exemple dans les domaines
-de la biologie, des données en flots (e.g. issues de réseaux de capteurs), etc. Très
-récemment, des algorithmes ont été proposés pour extraire automatiquement
-de tels motifs. Cependant, même si certains d’entre eux ont permis des gains
-de performance importants, les algorithmes restent coûteux et ne permettent
-pas de traiter efficacement les bases de données réelles souvent très volumi-
-neuses (en nombre de lignes et/ou nombre d’attributs). Nous proposons donc
-dans cet article une méthode originale de recherche de ces motifs utilisant le
-multi-threading pour exploiter au mieux les multiples coeurs présents dans la
-plupart des ordinateurs et serveurs actuels. L’efficacité de cette approche est va-
-lidée par une étude expérimentale.
-1 Introduction
-En fouille de données, la recherche de motifs fréquents est un sujet de recherche très ac-
-tif. Initialement étudiés dans le cas de données transactionnelles, les algorithmes ont vite été
-étendus aux structures de données complexes (séquences, arbres, graphes etc.) Han et Kamber
-(2006). De manière générale, tous les algorithmes doivent explorer un espace de recherche très
-important. Ils sont donc très coûteux en temps de calcul, la complexité des calculs augmentant
-avec celle des structures de données à traiter. Une grande partie des travaux a été menée pour
-mettre au point des algorithmes de plus en plus efficaces permettant de fouiller de très grandes
-bases de données aux structures potentiellement complexes.
-Récemment, un nouveau type de règles et motifs a été introduit : les motifs graduels (ou
-itemsets graduels). Ce problème vise à découvrir, à partir de bases de données numériques,
-des motifs du type “plus un individu est âgé, plus son salaire est élevé” et trouve de très nom-
-breuses applications pour les bases de données numériques comme par exemple les données
-RNTI-E-19- 453 -
-PGP-mc : extraction parallèle efficace de motifs graduels
-biologiques et médicales. Dans ce contexte, l’algorithme GRITE proposé dans Di Jorio et al.
-(2009) est à notre connaissance le plus efficace en termes de temps de calcul et occupation mé-
-moire. Développé à partir d’une approche par niveaux Agrawal et Srikant (1994), il permet de
-fouiller des bases de données comprenant jusqu’à plusieurs centaines d’attributs ou plusieurs
-milliers de lignes, quand les approches précédentes étaient limitées à six attributs Berzal et al.
-(2007). Cependant, ces performances restent faibles au regard des bases de données réelles
-(comprenant des milliers d’attributs et/ou des millions de lignes), sur lesquelles l’algorithme
-GRITE peut s’avérer très long, voire impossible à exécuter. Face à ce défi, deux solutions (non
-exclusives) sont envisageables à l’échelle de GRITE afin de l’appliquer aux données réelles :
-(i) des améliorations algorithmiques, par exemple en utilisant les techniques pattern growth
-Han et al. (2000) et en définissant la notion de fermeture sur les motifs graduels Pasquier et al.
-(1999); Uno (2005), ou (ii) en explorant les possibilités de parallélisation.
-Dans cet article, nous explorons la seconde solution en exploitant le parallélisme sur les
-processeurs multi-cœurs. Au cours des 20 dernières années l’augmentation de la performance
-des processeurs passait en effet essentiellement par une augmentation de la fréquence d’hor-
-loge. Or, depuis 2005, les limites physiques empêchent d’améliorer cette fréquence. Cepen-
-dant, il est possible d’intégrer de plus en plus de transistors, qui permettent de multiplier les
-cœurs de calcul dans un seul processeur. L’exploitation optimale de ces multiples cœurs re-
-quiert l’écriture de programmes parallèles, ce type d’architecture ayant des propriétés propres,
-différentes par exemple des clusters de machines. Les processeurs multi-cœurs ont souvent une
-architecture dite UMA (Uniform Memory Access) : la machine est dotée d’un bloc mémoire
-et tous les cœurs ont un temps d’accès équivalent à cette mémoire, à travers un bus unique, qui
-fait de l’usage de la mémoire le goulot d’étranglement classique des applications parallèles.
-Ces denières années, des recherches ont été menées en fouille de données parallèle pour ex-
-ploiter ces architectures multi-cœurs Buehrer et al. (2006); Lucchese et al. (2007); Liu et al.
-(2007); Tatikonda et Parthasarathy (2009), montrant que plus le problème de fouille était com-
-plexe (e.g. arbres, graphes), plus la parallélisation améliorait les performances. La principale
-raison est que les accès mémoires sont relativement faibles par rapport aux calculs coûteux
-à effectuer sur les données chargées dans les caches. L’application de la parallélisation à la
-recherche de motifs graduels, qui reste une technique coûteuse, est donc prometteuse. Nous
-l’étudions ci-après et nous le validons au travers des expérimentations menées.
-La suite de cet article est organisé de la manière suivante : la section 2, introduit la notion de
-motif graduel, tandis que la section 3 rappelle les principales définitions de ces motifs présents
-dans la littérature ainsi que les principales approches de la fouille de données parallèle. La
-section 4 présente notre algorithme parallèle d’extraction de motifs graduels, dont les résultats
-expérimentaux sont présentés en section 5. Enfin, la section 6 conclut et présente les principales
-perspectives associées à ce travail.
-2 Motifs graduels
-Les motifs graduels sont de la forme “plus/moins X1, . . ., plus/moins Xn”. On considère
-ici une base de données DB consistant en une relation définie sur l’ensemble d’attributs I.
-Dans ce contexte, les motifs graduels sont définis sur un sous-ensemble de I dont les éléments
-sont associés à un ordre croissant ou décroissant. On note t[I] la valeur de t sur l’attribut I .
-RNTI-E-19 - 454 -
-A. Laurent et al.
-Id Size Weight Sugar
-(S) (W) Rate (SR)
-t1 6 6 5.3
-t2 10 12 5.1
-t3 14 4 4.9
-t4 23 10 4.9
-t5 6 8 5.0
-t6 14 9 4.9
-t7 18 9 5.2
-t8 23 10 5.3
-t9 28 13 5.5
-FIG. 1 – Fruits et leurs caractéristiques
-FIG. 2 – g = {(S,≥), (SR,≤)}
-Par exemple, on considère la base de données de la figure 1 décrivant des fruits et leurs
-caractéristiques.
-Définition 1 (Item graduel) SoitDB une base de données définie sur les attributs I, un motif
-graduel est un couple (I, θ) où I est un attribut de I et θ est un opérateur de comparison
-operator de {≥,≤}.
-Un itemset graduel ou motif graduel g = {(I1, θ1), ..., (Ik, θk)} est un ensemble d’items
-graduels.
-Par exemple, (Size,≥) est un item graduel, tandis que {(Size,≥), (Weight,≤)} est un
-itemset graduel. Le support d’un itemset graduel dans une base de données DB revient à cal-
-culer à quel point le motif est présent dansDB. Plusieurs définitions formelles de cette notion
-de support ont été proposées (voir la section 3 ci-dessous). Dans cet article, on considère le
-nombre de n-uplets qu’il est possible d’ordonner pour respecter les opérateurs de comparaison
-sur chacun des attributs présents dans le motif considéré.
-Définition 2 (Support d’un itemset graduel) SoitDB une base de données et g = {(I1, θ1), ...,
-(Ik, θk)} un itemset graduel. La cardinalité de g dans DB, notée λ(g,DB), correspond à
-la longueur de la plus longue liste l = 〈t1, . . . , tn〉 de n-uplets de DB tels que, pour tout
-p = 1, . . . , n− 1 et pour tout j = 1, . . . , k, la comparaison tp[Ij ] θj tp+1[Ij ] est valide.
-Le support de g dans DB, noté supp(g,DB), correspond au ratio de λ(g,DB) par rap-
-port à la cardinalité de DB, que nous notons |DB|. On a donc : supp(q,DB) = λ(g,DB)|DB| .
-Afin de calculer λ(g,DB), Di Jorio et al. (2009) propose de considérer le graphe dans
-lequel les nœuds correspondent aux n-uplets de DB et dans lequel il existe un arc entre deux
-nœuds si les n-uplets associés sont ordonnés par rapport à g. Par exemple, la figure 2 montre
-l’ordonnancement des n-uplets de la base de l’exemple précédent (Fig. 1) pour l’itemset gra-
-duel g = {(S,≥), (SR,≤)} (plus la taille est grande, moins le taux de sucre est important).
-RNTI-E-19- 455 -
-PGP-mc : extraction parallèle efficace de motifs graduels
-La longeur du plus long chemin de ce graphe est 5. CommeDB contient 9 n-uplets, on a donc
-supp(g,DB) = 59 .
-L’algorithme est basé sur le principe APriori, en notant que les items ne sont pas explorés
-dans la mesure où toute base de données peut être ordonnée pour trier sur un unique attribut.
-L’algorithme débute donc en étudiant le support de toutes les paires d’items graduels et en pas-
-sant ensuite d’un niveau k au suivant en constituant des candidats de niveau k en fonction des
-fréquents de taille k− 1 puis en testant leur support. Le stockage de tous les ordonnancements
-à un niveau k, même sous format binaire, peut être très coûteux. Cependant, le principal goulot
-d’étranglement est dû au fait que (i) les n-uplets doivent être ordonnés en fonction de l’itemset
-graduel considéré et (ii) le calcul de la longueur du plus long chemin prend du temps.
-3 Travaux connexes
-Nous rappelons dans cette section les principales approches de la littérature pour la décou-
-verte de motifs graduels et l’extraction parallèle de motifs fréquents.
-3.1 Découverte de motifs graduels
-Les motifs graduels sont étudiés depuis de nombreuses années pour le contrôle, la com-
-mande (floue) et les systèmes de recommandation. Plus récemment, des algorithmes de fouille
-de données ont été étudiés pour extraire automatiquement de tels motifs Di Jorio et al. (2009);
-Berzal et al. (2007); Di Jorio et al. (2008); Fiot et al. (2008); Hüllermeier (2002); Laurent et al.
-(2009). Ainsi, Hüllermeier (2002) utilise la régression linéaire, tandis que Berzal et al. (2007)
-définit quatre types de règles graduelles de la forme plus/moins X est A, alors plus/moins Y est
-B, et propose un algorithme par niveaux pour extraire de telles règles. Cependant, le support
-est calculé en considérant les couples de n-uplets, ce qui rend l’approche complexe. Dans Fiot
-et al. (2008), les auteurs introduisent les motifs séquentiels graduels pour rendre compte de
-la force de modification (accélération). Dans Di Jorio et al. (2009) et Di Jorio et al. (2008),
-deux méthodes sont proposées, la différence étant liée au mode de calcul du support : tandis
-qu’une heuristique est utilisée dans Di Jorio et al. (2008), le support exact est calculé dans Di
-Jorio et al. (2009) grâce à la méthode vue précédemment. Dans Laurent et al. (2009), les au-
-teurs proposent une autre manière de calculer le support, en considérant le Kendall tau ranking
-correlation coefficient qui calcule non pas la longeur du plus long chemin, mais le nombre
-de paires de n-uplets ordonnables dans la base de données pour être en accord avec le motif
-graduel considéré (on parle alors de paires concordantes et discordantes).
-Dans cet article, nous considérons l’approche présentée dans Di Jorio et al. (2009) car elle
-est à notre connaissance la plus performante.
-3.2 Extraction parallèle de motifs fréquents
-Depuis 1996, les spécialistes en extraction de motifs fréquents ont travaillé sur des algo-
-rithmes parallèles. De nombreux travaux ont été réalisés pour extraire des motifs fréquents sur
-des clusters (Agrawal et Shafer (1996); Zaki et al. (1997)) ou des SMPs (Zaki (1999)). A cette
-époque, la mémoire vive des ordinateurs personnels était beaucoup plus petite que la taille de
-la plupart des bases de données (quelques centaines de MégaOctets / quelques GigaOctets),
-RNTI-E-19 - 456 -
-A. Laurent et al.
-donc l’intérêt principal du calcul parallèle était de permettre de traiter efficacement des bases
-de données de taille importante en les distribuant sur plusieurs machines. Avec l’augmenta-
-tion de la capacité des mémoires vives et la découverte de manières plus efficaces d’explorer
-l’espace de recherche (motifs fréquents fermés par exemple), les publications sur l’extraction
-parallèle de motifs fréquents se sont raréfiées jusqu’en 2005. Depuis l’apparition des proces-
-seurs multicœurs (appelés en anglais Chip MultiProcessors ou CMP), une nouvelle thématique
-de recherche est apparue pour la définition d’algorithmes performants utilisant ces processeurs
-multicœurs. Cette thématique a été initiée par Buehrer et al. (2006), avec un algorithme d’ex-
-traction de graphes fréquents présentant d’excellentes techniques de passage à l’échelle. Cet
-algorithme est basé sur gSpan (Yan et Han (2002)), et leur contribution consiste d’une part
-en une manière efficace de partager le travail entre les cœurs, et d’autre part en une technique
-pour exploiter la localité temporelle du cache lors de décisions locales pour savoir s’il faut
-immédiatement traiter un appel récursif ou s’il faut le mettre en file d’attente. Lucchese et al.
-(2007) ont ensuite présenté le premier algorithme pour extraire des itemsets fréquents fermés
-sur CMP. Leur contribution se concentre sur la meilleure manière de répartir le travail, et ils
-montrent l’intérêt d’utiliser les instructions SIMD pour améliorer encore les performances.
-La même année, Liu et al. (2007) ont présenté une parallélisation du célèbre algorithme FP-
-growth (Han et al. (2000)). Plus récemment, Tatikonda et Parthasarathy (2009) ont présenté un
-algorithme pour extraire des arbres fréquents avec un speed-up quasi-linéaire. Ils montrent que
-le principal facteur limitant les performances lors de l’extraction de motifs fréquents sur un
-processeur multicœurs est que la mémoire est partagée entre tous les cœurs. Donc si tous les
-cœurs accèdent simultanément à une quantité importante de données, le bus entre la mémoire
-et le processeur va être saturé et les performances vont chuter : il y a trop de contention pour
-la bande passante Cette observation est opposée à tout ce qui donnait de bons résultats dans
-le cas séquentiel, où pour éviter des calculs redondants une grande quantité de résultats inter-
-médiaires étaient stockés en mémoire. Ici Tatikonda et al. montrent que la taille de l’ensemble
-de travail doit être réduite autant que possible, même si cela doit conduire à refaire certains
-calculs plusieurs fois. Ils montrent également que les traditionnelles structures de données à
-base de pointeurs sont mal adaptées pour l’extraction parallèle de motifs fréquents sur CMP, à
-cause de leur mauvaise localité dans le cache, qui là encore amène à avoir trop de contention
-pour la bande passante.
-Dans cet article, nous nous intéressons au problème complexe de l’extraction de motifs
-graduels. Nous sommes dans un cas favorable où il y a beaucoup de calculs à faire pour chaque
-bloc de données transféré depuis la mémoire. Il ne devrait donc pas y avoir de contention
-importante pour la bande passante, à condition de ne pas utiliser des structures de données
-inutilement volumineuses.
-4 PGP-mc : Recherche parallèle de motifs graduels
-4.1 Caractéristiques des motifs graduels
-Le problème de l’extraction des itemsets graduels diffère des cas classiques liés aux item-
-sets simples. Dans ce dernier cas, pour chaque ligne de la base de données, il est possible de
-dire si elle supporte ou non l’itemset. Dans le cas graduel, toute la base de données est néces-
-saire à chaque comptage. Il n’est donc pas raisonnable d’envisager une distribution de données
-RNTI-E-19- 457 -
-PGP-mc : extraction parallèle efficace de motifs graduels
-par blocs de lignes. Notons que même l’extraction des motifs séquentiels est un problème in-
-termédiaire car le comptage se fait par bloc de lignes, chaque bloc correspondant à toutes les
-lignes associées au même client.
-Le calcul du support d’un itemset graduel est une opération assez complexe et nécessite
-deux tâches très coûteuses que nous englobons dans une procédure appelée Join(). Cette
-procédure, décrite en détail dans Di Jorio et al. (2009), assure (i) l’ordonnancement des lignes
-de la base de données et la construction de la matrice binaire associée et (ii) le calcul du plus
-long chemin.
-Notre proposition repose sur le grand nombre de répétitions de ces opérations lors de l’ex-
-ploration d’une base de données. Il s’agit d’un problème irrégulier dans le sens où il est difficile
-de prévoir à l’avance le nombre de motifs retenus et leur distribution dans l’espace des can-
-didats construit dynamiquement niveau par niveau. En revanche, nous notons que le calcul du
-support d’un itemset ne dépend pas du calcul du support des autres itemsets d’un même niveau,
-ce qui nous permet d’envisager la construction et le test de plusieurs candidats en parallèle.
-Nous rappelons que nous adoptons une approche multi-thread qui sépare et exécute le travail
-sur différentes unités de calcul (processeurs ou coeurs) procédant de manière concurrente.
-4.2 Approche proposée : GRITE-MT
-L’algorithme GRITE repose sur une exploration du treillis niveau par niveau. Le premier
-niveau est initialisé à partir des colonnes de la base. Ensuite les candidats k du niveauN+1 sont
-construits à partir de chaque itemset i du niveau N combiné successivement à l’ensemble de
-ses itemsets frères j de rang supérieur (noté Siblingsj>i(i)) grâce à la procédure Join(i, j).
-Lorsqu’un candidat dépasse un certain seuil de support, il est considéré comme fréquent et
-conservé. Le processus s’arrête quand le dernier niveau construit ne contient aucun fréquent.
-L’algorithme 1 montre une version simplifiée de la construction d’un niveau N + 1 à partir
-d’un niveau N .
-Algorithme 1 GRITE : construction du niveau N + 1 à partir du niveau N .
-1 PourChaque itemset i De niveau N Faire
-2 PourChaque itemset j De Siblingsj>i(i) Faire
-3 itemset k ← Join(i, j)
-4 Si k est fréquent Alors
-5 k devient nœud fils de i (et prend l’index j)
-6 {k est conservé au niveau N + 1}
-7 FinSi
-8 FinPourChaque
-9 FinPourChaque
-Ici, chaque niveau doit être construit avant de commencer le traitement du niveau suivant.
-Pour cette raison, nous nous sommes concentrés sur la parallélisation de chaque niveau pris
-individuellement, où la construction d’un candidat (via la procédure Join()) est une opération
-RNTI-E-19 - 458 -
-A. Laurent et al.
-essentiellement indépendante des autres. Le problème principal concerne alors l’équilibre de
-la distribution des tâches sur les unités de traitement disponibles. En effet, le nombre d’opé-
-rations au sein de la boucle interne de l’algorithme 1 est difficile à prévoir au delà du niveau
-2 et le nombre d’itemsets "frères" pour chaque itemset i peut varier de façon sensible. Une
-parallélisation automatique de ces boucles risque de conduire à un déséquilibre de la charge.
-Notre méthode vise à compenser cette irrégularité en affectant dynamiquement les construc-
-tions de candidats d’un même niveau à un pool de threads selon la règle "premier arrivé, pre-
-mier servi". Au début, tous les itemsets fréquents d’un niveau N sont marqués non traités et
-stockés dans une file d’attente Fi. Un nouvel itemset i est défilé et tous ses nœuds frères de
-plus haut rang sont ajoutés dans une seconde file Fsi. Chaque thread disponible extrait alors
-un itemset j de Fsi et construit un nouveau candidat k à partir de i et de j. S’il est "fréquent",
-ce candidat est conservé au niveau N + 1 comme nœud fils de i. Lorsque la file Fsi est vide,
-un nouvel itemset i est extrait de Fi et le processus reprend au début. On s’arrête quand tous
-les itemsets i ont été traités (i.e les deux files sont vides). L’algorithme 2 montre une version
-simplifiée de cette approche.
-Algorithme 2 GRITE-MT (multithread) : construction du niveau N + 1 à partir du niveau N .
-1 i, j : itemsets
-2 Pt : pool de threads
-3 Fi : file ← itemsets du niveau N
-4 Fsi : file ← ∅ {nœuds frères non traités}
-5 PourChaque thread De Pt (en parallèle) Faire
-6 TantQue Fi = ∅ OR Fsi = ∅ Faire
-7 Si Fsi = ∅ Alors
-8 i ← defiler(Fi)
-9 Fsi ← Siblingsj>i(i)
-10 FinSi
-11 j ← defiler(Fsi)
-12 itemset k ← Join(i, j)
-13 Si k est frequent Alors
-14 k devient nœud fils de i (et prend l’index j)
-15 {k est conservé au niveau N + 1}
-16 FinSi
-17 FinTantQue
-18 FinPourChaque
-4.3 Mise en œuvre et optimisations préliminaires
-Outre les contraintes de bande passante de la mémoire, un autre problème des calculs mas-
-sivement multithreadés peut apparaître lorsqu’un trop grand nombre d’allocations mémoires
-RNTI-E-19- 459 -
-PGP-mc : extraction parallèle efficace de motifs graduels
-dynamiques ont lieu simultanément. Ces tâches d’allocations sont par défaut dévolues au noyau
-du système d’exploitation et sont la plupart du temps sérialisées, pouvant introduire des attentes
-inutiles lors du calcul. Afin de simplifier l’utilisation de la mémoire, aussi bien en terme d’oc-
-cupation que de nombre de transactions, nous avons profilé et optimisé la version initiale du
-programme C++ de Di Jorio et al. (2009) sans en modifier l’algorithme. Le programme ré-
-sultant ne consomme en moyenne que la moitié de la mémoire et presque un tiers seulement
-du temps d’exécution. Nos travaux de parallélisation et nos expérimentations sont basés sur
-cette nouvelle version. Notons que les threads ont été implantés via la bibliothèque de threads
-standard POSIX.
-5 Résultats expérimentaux et discussion
-Dans cette section, nous présentons les résultats obtenus par l’exécution de notre pro-
-gramme sur deux architectures multi-processeurs comportant jusqu’à 32 cœurs :
-– COYOTE dispose de 8 processeurs quadri-cœurs AMD Opteron 852, 64Go de mémoire,
-Linux Centos 5.1 et g++ 4.1.2
-– IDKONN dispose de 4 processeurs Intel Xeon 7460 de 6 cœurs chacun, 64GB of RAM,
-Linux Debian 5.0.2 et g++ 4.3.2.
-Les expériences ont été menées sur des bases artificielles créées automatiquement par un
-outil basé sur une version adaptée du Synthetic Data Generation Code for Associations and
-Sequential Patterns 1 d’IBM. Cet outil produit des bases numériques en fonction du nombre de
-lignes, du nombre d’attributs et du nombre moyen de valeurs distinctes par attribut.
-5.1 Accélérations
-Les résultats suivants illustrent l’évolution des temps de calcul et des accélérations en fonc-
-tion de la complexité du problème. Cette complexité peut avoir deux origines : le nombre d’at-
-tributs dont dépend le nombre de tâches (i.e. le nombre de candidats à synthétiser et à tester)
-et le nombre de lignes qui influe sur le temps de traitement moyen de chaque tâche (i.e. le
-temps de traitement de la procédure Join()). Nous présentons ici deux jeux de test permettant
-d’observer le comportement de notre solution suivant ces deux aspects.
-Le premier jeu de tests concerne des bases de données qui comportent un grand nombre
-de lignes mais relativement peu d’attributs. Ce genre de bases produit en général assez peu
-d’itemsets fréquents pour un seuil de support suffisamment élevé. Dès lors le temps global
-d’exécution du programme est principalement dévolu à la construction des deux premiers ni-
-veaux de candidats. La figure 3a montre la diminution des temps d’exécution pour le traitement
-de bases de données de 10000 lignes pour 10 à 50 attributs sur la machine COYOTE. La figure
-3b montre les accélérations correspondantes.
-Les accélérations atteignent ici un niveau très satisfaisant dans les cas les plus complexes.
-Par exemple, l’accélération atteint environ 30 pour 50 attributs avec 32 threads. La limite at-
-teinte pour 10 et 20 attributs s’explique essentiellement par le fait que la construction du pre-
-mier niveau occupe une grande part du temps d’exécution global du programme. Or, à ce
-1. www.almaden.ibm.com/software/projects/hdb/resources.shtml
-RNTI-E-19 - 460 -
-A. Laurent et al.
-COYOTE
+Analyse de données symboliques et graphe de connaissances 
+d’un agent 
+ 
+Philippe Caillou*, Edwin Diday** 
+ 
+*LAMSADE - Université Paris Dauphine 
+Place du maréchal de Lattre de Tassigny 75016 Paris 
+caillou@lamsade.dauphine.fr 
+**CEREMADE - Université Paris Dauphine 
+Place du maréchal de Lattre de Tassigny 75016 Paris 
+diday@ceremade.dauphine.fr 
+ 
+Résumé. Dans cet article nous appliquons l’analyse de données symboliques 
+au graphe de connaissances d’un agent. Nous présentons une mesure de 
+similarité entre des données symboliques adaptée à nos graphes de 
+connaissances. Nous utilisons les pyramides symboliques pour extraire un 
+nouvel objet symbolique. Le nouvel objet est ensuite réinséré dans le graphe 
+où il peut être utilisé par l’agent, faisant ainsi évoluer sa sémantique. Il peut 
+alors servir d’individu lors des analyses ultérieures, permettant de découvrir de 
+nouveaux concepts prenant en compte l’évolution de la sémantique. 
+ 
+1 Introduction 
+ 
+Notre objectif est d’utiliser l’analyse de données symboliques (ADS) pour qu’un agent 
+informatique enrichisse sa sémantique (et non pour qu’un utilisateur humain dispose de 
+concepts décrivant ses données). L’analyse permettant d’extraire de nouveaux concepts 
+pertinents à partir des données, l’agent va modifier progressivement sa sémantique pour 
+s’adapter à son environnement.  Le contexte et la représentation des connaissances sont 
+décrits section 2, la modélisation en section 3. Nous avons défini une mesure de similarité 
+entre graphes ainsi qu’un opérateur de fusion (voir section 4) afin de permettre l’application 
+des différents outils de l’ADS (voir section 5). Un algorithme introduisant un objet 
+symbolique dans le graphe est présenté section 6. Des résultats sont présentés en section 7.  
+ 
+2 Domaine d’application 
+ 
+Le modèle présenté ici a été développé pour être appliqué à un graphe de connaissances, 
+lequel est utilisé et modifié en temps réel par un agent. Le graphe utilisé (Caillou 2003) est 
+un graphe de concepts fluides inspiré de (Hofstadter 1995). Les liens entre les nœuds du 
+graphe (qui sont appelés Connaissances) sont non-typés et ont une utilité fonctionnelle. Ils 
+servent à transmettre un flux d’activation au sein du graphe. Ce flux génère les « états 
+mentaux » de l’agent. L’intensité du lien mesure la part d’activation du nœud origine qui est 
+transmise au nœud destination. La cible du lien sera donc activée si l’intensité est positive et 
+inhibée si elle est négative. Une Frame (qu’elle représente une règle ou un objet) correspond 
+à un sous-graphe centré autour d’une connaissance (appelée racine) et contenant toutes les 
+connaissances potentiellement activées directement ou indirectement par cette racine.  
+RNTI-E-3643
+Analyse de données symboliques et graphe de connaissances 
+RNTI - 1 
+FIG. 1 - Exemple de graphe contenant trois instances de Pièce correspondant aux individus IPièce1, 
+IPièce2 et IPièce3 et leur représentation sous forme de Frame 
+Les liens épais, correspondant à des intensités élevées, sont des liens de type implicite 
+Est-Un. La lettre I au début d’un nom signifie « instance de ». Les attributs sont représentés 
+grâce à des connaissances intermédiaires (IAPourCouleur1) liées à la fois à la connaissance 
+correspondant au type de l’attribut (APourCouleur) et à la connaissance cible de l’attribut 
+(Rouge). Notre agent est appliqué à une version simplifiée du jeu Tetris.  
+ 
+3 Modélisation 
+ 
+L’objectif de l’ADS est d’offrir un cadre d’analyse pour traiter tout type de données mais 
+aussi pour modéliser et utiliser les concepts sous-jacents (Diday 2000). Les principales 
+notations sont représentées figure 4 (à gauche). Notre objectif est d’analyser les 
+connaissances de l’agent à partir de son graphe pour extraire de nouveaux concepts 
+pertinents par rapport à l’environnement. C désigne l’ensemble des connaissances (nœuds) 
+du graphe. L désigne l’ensemble des liens du graphe. Un lien l est orienté et possède une 
+connaissance origine (origine(l)), une connaissance cible (cible(l)) et une intensité comprise 
+entre -1 et 1 (intensité(l)). D désigne l’ensemble des sous-graphes. Pour illustrer notre 
+modèle, nous allons considérer le graphe représenté figure 1. Ce graphe contient 15 
+connaissances, donc 15 individus analysables. Nous choisissons ici d’analyser les individus 
+qui sont des instances de Pièce: IPièce1, IPièce2 et IPièce3.
+Les liens décrivant un individu sont ceux qui sont atteignables depuis la racine de 
+l’individu. Lorsque l’origine est la racine de l’individu, ils sont décrit comme partant d’une 
+connaissance générique Racine. Par exemple, la description de l’individu IPièce2 est donnée 
+figure 2. L’intensité des liens variant entre -1 et 1, on peut représenter cette variable sous une 
+forme d’histogramme.  
+Les objets symboliques (OS) permettent de modéliser les concepts du monde, qu’ils 
+soient issus directement d’un individu, d’une classe d’individus ou d’un outil d’analyse. 
+L’ensemble des objets symboliques est noté S. Un OS est défini par : Une description 
+d D ; Une relation binaire R sur D permettant de comparer d à une autre description de 
+D ; Une fonction a permettant d’évaluer le résultat de la comparaison (à l’aide de R) de la 
+description d’un individu de D par rapport à la description donnée d.
+Dans notre application, un concept peut être décrit au travers de liens minimaux qu’un 
+individu doit posséder pour appartenir au concept. La description de l’OS est un « squelette » 
+minimum de sous-graphe. Le concept d’ « instance de Pièce » peut se décrire : 
+( )
+ *
+1 1 1
+soit ... ( ) ( ), ( ) ( ), 1; 1 , ( ) ( )
+soit ( ) ( )
+k
+k k t t
+l
+L
+l l L k avec origine l racine w cible l origine t k cible l origine l
+y w
+origine racine w
+
+
+
++
+
+   = =   	 =
+=
+=
+
+ 
+ 
+ 
+
+RNTI-E-3 644
+Caillou et al. 
+RNTI - 1 
+{ }
+{ }
+{ }
+{ }
+{ }
+{ }
+{ }
+{ }
+2
+, ; 0, 9 ;
+, ; 0, 81 ;
+, ; 0, 81 ;
+, 2; 0, 7 ;
+2, ; 0, 63 ;
+2, ; 0, 49 ;
+, ; 0, 63 ;
+, ; 0, 49
+IPièce
+Racine Pièce
+Pièce Objet
+Racine Objet
+Racine IAPourCouleur
+IAPourCouleur APourCouleur
+IAPourCouleur Rouge
+Racine APourCouleur
+Racine Rouge
+d =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+{ }
+{ }
+{ }
+{ }
+{ }
+2
+, ; 0, 9 ;
+, ; 0, 9 ;
+, 2; 0, 7 ;
+2, ; 0, 9 ;
+2, ; 0, 7
+IPièce
+Racine Pièce
+Pièce Objet
+Racine IAPourCouleur
+IAPourCouleur APourCouleur
+IAPourCouleur Rouge
+d =
+
+ 
+ 
+  
+ 
+ 
+ 
+  
+{ }{ }, ; 0, 9InstPieced Racine Pièce= . Tout individu qui active suffisamment la connaissance Pièce,
+directement ou indirectement, à partir de sa connaissance racine est une instance de Pièce.
+La relation R compare la description d de l’OS et une autre description d’. Intuitivement, 
+on aura d’Rd si tous les liens de d existent dans d’ avec une intensité supérieure et 
+éventuellement des liens intermédiaires. La fonction caractéristique de R, hR se définit ainsi : 
+ 
+' ' * ' '
+1 1
+' '
+1
+1 , ( ... ) ' , ( ) ( ), ( ) ( ),
+( '; ) 1; 1 , ( ) ( ) ( )
 0
-250
-500
-750
-1000
-1250
-1500
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32
-Bases de 10000 lignes / 10, 30 et 50 attributs / minsupp = 0.8
-Te
-m
-p
-s 
-d
-’e
-xé
-cu
-tio
-n 
-(s
-ec
-.)
-Nombre de threads
-10 attr. 30 attr. 50 attr.
-(a) Tps d’exécution
-COYOTE
+k
+k n
+'
+R t t j
+j=1..k
+si lien d l l d k avec origine l origine lien cible l cible l
+h d d t k cible l origine l et min(intensité((l )) intensité l
+sinon
++
+     = =
+=   	 = 
+
+a est une fonction binaire qui vérifie si d’Rd. Si les liens d’un individu sont au moins 
+aussi fort que ceux de l’OS,  a(w)=vrai ; a(w)=faux sinon. Ainsi, ( 1)
+InstPièce
+a IPièce vrai= . La 
+définition de l’objet symbolique InstPièce peut s’écrire  ( ){ }[ ], ; 0, 9
+InstPiece l
+a y Racine Piece= 
+4 Mesure de similarité et opérateur de fusion 
+ 
+Pour plus d’efficacité,  la similarité choisie nécessite un prétraitement des données: 
+Modification des intensités des liens : L’intensité modifiée décrite correspond à 
+l’activation maximale qui peut passer par ce lien en provenant de la racine. La valeur est 
+donc le produit des intensités des liens réels depuis la racine.  
+Ajout de liens virtuels : Les liens ayant une fonction de transmission d’activation, nous 
+complétons la description avec des liens virtuels entre les connaissances liées par une chaîne 
+de liens. L’intensité du lien ajouté est égale au produit des intensités des liens intermédiaires.  
+La nouvelle description de l’individu IPièce2 est donnée figure 2. 
+FIG. 2 - Individu IPièce2 et sa modélisation avant et après traitement 
+Le principe de la similarité est de mesurer la somme des minima d’activation vers chaque 
+connaissance commune depuis la racine. Une fois les prétraitements utilisés, elle peut 
+s’écrire simplement en utilisant une fonction lien : lien(c1,c2,d) correspond à l’intensité 
+modifiée du lien de c1 vers c2 pour la description d.
+{ }
+{ }
+{ }( )
+1
+2 2
+1 2 2 1 2 2 1 2 1 1 2 2
+\
+( ; ) ( , , ); ( , , ) ( , , ); ( , , )
+c C Racine
+c C c C
+Sim d d Min lien Racine c d lien Racine c d Max Min lien c c d lien c c d
+
+ 
+= 	 
+Somme des intensités communes des liens depuis la racine (Base) : Du fait de la 
+nature fonctionnelle des liens, l’élément important est la proportion des connaissances 
+communes qui sera activée dans le cas d’une activation de la connaissance centrale (Racine) 
+qui définit l’OS. Nous comparons non pas tous les liens entre les connaissances, mais 
+uniquement les liens virtuels entre la racine et les autres connaissances communes.  
+Retrait de l’activation redondante (Redondance) : La mesure de base précédente 
+entraîne l’apparition de redondance au delà des connaissances communes. Par exemple, entre 
+RNTI-E-3645
+Analyse de données symboliques et graphe de connaissances 
+RNTI - 1 
+IPièce2 et IPièce3, nous volons mesurer ce qui est commun aux individus (ce sont des Pièce)
+et non les conséquences de ces éléments communs (ce sont des Objet). La suppression de ces 
+éléments redondants favorise la découverte de nouveaux concepts caractérisés par des 
+attributs qui n’ont pas encore été regroupés (voir les résultats obtenus section 7)  
+ FIG. 3 - Calcul de la similarité entre les individus IPièce2 et IPièce3 
+Fusion : L’opérateur de fusion nous permet d’obtenir un nouvel objet symbolique 
+correspondant à l’ensemble des Objets Symboliques fusionnés. Pour réaliser la fusion, nous 
+prenons le minimum des intensités des liens communs (réels ou virtuels) aux objets 
+fusionnés (L désigne l’ensemble des liens possibles). G={d1,… ;dn} 
+ 
+5 Sélection du concept appris 
+ 
+Du fait de la contrainte de rapidité de notre application (un agent temps réel), nous avons 
+choisi de réaliser une pyramide et de sélectionner comme nouveaux concepts les paliers 
+réalisant les sauts maximaux au niveau de la fonction d’indice. 
+( )( ) ( ) ( )( ) ( ){ }{ }arg max min ;
+O P
+Omax f SupG O f O f SupD O f O
+
+= 	 	  
+Où f(O) désigne une fonction d’indice d’un palier de la pyramide, SupD(O) désigne le 
+palier supérieur droit de O et SupG(O) désigne le palier supérieur gauche et P l’ensemble des 
+paliers de la pyramide. Pour la fonction d’indice, nous utilisons ici la similarité décrite 
+précédemment en la généralisant à n individus.  
+ 
+6 Individualisation 
+ 
+Afin que l’agent puisse utiliser le nouvel objet pour raisonner, il faut l’introduire dans le 
+graphe comme un nouvel individu. Cette opération d’ « individualisation », c'est-à-dire de 
+création d’un individu à partir d’un objet symbolique, n’est habituellement pas traitée par les 
+modèles d’analyse de données, car ceux-ci ont pour objectif d’extraire des concepts et non de 
+les réinsérer par la suite. Il nous faut donc compléter le modèle global (cf. figure 4). 
+Le nouveau concept est ajouté aux connaissances de l’agent. Comme il n’y a pas de 
+différence de représentation en fonction de l’abstraction des concepts, le nouveau concept 
+pourra être considéré comme un individu lors des analyses suivantes. Le nouvel ensemble 
+des individus (D’) peut alors être vu comme l’ensemble des concepts précédents (C). Celui-
+Racine; Objet
+Pièce; Objet
+Racine; IAPourCouleur2
+IAPourCouleur2; APourCouleur
+IAPourCouleur2; Rouge
+Racine; Pièce
+Racine; Rouge
+Racine; APourCouleur
+Racine; IAPourCouleur3
+Racine; Bleu
+IAPourCouleur3; APourCouleur
+IAPourCouleur3; Bleu
+IPièce2 IPièce3
+0,9
+0,81
+0,7
+0,63
+0,49
+0,63
+0,49
+0,81
+0,9
+0,81
+0,7
+0,63
+0,49
+0,63
+0,49
+0,81
+Min
+0,9
+0,81
 0
-4
-8
-12
-16
-20
-24
-28
-32
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32
-Bases de 10000 lignes / 10, 30 et 50 attributs / minsupp = 0.8
-A
-cc
-él
-ér
-at
-io
-n
-Nombre de threads
-10 attr. 30 attr. 50 attr.
-(b) Accélération
-FIG. 3 – Tps d’exécution et accélération / nbre de threads (10000 lignes, sur COYOTE).
-niveau, le nombre de tâches - strictement égal au nombre d’attributs - est trop faible pour ex-
-ploiter plus que quelques unités de traitement et surtout pour assurer un bon équilibre de la
-charge. Ainsi, le traitement séquentiel de la base de 10 attributs prend environ 64 secondes
-parmi lesquelles 9 secondes (soit 14%) sont nécessaires pour charger la base et construire le
-premier niveau. Avec 16 threads ou plus, le temps global d’exécution n’est plus que de 13
-secondes mais 5,5 secondes (soit 42%) sont encore nécessaires pour le premier niveau. Les
-expériences pratiquées sur la machine IDKONN avec les mêmes bases montrent des résultats
-similaires. Tous les résultats détaillés (tables et courbes) sont consultables en ligne à l’adresse
-http://www.lirmm.fr/~laurent/PGP/pgp-mc.EGC10.pdf.
-Le deuxième banc de tests concerne les bases de données de complexité croissante en
-fonction du nombre d’attributs. Les figures 4a et 4b montrent respectivement la diminution des
-temps de traitement et les accelérations obtenues pour des bases de 500 lignes contenant 50 à
-350 attributs, sur la machine IDKONN.
-IDKONN
+0,63
 0
-5000
-10000
-15000
-20000
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
-Bases de 500 lignes / 50 à 350 attributs / minsupp = 0.8
-Te
-m
-p
-s 
-d
-’e
-xé
-cu
-tio
-n 
-(s
-ec
-.)
-Nombre de threads
-50 attr. 100 attr. 150 attr.
-200 attr. 250 attr. 300 attr.
-350 attr.
-(a) Tps d’exécution
-IDKONN
+0,81
 0
-4
-8
-12
-16
-20
-24
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
-Bases de 500 lignes / 50 à 350 attributs / minsupp = 0.8
-A
-cc
-él
-ér
-at
-io
-n
-Nombre de threads
-50 attr. 100 attr. 150 attr.
-200 attr. 250 attr. 300 attr.
-350 attr.
-(b) Accélération
-FIG. 4 – Tps d’exécution et accélération / nbre de threads (500 lignes, sur IDKONN).
-RNTI-E-19- 461 -
-PGP-mc : extraction parallèle efficace de motifs graduels
-Là encore, notre solution est très efficace pour les problèmes suffisamment complexes
-puisque les accélérations sont peu éloignées de la progression maximale théorique à partir de
-150 attributs sur IDKONN. Les figures 5a et 5b montrent respectivement les temps d’exécu-
-tion et les accélérations obtenues pour les mêmes bases entre 50 et 300 attributs sur la machine
-COYOTE. Le traitement de la base de 350 attributs passe d’une durée de plus de 8 heures et 46
-minutes en séquentiel à environ 16 minutes et 33 secondes avec 32 threads sur cette machine.
-COYOTE
 0
-700
-1400
-2100
-2800
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32
-Bases de 500 lignes / 50 à 350 attributs / minsupp = 0.8
-Te
-m
-p
-s 
-d
-’e
-xé
-cu
-tio
-n 
-(s
-ec
-.)
-Nombre de threads
-50 attr. 100 attr.
-150 attr. 200 attr.
-250 attr. 300 attr.
-350 attr.
-(a) Tps d’exécution
-COYOTE
 0
-4
-8
-12
-16
-20
-24
-28
-32
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32
-Bases de 500 lignes / 50 à 350 attributs / minsupp = 0.8
-A
-cc
-él
-ér
-at
-io
-n
-Nombre de threads
-50 attr. 100 attr. 150 attr. 200 attr.
-250 attr. 300 attr. 350 attr.
-(b) Accélération
-FIG. 5 – Tps d’exécution et accélérations / nbre de threads (500 lignes, sur COYOTE).
-A vu de la similarité des résultats sur deux machines différentes (architectures des proces-
-seurs et de la hiérarchie mémoire différentes), on peut noter que les performances en terme
-d’accélération sont peu sensibles aux spécificités architecturales de la plateforme (mémoire,
-caches...). Précisons enfin que les résultats du traitement de la base de 500 lignes et 50 attributs
-ne sont pas nécessairement pertinents dans le cadre de calculs massivement parallèles puisque
-le temps d’exécution séquentiel est d’environ 3,3 secondes sur COYOTE. Nous les avons tou-
-tefois reportés afin de montrer que notre approche permet aussi dans ces situations d’obtenir
-des accélérations sensibles. Celles-ci peuvent s’avérer déterminantes dans le traitement de pro-
-blèmes de fouille de données en temps réel ou quasi-temps réel, par exemple pour la détection
-d’intrusion, ou de manière plus générale la fouille de données arrivant en flots (stream mining)
-puisqu’il faut alors que le traitement soit plus rapide que le taux d’arrivée des données.
-5.2 Limitations dues à l’occupation mémoire
-La principale difficulté de ce genre de problème reste la maîtrise de la consommation mé-
-moire, mise à mal par le très grand nombre de candidats traités (et éventuellement retenus) à
-chaque niveau de l’exploration du treillis. À titre d’illustration, nous avons appliqué notre pro-
-gramme sur une base dense de 30 lignes et 1500 colonnes pour un seuil de support élevé (0.9).
-Nous avons trouvé environ 1,6 millions d’itemsets fréquents au seul niveau 2. Le traitement
-des 10000 premiers a conduit à la création de 5 millions de nouveaux fréquents au niveau 3.
-Selon ce rythme de la consommation mémoire, près de 150Go de mémoire auraient été néces-
-saires pour stocker tous les itemsets fréquents du niveau 3. Ces limitations pour les bases de
-données très denses nous conduisent à explorer d’autres architectures (clusters notamment).
-RNTI-E-19 - 462 -
-A. Laurent et al.
-6 Conclusion et Perspectives
-Dans cet article, nous proposons une nouvelle approche pour l’extraction de motifs et règles
-graduels de la forme plus une personne est âgée, plus son salaire est élevé. Notre approche est
-basée sur l’utilisation des multiples cœurs présents maintenant sur la plupart de nos ordina-
-teurs et sur les serveurs maintenant accessibles à tous. Anciennement réservée à des domaines
-particuliers, l’utilisation de telles machines est désormais courante et il est important que les
-algorithmes de fouille de données puissent profiter au mieux de ces architectures. Les expéri-
-mentations menées montrent le grand intérêt et l’efficacité de notre approche, atteignant des
-speed-ups quasi linéaires sur les problèmes difficiles et réduisant considérablement les temps
-de calcul (e.g. 16 min. 33 sec. avec 32 threads contre 8h46 en séquentiel).
-Les perspectives associées à ce travail sont nombreuses. Au-delà des optimisations très
-techniques (optimisations ad-hoc selon les différentes architectures), nous allons en particu-
-lier nous intéresser à trois pistes principales : l’utilisation des motifs graduels clos pour ré-
-duire les temps de calcul, des algorithmes en profondeur (patterns growth) et l’utilisation
-d’un autre mode de parallélisation, les clusters (y compris des clusters de machines mutli-
-processeurs/multi-cores).
-Remerciements. Les auteurs remercient Lisa Di Jorio pour leur avoir fourni les sources de son
-implémentation de recherche des motifs et règles graduels (Di Jorio et al. (2009)).
-Références
-Agrawal, R. et J. C. Shafer (1996). Parallel mining of association rules. IEEE Trans. Knowl.
-Data Eng. 8(6), 962–969.
-Agrawal, R. et R. Srikant (1994). Fast algorithms for mining association rules. In Proceedings
-of the 20th VLDB Conference, pp. 487–499.
-Berzal, F., J.-C. Cubero, D. Sanchez, M.-A. Vila, et J. M. Serrano (2007). An alternative
-approach to discover gradual dependencies. Int. Journal of Uncertainty, Fuzziness and
-Knowledge-Based Systems (IJUFKS) 15(5), 559–570.
-Buehrer, G., S. Parthasarathy, et Y.-K. Chen (2006). Adaptive parallel graph mining for cmp
-architectures. In ICDM, pp. 97–106.
-Di Jorio, L., A. Laurent, et M. Teisseire (2008). Fast extraction of gradual association rules :
-A heuristic based method. In IEEE/ACM Int. Conf. on Soft computing as Transdisciplinary
-Science and Technology, CSTST’08.
-Di Jorio, L., A. Laurent, et M. Teisseire (2009). Mining frequent gradual itemsets from large
-databases. In Int. Conf. on Intelligent Data Analysis, IDA’09.
-Fiot, C., F. Masseglia, A. Laurent, et M. Teisseire (2008). Gradual trends in fuzzy sequential
-patterns. In Proc. of the Int. Conf. on Information Processing and Management of Uncer-
-tainty in Knowledge-based Systems (IPMU).
-Han, J. et M. Kamber (2006). Data Mining : Concepts and Techniques (2nd ed.). The Morgan
-Kaufmann Series in Data Management Systems. Morgan Kaufmann Publishers.
-Han, J., J. Pei, et Y. Yin (2000). Mining frequent patterns without candidate generation. In
-Proc. of the International Conference on Management of Data, pp. 1–12.
-RNTI-E-19- 463 -
-PGP-mc : extraction parallèle efficace de motifs graduels
-Hüllermeier, E. (2002). Association rules for expressing gradual dependencies. In Proc. of the
-6th European Conf. on Principles of Data Mining and Knowledge Discovery, PKDD’02, pp.
-200–211. Springer-Verlag.
-Laurent, A., M.-J. Lesot, et M. Rifqi (2009). Graank : Exploiting rank correlations for extrac-
-ting gradual dependencies. In Proc. of FQAS’09.
-Liu, L., E. Li, Y. Zhang, et Z. Tang (2007). Optimization of frequent itemset mining on
-multiple-core processor. In VLDB ’07 : Proceedings of the 33rd international conference on
-Very large data bases, pp. 1275–1285. VLDB Endowment.
-Lucchese, C., S. Orlando, et R. Perego (2007). Parallel mining of frequent closed patterns :
-Harnessing modern computer architectures. In ICDM, pp. 242–251.
-Pasquier, N., Yves, Y. Bastide, R. Taouil, et L. Lakhal (1999). Efficient mining of association
-rules using closed itemset lattices. Information Systems 24, 25–46.
-Tatikonda, S. et S. Parthasarathy (2009). Mining tree-structured data on multicore systems. In
-VLDB ’09 : Proceedings of the 35th international conference on Very large data bases.
-Uno, T. (2005). Lcm ver. 3 : Collaboration of array, bitmap and prefix tree for frequent itemset
-mining. In In Proc. of the ACM SIGKDD Open Source Data Mining Workshop on Frequent
-Pattern Mining Implementations, pp. 77–86.
-Yan, X. et J. Han (2002). gspan : Graph-based substructure pattern mining. In Proc. of the
-IEEE International Conference on Data Mining, pp. 721. IEEE Computer Society.
-Zaki, M. J. (1999). Parallel sequence mining on shared-memory machines. In Large-Scale
-Parallel Data Mining, pp. 161–189.
-Zaki, M. J., S. Parthasarathy, M. Ogihara, et W. Li (1997). Parallel algorithms for discovery of
-association rules. Data Min. Knowl. Discov. 1(4), 343–373.
-Summary
-Gradual patterns of the form “the older, the higher the salary” have been extensively used in
-(fuzzy) command systems. They currently play a crucial role in many real world applications
-where huge volumes of complex numerical data must be handled, e.g., biological databases,
-survey databases, data streams or sensor readings. Only recently algorithms have appeared to
-mine efficiently such gradual patterns. However, due to the complexity of mining gradual rules,
-these algorithms cannot yet scale on huge real world datasets. In this paper, we thus propose to
-exploit parallelism in order to enhance the performances of the fastest existing one (GRITE).
-Through a detailed experimental study, we show that our parallel algorithm scales very well
-with the number of cores available.
-RNTI-E-19 - 464 -
+0
+0
+0
+Max
+c1
+c1;c2
+0
+0,81
+0
+0
+1
+2
+{}
+c Racine
+c
+Min
+=
+ ( )
+1
+2
+{}
+c Racinec
+Max Min
+
+ S
+0,81
+2,34
+1,53
+  [ ] [ ]
+( )( ){ }
+1 2 1 2
+1 2
+, 1; , ( ) ( )
+( )
+; ; intensite
+k k k k
+k
+k
+c c C C k n l d origine l c cible l c
+T G l
+l c c Min l
+  ×     =  =
+=  
+=
+
+  
+ 
+  
+RNTI-E-3 646
+Caillou et al. 
+RNTI - 1 
+ci contient à la fois le nouveau concept (c) et tous les concepts dont l’extension correspond à 
+un seul individu de D. Card(D’)=Card(D)+1 (le nouveau concept). Si l’on considère le 
+nouvel objet symbolique (s’) issu de la fusion des mêmes individus que lors de l’analyse 
+précédente, l’extension de cet objet contiendra l’individu correspondant au nouveau concept 
+(ws). C'est-à-dire qu’on aura : as’ (ws)=vrai. Le graphe ne peut être modifié directement à 
+partir de la description de l’objet symbolique. Pour être utilisable pour le raisonnement, il 
+faut reconstruire les nœuds intermédiaires qui ont été perdus au cours de l’analyse, car ceux-
+ci sont spécifiques aux différents individus. Pour cela, nous utilisons un algorithme qui va 
+chercher à compléter le graphe progressivement tout en plaçant les liens issus de la fusion.  
+
+wd
+sd
+'
+wd
+'sd
+FIG. 4 - Ajout d’un nouvel individu à partir du concept appris 
+ 
+7 Résultats 
+ 
+Dans notre application, chaque individu de ce type d’analyse comporte entre 100 et 1200 
+Connaissances (nœuds du sous-graphe). On constate une première tendance, qui consiste à 
+extraire un concept très général qui pourrait s’interpréter comme « instance du type 
+général ». Par exemple, lorsqu’il analyse le concept de Pièce, il va extraire « Pièce 
+observée » par opposition à la catégorie générale de Pièce. Cette distinction est utile et 
+n’existe pas à l’origine dans le graphe, un sur-type n’étant pas une catégorie mais un 
+ensemble de propriétés communes. Lorsque l’agent crée le concept de « Pièce observée », 
+cela signifie qu’il rassemble toutes les propriétés communes de toutes les pièces qu’il a 
+observé, ce qui permet à toute nouvelle pièce observée de les acquérir instantanément. On 
+obtient par exemple en analysant les objectifs au début d’une exécution de l’agent la 
+pyramide 1 de la figure 5. Le premier concept extrait est celui correspondant aux dix 
+objectifs supérieurs, et qui correspond bien aux « objectifs exécutables » par opposition aux 
+catégories d’objectifs, situés au dessous. Le deuxième concept extrait par l’agent est celui d’ 
+« objectif avec sous-objectif en attente » (les trois premiers en haut), catégorie elle aussi 
+pertinente. L’intérêt de la suppression des redondances apparaît ici : à partir du moment où 
+deux individus sont du même type, leur similarité augmente, mais tout ce qui est 
+caractéristique du type est considéré comme redondant, donc retiré. Par exemple, dans la 
+pyramide 2, bien qu’il y ait onze objectifs du même type ana_brique, on remarque que le 
+palier correspondant à leur regroupement n’est même pas sélectionné dans les dix meilleurs. 
+Des concepts plus intéressants peuvent alors apparaître, tels que ceux sélectionnés ici 
+d’Objectif en cours et d’Objectif créé par une règle. Un deuxième avantage de la suppression 
+de la redondance provient du fait qu’une fois qu’un concept a été  créé (comme 
+PièceObservée), il peut être lui-même analysé. Même s’il n’est pas analysé, il va influencer 
+les résultats en supprimant toutes les valeurs communes aux PièceObservée futures. 
+RNTI-E-3647
+Analyse de données symboliques et graphe de connaissances 
+RNTI - 1 
+ FIG. 5 - Exemples issus de deux analyses du concept Objectif à des périodes différentes 
+8 Conclusion 
+ 
+Dans cet article, nous avons proposé une méthode d’analyse de données symboliques 
+permettant à la fois d’extraire des concepts pertinents du graphe de connaissances d’un agent 
+et de les réintégrer dans le graphe pour que l’agent puisse les utiliser et les analyser à leur 
+tour. Les résultats ont montré que les concepts extraits étaient pertinents par rapport au 
+contexte et bien utilisés par l’agent. De nombreuses perspectives existent pour étendre le 
+modèle. D’autres méthodes de sélection de la classe extraite sont utilisables, tout en gardant 
+à l’esprit l’impératif de rapidité lié à l’application. L’utilisation de pyramides 3D (Diday 
+2004) pourrait notamment constituer une alternative intéressante. L’extension de la similarité 
+et de l’individualisation à d’autres types de représentation sous forme de graphes, comme les 
+graphes conceptuels (Sowa 2000),  permettrait d’étendre leur domaine d’applicabilité. 
+ 
+Références 
+ 
+Caillou, P. (2003), "Raisonnement Heuristique Réflexif Dans Un Agent Temps Réel," in JNMR 03, 
+Laval, France: INRIA, pp. 51-66. 
+Diday, E. (2000), "Symbolic Data Analysis and the Sodas Project: Purpose, History, Perspective," in 
+Analysis of Symbolic Data, eds. H.-H. Bock and E. Diday, Springer. 
+Diday, E. (2004), "Spatial Pyramid Clustering Based on a Tessellation," in International Federation of 
+Classification Societies (IFCS 04), Chicago: Springer Verlag, pp. 105-122. 
+Hofstadter, D. (1995), Fluid Concepts and Creative Analogies, New York: BasicBooks. 
+Sowa, J. F. (2000), Knowledge Representation, Brooks Cole. 
+ 
+Summary 
+ 
+In this paper, we use symbolic data analysis on the knowledge graph of a computer agent. 
+The agent can thus learn new concepts that he will introduce in his graph. By doing it, he 
+will progressively change his semantic. To achieve this process, we present a similarity 
+measure between graphs and an operator to put the new concept in the graph. 
+RNTI-E-3 648

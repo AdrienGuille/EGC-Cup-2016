@@ -1,271 +1,1058 @@
-Extraction de Dépendances Fonctionnelles Approximatives:
-une Approche Incrémentale
-Ekaterina Simonenko∗ et Noël Novelli∗∗
-∗ LRI-CNRS UMR 8623
-Université Paris-Sud XI; F-91405 Orsay Cedex
-ekaterina.simonenko@lri.fr
-∗∗ LIF-CNRS UMR 6166 – Case 901
-Université d’Aix-Marseille; Faculté des Sciences de Luminy;
-F-13288 Marseille Cedex 9
-noel.novelli@lif.univ-mrs.fr
-Résumé. La découverte de dépendances fonctionnelles (DF) à partir d’une rela-
-tion existante est une technique importante pour l’analyse de Bases de Données.
-L’ensemble des DF exactes ou approximatives extraites par les algorithmes exis-
-tants est valide tant que la relation n’est pas modifiée. Ceci est insuffisant pour
-des situations réelles où les relations sont constamment mises à jour.
-Nous proposons une approche incrémentale qui maintiens à jour l’ensemble des
-DF valides, exactes ou approximatives selon une erreur donnée, quand des tuples
-sont insérés et supprimés. Les résultats expérimentaux indiquent que lors de l’ex-
-traction de DF à partir d’une relation continuellement modifiée, les algorithmes
-existants sont sensiblement dépassés par notre stratégie incrémentale.
-1 Contexte
-Les Dépendances Fonctionnelles (DF) représentent les contraintes d’intégrité les plus cou-
-rantes et les plus importantes en Bases de Données (Mannila et Räihä (1994)). Une DF entre 2
-attributs (X,Y ) notée X → Y est vraie dans une relation si les valeurs de Y sont totalement
-déterminées par les valeurs de X (Codd (1970)). Le problème de l’extraction de DF est le
-suivant : “Étant donnée une relation r, trouver toutes les DF qui sont valides dans r”. Les Dé-
-pendances Fonctionnelles Approximatives (DFA) généralisent les DF et sont définies comme
-“les DF qui sont presque valides dans r, i.e. quelques tuples doivent être retirés de la relation r
-pour que la DFX → Y soit vraie dans r” (Kivinen et Mannila (1995)). Des DFA apparaissent
-dans les relations s’il existe une dépendance naturelle entre les attributs mais certains tuples
-contiennent des erreurs ou représentent une exception. Comme des erreurs peuvent être pré-
-sentes dans les BD, les DF approximatives sont particulièrement intéressantes.
-Récemment, la taille des bases de données a augmenté significativement voire de façon infi-
-nie pour les flux de données, rendant les algorithmes existants inefficaces. Ces approches ne
-peuvent considérer que des relations figées. Quand un tuple est ajouté ou supprimé, l’ensemble
-des DF valides doit être recalculé.
-Les algorithmes les plus efficaces pour l’inférence de DF sont TANE (Huhtala et al. (1998)),
-- 77 -
-DEPMINER (Lopes et al. (2000)), FASTFDS (Wyss et al. (2001)) et FUN (Novelli et Cicchetti
-(2001)). Ces approches extraient l’ensemble des DF minimales et non triviales, la couverture
-canonique de DF. Cette dernière est équivalente à l’ensemble des DF (Codd (1970)). D’un point
-de vue formel, DEPMINER et FASTFDS sont basés sur la caractérisation des parties gauches
-des dépendances minimales non triviales comme étant l’ensemble des transversaux minimaux
-d’un hypergraphe (Mannila et Räihä (1994)). En revanche, TANE et FUN énumèrent toutes les
-sources de DF possibles et déterminent si ces sources induisent des DF minimales non triviales.
-Concernant les DF Approximatives (DFA), leur extraction est faite de façon efficace par DEP-
-MINER, TANE et FUN. TANE et FUN reprennent l’une des mesures d’erreur définie dans Man-
-nila et Räihä (1994); Kivinen et Mannila (1995) (appelé g3) comme la proportion minimale de
-tuples qu’il suffit de supprimer de la relation pour que la DF soit satisfaite par tous les tuples
-restants. L’erreur est égale à 0 si la DF est exacte, et proche de 1 si la DF n’est vérifiée que par
-un petit nombre de tuples.
-Ces travaux permettent l’extraction des DF d’une relation figée. A notre connaissance seule
-l’approche INCFDS (Gasmi (2010)) prend en compte les modifications (insertion de tuples
-uniquement) de la relation pour maintenir à jour l’ensemble des DF exactes valides. L’ap-
-proche est basée sur la détection des modifications induites lors de l’insertion de tuples dans la
-relation sur les ensembles en accord (puis bien sûr sur les maximaux et leurs complémentaires).
-2 Approche Incrémentale pour la découverte de DFA
-Nous désignons par R un schéma de relation et r une relation sur R. Un sous-ensemble
-maximal S de X ⊆ R est un sous-ensemble de X tel que S ⊂ X et |S| = |X | − 1. La
-cardinalité d’une combinaison d’attributsX dans r, noté |X |r représente le nombre de valeurs
-distinctes de X dans r. |r| représente la cardinalité de r c’est-à-dire le nombre de tuples de
-r. Pour chaque combinaison d’attributsX , l’ensemble de ses valeurs réelles, le domaine actif,
-dans la relation r est noté ADomr(X).
-2.1 Définitions
-Définition 1 Dépendances Fonctionnelles (DF)
-SoitX,A ⊂ R une combinaison d’attributs. La dépendance fonctionnelle entreX et A, notée
-X → A, est valide dans r si est seulement si ∀ t1, t2 deux tuples de r, si t1[X ] = t2[X ], alors
-t1[A] = t2[A].
-X → A est une DF minimale si et seulement si : ∀ X ′ ⊂ X ,X ′ 6→ A.
-X → A est une DF non-triviale si et seulement si : A 6⊆ X .
-Définition 2 (Kivinen et Mannila (1995)) Dépendances Fonctionnelles Approximatives (DFA)
-Une DF entre X et A est dite approximative suivant l’erreur ε, notée X ⇁ε A, si g3(X →
-A) ≤ ε, où la fonction g3 calcule la proportion, par rapport à |r|, des tuples qu’il faut retirer
-à r pour que la DFX → A soit valide.
-2.2 Extraction Incrémentale de DFA
-Soit Remover(X ⇁ε A), où X désigne une combinaison d’attributs et A un attribut, un
-ensemble minimal de tuples à retirer de la relation r pour que la DF exacte (X → A) soit
-2- 78 -
-valide. Soit er(X ⇁ε A) = |Remover(X ⇁ε A)|, le nombre de tuples à enlever de r pour
-rendre la DF (X → A) valide. Dans la suite, er(X ⇁ε A) est souvent appelé “erreur”.
-Le Théorème suivant décrit l’influence de l’insertion d’un tuple t sur er(X ⇁ε A).
-Théorème 1 Étant donnée une DFA X ⇁ε A valide sur r, er∪t(X ⇁ε A) ≥ er(X ⇁ε A)
-Preuve : Soit t le tuple qui va être inséré. Considérons t[X ] la valeur de t sur la combinaison
-d’attributsX .
-Si t[X ] 6∈ ADomr(X) : le tuple t ne peut pas violer la DF X → A, puisque la valeur de t sur
-X est nouvelle. Donc, er(X ⇁ε A) reste le même : er∪t(X ⇁ε A) = er(X ⇁ε A).
-Sinon t[X ] ∈ ADomr(X) :
-1. Si t[XA] 6∈ ADomr(XA), on peut en déduire que soit t[A] 6∈ ADomr(A), soit t[A]
-n’a encore jamais été associée à t[X ]. Dans les 2 cas t viole la DF X → A. Or,
-t[XA] 6∈ ADomr(XA) ⇒ t[XA] 6∈ ADom(Remover(X ⇁ε A)[XA]), et donc
-Remover∪t(X ⇁ε A) = Remover(X ⇁ε A) ∪ t et er∪t(X ⇁ε A) = er(X ⇁ε
-A) + 1. Il n’est donc pas nécessaire de recalculer er(X ⇁ε A).
-2. Si t[XA] ∈ ADomr(XA) :
-(a) Si t[XA] 6∈ ADom(Remover∪t(X ⇁ε A)[XA]),
-alors t[XA] ∈ ADom( Remover∪t(X ⇁ε A)[XA]) puisque
-t[XA] ∈ ADomr(XA), donc t satisfait la DF X → A et er(X ⇁ε A) ne change
-pas.
-(b) Si t[XA] ∈ ADom(Remover∪t(X ⇁ε A)[XA]), ce qui signifie que les tuples
-avec la même valeur sur XA que t, sont considérés comme non-vérifiant la DF
-X → A. Malheureusement, ajouter t dans Remover(X ⇁ε A) ne suffit pas, car
-après avoir incrémenté la cardinalité de Remover( X ⇁ε A), il est nécessaire de
-vérifier sa minimalité ce qui implique le recalcule complet de Remover∪t(X ⇁ε
-A)[XA]. ✷
-Il est clair que lors de l’insertion d’un tuple, l’erreur ne peut qu’augmenter de 1. De plus,
-la preuve de ce théorème énumère tous les cas à considérer et permet donc de ne recalculer
-er∪t(X ⇁ε A) que lorsque c’est strictement nécessaire.
-Le théorème suivant donne le résultat analogue pour la suppression d’un tuple.
-Théorème 2 Étant donnée une DFA X ⇁ε A valide sur r, er\t(X ⇁ε A) ≤ er(X ⇁ε A)
-Preuve : La preuve de ce théorème n’est pas explicitée ici par manque de place mais elle suit
-le même cheminement que celle du théorème 1. ✷
-Pour maintenir l’ensemble des DFA valides dans une relation selon une erreur ε donnée, une
-représentation interne basée sur la caractérisation des DFA introduite dans Novelli (2000) est
-utilisée. Celle-ci est une table contenant pour chaque combinaison d’attributs X , sa quasi-
-fermeture approximativeX◦r et sa fermeture approximativeX⊕r . Quand un tuple est ajouté ou
-supprimé d’une relation, pour certaines DFA, l’erreur er(X ⇁ε A) change, et donc la repré-
-sentation interne doit être mise à jour pour découvrir le nouvel ensemble de DFA minimales
-valides.
-3- 79 -
-2.3 Algorithme AFD-DYNAMICUPDATE
-L’algorithme, AFD-DYNAMICUPDATE, que nous décrivons ci-après maintient à jour l’en-
-semble des DFA valides dans une relation suivant une erreur donnée. Il s’appuie sur les théo-
-rèmes 1 et 2 ainsi que sur leur preuve pour minimiser le nombre de recalcul d’erreur de chaque
-DFA. Le recalcule de l’erreur n’est appelé que si c’est strictement nécessaire. Lorsqu’un tuple
-est ajouté, la représentation correspondante doit être mise à jour. Cela consiste à vérifier quelles
-DFA doivent être ajoutées ou supprimées de l’ensemble des DFA valides. Une approche par
-niveau est utilisée pour le parcours des candidats.
-Pour la suppression, seule la fonction RecalculateError est modifiée suivant le Théo-
-rème 2.
-Algorithm 1 AFD-DYNAMICUPDATE (R, TupleInQuestion, ε, g3[] Levels)
-Input :
-R : L’ensemble d’attributs de la relation considérée
-TupleInQuestion : Le tuple inséré
-ε : L’erreur maximale admissible
-Input/Output :
-g3[] : Les erreurs (par rapport à |r|) de DFX ⇁ε A
-Levels : La représentation
-1: for all i ∈ [1..Levels.NbLevel] do
-2: for all candidate l ∈ Li do
-3: for all subset s ⊂ l.candidate / |s| = |l.candidate| − 1 do
-4: X := s.candidate
-5: A := {l.candidate− s.candidate})
-6: g3[X ⇁ε A] := RecalculateError(l,Remover(X ⇁ε A), ErrorChanges)
-7: if ErrorChanges then
-8: if g3[X ⇁ε A] ≤ ε then
-9: if A 6∈ s.closure then
-10: s.closure := s.closure ∪A
-11: for all superset S ⊃ s.candidate / |s| = |l.candidate|+ 1 do
-12: UpdateQuasiClosureAdd(S,A)
-13: else if g3[X ⇁ε A] > ε then
-14: if A ∈ s.closure then
-15: s.closure := s.closure −A
-16: for all superset S ⊃ s.candidate / |s| = |l.candidate|+ 1 do
-17: UpdateQuasiClosureDelete(S,A)
-18: DisplayFDs( Li − 1 )
-2.4 Expérimentations pour AFD-DYNAMICUPDATE
-L’algorithme a été implémenté en C++ avec QT4. Plusieurs expérimentations ont été réali-
-sées sur un ordinateur équipé d’un processeur Pentium 4 cadencé à 3GHz avec 1Go de RAM.
-Pour les comparaisons entre AFD-DYNAMICUPDATE et FUN, nous commençons à partir
-d’une relation vide et ajoutons un par un chaque tuple (donc #tuples fois) 1. Pour chaque
-1. Les résultats obtenus pour les suppressions sont similaires à ceux obtenus pour l’ajout.
-4- 80 -
-tuple inséré, l’approche FUN est exécutée. Les temps d’exécution de FUN donnés dans les
-comparaisons correspondent à la somme des temps de calcul de FUN pour chaque relation mo-
-difiée. Les figures 1(A) et 1(B) détaillent pour différentes valeurs des paramètres des relations
-synthétiques, les temps d’exécution de AFD-DYNAMICUPDATE. La figure 1(A) montre que
-AFD-DYNAMICUPDATE est indépendant de la corrélation des données (30%, 50%, 70%), et
-bien sûr qu’il est exponentiel au nombre d’attributs. La figure 1(B) illustre que l’algorithme est
-linéaire au nombre de tuples ajoutés dans la relation.
- 0
- 5
- 10
- 15
- 20
- 25
- 30
- 35
-5 7 9
-Te
-m
-ps
- e
-n 
-se
-co
-nd
-e
-Nombre d’attributs
-(A)
-Relation de 5000 tuples
-Taux de correlation 30%
-Taux de correlation 50%
-Taux de correlation 70%
- 0
- 20
- 40
- 60
- 80
- 100
- 5000  10000  15000  20000  25000  30000  35000  40000  45000  50000
-Te
-m
-ps
- e
-n 
-se
-co
-nd
+Classer, discriminer et visualiser des séquences d’événements
+Matthias Studer∗, Nicolas S. Müller∗, Gilbert Ritschard∗, Alexis Gabadinho∗
+∗Institut d’études démographiques et des parcours de vie, Université de Genève
+{matthias.studer, nicolas.muller, gilbert.ritschard, alexis.gabadinho}@unige.ch,
+http://mephisto.unige.ch/traminer/
+Résumé. Cet article 1 présente un ensemble d’outils destiné à analyser des sé-
+quences d’événements en sciences sociales et à visualiser les résultats obtenus.
+Nous commençons par formaliser la notion de séquence d’événements avant de
+définir une mesure de dissimilarité entre ces séquences afin de construire des
+typologies et de tester les liens entre ces séquences et d’autres variables d’inté-
+rêts. Initialement définie par Moen (2000), cette mesure se base sur la notion de
+distance d’édition entre séquences et permet d’identifier les différences d’ordon-
+nancement et de temporalité des événements. Nous proposons une extension de
+celle-ci afin de pouvoir prendre en compte la simultanéité des événements ainsi
+qu’une méthode de normalisation qui garantit le respect de l’inégalité triangu-
+laire. Dans un deuxième temps, nous présentons un ensemble d’outils destinés
+à interpréter les résultats. Nous proposons ainsi deux méthodes de visualisation
+d’un ensemble de séquences et nous introduisons la notion de sous-séquence
+discriminante qui permet d’identifier les différences d’ordonnancement des évé-
+nements les plus significatives entre groupes. L’ensemble des outils présentés est
+disponible au sein de la librairie R TraMineR.
+1 Introduction
+L’analyse de séquences en sciences sociales se centre essentiellement sur deux types de
+questions. Premièrement, dans une optique descriptive, on cherche à construire une typolo-
+gie des séquences, ce que l’on réalise généralement à l’aide d’une classification automatique.
+Deuxièmement, on s’intéresse à comprendre les liens entre ces séquences et d’autres variables
+d’intérêt afin de mettre en relation ces séquences avec leur contexte. Il existe déjà plusieurs
+méthodes pour répondre à ces questions dans le cas de séquences d’états. Dans cet article,
+nous développons un ensemble de méthodes destinées à analyser des séquences d’événements.
+Toutes ces méthodes sont disponibles au sein de la librairie R TraMineR (Gabadinho et al.,
+2009).
+La méthode généralement utilisée en sciences sociales consiste à recoder les séquences
+d’événements sous forme de séquence d’états puis d’utiliser une mesure de dissimilarité déri-
+vée des méthodes d’alignement de séquences (Abbott, 1990). Cette méthode a deux désavan-
+tages. Premièrement, les méthodes d’alignement de séquences ne prennent qu’indirectement en
+1. Etude réalisée avec le soutien financier du Fonds national suisse (FNS), subside 100015-122230.
+RNTI-E-19- 37 -
+Classer, discriminer et visualiser des séquences d’événements
+compte la structure temporelle des séquences (Wu, 2000; Levine, 2000) et ne permettent pas,
+par exemple, l’opération consistant à déplacer dans le temps une transition entre deux états.
+Deuxièmement, le nombre d’états nécessaire pour représenter sans perte d’information une
+séquence d’événements est grand (2n) ce qui rend vite l’interprétation des résultats difficile.
+Nous commençons par introduire une extension de la dissimilarité entre séquences d’évé-
+nements conçue par Moen (2000). Cette mesure est basée sur la notion de distance d’édition
+et peut être définie comme le coût minimum nécessaire pour transformer une séquence en
+une autre à l’aide de deux opérations : l’insertion d’événements et le déplacement de groupes
+d’événements simultanés. De plus, notre extension nous permettra de proposer une norma-
+lisation des dissimilarités — nécessaire puisque les séquences contiennent généralement un
+nombre d’événements variable — qui respecte l’inégalité triangulaire. Cette dernière propriété
+nous permettra d’utiliser ces dissimilarités dans une procédure de classification automatique
+ou encore pour mesurer les liens avec d’autres variables d’intérêt (Studer et al., 2009).
+Nous introduisons ensuite un ensemble de méthodes destiné à caractériser les différences
+entre les groupes obtenus. Cette étape doit également permettre de donner une interprétation
+aux liens statistiquement significatifs avec d’autres variables. Pour ce faire, nous introduisons
+la notion de sous-séquence discriminante définie comme les sous-séquences fréquentes dont la
+présence permet de discriminer l’appartenance à un groupe spécifié. Nous introduisons égale-
+ment une méthode de visualisation d’un ensemble de séquences d’événements.
+L’article est organisé de la manière suivante. Nous commençons par donner une courte in-
+troduction à l’étude des trajectoires familiales qui nous servira d’exemple d’application tout au
+long de cet article. Nous formalisons ensuite la notion de séquence d’événements en reprenant
+les termes et les concepts utilisés en sciences sociales, notre principal domaine d’application.
+Sur cette base, nous présentons ensuite la méthode de calcul de dissimilarité entre séquences
+d’événements ainsi que les extensions disponibles dans TraMineR. Finalement, nous intro-
+duisons les différentes méthodes de visualisation utilisées pour qualifier les différences entre
+groupes de séquences.
+2 Présentation des données
+Nous utilisons les données de l’enquête biographique rétrospective réalisée par le Panel
+suisse de ménages 2 en 2002. Dans le cadre de cette étude, nous retenons cinq événements
+constitutifs de la vie familiale : le départ du foyer parental, la première cohabitation en couple,
+le premier mariage, le premier divorce et la naissance du premier enfant. Afin de comparer des
+séquences similaires, nous n’avons retenu que les répondants ayant 45 ans lors de l’enquête,
+soit 2601 individus. Ce choix nous permettra de comparer les résultats de l’analyse directe
+des séquences d’événements avec ceux obtenus dans (Müller et al., 2008) en passant par le
+recodage sous forme de séquences d’états. L’objectif de l’étude est de mettre en évidences les
+différents types de parcours familiaux et les changements que ceux-ci ont connus au cours du
+20ème siècle, notamment concernant le mariage.
+2. http ://www.swisspanel.ch
+RNTI-E-19 - 38 -
+M. Studer et al.
+3 Formalisation des séquences d’événements
+Dans cette section, nous présentons une formalisation de la notion de séquence qui permet
+de prendre compte la temporalité des événements. Cette formalisation se base sur une adapta-
+tion à la terminologie sociologique de la formalisation généralement utilisée en data-mining et
+présentée notamment par Agrawal et Srikant (1995) et Zaki (2001).
+Notre optique consiste à analyser les trajectoires comme une succession ordonnée de chan-
+gements, de transitions et d’événements. Dès lors, nous définissons une séquence comme une
+liste ordonnée de transitions. Une séquence X est notée (τ1 → τ2 → . . .→ τq), où chaque τi
+désigne une transition. Les transitions peuvent être formalisées comme une liste non ordonnée
+d’événements distincts. Autrement dit, une transition correspond à la réalisation d’un ou de
+plusieurs événements simultanés, chaque événement ne pouvant se produire qu’une seule fois
+dans une même transition. Une transition τi est notée (1, 2, . . . , r), ou chaque i désigne un
+événement distinct. La distinction entre transition et événement permet de rendre compte de la
+simultanéité de certains événements. L’ensemble des événements pouvant se réaliser constitue
+l’alphabet Σ∗ des séquences d’événements. Prenons un exemple.
+(Départ, Couple)→ (Mariage)→ (Enfant) (1)
+Cette séquence décrit le parcours d’une personne qui quitterait ses parents pour se mettre en
+couple avant de se marier puis d’avoir un premier enfant. Selon notre formalisation, “Départ”,
+“Couple”, “Mariage” et “Enfant” sont des événements alors que (Départ, Couple) dénote une
+transition, contenant deux événements distincts, entre les états “Encore chez les parents et sans
+partenaire” et “Parti et avec un partenaire”.
+Afin de garantir l’unicité de la représentation d’une transition, nous répertorions les évé-
+nements qui la composent dans un ordre constant prédéfini. Sans ce point, la séquence (1)
+pourrait également s’écrire (Couple, Départ)→ (Mariage)→ (Enfant).
+Cette formalisation laisse cependant de côté la temporalité des événements, alors qu’il
+s’agit d’une notion centrale à l’étude des séquences d’événements en sciences sociales. Nous
+proposons de la compléter en datant les transitions et en mesurant les durées qui les séparent.
+Nous utilisons un exposant pour indiquer l’âge auquel chaque transition se produit. Ainsi, une
+transition τ1 se produisant à l’instant t s’écrira τ t1. A titre d’exemple, la séquence 1 pourrait
+être enrichie de la manière suivante :
+(Départ, Couple)23 → (Mariage)29 → (Enfant)30 (2)
+Dans certaines situations, on préférera des écarts relatifs entre événements et transitions
+plutôt que des âges absolus. Dans notre exemple, on peut ainsi noter que le premier enfant
+survient à trente ans ou qu’il survient un an après le mariage. Nous introduisons une notation
+basée sur les écarts à l’aide d’un exposant au dessus de la flèche→. Afin de disposer de l’en-
+semble des informations, il est nécessaire d’inclure l’écart à l’origine (âge 0) pour la première
+transition. Notons que les deux notations, sous forme d’âge absolu ou d’écarts, comportent la
+même information et que l’une ou l’autre doit être utilisée en fonction de la perspective selon
+laquelle on entend aborder une trajectoire. Ainsi, nous pourrions réécrire la séquence 2 de la
+manière suivante.
+23−→ (Départ, Couple) 6−→ (Mariage) 1−→ (Enfant) 15−→ (3)
+RNTI-E-19- 39 -
+Classer, discriminer et visualiser des séquences d’événements
+De manière similaire, nous pouvons inclure l’écart jusqu’à la fin de l’observation de la
+séquence. Ce formalisme permet de prendre en compte les données censurées. En effet, en
+sciences sociales, il est fréquent que les durées d’observation de chaque individu diffèrent.
+Notons qu’en interne TraMineR utilise une représentation basée sur les écarts.
+4 Distance entre séquences d’événements
+La définition d’une mesure de dissimilarité permet de construire une typologie des sé-
+quences à l’aide d’une procédure de classification hiérarchique. Elle permet aussi de tester le
+lien avec d’autres variables d’intérêts. Cette mesure de dissimilarité doit permettre de comparer
+les séquences en fonction de l’ordonnancement des événements et de leur temporalité. Dans
+cette section, nous construisons, sur la base de la mesure établie par Pirjo Moen (Moen, 2000),
+une distance entre séquences d’événements.
+Dans sa thèse de doctorat, Moen (2000) propose d’établir une mesure de dissimilarité entre
+séquences de transitions 3 en se basant sur la notion de distance d’édition. La dissimilarité entre
+deux objets est alors définie comme le coût minimum nécessaire à la transformation d’une
+séquence en une autre en considérant deux types d’opérations : l’insertion d’une transition et
+son déplacement temporel. Cette mesure prend ainsi deux paramètres : un tableau spécifiant
+le coût d’insertion de chaque type de transition et le coût (constant) associé au déplacement
+d’une transition d’une unité de temps. L’approche ressemble ainsi fortement à l’alignement de
+séquences, procédure souvent utilisée en sciences sociales pour l’analyse de séquences d’états.
+Elle permet toutefois d’inclure des opérations propres aux séquences d’événements, tels que le
+déplacement temporel d’une transition.
+Cette dissimilarité présente plusieurs inconvénients. Premièrement, elle ne permet pas de
+prendre en compte les événements simultanés, alors qu’ils sont courants en sciences sociales
+où les processus sont souvent mesurés à l’échelle de l’année. Deuxièmement, la normalisation
+des distances en fonction du coût maximal peut remettre en cause l’inégalité triangulaire.
+L’extension que nous présentons permet de se baser sur la notion d’événement plutôt que
+celle de transition. Deux opérations sont considérées : l’insertion d’événements et le déplace-
+ment temporel de transitions. Dès lors, deux transitions comportant des événements en com-
+mun pourront être considérées comme similaires. Notre formulation est générale et en l’ab-
+sence d’événements simultanés, correspond à l’algorithme de Moen (2000). De plus, notre
+formulation permet de proposer une normalisation qui respecte l’inégalité triangulaire.
+4.1 Définition
+La distance entre deux séquences d’événements est définie comme le coût minimum néces-
+saire pour transformer une séquence en une autre à l’aide de deux opérations : le déplacement
+temporel d’une transition et l’insertion d’un événement dans une séquence. La métrique dé-
+pend ainsi de deux paramètres : δ le coût associé au déplacement d’une transition d’une unité de
+temps et ω() le coût associé à l’insertion-suppression d’un événement de type . Moen (2000)
+propose de faire dépendre ce dernier coût de la fréquence d’apparition de l’événement .
+3. Pirjo Moen parle de séquence d’événements. Toutefois, sa définition de l’événement suppose la non-
+simultanéité des événements et sa proposition de considérer les combinaisons d’événements simultanés comme des
+événements distincts correspond à la définition de transition que nous avons introduite dans notre formalisation.
+RNTI-E-19 - 40 -
+M. Studer et al.
+Le calcul de cette distance peut être réalisé en redéfinissant les coûts associés aux deux
+opérations de base définies dans la distance de Levenshtein généralisée (Yujian et Bo, 2007) :
+l’insertion-suppression et la substitution d’une transition. Soit λ l’élément nul que nous ajou-
+tons à l’alphabet Σ∗ et Ω(A) la somme des coûts ω d’insertion de l’ensemble des événements
+appartenant à A, A étant une transition ou une séquence :
+Ω(A) =
+∑
+i∈A
+ω(i) (4)
+Nous notons γ(λ → τ t) le coût d’insertion d’une transition τ à l’instant t et γ(τ t → λ)
+celui d’une suppression. Le coût de cette opération dépend des événements inclus dans la
+transition et est défini comme la somme des coûts de leur insertion-suppression, soit :
+γ(λ→ τ t) = Ω(τ t) =
+∑
+i∈τt
+ω(i) (5)
+Le coût de la substitution d’une transition τ t11 par τ
+t2
+2 est notée γ(τ
+t1
+1 → τ t22 ). Soit
+Δ(τ t11 → τ t22 ), le coût associé au déplacement de la transition de t1 à t2 plus le coût nécessaire
+pour transformer τ1 en τ2 :
+Δ(τ t11 → τ t22 ) = δ|t1 − t2|+Ω(τ1) + Ω(τ2)− 2 · Ω(τ1 ∩ τ2) (6)
+γ(τ t11 → τ t22 ) = min{Δ(τ t11 → τ t22 ); γ(τ t11 → λ) + γ(λ→ τ t22 )} (7)
+Soit TX,Y un ensemble d’opérations Ti permettant de transformer la séquence X en Y , la
+distance d(X,Y ) est définie comme :
+d(X,Y ) = min{
+∑
+TI∈TX,Y
+γ(Ti)} (8)
+Cette distance peut être calculée à l’aide d’un algorithme de programmation dynamique clas-
+sique. Remarquons qu’il s’agit d’une distance au sens mathématique du terme. En effet, la
+matrice des opérations de base γ ainsi définie respecte les conditions mathématiques de la dis-
+tance, ce qui est une condition suffisante pour assurer que l’algorithme produise une distance
+(Yujian et Bo, 2007). Il est toutefois nécessaire que les paramètres respectent les conditions
+suivantes : ω() > 0 et δ ≥ 0.
+A titre d’exemple, prenons les deux séquences X et Y suivantes :
+X = (Naissance) 20−→ (Couple, Depart) 4−→ (Mariage) 21−→
+Y = (Naissance) 19−→ (Couple, Depart, Mariage) 26−→
+La série de transformation associée au coût minimal avec un coût d’insertion constant ω = 1
+et un coût de déplacement δ = 0.2 est :
+d(X,Y ) = γ((Naissance)0 → (Naissance)0);
+γ((Couple, Depart)20 → (Couple, Depart, Mariage)19);
+γ((Mariage)24 → λ)
+= 0 + 1.2 + 1 = 2.2
+RNTI-E-19- 41 -
+Classer, discriminer et visualiser des séquences d’événements
+4.2 Normalisation
+En sciences sociales, les séquences d’événements sont souvent de longueurs différentes,
+même pour des temps d’observations identiques. Certaines personnes connaissent des trajec-
+toires plus turbulentes que d’autres. Pour pallier ce problème qui affecte divers domaines, il
+est nécessaire de normaliser les distances. Sans normalisation, une insertion dans la comparai-
+son de deux séquences comportant mille événements conduira à la même distance que si les
+séquences en comportent deux. Moen (2000) propose de diviser chaque distance par le coût
+maximum, mais cette normalisation peut entraîner le non-respect de l’inégalité triangulaire.
+Ceci est notamment problématique pour calculer l’association des séquences avec d’autres va-
+riables sur la base des dissimilarités (Studer et al., 2009).
+Yujian et Bo (2007) proposent une méthode de normalisation qui maintient l’inégalité tri-
+angulaire pour la distance de Levenshtein généralisée à coût d’insertion constant. Nous propo-
+sons une adaptation de celle-ci à notre métrique basée sur des coûts d’insertion variables (mais
+sans substitution). Yujian et Bo (2007) montrent qu’une telle normalisation peut être obtenue
+en définissant une mesure de similarité s qui satisfait les conditions suivantes :
+s(Y, Y ) + s(X,Z) ≥ s(X,Y ) + s(Y, Z) (9)
+0 ≤ s(X,Y ) ≤ min{s(X,X), s(Y, Y )} (10)
+Sur la base de la distance introduite, nous définissons la mesure de similarité suivante.
+s(X,Y ) =
+Ω(X) + Ω(Y )− d(X,Y )
+2
+(11)
+Cette mesure de similarité satisfait la relation (9), ce qui peut être montré de la manière
+suivante en notant que s(Y, Y ) = Ω(Y ) :
+d(X,Z) ≤ d(X,Y ) + d(Y, Z)
+Ω(X) + Ω(Z)− 2s(X,Z) ≤ Ω(X) + Ω(Y )− 2s(X,Y ) + Ω(Y ) + Ω(Z)− 2s(Y, Z)
+s(X,Y ) + s(Y, Z) ≤ Ω(Y ) + s(X,Z)
+La relation (10) est également respectée. En effet, d(X,Y ) est nécessairement supérieur
+ou égal à la somme des insertions et suppressions nécessaires pour transformer X en Y sans
+considération d’ordre ni de temporalité (qui ne peuvent qu’augmenter la distance), ce qui est
+égal à Ω(X) + Ω(Y )− 2 ·Ω(X ∩ Y ). Ainsi, s(X,Y ) ≤ Ω(X ∩ Y ) ≤ min{Ω(X),Ω(Y )} =
+min{s(X,X), s(Y, Y )}. De plus, comme d(X,Y ) ≤ Ω(X) + Ω(Y ), on a s(X,Y ) ≥ 0.
+La distance normalisée est alors définie comme :
+dN (X,Y ) =
+s(X,X) + s(Y, Y )− 2s(X,Y )
+s(X,X) + s(Y, Y )− s(X,Y ) =
+2d(X,Y )
+Ω(X) + Ω(Y ) + d(X,Y )
+(12)
+4.3 Prise en compte du temps
+La définition du temps auquel les transitions ont lieu n’est pas triviale. Pirjo Moen propose
+de prendre l’âge absolu comme référence temporelle. Toutefois, comme nous l’avons vu dans
+notre formalisation, il est également possible de raisonner en terme d’écarts à la transition
+RNTI-E-19 - 42 -
+M. Studer et al.
+précédente. Dans le premier cas, un décalage au début peut se répercuter sur l’ensemble des
+événements suivants si les écarts sont les mêmes, ce qui est évité avec la deuxième solution.
+Le calcul sur la base des âges mettra en avant la temporalité absolue des transitions alors que
+les écarts permettent de prendre en compte la dynamique. Il est également possible d’utiliser
+l’écart à la transition suivante ou à la fin de l’observation de la séquence pour la dernière
+transition. Dans ce dernier cas, on mettra en avant le fait qu’une transition influence une période
+de longueur déterminée.
+Toutes ces manières de prendre en considération la temporalité des séquences d’événe-
+ments entrent dans le cadre de la mesure de distance que nous avons présentée. Le choix de
+l’une ou l’autre des solutions devrait être effectué en fonction de la problématique considérée.
+4.4 Application
+Nous proposons à présent de mettre en oeuvre cette mesure de dissimilarité sur l’exemple
+que nous avons présenté. Nous avons utilisé un coût δ de 0.1 et un coût d’insertion-délétion
+constant égal à 0.5. Cette définition implique qu’un déplacement de dix ans correspond à l’in-
+sertion et la suppression d’un événement. Dans notre logique, à dix ans d’intervalle, la signi-
+fication sociale d’un événement change tellement qu’il est nécessaire de le considérer comme
+différent. Nous avons choisi de calculer les distances en fonction des âges absolus.
+A l’aide des distances obtenues, on peut procéder à une classification automatique en uti-
+lisant diverses procédures. Étant donné que TraMineR est un package R, l’ensemble des pro-
+cédures disponibles dans R peut être utilisé. Nous avons ici créé trois groupes à l’aide de
+l’algorithme PAM (Partitioning Around Medoids) (Maechler et al., 2005), une extension des
+nuées dynamiques à tout type de dissimilarités. Une fois les groupes construits, il est possible
+de se faire une idée de leurs contenus à l’aide de leur centroïde. Le tableau1 présente le nombre
+d’individus, la dispersion calculée sur la base des dissimilarités (Studer et al., 2009) ainsi que
+le centroide de chaque groupe obtenu.
+Groupe N Dispersion Centroïde
+1 1256 0.236 (Naissance) 24−−→ (Couple, Depart, Mariage) 21−−→
+2 973 0.275 (Naissance) 20−−→ (Depart) 6−→ (Couple, Mariage) 2−→ (Enfant) 17−−→
+3 372 0.262 (Naissance) 24−−→ (Mariage) 21−−→
+Total 2601 0.311
+TAB. 1 – Groupes obtenus
+A l’aide de ces dissimilarités, il est également possible de mesurer le lien entre les sé-
+quences d’événements représentées par les dissimilarités et d’autres variables d’intérêts. Nous
+pouvons ainsi affirmer que la relation entre les séquences et la cohorte de naissance est statis-
+tiquement significative. Autrement dit, les modèles de construction de la vie familiale de ceux
+qui sont nés après 1949 sont différents de ceux nés avant.
+Toutefois, en l’état, la procédure de classification automatique reste d’un intérêt limité : il
+nous manque des méthodes pour décrire ou visualiser les groupes obtenus. L’utilisation des
+centroides est trop réductrice pour pouvoir interpréter les groupes. Il en va de même pour la
+mesure d’association. Il est nécessaire de décrire en quoi les cohortes diffèrent pour donner du
+RNTI-E-19- 43 -
+Classer, discriminer et visualiser des séquences d’événements
+sens à la relation. Dans le prochain chapitre, nous abordons des méthodes destinées à visualiser
+un ensemble de séquences et à identifier les différences entre groupes de séquences.
+5 Visualisation et caractérisation de groupes de séquences
+Dans cette section, nous décrivons de nouvelles méthodes pour visualiser des ensembles de
+séquences d’événements. Nous abordons également, dans un deuxième temps, la localisation
+de différences entre groupes de séquences. Ces méthodes nous permettront d’interpréter les
+résultats obtenus précédemment.
+5.1 Visualisation et description d’un ensemble de séquence
+Il est possible de décrire un ensemble de séquences à l’aide des sous-séquences les plus fré-
+quentes dans cet ensemble (Agrawal et Srikant, 1995; Zaki, 2001). Une sous-séquence d’une
+séquence donnée x peut être définie comme une séquence d’événements composée d’un sous-
+ensemble des événements de x et qui respecte l’ordre des événements de x. Par exemple,
+(Départ, Couple) → (Enfant) est une sous-séquence de la séquence (1) puisque l’ordre des
+transitions et des événements est respecté. Le support d’une sous-séquence correspond au
+nombre de séquences dans lesquelles cette sous-séquence apparaît. Une sous-séquence est dite
+fréquente si son support dépasse un certain seuil appelé le support minimum.
+TraMineR permet de rechercher les sous-séquences fréquentes à l’aide d’un algorithme
+simple, basé sur les arbres de préfixes (Masseglia, 2002). Cette recherche peut être contrôlée
+à l’aide de contraintes temporelles. Ainsi, il est possible de spécifier une fenêtre maximum
+(temps maximal pendant lequel une sous-séquence peut se produire) et le temps maximum
+séparant deux transitions. Un âge minimum et maximum peuvent également être spécifié afin
+de se concentrer sur l’étude de tranches d’âges spécifiques. La figure 1 présente les vingt sous-
+séquences les plus fréquentes dans nos séquences sans aucune contrainte temporelle.
+F
+ré
+qu
+en
+ce
+s 
+re
+la
+tiv
 es
-Nombre de tuples
-(B)
-Relation de 7 attributs; 30% de correlation
-FIG. 1 – Temps d’exécution pour différents nombres d’attributs, différentes corrélations, et
-différents nombres de tuples
-La table suivante décrit les caractéristiques des données réelles et les temps d’exécutions
-avec AFD-DYNAMICUPDATE et FUN.
-Relation names #attributes #tuples AFD-DYNAMICUPDATE FUN
-TombNecropolis 7 1 846 5,700s 82,770s
-someCompanies 6 40 316 11m15s 1h 27m
-Le tableau ci-dessus est très clair : notre approche est beaucoup plus efficace que FUN pour
-le calcul incrémental de Dépendances Fonctionnelles.
-3 Conclusion et perspectives
-Nous avons proposé une nouvelle approche pour l’extraction de DFA et un algorithme as-
-socié nommé AFD-DYNAMICUPDATE. Contrairement à d’autres algorithmes, celui-ci est une
-approche incrémentale qui permet la mise à jour de l’ensemble des DFA valides quand la re-
-lation évolue. Nous caractérisons l’influence de l’évolution d’une relation sur l’ensemble des
-DFA valides. Pour cela, nous n’utilisons pas la relation, mais une représentation de celle-ci, ce
-qui rend l’algorithme efficace et exploitable.
-Pour montrer les avantages et la faisabilité de notre approche, nous avons comparé AFD-
-DYNAMICUPDATE avec FUN. Les résultats des expérimentations obtenus sous les mêmes
-conditions (cf. Section 2.4) montrent de bonnes propriétés de passage à échelle de l’approche
-lorsque la relation change (ajout ou suppression de tuples).
-Par ailleurs, ce travail sera utilisé pour la détection visuelle de changements d’habitude ou de
-5- 81 -
-détections d’erreurs. Un outil de visualisation on line et off line (à l’aide de scénarii, séquence
-d’instructions d’ajout et de suppression de tuples) est en cours de réalisation pour visualiser
-l’évolution de l’ensemble des DF valides au cours du temps. Cet outil montrera les différents
-ensembles de DF (exactes ou approximatives) valides pour une relation à plusieurs instants ce
-qui permettra de mieux comprendre les changements d’habitudes ou les apparitions d’erreurs.
+0.
+0
+0.
+2
+0.
+4
+0.
+6
+0.
+8
+(M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t)
+(C
+ou
+pl
+e)
+(E
+nf
+an
+t)
+(C
+ou
+pl
+e,
+M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t)
+−(
+E
+nf
+an
+t)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t)
+(C
+ou
+pl
+e)
+−(
+E
+nf
+an
+t)
+(M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t,M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t,M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e,
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+C
+ou
+pl
+e)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t)
+−(
+E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+C
+ou
+pl
+e,
+M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t,M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t,M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+C
+ou
+pl
+e)
+−(
+E
+nf
+an
+t)
+FIG. 1 – Les vingt sous-séquences les plus fréquentes.
+Cette représentation permet d’observer les enchaînements les plus fréquents, mais sa lec-
+ture peut s’avérer difficile. Ce n’est pas parce qu’une sous-séquence est fréquente qu’elle est
+intéressante et le nombre de sous-séquences à afficher est difficile à déterminer. De plus, cer-
+taines sous-séquences peuvent être redondantes. Finalement, cette description ne prend pas en
+compte la temporalité des événements, hormis si l’on spécifie des contraintes temporelles.
+RNTI-E-19 - 44 -
+M. Studer et al.
+La figure 2 propose deux représentations d’un ensemble de séquences. Le premier gra-
+phique montre l’évolution du nombre moyen d’événements par individu pour chaque type
+d’événement (l’événement “Naissance” a été omis pour plus de clarté). Ce graphique permet de
+mettre en lumière les régularités temporelles de certains événements. Ainsi, le départ connaît
+un pic aux alentours de vingt ans alors que l’arrivée du premier enfant se concentre entre 25
+et 30 ans. Cette représentation tient compte des apparitions multiples des mêmes événements
+dans une même séquence.
+15 20 25 30 35 40 45
+0.
+00
+0.
+02
+0.
+04
+0.
+06
+0.
+08
+0.
+10
+Nombre d'événements moyen par âge
+15 20 25 30 35 40 45
+0.
+0
+0.
+2
+0.
+4
+0.
+6
+0.
+8
+1.
+0
+Probabilité de survie selon l'âge
+Couple Depart Divorce Enfant Mariage
+FIG. 2 – Représentation d’un ensemble de séquences.
+Le graphique de droite affiche les courbes de survie S(t) jusqu’à la première occurrence
+de chaque événement. S(t) = P (T ≥ t) donne la probabilité que la durée d’attente T jusqu’à
+l’événement soit au moins t. Ce graphique à l’avantage de montrer la part de la population qui
+connaît chaque événement. Toutefois, il n’est pas possible d’inclure les événements récurrents.
+5.2 Différencier des groupes de séquences
+Les méthodes présentées dans la section précédente permettent de représenter un ensemble
+de séquences. Elles s’avèrent notamment utiles pour explorer les différences entre des groupes
+de séquences. La figure 3 présente les courbes de survie dans chaque groupe obtenu par la
+procédure de classification automatique.
+Il est ainsi possible de donner une interprétation plus précise des groupes obtenus. Les
+groupes reprennent trois logiques connues des parcours de cohabitation suisses. Le premier
+correspond à l’ancien modèle qui consiste à quitter le foyer parental quand on se marie. Le
+deuxième groupe reprend le modèle moderne de construction de la vie familiale qui se dis-
+tingue par l’existence d’une période “seule”. Finalement, le dernier groupe reprend les indivi-
+dus qui n’ont jamais quitté leurs parents (éventuellement en se mariant).
+La méthode traditionnellement employée, qui exploite un recodage sous forme de sé-
+quences d’états (Müller et al., 2008), favorise un regroupement selon le temps passé au sein de
+chaque état (défini par la combinaison des événements vécus). La dissimilarité entre séquences
+d’événements proposée ici donne un poids plus grand aux différences de séquencement, même
+RNTI-E-19- 45 -
+Classer, discriminer et visualiser des séquences d’événements
+15 20 25 30 35 40 45
+0.
+0
+0.
+2
+0.
+4
+0.
+6
+0.
+8
+1.
+0
+Type − 1
+15 20 25 30 35 40 45
+0.
+0
+0.
+2
+0.
+4
+0.
+6
+0.
+8
+1.
+0
+Type − 2
+15 20 25 30 35 40 45
+0.
+0
+0.
+2
+0.
+4
+0.
+6
+0.
+8
+1.
+0
+Type − 3
+Couple
+Depart
+Divorce
+Enfant
+Mariage
+FIG. 3 – Courbes de survie par groupe obtenu.
+si les écarts entre événements sont petits. Avec la première solution, les individus qui passent
+un grand nombre d’années dans l’état marié avec enfant sont regroupés, peu importe le proces-
+sus qui les a conduits à connaître ou à quitter cet état. La première méthode se centre sur les
+états occupés, alors que celle que nous proposons se centre sur les événements et correspond
+ainsi mieux à l’étude des processus représentés sous la forme de succession d’événements.
+Il serait possible de décrire les groupes à l’aide des sous-séquences les plus fréquentes.
+Toutefois, un tel graphique n’apporte généralement que peu d’information. En effet, une sous-
+séquence très fréquente peut l’être dans chacun des groupes comparés. Autrement dit, les
+groupes peuvent se distinguer sur des sous-séquences relativement peu fréquentes.
+Afin de pallier ce problème, nous proposons d’ordonner les sous-séquences en fonction de
+leurs capacités à discriminer l’appartenance à un groupe plutôt qu’à un autre. Nous mesurons
+cette capacité de chaque sous-séquence à l’aide de la valeur du khi-carré de Pearson calculé sur
+le tableau croisé entre l’appartenance au groupe et la présence de la sous-séquence en question.
+Notons que les valeurs du khi-carré sont comparables puisque les degrés de liberté sont les
+mêmes pour l’ensemble des sous-séquences. Nous sélectionnons ensuite les sous-séquences
+pour lesquelles le test du khi-carré est statistiquement significatif en appliquant une correction
+de Bonferroni pour prendre en compte la multiplicité des tests effectués.
+La figure 4 présente les fréquences d’apparition des 10 sous-séquences permettant de dis-
+criminer le plus ceux nés avant ou après 1950. Les sous-séquences sont ordonnées, de gauche
+à droite, selon leur pouvoir discriminant. Les barres sont coloriées en fonction de la significati-
+vité du résidu de Pearson correspondant au croisement entre l’appartenance au groupe et la pré-
+sence de la sous-séquence. Un résidu négatif (resp. positif) nous montre que la sous-séquence
+apparaît significativement moins (resp. plus) souvent qu’attendu en cas d’indépendance.
+Nous avions mis en évidence la présence d’un effet de génération à l’aide d’un test statis-
+RNTI-E-19 - 46 -
+M. Studer et al.
+<1950
+F
+ré
+qu
+en
+ce
+s 
+re
+la
+tiv
+es
+0.
+0
+0.
+1
+0.
+2
+0.
+3
+0.
+4
+0.
+5
+0.
+6
+(C
+ou
+pl
+e,
+M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t,M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t,M
+ar
+ia
+ge
+)
+>=1950
+F
+ré
+qu
+en
+ce
+s 
+re
+la
+tiv
+es
+0.
+0
+0.
+1
+0.
+2
+0.
+3
+0.
+4
+0.
+5
+0.
+6
+(C
+ou
+pl
+e,
+M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t)
+−(
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(D
+ep
+ar
+t)
+−(
+C
+ou
+pl
+e)
+−(
+M
+ar
+ia
+ge
+)−
+(E
+nf
+an
+t)
+(C
+ou
+pl
+e,
+D
+ep
+ar
+t,M
+ar
+ia
+ge
+)
+(D
+ep
+ar
+t,M
+ar
+ia
+ge
+)
+Pearson residuals
+Negative 0.01 Negative 0.05 neutral Positive 0.05 Positive 0.01
+FIG. 4 – Fréquences d’apparition des 10 sous-séquences les plus discriminantes.
+tique sur les dissimilarités. La figure 4 permet d’interpréter cet effet et notamment de mettre
+en évidence l’apparition d’un délai entre la cohabitation et le mariage pour les individus nés
+après 1949.
+6 Conclusion
+Dans cet article, nous avons présenté un ensemble de méthodes d’analyse de séquences
+d’événements visant à des questions communes en sciences sociales. Ces outils se basent sur
+la définition d’une mesure de dissimilarité entre séquences qui prend en compte l’ordonnance-
+ment et la temporalité des transitions. La mesure proposée prend en compte la simultanéité des
+événements ainsi que la longueur des séquences comparées tout en respectant l’inégalité trian-
+gulaire. Il est ainsi possible de construire des typologies et de mesurer les liens avec d’autres
+variables d’intérêts. Nous avons en particulier obtenu des résultats pertinents pour l’analyse
+des parcours de cohabitation en Suisse. La mesure doit être encore testée plus systématique-
+ment, par exemple à l’aide de données générées artificiellement afin de mettre en lumière ses
+forces et ses limites.
+Dans un deuxième temps, nous avons présenté des méthodes de visualisation qui per-
+mettent d’interpréter les résultats obtenus. L’utilisation de courbes de survie jusqu’à l’appa-
+rition de chacun des événements permet de comparer leur temporalité dans les séquences.
+Nous avons également introduit la notion de sous-séquence discriminante pour repérer les
+différences les plus significatives d’ordonnancement des événements entre groupes. Nous tra-
+vaillons actuellement à l’extension de la recherche de séquences discriminantes à l’aide d’autres
+tests statistiques. Nous envisageons, par exemple, de comparer les durées ou encore l’attente
+jusqu’à l’apparition de chacune des sous-séquences.
+Finalement, rappelons que l’ensemble des outils que nous avons présenté est disponible
+dans TraMineR. Les résultats peuvent ainsi être réutilisés en interaction avec d’autres méthodes
+d’analyses plus classiques disponible dans R.
+RNTI-E-19- 47 -
+Classer, discriminer et visualiser des séquences d’événements
 Références
-Codd, E. (1970). A Relational Model of Data for Large Shared Data Banks. Communication
-of the ACM 13(6), 377–387.
-Gasmi, G. (2010). Incfds : un nouvel algorithme d’inférence incrémentale des dépendances
-fonctionnelles. In EGC’10, pp. 303–314.
-Huhtala, Y., J. Karkkainen, P. Porkka, et H. Toivonen (1998). Efficient Discovery of Functional
-and Approximate Dependencies. In ICDE, pp. 392–401.
-Kivinen, J. et H. Mannila (1995). Approximate Dependency Inference from Relations. Theo-
-retical Computer Science 149(1), 129–149.
-Lopes, S., J. Petit, et L. Lakhal (2000). Efficient Discovery of Functional Dependencies and
-Armstrong Relations. In EDBT, pp. 350–364.
-Mannila, H. et K. Räihä (1994). Algorithms for Inferring Functional Dependencies from Re-
-lations. Data and Knowledge Engineering 12(1), 83–99.
-Novelli, N. (2000). Extraction de Dépendances Fonctionnelles dans les Bases de Données :
-une Approche Data Mining. Ph. D. thesis, Université Aix-Marseille II.
-Novelli, N. et R. Cicchetti (2001). Functional and Embedded Dependency Inference : A Data
-Mining Point of View. Information Systems 26(7), 477–506.
-Wyss, C. M., C. Giannella, et E. L. Robertson (2001). Fastfds : A heuristic-driven, depth-first
-algorithm for mining functional dependencies from relation instances - extended abstract.
-In DaWaK, pp. 101–110.
+Abbott, A. (1990). A primer on sequence methods. Organization Science 1(4), 375–392.
+Agrawal, R. et R. Srikant (1995). Mining sequential patterns. In P. S. Yu et A. L. P. Chen
+(Eds.), Proceedings of the International Conference on Data Engeneering (ICDE), Taipei,
+Taiwan, pp. 487–499. IEEE Computer Society.
+Gabadinho, A., G. Ritschard, M. Studer, et N. S. Müller (2009). Mining sequence data in
+R with TraMineR: A user’s guide. Technical report, Department of Econometrics and
+Laboratory of Demography, University of Geneva, Geneva.
+Levine, J. (2000). But what have you done for us lately. Sociological Methods & Research 29
+(1), pp. 35–40.
+Maechler, M., P. Rousseeuw, A. Struyf, et M. Hubert (2005). Package ‘cluster’: Cluster
+analysis basics and extensions. Refence manual, R-project, CRAN.
+Masseglia, F. (2002). Algorithmes et applications pour l’extraction de motifs séquentiels
+dans le domaine de la fouille de données : de l’incrémental au temps réel. Ph. D. thesis,
+Université de Versailles Saint-Quentin en Yvelines.
+Moen, P. (2000). Attribute, Event Sequence, and Event Type Similarity Notions for Data
+Mining. Ph. D. thesis, University of Helsinki.
+Müller, N. S., S. Lespinats, G. Ritschard, M. Studer, et A. Gabadinho (2008). Visualisation
+et classification des parcours de vie. Revue des nouvelles technologies de l’information
+RNTI E-11, II, 499–510.
+Studer, M., G. Ritschard, A. Gabadinho, et N. S. Müller (2009). Analyse de dissimilarités par
+arbre d’induction. Revue des nouvelles technologies de l’information RNTI E-15, 7–18.
+Wu, L. L. (2000). Some comments on ‘sequence analysis and optimal matching methods in
+sociology : Review and prospect’. Sociological Methods Research 29(1), 41–64.
+Yujian, L. et L. Bo (2007). A normalized levenshtein distance metric. IEEE Transactions On
+Pattern Analysis And Machine Intelligence 29(6), 1091–1095.
+Zaki, M. J. (2001). SPADE : An efficient algorithm for mining frequent sequences. Machine
+Learning 42(1/2), 31–60.
 Summary
-Functional Dependency (FD) inference from existing relations is an important data base
-analysis technique. The problem has been treated by using data mining approach, by the algo-
-rithms TANE, DEPMINER, FASTFDS et FUN. Since the FD set, inferred by these algorithms
-is valid as long as the relation remains unchanged, they become efficient in the real life situa-
-tions when the relation is constantly updated. It is particularly important to be able to extract
-approximate FDs, allowing to take into account errors and exceptions in the given data. We
-propose an incremental approach, allowing to update the valid set of approximate FDs, while
-tuples are inserted or deleted. The algorithm employs a level-wise strategy to keep the internal
-representation of the relation up-to-date. Experimental results show that during FDs extraction
-from a constantly updated relation, existing algorithms are significantly outperformed by our
-incremental approach.
-6- 82 -
+This article presents a set of tools to analyze event sequences in the social sciences and
+visualize the results. We begin by formalizing the notion of event sequence before defining a
+measure of dissimilarity between these sequences to cluster them and test the links between
+these sequences and other variables of interest. Initially defined by Moen (2000), this measure
+is based on the notion of edit distance between sequences and identifies the differences in
+sequencing and timing of events. We propose an extension of it in order to take into account
+the simultaneity of events and a normalization method that guarantees the respect of the triangle
+inequality. In a second step, we present a set of tools to interpret the results. We thus propose
+two methods of viewing a set of sequences and we introduce the concept of discriminant sub-
+sequence that identifies differences in sequencing that are the most significant between groups.
+All the tools presented are available in the TraMineR R library.
+RNTI-E-19 - 48 -

@@ -1,817 +1,568 @@
-Classification par voisinages successifs sur des descriptions
-morphologiques complexes
-David Grosser∗, Noël Conruyt∗
-Henri Ralambondrainy∗
-∗LIM-IREMIA, Université de la Réunion
-Parc Technologique Universitaire, Bâtiment 2
-2, rue Joseph Wetzell - 97490 Sainte-Clotilde
-grosser, conruyt, ralambon@univ-reunion.fr
-Résumé. Afin de classifier des descriptions morphologiques issues de bases
-de connaissances en biologie, nous proposons une méthode de fouille de don-
-nées incrémentale, interactive et semi-dirigée. Cette méthode est fondée sur la
-construction itérative du voisinage de la description partielle de l’objet à classer.
-Nous proposons différents indices de similarité adaptés à la nature complexe
-des données considérées (multi-valuées, incomplètes et structurées), pour sélec-
-tionner les descriptions les plus proches. Les connaissances du domaine sont
-utilisées aux différentes étapes du processus de classification, notamment pour
-le choix de variables discriminantes. A partir de la base de connaissances sur les
-coraux des Mascareignes, une application montre l’intérêt de cette approche.
+OKM : une extension des k-moyennes pour la recherche de
+classes recouvrantes
+Guillaume Cleuziou
+Laboratoire d'Informatique Fondamentale d'Orléans (LIFO)
+Université d'Orléans
+Rue Léonard de Vinci - 45067 ORLEANS Cedex 2
+guillaume.cleuziou@univ-orleans.fr
+Résumé. Dans cet article nous abordons le problème de la classication (ou
+clustering) dans le but de découvrir des classes avec recouvrements. Malgré
+quelques avancées récentes dans ce domaines, motivées par des besoins applica-
+tifs importants (traitements des données multimédia par exemple), nous consta-
+tons l'absence de solutions théoriques à ce problème. Notre étude consiste alors
+à proposer une nouvelle formulation du problème de classication par parti-
+tionnement, adaptée à la recherche d'un recouvrement des données en classes
+d'objets similaires. Cette approche se fonde sur la dénition d'un critère ob-
+jectif de qualité d'un recouvrement et d'une solution algorithmique visant à
+optimiser ce critère. Nous proposons deux évaluations de ce travail permettant
+d'une part d'appréhender le fonctionnement global de l'algorithme sur des don-
+nées simples (vitesse de convergence, visualisation des résultats) et d'autre part
+d'évaluer quantitativement le bénéce d'une telle approche sur une application
+de classication de documents textuels.
 1 Introduction
-Outre l’étude des liens de parenté entre espèces (phylogénie), la description de la mor-
-phologie de spécimens biologiques à des fins d’identification et de classification est une part
-essentielle du travail des systématiciens (phénétique). L’automatisation de ce processus par
-des outils informatiques dans le but de construire des systèmes classificatoires pose d’intéres-
-sants problèmes de représentation et de traitement de connaissances. Ceci est particulièrement
-vrai en biologie marine et pour certains taxons comme les coraux, où la nature polymorphe
-des individus (les colonies coralliennes) rend difficile leur description par des représentations
-classiques de type attribut-valeur. Les relations de dépendance entre caractères, induites par
-une forte variabilité morphologique engendrent notamment des difficultés d’observation et de
-description.
-Pour pallier à ces contraintes et permettre la construction de bases de connaissances sur
-la biodiversité des milieux marins, une méthodologie d’acquisition des connaissances descrip-
-tives adaptée aux besoins particuliers des biologistes, s’appuyant sur les logiques descriptives
-en sciences de la vie a été proposée par Conruyt (1994) et Renard et al. (1996). Cette méthode
-permet de définir une connaissance d’ordre ontologique sur la nature des taxons et de décrire
-de manière structurée les spécimens utilisés pour la conception de la Taxonomie des milieux
-considérés. Elle offre un cadre signifiant pour représenter des objets biologiques complexes,
-Classification par voisinages successifs
-permettant notamment d’exprimer des relations de dépendance entre composants d’une des-
-cription. Ces objets complexes sont caractérisés par des attributs de type nominal, ordinal ou
-continu, ensemble ou intervalle, dont les valeurs peuvent être manquantes, inconnues, variées
-ou imprécises selon les choix de définition des experts et les difficultés d’observation rencon-
-trées (voir partie 2).
-Les logiques descriptives en sciences de la vie sont à l’origine du modèle de représentation
-des connaissances par objets Codesc proposé par Grosser et al. (2003) et implanté au sein
-du système IKBS (Iterative Knowledge Base System) développé en Java par Grosser (2002).
-Ce système de gestion de bases de connaissances (SGBC) a notamment été utilisé pour la
-conception de la base de connaissances sur les coraux des Mascareignes grâce à des experts
-internationaux du domaine (Faure et al., 1999). Celle-ci rassemble plus de 150 taxons et 800
-descriptions de spécimens, soit une représentation d’environ 80% des coraux de cet archipel
-du Sud-Ouest de l’Océan Indien. L’objectif premier de cette base de connaissances est de
-capitaliser une partie du savoir des rares experts traitant de la Taxonomie des coraux dans
-des monographies mais aussi du "savoir-faire" des systématiciens lié à l’observation et à la
-description de spécimens en collection et sur le terrain. L’objectif second est d’apporter une
-aide à la classification et à l’identification de nouveaux spécimens. IKBS dispose en effet de
-plusieurs algorithmes spécialisés adaptés à ce type de représentation, tels que la génération
-d’arbres d’identification, le calcul de similarités entre individus ou la recherche de voisinages
-d’une description partielle. Cette base de connaissances est aussi utile pour répondre à des
-problématiques de suivi de la biodiversité, d’identification d’espèces menacées ou encore de
-révision taxinomique des groupes zoologiques.
-Pour identifier un spécimen et lui associer un nom, les biologistes utilisent traditionnelle-
-ment des clefs d’identification (ou de détermination 1). Cette méthode historique offre l’avan-
-tage d’être véhiculée sur support écrit et d’être très explicite, la diagnose pouvant être associée
-à l’identification. Avec l’informatisation des données systématiques et biologiques et l’essor de
-la taxonomie numérique initiée par Sokal et Sneath (1963), de nombreuses méthodes d’iden-
-tification et de classification ont été proposées sur des données tabulaires. Parallèlement, en
-analyse discriminante et en apprentissage, d’autres méthodes de classification par arbre ont
-également été développées, telles que les arbres de classification (Breiman et al., 1984) ou de
-décision (Quinlan, 1986). Ces différentes méthodes peuvent être utilisées dans le cadre de la
-classification de données biologiques complexes, mais ne sont pas toujours satisfaisantes car
-elles ne prennent en compte ni les relations entre attributs, ni les données manquantes ou im-
-précises. Plus important encore, ces méthodes n’intègrent pas de connaissances a priori sur les
-domaines considérés, pré-requis indispensable pour construire des systèmes classificatoires,
-fiables et robustes (Conruyt, 1994). Or, les experts émettent des hypothèses sur l’objet étudié
-et procèdent généralement en deux phases pour déterminer la classe d’un spécimen. D’abord
-une phase synthétique, par observation globale des caractères les plus visibles permet de ré-
-duire le champ d’investigation en sélectionnant des descriptions présentant des similitudes.
-Puis une phase analytique, par l’observation fine de caractères discriminants permet d’affiner
-la recherche jusqu’à obtention du résultat.
-La méthode de classification par voisinages successifs (CVS) développée dans cet article
-propose une méthode de fouille fondée sur ce type de raisonnement. Elle s’appuie sur la re-
-1. succession d’alternatives dichotomiques portant sur les caractères d’un spécimen qui permet d’en déterminer le
-rang taxinomique.
-D. Grosser et al.
-cherche du voisinage d’une description partiellement renseignée, possédant éventuellement
-des erreurs. Cette méthode est rendue possible grâce aux différentes mesures de similarité qui
-tiennent compte de la structure et du contenu des descriptions (voir partie 3). Elle utilise une
-phase de sélection de variables discriminantes afin de compléter l’information et d’affiner pro-
-gressivement le processus d’identification. La méthode est à la fois interactive et itérative. La
-partie 4 propose une implémentation de cette méthode au sein du système IKBS ainsi qu’une
-expérimentation sur différents groupes taxinomiques issus de la base de connaissances sur les
-coraux (partie 5).
-2 Représentation des données morphologiques
-Le modèle de représentation des données morphologiques Codesc propose deux entités de
-premier ordre pour la conception d’une base de connaissances : le modèle descriptif et les
-descriptions.
-2.1 Le modèle descriptif
-Un modèle descriptif permet de structurer les caractères observables d’un groupe taxino-
-mique donné. Il est composé d’objets (ou composants) ainsi que d’attributs munis d’un do-
-maine de valeurs et de relations. Celles-ci sont par défaut des relations de composition (part-
-of ) entre composants ou entre un composant et des propriétés (caractères). Les attributs sont
-ainsi attachés aux composants qu’ils caractérisent. Par exemple sur la figure 1, le modèle des-
-criptif de la famille des Fungiidae comporte cinq attributs (label, descripteur, taxon, etc.). Ces
-attributs sont attachés au composant identification. Dans cette représentation, les composants
-identification et contexte définissent les méta-données associées aux descriptions. Ils sont si-
-tués dans le même plan que ceux relatifs aux caractères morphologiques (branche description)
-afin de disposer d’une vision globale des données et méta-données des descriptions.
-Formellement, la structure d’un modèle descriptif est une arborescenceM = (A,U), où
-l’ensemble des sommets A est un ensemble des objets et attributs. Les noeuds non-terminaux
-sont des objets, appelés également attributs structurés et sont notésAj :< A1, . . . , Ap > oùAj
-est la racine du sous-arbre dont les fils sont les A1, . . . , Ap,. Une arête (Aj , Al) ∈ U exprime
-que Al est un composant de Aj .
-L’objectif principal de cette modélisation est de permettre aux experts de bâtir une repré-
-sentation d’un groupe taxinomique donné, dans l’exemple, une famille corallienne. La struc-
-turation est une donnée essentielle du modèle car elle permet de regrouper les caractères qui
-définissent le même objet observable (le squelette, les différentes sortes de columelles, la mu-
-raille, etc.). Certains objets peuvent être absents des descriptions. Par exemple, les columelles
-des différents centres calicinaux (axiaux et latéraux) peuvent être absentes et certains indivi-
-dus du groupe Fungiidae 2 peuvent en être dépourvus, ce qui est visualisé par la présence d’un
-signe - à gauche de l’objet. Ces composants sont qualifiés “absents possibles” ou contingents.
-Les caractères sont définis comme des attributs complexes décrits par plusieurs facettes
-telles que le type, le co-domaine, la question associée, la pondération, un commentaire expli-
-catif, des liens hypertextuels, des illustrations. Ces dernières offrent une représentation photo-
-2. La famille des Fungiidae se distingue par le fait que les colonies sont constituées d’un organisme unique (po-
-lype) de grande taille, à l’inverse des autres familles.
-Classification par voisinages successifs
-FIG. 1 – Partie du modèle descriptif de la famille des Fungiidae, extrait d’IKBS.
-graphique des différents états de caractère (cf. figure 2). Dans cet exemple, le caractère forme
-générale de l’objet squelette est de type taxonomique (ou hiérarchisé), son co-domaine est
-organisé en une hiérarchie de spécialisations de valeurs.
-Des règles de dépendance (ou d’implication) entre caractères peuvent être exprimées. Elles
-sont du type SI c1 = v1 ALORS c2 = v2 où les ci sont des caractères et vi des états. Ces règles
-permettent essentiellement de garantir la cohérence des descriptions.
-2.2 Les descriptions
-Une description est une sous-arborescence dérivée de celle de A, obtenue par valuation de
-la présence/absence des objets et par valuation des caractères. Dans l’exemple de la figure 3, les
-caractères ont été valués par des valeurs complexes. Les valeurs peuvent être de type nominal,
-ordinal, taxonomique, numérique, discrète ou intervalle, conjonctive ou disjonctive, etc. Par
-exemple densité des dents = [12 18] indique une variation de densité par cm2, hauteur des
-dents = basse & moyenne indique la présence simultanée des deux valeurs basse et moyenne,
-car c’est un ensemble de dents qui sont ici décrites et caractérisées. Les descriptions sont
-réunies au sein d’une base de cas.
-La structure arborescente d’une description est appelée squelette. Un squelette décrit la
-structure morphologique d’une observation, il renseigne le statut de chaque composant, dont
-l’état peut être présent (+), absent (-) ou inconnu (∗). Dans l’exemple, plusieurs composants
-sont absents : centres calicinaux latéraux, lobes tentaculaires, etc. Le symbole croix vient se
-superposer dans la figure. Certains composants comme la columelle des centres calicinaux
-axiaux sont inconnus car ils n’ont pu être observés. Le symbole inconnu permet d’exprimer le
-doute, l’imprécision.
-D. Grosser et al.
-FIG. 2 – Partie du modèle descriptif de la famille des Fungiidae, extrait d’IKBS.
-Notons S l’ensemble des symboles {+,−, ∗}. Une application σ : A → S définit le
-squeletteHσ par l’arborescence annotée par S :Hσ = (Aσ,U) avecAσ = {(Aj , σ(Aj))j∈J},
-avec Aj ∈ A.
-Sur l’ensemble des squelettes les règles de cohérence suivantes sont imposées. Pour tout
-attribut structuré B :< Bl >l∈L, on a :
-1. "Les fils d’un noeud absent sont absents" : σ(B) = − alors σ(Bl) = − pour l ∈ L,
-2. "Les fils d’un noeud inconnu sont inconnus ou absents" : σ(B) = ∗ alors σ(Bl) = ∗|−
-pour l ∈ L.
-3. "Les fils d’un noeud présent peuvent être présents, absents ou inconnus" : σ(B) = +
-alors σ(Bl) = +| − |∗ pour l ∈ L.
-On noteH l’ensemble des squelettes vérifiant les règles de cohérence précédentes.
-3 Mesures de similarité
-Comment mesurer la similarité entre des arbres étiquetés enracinés ? Nous allons en pre-
-mier lieu examiner quelques mesures classiques proposées pour la comparaison d’arbres.
-3.1 Mesures de similarité structurelle en Biologie
-Soient les arbres H1, H2 ∈ H étiquetés par les fonctions λ1 et λ2. Notons :
-– n le nombre total d’attributs,
-Classification par voisinages successifs
-FIG. 3 – Partie d’une description. Espèce Fungia concina, famille des Fungiidae.
-– n= = |{λ1(Aj) = λ2(Aj) = +|−}| le nombre de co-présence et de co-absence,
-– n∗∗ = |{λ1(Aj) = λ2(Aj) = ∗}| le nombre de noeuds simultanément inconnus,
-– n∗ = |{λ1(Aj)|λ2(Aj) = ∗}| le nombre de noeuds où un seul des deux noeuds est
-inconnu,
-– n 6= = n − n= − n∗∗ − n∗ le nombre de noeuds différents en ne tenant pas compte des
-valeurs inconnues.
-En Biologie, Sokal et Sneath (1963) proposent l’indice de similarité suivant :
-ζSokal(H1, H2) =
-n=
-n
-.
-Le numérateur exprime que seules les co-présences et co-absences sont prises en compte, car
-on estime que la comparaison de deux noeuds inconnus n’est pas source de discordance (toutes
-les possibilités d’appariements +/- sont possibles). L’indice de dissimilarité associé à cet indice
-de similarité est :
-dSokal(H1, H2) =
-n− n=
-n
-=
-n 6= + n∗ + n∗∗
-n
-.
-Estabrook et Rogers (1966) ont proposé une variante de l’indice de similarité de Sokal qui ne
-tient pas compte au dénominateur des valeurs inconnues :
-ζEstabrook(H1, H2) =
-n=
-n− n∗∗ − n∗
-3.2 Distance d’édition d’arbre
-Les données se présentant comme des arbres étiquetés se rencontrent dans de nombreux
-domaines. Durant ces dernières années, elles ont conduit à différents travaux sur la distance
-entre arbres dite "distance d’édition" (Kaizhong et Shasha, 1989) (Bille, 2005), pour l’étude de
-la similarité des structures secondaires de l’ARN (Dulucq et Tichit, 2003), la classification de
-documents structurés XML (Dalamagas et al., 2006), par exemple.
-La valeur de la distance d’édition entre deux arbres étiquetés et ordonnés est le coût mini-
-mum d’une séquence d’opérations qui transforme un arbre en un autre. Les opérations si sur
-D. Grosser et al.
-les noeuds sont : la suppression, l’insertion et le renommage. A chaque opération est associée
-une fonction de coût α(si) que l’on impose être une distance. Soit SH1H2 = {s, . . . , sn} une
-séquence de transformation des arbres H1, H2, son coût est :
-α(SH1H2) = Σiα(si)
-et la distance d’édition est alors
-dedition(H1, H2) = minSH1H2α(SH1H2)
-ded est une distance, car chaque fonction de coût est elle aussi une distance.
-Dans notre cas, les arbres sont décrits par un modèle descriptif et le calcul de la "distance
-d’édition" s’en trouve simplifié car tous les arbres sont structurellement isomorphes. Afin de
-transformer de tels arbres, il n’y a pas lieu de supprimer ou d’insérer des noeuds. La seule
-opération reste le renommage. Notons a → b l’opération de renommer le noeud dont le label
-est a de l’arbre H1 en b dans l’arbre H2. Considérons le cas généralement adopté où le coût
-est constant : α(a → b) = 1n pour tout noeud dont le label est a ∈ H1 différent de b ∈ H2.
-Notons J6= l’ensemble des indices des noeuds dont les labels diffèrent dans les deux arbres :
-J 6= = {j ∈ J |λ1(Aj) 6= λ2(Aj)}. La distance d’édition entre H1 et H2 s’écrit :
-dedition(H1, H2) = Σj∈J 6=α(λ1(Aj)→ λ2(Aj)) =
-n 6= + n∗
-n
-. (1)
-c’est-à-dire le pourcentage de labels qui diffèrent dans les deux arbres qu’ils soient inconnus
-ou non, d’où la relation suivante :
-dedition = dSokal +
-n∗∗
-n
-Compte tenu de la structure identique des arbres que nous traitons, l’utilisation des algorithmes
-complexes fondés sur la programmation dynamique (Kaizhong et Shasha (1989)), pour le cal-
-cul de cette distance d’édition ne se justifient pas. D’autre part, imposer que la fonction de coût
-de renommage des labels soit une distance ne permet pas de prendre en compte la structure hié-
-rarchique des données dans le traitement des présences-absences de noeuds (voir paragraphe
-3.3.2).
-3.3 Mesure de similarité structurelle pondérée
-Deux critiques essentielles peuvent être faites aux précédents indices. La première est qu’ils
-ne tiennent pas compte des liens de cohérence entre les noeuds (cf. paragraphe 2.2). La seconde
-est qu’un même poids est accordé aux différents noeuds, qu’ils soient en position élevée ou
-basse dans la hiérarchie du calcul de la similarité entre les arbres.
-Afin d’accorder une importance différente aux noeuds, selon leur degré de profondeur,
-nous définissons une fonction de poids m sur les noeuds. Le poids d’un noeud est le nombre
-de sommets du sous-arbre dont il est la racine. D’autres choix sont possibles comme le rapport
-entre le poids du père d’un noeud sur le nombre de fils. Puis, on se donne une mesure de
-similarité σ, sur les fonctions labels, à valeurs dans [0, 1] c’est-à-dire :
-1. σ(λ1(Aj), λ2(Aj) = 1⇐⇒ λ1(Aj) = λ2(Aj)
-Classification par voisinages successifs
-2. σ(λ1(Aj), λ2(Aj)) = σ(λ2(Aj), λ1(Aj))
-La similitude structurelle de deux squelettes est alors évaluée comme la moyenne des valeurs
-de similitude des noeuds. La mesure de similarité structurelle pondérée, notée ζSPondere a
-pour expression :
-ζSPondere(H1, H2) =
-Σj∈Jm(Aj)σ(λ1(Aj), λ2(Aj))
-Σj∈Jm(Aj)
-.
-Le tableau 1 donne l’expression générale de la mesure de similarité σ pour un noeud donné.
-Cette mesure de similarité généralise celle de Sokal, et la distance d’édition d’arbre pour un
-choix particulier des poids des noeuds et des valeurs de σ.
-3.3.1 Comparaison avec des indices classiques
-Si on attribue à chaque noeud Aj le même poidsm(Aj) = 1 et que la mesure de similarité
-choisie est σ0 (tableau 2) alors la mesure de similarité structurelle pondérée est égale à l’indice
-de Sokal. En effet, elle s’écrit sous ces hypothèses :
-ζ0(H1, H2) =
-Σj∈Jσ0(λ1(Aj), λ2(Aj))
-n
-=
-n=
-n
-= ζSokal(H1, H2).
-car seules les co-présence et les co-absence sont prises en compte par la mesure de similarité
-σ0.
-La distance d’édition du paragraphe 3.2 est un cas particulier de la distance associée à la
-mesure de similarité ζSPondere. On considère que les noeuds ont toujours le même poids et la
-mesure de similarité choisie est σedition (tableau 3). On a
-ζedition(H1, H2) =
-Σj∈Jσ1(λ1(Aj), λ2(Aj))
-n
-=
-n= + n∗∗
-n
-.
-car la similarité entre les termes non diagonaux est nulle. La valeur de la distance associée à la
-mesure de similarité ζedition est :
-d(H1, H2) = 1− ζedition(H1, H2) = 1− n= + n∗∗
-n
-=
-n− n= − n∗∗
-n
-=
-n 6= + n∗
-n
-elle est bien égale à celle de la distance d’édition (1). En fait à ζedition est associée la distance
-d’édition dont la fonction de coût pour un noeud Aj est :
-α(λ1(Aj)→ λ2(Aj)) = 1
-n
-(1− σedition(λ1(Aj), λ2(Aj))
-Cette fonction de coût est bien une distance. Le calcul de la distance d’édition associée donne :
-d(H1, H2) = Σj∈J6=α(λ1(Aj)→ λ2(Aj)) = Σj∈J6=
+La classication automatique (ou clustering) est un domaine d'étude situé à l'intersection
+de deux thématiques de recherches majeures que sont l'analyse de données et l'apprentissage
+automatique. Ce domaine est en perpétuelle évolution du fait de l'apparition constante de nou-
+veaux besoins portant à la fois sur la quantité ou la nature des données à traiter (numériques,
+symboliques, spatiales, histogrammes, etc.) que sur le type de classication attendue (partition,
+hiérarchie, schéma ou, etc.).
+Nombreuses sont les approches proposées an d'organiser, de résumer ou de simplier un
+ensemble de données à l'aide d'une structure de laquelle il est possible de faire émerger des
+classes d'objets similaires au sens d'un critère de proximité déni ou plus généralement au re-
+gard des propriétés que ces objets partagent. Il est de coutume de structurer ces approches
+en différentes catégories mutuellement non-exclusives (voir Jain et al. (1999)) comme par
+exemple, pour ne citer que les principales, les approches hiérarchiques, par partitionnement
+ou encore les modèles de mélanges.
+Les approches par partitionnement, dont l'algorithme des k-moyennes (MacQueen, 1967)
+en est l'un des plus célèbre représentant, consiste le plus souvent à construire une collection
+de classes disjointes formant une partition des données par optimisation d'un critère objectif.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+Ce critère étant généralement choisi de façon à minimiser la variance intra-classe (les objets à
+l'intérieur d'une classe doivent tous être assez similaires) et/ou à maximiser la variance inter-
+classes (les classes doivent être séparées les unes des autres).
+Les approches hiérarchiques aboutissent en revanche à une collection de classes emboîtées,
+que l'on peut représenter par un arbre ou plus généralement un graphe dont les arêtes modé-
+lisent une relation d'inclusion. Généralement agglomératifs (parfois divisifs) les algorithmes
+proposés procèdent par fusions successives de classes similaires et les plus utilisés restent sans
+nul doutes les méthodes agglomératives hiérarchiques (liens simple, complet, moyen ou critère
+de Ward) présentées dans Sneath et Sokal (1973).
+Enn, pour les approches de classication par mélange de lois, le problème est posé de
+façon à maximiser la vraisemblance d'un modèle faisant l'hypothèse que les données sont des
+observations d'un mélange de densités. Le modèle est caractérisé par le nombre de lois sup-
+posées et leurs paramètres. La méthode EM par exemple, proposée par Dempster et al. (1977)
+constitue une solution algorithmique incontournable à ce genre de problème d'optimisation.
+Si la plupart des domaines d'application trouvent dans cette pluralité d'approches des ré-
+ponses satisfaisantes aux besoins exprimés, des domaines récents nécessitent d'adapter voire
+de reposer la problématique de la classication et d'y adjoindre une solution algorithmique
+efcace. Nous nous intéressons ici au problème de la classication de données en classes non-
+disjointes (également dites empiétantes ou recouvrantes)1. Ce type d'approche vise à structurer
+les données en une collection de classes telle que chaque objet puisse appartenir à plusieurs
+classes, correspondant alors à une organisation naturelle pour des données par exemple multi-
+média (texte, image et/ou vidéo) ou encore biologiques (gènes) (Banerjee et al., 2005).
+Nous présenterons tout d'abord en Section 2 un ensemble de pistes proposées (approches
+pyramidales, classication oue, etc.) pour répondre plus ou moins directement aux besoins
+exprimés par les domaines d'application mentionnés ci-dessus. Nous montrerons alors qu'au-
+cune de ces approches ne constitue une solution globale pour le problème posé. Nous tenterons
+en Section 3 d'en proposer une nouvelle formalisation et d'y adjoindre une première solution
+algorithmique en nous inspirant de l'algorithme simple et efcace des k-moyennes. L'approche
+ainsi présentée sera ensuite observée dans son fonctionnement puis évaluée sur deux jeux de
+données réelles dont la collection de textes Reuters (Section 4). Enn nous proposerons en
+guise de conclusion, un ensemble de perspectives à cette étude, visant à positionner le pro-
+blème de classication avec recouvrements comme sous-domaine à part entière des recherches
+menées en classication automatique.
+2 ProblØmatique de la classication avec recouvrements
+2.1 Des solutions partielles
+Une première voie de recherches conduisant à une structuration des données en classes
+empiétantes réside dans les techniques de classication pyramidales initiées par Diday (1984).
+Cependant, l'ensemble des recouvrements envisageables par une telle structure se limite aux
+collections de classes telles que chaque classe s'intersecte avec au plus deux autres classes.
+Plusieurs autres structures hiérarchiques ont été proposées par la suite an d'étendre les
+schémas atteignables de façon à approcher l'ensemble de tous les recouvrements possibles ; en
+1En Anglais : Overlapping clustering.
+G. Cleuziou
+particulier les hiérarchies faibles puis les k-hiérarchies faibles (Bertrand et Janowitz, 2003).
+Cependant deux points restent à déplorer : d'une part il n'existe pas aujourd'hui de méthode
+algorithmique permettant de construire de telles structures hiérarchiques, et d'autre part l'en-
+semble des recouvrements atteints - bien que très largement étendu - reste limité aux collections
+de classes vériant la propriété suivante : l'intersection de (k+1) classes arbitraires peut être
+réduite à l'intersection de k de ces classes.
+Un second axe de recherches a été assez fortement étudié ces dernières années et consiste
+soit à adapter des algorithmes existants (k-moyennes et sa variante oue ou encore EM) ou à
+développer de nouvelles méthodologies spéciées pour la recherche d'un bon recouvrement
+des données en classes d'objets similaires. Dans cette dernière classe de méthodes on peut
+citer les algorithmes des k-moyennes axiales (Lelu, 1994) et CBC (Clustering By Commit-
+tee) développé par Pantel (2003) tous deux motivés par l'application aux données textuelles
+(mots ou documents) ou encore l'algorithme plus général POBOC (Pole-Based Overlapping
+Clustering) proposé par Cleuziou et al. (2004).
+De façon globale, qu'il s'agisse d'algorithmes nouveaux ou simplement adaptés, toutes
+ces méthodes consistent, en une ou plusieurs itérations, à rechercher des centres auxquels sont
+affectés les objets. Ces centres peuvent être des points de l'espace (k-moyennes mais aussi
+EM2), des axes (k-moyennes axiales) ou encore des petits ensembles d'objets appelés commit-
+tee dans CBC et Pole dans POBOC. Quelque soit la forme prise par ces centres, l'algorithme
+permettant de les obtenir ne prend pas en considération le fait que les classes nales formeront
+un recouvrement et pourront ainsi contenir des objets communs. Par exemple les méthodes
+d'agrégation autour des centres mobiles (k-moyennes et k-moyennes axiales) déterminent un
+centre après affectation de chaque objet à un seul de ces centres ; à l'inverse les variantes oues
+de ce type de méthodes considèrent systématiquement que tous les objets doivent participer à
+la dénition de chaque centre ; l'une des hypothèses utilisées dans l'algorithme EM vise à
+considérer que chaque objet est une observation de l'une (et une seule) des lois du mélange ;
+enn les algorithmes CBC et POBOC dénissent les centres indépendamment de tout critère
+objectif de qualité du recouvrement induit par ces centres.
+Ainsi dénis, les centres sont déterminants pour la dernière étape d'affectation qui conduira
+au schéma nal de classication. L'affectation est le plus souvent réalisée au moyen d'un
+seuil3, difcile à déterminer, quitte à violer les fondements théoriques sur lesquels l'algorithme
+repose, par exemple la minimisation d'un critère objectif. Finalement, l'hypothèse sous-jacente
+formulée par ces approches vise à considérer qu'un recouvrement de qualitØ correspond nØ-
+cessairement à l’extension d’une "bonne" partition.
+2.2 Recouvrements et partitions étendues
+L'hypothèse précédemment formulée ne semble pas incohérente de prime abord. En théo-
+rie tout recouvrement R = fR1; : : : ; Rkg d'un ensemble d'objets X peut être obtenu par
+l'extension d'au moins une partition P = fP1; : : : ; Pkg telle que 8i 2 1; : : : ; k ; Pi  Ri.
+En revanche, partant d'une partition P , l'ensemble des recouvrements possibles par extension
+2Les approches de classication par mélange de lois consistent à rechercher les paramètres de ces lois ; l'un d'entre
+eux correspond à la moyenne, identiable à un point de l'espace.
+3Un objet est affecté à tous les centres pour lesquels sa distance au centre ou sa probabilité d'appartenance à cette
+classe est supérieure au seuil.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+correspond à une classe de recouvrements (notée CP ), qui n'est qu'un sous ensemble de tous
+les recouvrements possibles. Ainsi, considérer qu'un "bon" recouvrement (selon un critère
+W (:)) correspond nécessairement à l'extension d'une "bonne" partition (selon un critère V (:))
+supposerait que : si P optimise le critŁre V (:) etR optimise le critŁreW (:) alorsR 2 CP
+Cette dernière propriété dépend bien sûr des critères V (:) etW (:) choisis. Nous montrons
+alors sur un exemple que l'on peut choisir des critères cohérents pour lesquels cette propriété
+n'est pas vériée.
+Soit X = fx1; : : : ; x6g un ensemble d'objets dénis dans R2, présentés en gure 1 et que
+l'on souhaite organiser en deux classes (k=2). On pose V (:) etW (:) les critères objectifs pour
+l'évaluation respectivement d'une partition et d'un recouvrement et on les déni de la manière
+suivante :
+V (P) =
+X
+Pj2P
+X
+xi2Pj
+d(xi; cj) et W (R) =
+X
+xi2X
+d(xi; xi)
+avec d la distance de Manhattan, cj de centre de gravité des objets d'une classe Pj ouRj selon
+le modèle, et xi le centre de gravité de l'ensemble fcj jxi 2 Rjg.
+FIG. 1  Partition (à gauche) et recouvrement (à droite) optimaux selon les critŁres V (:) et
+W (:) respectivement.
+On peut calculer que la partition P = ffx1; x2; x3g; fx4; x5; x6gg minimise le critère
+V (:) (V (P) = 12:0) et queR = ffx1; x2; x4; x5g; fx2; x3; x5; x6ggminimise le critèreW (:)
+(W (R) = 12:0 également). PourtantR n'est pas une extension de la partitionP et n'appartient
+donc pas à la classe des recouvrements CP .
+Nous venons donc de montrer par un exemple simple que la classication avec recouvre-
+ments ne se résume pas à étendre une partition par des affectations supplémentaires. Faire
+cette hypothèse consisterait à ne considérer qu'un sous-espace de l'espace de recherche d'une
+solution, ce dernier étant déni par l'ensemble des recouvrements possibles.
+3 À la recherche d’un "bon" recouvrement
+3.1 Dénition du problème
+Rechercher une partition P d'un ensemble X = fx1; : : : ; xng en k classes P1; : : : ; Pk
+selon un critère V (:) déni sur l'ensemble des partitions possibles est un problème NP-difcile
+dans la mesure où l'espace de recherche est de taille exponentielle (kn partitions possibles).
+L'algorithme bien connu des k-moyennes (MacQueen, 1967) propose une solution partielle
+G. Cleuziou
+au problème d'optimisation du critère des moindres carrés (aussi appelé critère de variance
+intra-classe) : V (P) =PPj2PPxi2Pj d2(xi; cj).
+Ce critère favorise les partitions dont les classes présentent une faible variance, autrement
+dit telles que les objets à l'intérieur d'une même classe sont faiblement dispersés. Cet algo-
+rithme procède par itérations de deux étapes (calcul des centres de classes puis affectation de
+chaque objet à son centre le plus proche) assurant la décroissance du critère et par la même, la
+convergence de la méthode vers une partition stable. La solution ainsi obtenue correspond à un
+minimum seulement local du critère et dépend de l'initialisation (tirage aléatoires de k centres)
+de l'algorithme.
+Le problème de recherche d'un recouvrement minimisant un critèreW (:) ne peut pas être
+considéré comme plus facile que le précédent puisque l'espace de recherche est de taille beau-
+coup plus importante (2k:n recouvrements possibles). Par ailleurs le critère V (:) permettant
+d'évaluer la qualité d'une partition n'est plus adapté dans le cas des recouvrements car si R
+est un recouvrement deX en k classes on peut montrer que 8P; R 2 CP ) V (P)  V (R) ;
+un bon recouvrement selon V (:) ne pouvant alors être qu'une partition.
+Dans cette étude, notre proposition porte ainsi sur la dénition d'un nouveau critère de
+qualité d'un recouvrement d'une part et d'une solution algorithmique permettant d'approcher
+un recouvrement optimal selon ce critère d'autre part. Pour y parvenir nous nous inspirons de
+l'algorithme simple et efcace des k-moyennes.
+3.2 Critère objectif pour les recouvrements
+Pour dénir un critère de qualité d'un recouvrement il est indispensable de se reporter aux
+motivations premières qui nous conduisent à rechercher ce type d'organisation. Dans le cas
+d'un document par exemple, choisir une classe thématique et une seule pour ce document peut
+réduire considérablement la représentation que l'on conservera de ce document dans la clas-
+sication. En revanche, autoriser ce document à s'afcher selon plusieurs thèmes rendra une
+image certainement plus juste de son contenu. La qualité d'un recouvrement pourra alors être
+mesurée relativement à l'écart entre le contenu réel des objets et l'"image" que la classication
+(ici le recouvrement) établie renvoie d'eux. Nous formalisons cette intuition dans le critère
+suivant :
+W (R) =
+X
+xi2X
+d2(xi; xi)
+L'image d'un objet dans un recouvrement R est notée xi dans ce critère et correspond
+à un compromis entre les différentes classes auxquelles cet objet appartient. Ainsi pour un
+recouvrement R en k classes fR1; : : : ; Rkg de centres respectifs fc1; : : : ; ckg, xi est déni
+par le centre de gravité de l'ensemble fcj jxi 2 Rjg.
+3.3 L'algorithme OKM
+L'algorithme OKM (Overlapping k-means) que nous détaillons dans cette section présente
+un squelette (gure 2) similaire à l'algorithme des k-moyennes. L'initialisation qui consiste à
+tirer aléatoirement k centres puis à dériver un premier recouvrement est suivie par l'itération
+de deux étapes : (1) la mise à jour des centres de classes puis (2) l'affectation des objets à ces
+centres.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+Initialisation : t=0
+choisir aléatoirement k centres C t = fct1; ct2; : : : ; ctkg dansX ,
+Pour chaque xi 2 X : Affecter(xi,Ct),
+en déduire un recouvrement initialRt = fRt1; Rt2; : : : ; Rtkg.
+Faire
+t=t+1
+Mettre_à_jour(C(t 1),R(t 1)) (en dØduire Ct),
+ Pour chaque xi 2 X : Affecter(xi,Ct) (en dØduireRt),
+Tant que Rt 6= Rt 1
+FIG. 2  Squelette de l’algorithme OKM.
+L'intérêt de l'algorithme OKM réside dans la méthode employée pour Mettre_à_jour les
+centres et pour Affecter chaque objet à un ou plusieurs centres. Ces deux opérations doivent
+d'une part assurer la cohérence des classes en regroupant ensemble des objets similaires et
+d'autre part permettre la convergence de la méthode par décroissance du critèreW (:).
+Étant donné un ensemble C = fc1; c2; : : : ; ckg correspondant aux centres des k classes
+respectivesR1; R2; : : : ; Rk d'un recouvrementR, la méthode d'affectation d'un objet xi, pré-
+sentée en gure 3 consiste à parcourir l'ensemble des centres de classes du plus proche au plus
+éloigné (suivant une métrique d) et à affecter xi tant que son image est améliorée (d(xi; xi)
+diminue). La nouvelle affectation de l'objet xi ne sera nalement conservée que si l'image de
+xi s'en trouve améliorée par rapport à l'ancienne affectation. Cette dernière précaution permet
+d'assurer la décroissance du critèreW (:) lors de l'étape d'affectation.
+Affecter(xi,C) :
+Initialisation : Soit c le centre de C le plus proche de xi (8cj 2 C; d(xi; c)  d(xi; cj)),
+A = fcg (liste des affectations),
+C = C n fcg.
+Faire
+Soit c le centre de C le plus proche de xi et xiA le centre de gravité des éléments de A,
+Si d(xi; xiA[fc
+g) < d(xi; xiA) alors A fcg et C = C n fcg,
+Sinon STOP
+Tant que C 6= ;
+Soit A0 l'ancienne affectation de xi,
+Si d(xi; xiA) < d(xi; xiA
+0
+) alors affecter xi aux centres de A,
+Sinon conserver l'ancienne affectation A0.
+FIG. 3  MØthode d’affectation utilisØe dans l’algorithme OKM.
+Enn, la mise à jour du centre cj de la classe Rj est dénie dans l'algorithme OKM par :
+cj;v =
+1X
+xi2Rj
 1
-n
-(1− σedition(λ1(Aj), λ2(Aj))
-comme Σj∈J 6=
+2i
+
+X
+xi2Rj
 1
-n =
-n 6=+n∗
-n , et que σedition prend des valeurs nulles en dehors de la diagonale,
-c’est-à-dire pour les indices j ∈ J6=, on a :
-d(H1, H2) =
-n 6= + n∗
-n
-et on retrouve :
-dedition(H1, H2) = 1− ζedition(H1, H2)
-D. Grosser et al.
-TAB. 1 – La mesure de similarité σ pour un noeud donné
-λ1λ2 + − ∗
-+ 1 α1j β
-1
+2i
+:x^i
 j
-− α2j 1 γj
-∗ β2j γj 1
-TAB. 2 – La mesure de similarité σ0
-λ1λ2 + − ∗
-+ 1 0 0
-− 0 1 0
-∗ 0 0 0
-3.3.2 Choix des valeurs de similarité
-Nous donnons ci-dessous des indications pour le choix des valeurs de la mesure de simila-
-rité σ (tableau 1) entre les noeuds.
-– σ(λ1(Aj) = +, λ2(Aj) = −) = α1j . Si le noeud Aj est une feuille alors α1j = 0,
-sinon sa valeur est le rapport entre le nombre de fils absents du noeud Aj de H1 sur
-le nombre de ses fils. α1j mesure l’importance du sous-arbre absent du noeud présent
-dans H1, plus ce noeud a des fils absents plus la similarité sera grande avec celui de
-H2. Notons la dissymétrie suivante, il n’y a aucune raison pour que cette valeur α1j soit
-égale à α2j = σ(λ1(Aj) = −, λ2(Aj) = +). Cette valeur ne peut donc pas être un coût
-associé à une opération de renommage d’une distance d’édition pour laquelle on doit
-avoir : α(+→ −) = α(− → +).
-– σ(λ1(Aj) = +, λ2(Aj) = ∗) = β1j . La valeur inconnue ∗ correspond à une présence
-(+) ou une absence (−) du noeud donné. On calcule dans l’échantillon les probabi-
-lités de présence simultanée Pr(λ1(Aj) = +, λ2(Aj) = +) et de présence-absence
-Pr(λ1(Aj) = +, λ2(Aj) = −). Si la co-présence est la plus probable alors β1j = 1
-sinon β1j = α
+v (1)
+G. Cleuziou
+Dans cette expression, cj;v désigne la vième composante du vecteur cj , i correspond au
+nombre de classes de R auxquelles xi appartient et x^ijv symbolise la vième composante du
+centre cj "idéal" pour l'objet xi, c'est à dire le centre cj tel que d(xi; xi) = 0. De façon plus
+précise on a x^ijv = i:xi;v (i 1):xivAnfcjg oùA désigne l'ensemble des centres des classes
+auxquelles xi appartient. Il découle de ce qui précède une dénition plus intuitive du nouveau
+centre cj qui correspond nalement au centre de gravité du nuage de points f(x^ij ; pi)jxi 2 Rjg
+où chaque x^ij est pondéré par pi = 12i .
+On montre que chaque mise à jour d'un centre dans OKM permet d'assurer la décroissance
+du critèreW (:)mais également que le nouveau centre calculé est celui qui minimise ce critère.
+Preuve
+Soient X un ensemble d'objets dénis dans (Rp; d) où d est la distance euclidienne, et R
+un recouvrement de X en k classes de centres c1; : : : ; ck. L'étape de mise à jour dans OKM
+consistant à recalculer chaque centre un par un, il suft alors de montrer que le recalcul d'un
+nouveau centre cj quelconque minimise le critère
+W (R) =
+X
+xi2X
+d2(xi; xi) =
+X
+xi2X
+pX
+v=1
+(xi;v   xiv)2
+Par réécriture du terme xi et décomposition de la somme sur les objets de X on obtient :
+W (R) =
+X
+xi =2Rj
+d2(xi; xi) +
+X
+xi2Rj
+pX
+v=1
+
+xi;v   1
+i
+(cj;v + (i   1):xiAnfcjgv )
+2
+Pour les objets n'appartenant pas à la classe Rj , leur image xi est indépendante de cj , le
+premier terme est donc constant relativement à cj . Le second terme constitue une fonction
+quadratique de cj qui sera alors minimisée pour une dérivée égale à 0.
+@W (R)
+@cj
+= 0()
+X
+xi2Rj
 1
-j . La valeur par défaut de ce paramètre est 0.
-– σ(λ1(Aj) = −, λ2(Aj) = ∗) = γj . Si la configuration (λ1(Aj) = −, λ2(Aj) = −)
-est la plus probable dans l’échantillon alors γj = 1 sinon sa valeur est 0. Par défaut, sa
-valeur est 0.
-– Les valeurs α2j , β
+2i
+pX
+v=1
+h
+cj;v   i:xi;v + (i   1):xiAnfcjgv
+i
+= 0
+d'où le résultat
+cj;v =
+1X
+xi2Rj
+1
+2i
+
+X
+xi2Rj
+1
+2i
+h
+i:xi;v   (i   1):xiAnfcjgv
+i
+.
+Notons pour conclure sur la présentation de l'algorithme, que la méthode des k-moyennes
+peut être considérée comme un cas particulier de OKM. En effet si on restreint dans OKM
+chaque objet à n'appartenir qu'à une seule classe (i=1) on retrouve exactement le processus
+de classication utilisé dans l'algorithme k-moyennes. Il s'agit donc d'un algorithme non-
+déterministe puisque le résultat dépendra de l'initialisation ; de plus, chaque classe n'étant plus
+indépendante l'une de l'autre dans un recouvrement, l'algorithme OKM dépendra également
+de l'ordre de parcours des classes lors de l'étape de mise à jour des centres.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+4 Évaluations et applications
+L'évaluation des méthodes de classication non-supervisée reste un problème entier dans
+ce domaine de recherches. Une piste possible pour évaluer (au moins partiellement) une telle
+méthode est de mesurer sa capacité à retrouver un schéma de classication préétabli ; nous
+l'utiliserons pour évaluer l'algorithme OKM en insistant toutefois sur les précautions qu'il
+s'impose de prendre lors de l'interprétation des résultats quantitatifs, notamment du fait de
+l'hypothèse non vériée que l'ensemble de descripteurs est pertinent pour établir la classica-
+tion attendue.
+4.1 Observation du fonctionnement de l'algorithme
+Nous proposons ici une première évaluation de l'algorithme OKM permettant au lecteur
+d'en appréhender le fonctionnement global en terme de : vitesse de convergence, importance et
+pertinence des recouvrements entre les classes et capacité à retrouver des classes attendues. La
+base de données Iris (D.J. Newman et Merz, 1998) est largement utilisée dans la communauté
+apprentissage et constitue un jeu d'évaluation simple constitué de 150 individus (Iris) décrits
+selon 4 descripteurs numériques (longueur et largeur des pétales et des sépales) et organisés en
+trois classes de 50 individus chacune (iris Setosa, Versicolour, Virginica).
+Sans tenir compte de l'étiquette de classe assignée à chaque individu, nous effectuons une
+classication en trois classes (k=3) en utilisant la distance euclidienne dans l'espace de repré-
+sentation des données (R4), préalablement centrées et réduites. Nous présentons sur les gures
+4, 6 et 5. le résultat d'une exécution4 des algorithmes k-moyennes et OKM dans des conditions
+initiales identiques.
+60
+80
+100
+120
+140
+160
+180
+200
+2 4 6 8 10 12 14 16 18
+Cr
+itè
+re
+sW
+(:
+)
+et
+V
+(:
+)
+Itérations
+OKMW (:)
+ 
+
+
+
+	
+
+    
+   ff fifl ffi  ! "# $%
+&'
+k-moyennes V (:)
++
++
++
++
++
++
++
++
++
++ +
++
+FIG. 4  Convergence des algorithmes. FIG. 5  Visualisation des classes par projection
+sur les deux premiers vecteurs propres.
+4L'exécution choisie correspond au meilleur résultat obtenu relativement au critèreW (:) nal, sur un total de 50
+exécutions.
+G. Cleuziou
+Les courbes de la gure 4 mettent en évidence un phénomène prévisible : la convergence
+plus lente pour l'algorithme OKM vers un recouvrement stable des données (19 itérations), par
+rapport à k-moyennes qui obtient une partition stable en seulement 12 itérations. On retiendra
+cependant que dès la cinquième itération, les deux méthodes ont généré un résultat de qualité
+qui évoluera peu par la suite.
+XXXXXXXXXXÉtiquettes
+Classes 1 2 3
+Iris Setosa 50 (50)
+Iris Versicolour 26 (3) 50 (47) 9 (0)
+Iris Virginica 49 (36) 27 (14)
+FIG. 6  Matrice de confusion pour OKM (et k-moyennes).
+La gure 6 présente la matrice de confusion et nous révèle que les deux méthodes identi-
+ent correctement les trois catégories d'iris puisque chacune des classes contient majoritaire-
+ment l'une de ces trois catégories. Il est reconnu que, sur cette base de données Iris, la catégorie
+des Iris Setosa est plutôt facile à identier tandis que les deux autres catégories sont répu-
+tées difcilement séparables, ce que l'on observe sur la gure 5. Ces phénomènes se vérient
+également sur notre expérimentation :
+ les 50 individus de la catégorie Iris Setosa se retrouvent exclusivement dans la classe
+n	3 avec les deuxméthodes. Dans le recouvrement obtenu avec OKM, cette classe contient
+9 individus de la catégorie Iris Versicolour en supplément, qu'elle partage avec les
+autres classes5 (faible intersection) ;
+ la séparation difcile des deux autres classes se manifeste par des erreurs de classi-
+cation si l'on cherche à partitionner les données (k-moyennes) et par une intersection
+importante entre les deux classes lorsque ces données sont organisées en classes recou-
+vrantes (OKM).
+Sur cette première expérimentation, nous avons d'une part observé un comportement sa-
+tisfaisant de l'algorithme OKM et d'autre part noté que la structuration en classes recouvrantes
+fournit un résultat informationnel plus riche qu'une simple partition, notamment en ce qui
+concerne l'organisation des classes entre elles.
+4.2 Classication de documents multi-thématiques
+Comme nous l'avons mentionné en introduction, les recherches menées autour de la clas-
+sication avec recouvrements des classes sont motivées par des besoins apparaissant dans des
+domaines d'application où des données peuvent appartenir à plusieurs catégories prédénies.
+Dans cette seconde expérimentation, nous évaluons l'impact de notre contribution dans le do-
+maine de la Recherche d'Information et plus précisément pour la classication de documents
+multi-thématiques.
+L'expérimentation est conduite sur la collection de documents Reuters6 initialement com-
+posée de 21578 articles journalistiques en langue anglaise. Chaque document peut être étiqueté
+par une ou plusieurs étiquettes parmi un ensemble de 114 catégories. Après ltrage, nous avons
+5On observe visuellement (gure 5) que ces objets sont parmi les plus proches des objets propres à la classe n	3.
+6http ://www.research.att.com/lewis/reuters21578.html
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+retenu 2739 documents, en ne choisissant que ceux pour lesquels au moins une catégorie est
+proposée, dont le corps de l'article n'est pas vide et appartenant au sous-ensemble "TEST"
+selon la répartition suggérée dans Apté et al. (1994).
+FIG. 7  Classication de documents issus de la collection Reuters.
+La représentation des documents est l'aboutissement d'une chaîne de traitements usuelle
+en Recherche d'Information : chaque document est représenté par un vecteur de dimensionm
+dans lequel chaque composante xi;v correspond à l'information mutuelle du mot7 wv pour le
+document xi. Une étape préalable de ltrage des descripteurs consiste à ne sélectionner que
+lesm mots d'information mutuelle supérieure à un seuil  xé. Enn, la similarité entre deux
+documents est évaluée au moyen du cosinus de Salton (Salton et McGill, 1983) :
+sim(xi; xj) =
+P
+v xi;v:xj;vqP
+v x
 2
-j du tableau 1 sont calculées de manière symétrique.
-Le tableau 7 donne des exemples de calcul de la mesure de similarité structurelle sur des
-observations.
-3.4 Mesure de similarité structurelle récursive
-Les mesures de similarité structurelle pondérée, en sommant sur tous les noeuds, intro-
-duisent une redondance pour ceux absents (resp. inconnus), car leurs descendants sont absents
-(resp. inconnus) selon les règles de cohérence présentées au paragraphe 2.2. L’idée est d’af-
-finer cette valeur en considérant la similitude des descendants uniquement pour les noeuds
-Classification par voisinages successifs
-TAB. 3 – La mesure de similarité σedition
-λ1λ2 + − ∗
-+ 1 0 0
-− 0 1 0
-∗ 0 0 1
-TAB. 4 – La mesure de similarité σSP
-λ1λ2 + − ∗
-+ 1 α1j 0
-− α2j 1 0
-∗ 0 0 1
-simultanément présents dans les deux squelettes. Soient les squelettes H1 et H2. Le degré de
-similitude est défini de manière récursive pour les noeuds simultanément présents, à l’aide
-d’une mesure de similitude σr définit comme suit :
-– Si Aj est une feuille alors σr(λ1(Aj) = +, λ2(Aj) = +) = 1,
-– Sinon c’est un noeud non terminal Aj :< Ak >k∈K alors :
-σr(λ1(Aj) = +, λ2(Aj) = +) =
-1 + Σkm(Ak)σr(λ1(Ak), λ2(Ak))
-m(Aj)
-(2)
-qui vérifie bien les propriétés d’une mesure de similarité. Le tableau 5 donne l’expression
-générale de σr. La mesure de similarité entre deux squelettes est calculée par une "descente
-récursive" à partir de la racine A :
-ζSRecursive(H1, H2) = σr(λ1(A), λ2(A)) (3)
-Dans ce parcours, la détermination des valeurs de similarité entre les noeuds non simultané-
-ment présents n’est faite que pour les noeuds les plus élevés de l’arbre. Dans le tableau 5
-sont données des valeurs de cette similarité entre des arbres pour la mesure de similarité σre
-(tableau 6),
-TAB. 5 – La mesure de similarité récursive σr pour un objet Aj =< Ak >k∈K
-λ1λ2 + − ∗
-+ 1+Σkm(Ak)σr(λ1(Ak),λ2(Ak))m(Aj) α
-1
-j β
-1
-j
-− α2j 1 γj
-∗ β2j γj 1
-D. Grosser et al.
-TAB. 6 – La mesure de similarité récursive σre
-λ1λ2 + − ∗
-+ 1+Σkm(Ak)σr(λ1(Ak),λ2(Ak))m(Aj) α
-1
-j 0
-− α2j 1 0
-∗ 0 0 1
-3.5 Mesure de similarité sur les valeurs
-Dans cette partie, nous nous intéressons aux similarités portant sur les valeurs relatives aux
-attributs. L’ensemble des attributs est noté : {(Aq, Dq)|q ∈ Q}, la valeur d’une observation
-pour un attribut Aq est dans son domaine Dq si et seulement si l’attribut est présent.
-On suppose donnée une mesure de similarité sq sur chaque domaine d’un attribut : sq :
-Dq ×Dq → [0, 1]. Dans le logiciel IKBS, diverses distances adaptées à différents types d’at-
-tribut sont disponibles : la distance euclidienne normalisée pour les attributs de type numérique,
-la distance du khi-deux pour des attributs qualitatifs, des distances adaptées aux variables in-
-tervalles (Grosser et al., 2000).
-L’indice de "similarité valeur" entre deux observations portera sur les valeurs des attributs
-présents en commun. Soit une observation o ∈ O, dont la fonction label est λo, on note l’en-
-semble de ces indices des attributs Q+(o) = {q ∈ Q|λo(Aq) = +}. L’ensemble des valeurs
-de o est :
-v(o) = (vq|vq ∈ Dq, q ∈ Q+(o)).
-La mesure de similarité valeur ζV : O × O → [0, 1] est définie pour deux observations o et o′
-dont les valeurs sont v(o) = (vq), v(o′) = (v′q) comme :
-ζV (o, o′) =
-Σq∈Q+(o)∩Q+(o′)sq(vq, v
-′
-q)
-|Q+(o) ∩Q+(o′)|
-pour |Q+(o) ∩Q+(o′)| 6= ∅ et ζV (o, o′) = 0 sinon.
-3.6 Mesures de similarité globale
-Une observation o ∈ O est décrite par son squeletteHo et ses valeurs v(o) = (vq). On sup-
-pose que l’on dispose d’une mesure de similarité structurelle ζS ∈ [0, 1]O×O (indice ζSPondere
-ou ζSRecursive) et d’une mesure de similarité valeur ζV ∈ [0, 1]O×O. Pour définir un indice
-de similarité unique qui tienne compte à la fois de la structure et du contenu, on peut consi-
-dérer la moyenne pondérée des deux indices. Pour les observations o = (Ho, v(o) = (vq)) et
-o′ = (Ho′ , v(o′) = (v′q)), la mesure de similarité globale moyenne s’écrit :
-ζG(o, o′) = αζS(Ho, Ho′) + (1− α)ζV (o, o′)
-où α ∈]0, 1[ est un coefficient qui permet de pondérer l’importance accordée à la structure ou
-aux valeurs.
-Cependant on remarque que les attributs présents dans deux squelettes, sont comptabilisés
-deux fois, une fois dans la mesure de similarité structurelle pondérée ou récursive, avec une
-Classification par voisinages successifs
-a
-b c
-d
-e f
-a
-b c
-d
-e f
-a
-b c
-d
-e f
-a
-b c
-d
-e f
-a
-b c
-d
-e f
-Modèle descriptif S1 S2
-F1 F2
-0.1
-0.45
-0.5 0.65
-0.2 0.3
-0.4 0.5
-0.6
-0.6 0.1
-0.2
-0.9
-0.7
-0.5
-0.6 0.7
-0.8 0.9
-0.1
-FIG. 4 – Le modèle descriptif et les observations.
-TAB. 7 – Valeurs des mesures de similarité.
-Similarité structurelle ζEdition ζSPondere ζSRecursive ζV
-Arbres S1 et S2 0.80 0.87 0.83 0.53
-Arbres F1 et F2 0.40 0.33 0.50 0.93
-Similarité globale (ζEdition+ζV )2
-(ζSPondere+ζV )
+i;v 
+P
+v x
 2
-(ζSRecursive+ζV )
-2 ζGR
-Arbres S1 et S2 0.66 0.70 0.69 0.64
-Arbres F1 et F2 0.66 0.63 0.72 0.48
-valeur égale à 1 et une autre fois avec la valeur de la mesure de similarité valeur. Pour éviter
-cette redondance, nous proposons la similarité globale ζGR en modifiant la mesure de similarité
-structurelle récursive proposée de la section 3.4 pour qu’elle prenne en compte la similitude au
-niveau des attributs présents en commun. Si Aj est une feuille alors on pose :
-σr(λo(Aj) = +, λo′(Aj) = +) = sj(vj , v′j),
-sinon c’est un noeud non terminal Aj :< Ak >k∈K , et l’expression (2) est appliquée. La
-mesure de similarité globale ζGR(o, o′) est calculée récursivement à partir de la racine par la
-formule (3).
-3.7 Exemples
-Les observations S1 et S2 de la figure 4 ont des structures similaires mais des valeurs
-d’attributs différentes, c’est l’inverse pour F1 et F2. Le tableau 7 recensent pour ces arbres
-les valeurs des mesures de similarité structurelle : ζEdition, ζSPondere, ζSRecursive, associées
-respectivement aux similarités σedition (tableau 3), σSP (tableau 4), σre (tableau 6), et la me-
-sure de similarité valeur ζV relative à la distance euclidienne de la valeur absolue. Les mesures
-globales moyennes sont calculées à partir de ces valeurs, de même que la mesure de simila-
-rité récursive ζGR. Les valeurs de la similarité entre S1, S2 (resp. F1, F2.) pour ζSPondere
-est supérieure (resp. inférieure) à celle de la mesure d’édition ζEdition, et ζEdition(S1, S2) <
-D. Grosser et al.
-ζSRecursive(S1, S2). Ces résultats illustrent la pertinence des mesures structurelles proposées
-qui font jouer aux noeuds élevés un rôle plus important dans la mesure de la ressemblance
-des structures. Si les moyennes sont des bons compromis de mesures globales pour prendre
-en compte la similarité de la structure et des valeurs, la mesure ζGR évite le choix délicat du
-coefficient de pondération α.
-3.8 Conclusion sur les mesures de similarité
-Après avoir montré les limites des indices classiques pour mesurer les similarités des don-
-nées morphologiques complexes, nous avons proposé des mesures de similarité qui prennent
-en compte à la fois la structure hiérarchique des données, les contraintes de cohérence entre
-les objets, et les valeurs des attributs : numériques, qualitatives, multiples, manquantes ou in-
-connues. Ces différentes mesures sont mises en oeuvre dans la méthode de fouille que nous
-présentons maintenant.
-4 Classification par voisinages successifs
-Afin de déterminer l’appartenance à une classe d’une description partielle décrite par un
-utilisateur, nous proposons une méthode itérative et interactive de classification par voisinages
-successifs (CVS). La méthode est hybride, elle met en oeuvre conjointement une stratégie
-de type k-plus-proches voisins ainsi qu’une étape de sélection de variables discriminantes de
-type arbre de décision. Dans la suite, on note (E , d) l’espace métrique des descriptions où
-E = H × V avec H l’ensemble des squelettes, V l’ensemble des valeurs des observations et
-d = 1−ζ l’indice de dissimilarité dérivé d’un indice de similarité global ζ précédement défini.
-4.1 Principe de la méthode
-La méthode proposée consiste dans un premier temps à compléter la description du spé-
-cimen en appliquant des règles d’inférence liées au domaine (cf. ci-dessous). Puis le système
-sélectionne un ensemble de spécimens proches de la description en cours. Il donne différentes
-informations relatives aux classes d’appartenance de ces "voisins" pour aider à la prise de
-décision. Si l’utilisateur n’est pas satisfait des suggestions du système, ce dernier calcule un
-ensemble d’attributs discriminants parmi l’ensemble d’attributs non encore renseignés et les
-propose à la valuation. Puis, il recommence à sélectionner un ensemble de voisins pour per-
-mettre la prise de décision.
-4.2 Cohérence des descriptions
-On note par e ∈ E la description partielle d’un spécimen dont la classe est à déterminer.
-Les règles d’inférence suivantes sont d’abord appliquées :
-1. Les descendants d’un noeud non renseigné sont valués à "∗",
-2. Les descendants d’un noeud absent sont valorisés à "−",
-3. Les ancêtres d’un noeud présent ou d’une feuille valuée sont considérés comme "pré-
-sent".
-Classification par voisinages successifs
-Si d’autres règles de cohérence liées aux connaissances sont disponibles, elles sont mises en
-oeuvre à ce stade. Après cela, nous obtenons une description e ∈ E .
-4.3 Principes de l’algorithme CVS
-L’algorithme CVS permet de calculer la classe d’appartenance d’un spécimen donné e. Il
-est itératif et comporte les étapes suivantes :
-1. Initialiser la valeur du rayon ∆ à la distance maximum de e à l’ensemble des observa-
-tions.
-2. Déterminer l’ensemble des voisins comme l’ensemble des objets à l’intérieur de la
-sphère de rayon∆ et de centre e,
-3. Calculer les scores de classification des classes a priori,
-4. Calculer la nouvelle valeur du rayon∆ à partir de l’ensemble des voisins,
-5. Répéter les étapes 2,3,4 jusqu’à ce que les critères d’arrêt soient satisfaits,
-6. A partir des scores de classification, proposer une classe d’appartenance de la description
-à l’utilisateur, si satisfaction alors fin.
-– sinon à partir de l’ensemble des voisins, calculer le pouvoir discriminant des attributs
-non encore valués,
-– L’utilisateur est invité à compléter la description avec une ou plusieurs valeurs des
-attributs suggérés.
-– Réitérer l’algorithme de discrimination par voisinage successif avec cette description
-complétée.
-4.4 Calcul du voisinage d’une description partielle
-L’ensemble des voisins de e à l’itérationm est défini comme l’ensemble des objets dans la
-sphère de rayon ∆m et de centre e :
-voisin(m) = {o ∈ O|d(e, o) < ∆m}.
-la valeur du rayon est déterminée comme suit : soit la mesure de dissimilarité maximum entre
-e et un ensemble A :
-Dmax(e,A) = maxa∈Ad(e, a)
-on choisit pour valeur de∆m la distance maximum :
-∆m = Dmax(e,N(m−1)). (4)
-La suite de nombre positifs ∆m est décroissante, car par définition de l’ensemble des voi-
-sins
-∆m+1 = D(em, voisin(m)) = maxo∈voisin(m)d(em, o) < ∆m
-Si à chaque objet oi est associé un poids normalisé pi, alors la distance moyenneDmoy(e,A) =
-1
-Σoi∈Api
-Σoi∈Apid(e, oi) ou celle de l’inertieDiner(e,A) =
-1
-Σoi∈Api
-Σoi∈Apid
-2(e, oi) peuvent
-être aussi choisies, car on peut montrer que ces suites sont décroissantes.
-D. Grosser et al.
-4.5 Suggestion de classes d’appartenance à partir de différents scores
-Soient {Cl}l∈K l’ensemble des classes a priori d’appartenance possibles.
-On note Pr(Cl|N(m)) = |Cl∩N(m)||N(m)| la probabilité de la classe Cl dans le contexte de
-voisins N(m) ou la fréquence relative de Cl dans l’ensemble de voisins N(m). La classe qui
-sera proposée comme celle d’appartenance du spécimen e sera choisie à partir des classes telles
-que les probabilités Pr(Cl|Nm) seront significativement différentes des probabilités à priori
-des classes Pr(Cl|O) = |Cl||0| . Les tests statistiques usuels de calcul de fréquence peuvent être
-appliqués à ce stade. Le score de classification de la classe Cl à l’itérationm est :
-Rl =
-Pr(Cl|Nm)
-Pr(Cl|O) . (5)
-4.6 Sélection d’attributs discriminants
-La méthode de sélection est interactive, car la liste des variables discriminantes est calculée
-à chaque étape du processus d’identification, en fonction de plusieurs critères et d’une réponse
-demandée à l’utilisateur. Elle est semi-dirigée dans le sens où l’utilisateur peut choisir une
-autre variable parmi la liste proposée ou bien apporter une réponse inconnue. Dans ce cas, la
-variable en seconde position sera automatiquement choisie.
-La méthode utilise une combinaison de plusieurs critères de choix, de façon à minimiser
-le nombre de questions et prendre également en compte certaines connaissances de fond du
-domaine relatives à la qualité des variables, exprimées dans le modèle descriptif :
-1. Construction de la liste des attributs éligibles. Cette liste est contextuelle, constituée des
-attributs pouvant être sélectionnés. Elle dépend aussi de la structure du modèle et des
-attributs déjà renseignés. La présence des attributs éligibles doit notamment être vérifiée
-pour chaque composant contingent (cf. section 2.1). Une question booléenne portant sur
-sa présence/absence est ajoutée à la liste.
-2. Choix de critère classique de calcul du gain d’information utilisé en apprentissage, tel
-que l’entropie de Shannon ou le Gini Index. Ce type de critère permet de minimiser la
-longueur de la diagnose en privilégiant les attributs les plus discriminants.
-3. Pondération des attributs. Chaque attribut peut être pondéré par l’expert sur une échelle
-réelle de 0 à 1. Le poids 0 est affecté à un attribut non discriminant. Les pondérations
-sont très utiles pour introduire une connaissance d’ordre stratégique sur les caractères.
-Certains attributs sont en effet particulièrement difficile à observer (nécessite du matériel
-spécifique), à décrire ou sujet à interprétation. L’expert peut ainsi choisir de minimiser
-leur occurrence.
-4.7 Critères d’arrêt
-Plusieurs critères d’arrêt sont considérés :
-– Le score de classification d’une classe Cl (cf. formule 5) supérieure à un seuil fixé par
-l’utilisateur.
-– Le nombre minimal de voisins, car le rayon ∆m est une suite décroissante (cf. formule
-4).
-Classification par voisinages successifs
-– Le nombre maximal d’itérations.
-– La description est complète ou bien il n’y a plus de variables discriminantes disponibles.
-Notons que ces différents critères sont exclusifs et ne peuvent être vérifiés simultanément.
-5 Applications
-Dans cette partie, nous procédons à différents tests de validation en grandeur réelle sur des
-données structurées issues de la base de connaissances sur les coraux des Mascareignes. L’ob-
-jectif poursuivi est double. D’une part (section 5.1), illustrer l’exécution de la méthode CVS
-dans l’environnement IKBS sur un exemple réel. D’autre part (section 5.2), comparer les per-
-formances relatives de la méthode CVS par rapport à un classement par arbre d’identification
-et un classement par la méthode des k-plus-proches voisins.
-5.1 Classement d’une description
-L’exemple choisi est l’illustration du processus de classement d’une description de réfé-
-rence er appartenant à l’espèce Fungia concinna, de la famille des Fungiidae, donné pour
-exemple dans la partie 2. La famille des Fungiidae est structurée en quatre genres (Cycloseris,
-Fungia, Herpolita et Podabacia) et onze espèces (cf. figure 5). La base Fungiidae compte 63
-descriptions (cas) comportant 94 caractères (attributs) et 15 taxons (classes).
-FIG. 5 – Taxonomie de la famille des Fungiidae, comprenant quatre genres et onze espèces.
-L’algorithme cherche à associer à em (le cas test, initialement vide) un élément de la hié-
-rarchie de taxons (fig. 5), en exploitant les informations du modèle descriptif et de la base
-de cas de référence. Afin de simuler l’interactivité avec l’utilisateur, la source de données de
-em est er. A chaque itération, em est alimenté par un attribut de er. L’étiquette de er est uti-
-lisée à la fin du processus pour vérifier que le classement est correct ou non. La mesure du
-gain d’information utilisée dans cette application est la mesure de l’entropie de Shannon (gain
-d’information). Dans l’exemple, l’algorithme CVS a conduit au bon classement de em en 21
-itérations.
-La table 8 illustre un sous-ensemble choisi d’itérations qui ont conduit au bon classement
-de et. Pour chaque itération, les informations suivantes sont renseignées :
-– le numéro de l’itération,
-– l’attribut sélectionné et le gain d’information associé,
-– la valeur correspond à l’attribut pour le cas de référence affectée à em, ainsi que des
-informations relatives au voisinage de em.
-D. Grosser et al.
-TAB. 8 – Illustration du classement d’une description structurée par la méthode CVS.
-Num Attribut Valeur Voisinage
-iter cas classe valeur Dist
-1 forme[squelette] circulaire 62 fungites circulaire 0,2216
-gain = 0,628 46 fungites circulaire 0,2239
-51 scruposa circulaire 0,2259
-7 taille[squelette] 10.3 cm 62 fungites 9,5 cm 0,1905
-gain = 0,423 46 fungites 9 cm 0,1930
-60 fungites 15,5 cm 0,1974
-8 densité[épines] [10 16] 62 fungites [6 10] 0,1912
-gain = 0,423 46 fungites 6 0,1946
-60 fungites [6 8] 0,1978
-9 profil[squelette] plat 60 fungites plat 0,1924
-gain = 0,394 62 fungites convexe 0,1935
-46 fungites plan convexe 0,1968
-19 dév[côtes] sub égales 46 fungites sub égales 0,1901
-gain = 0,211 39 concinna sub égales 0,1915
-60 fungites inégales 0,1930
-20 lobes-tentaculaires absent 46 fungites absent 0,1901
-gain = 0,173 39 concinna absent 0,1915
-60 fungites absent 0,1930
-21 forme[épines] cylindre 39 concinna cylindre 0,1912
-gain = 0,153 46 fungites conique 0,1935
-62 fungites cylindre 0,1941
-Pour chaque voisinage, sont donnés les numéros des cas de la base de référence les plus
-proches, le taxon (classe) associé, la valeur de l’attribut sélectionné, ainsi que la distance du
-cas em. Notons que pour des raisons pratiques, seuls les trois cas les plus proches du voisinage
-sont affichés.
-Différents types d’attributs sont sélectionnés lors de cette application : type hiérarchique
-(forme[squelette], cf. fig. 2) nominal, continu, intervalle ou booléen portant sur la présence
-d’un composant (présence des lobes-tentaculaires). Pour les besoins de notre application, le
-critère d’arrêt qui s’applique ici est la correspondance entre la classe du cas de référence et la
-classe du premier voisin. Dans un processus réel de classement pour lequel l’étiquette n’est
-pas a priori connue, ce critère s’applique selon les modalités développées à la section 4.5.
-L’information la plus intéressante à observer dans ce tableau est la liste des cas les plus
-proches. Les variations de position des voisins permet d’évaluer intuitivement dans quelle me-
-sure l’adjonction d’une information supplémentaire modifie les distances des éléments du voi-
-sinage au cas em et par conséquent modifie l’ordre des voisins. Ainsi par exemple, lors du
-passage de l’itération 8 à 9, le cas 60 passe en première position du fait que la valeur du profil
-du squelette (valeur plat) correspond à la valeur de référence. A l’itération 19, apparait dans la
-liste des trois candidats le cas 39 en position 2, dont la valeur de classe correspond à la classe
-recherchée. Enfin, à l’itération 21, le cas 39 passe en première position devant le cas 46, du fait
-Classification par voisinages successifs
-d’une correspondance avec l’attribut forme[épines], ce qui aboutit à un bon classement.
-5.2 Performances de la méthode CVS
-Dans cette seconde expérience, nous souhaitons tester les performances relatives de l’al-
-gorithme CVS par rapport à deux méthodes de référence disponibles dans IKBS : les arbres
-d’identification et les k-plus-proches voisins. La méthode des arbres d’identification (Grosser
-(2002)) est une extension de la méthode de classification supervisée C4.5 (Quinlan (1993))
-adaptée aux données complexes de notre modèle de représentation. La méthode est monothé-
-tique (les caractères sont proposés un à un) et interactive. Le modèle inductif utilisé pour le
-classement des attributs discriminants est identique à celui utilisé par la méthode CVS lors de
-la phase de sélection. Le second algorithme est de type k-plus-proches voisins. Dans l’expé-
-rience, le facteur k est simplement positionné à 1. La mesure de similarité utilisée est la mesure
-récursive ζGR exposée précédemment. La classe du cas le plus proche est affectée au cas test
-et la totalité de l’information du cas de référence est utilisée. La méthode est polythétique,
-un ensemble de caractères devant être renseignés a priori. La mesure de similarité utilisée est
-la même que celle de l’algorithme CVS. La méthode de validation utilisée, de type “Leave-
-on-out”, consiste à classer chaque cas de la base en utilisant les autres cas comme base de
-référence. La méthode est appliquée pour les trois algorithmes dans des conditions identiques.
-Les paramètres de classement sont identiques à ceux utilisés pour la première expérience.
-TAB. 9 – Tests de validation “Leave-on-out” de différentes bases
-Bases nb nb nb Arbre ident K-voisins CVS
-class cas attr score taux score taux score taux
-Faviinae 36 92 146 65 70,65% 85 92,39% 84 91,30%
-Montastreinae 15 24 118 17 70,83% 22 91,66% 19 79,16%
-Fungiidae 15 63 94 47 74,60% 58 92,06% 55 87,30%
-Mussidae 15 56 28 49 87,50% 54 96,42% 51 91,07%
-Poritidae 28 28 87 22 78,57% 24 85,71% 19 67,85%
-Siderastreidae 14 60 99 49 81,67% 56 93,33% 57 95,00%
-La table 9 illustre les résultats des trois méthodes de classification sur 6 bases extraites de
-la base coraux. Pour chaque base, les informations suivantes sont affichées : nombre de taxons
-pour le modèle (nb class), nombre de cas (nb cas), nombre d’attributs (nb attr). Ensuite pour
-chaque méthode est donné le nombre (score) et le taux de cas bien classés.
-Globalement, la méthode la moins robuste est la méthode par arbre d’identification. Les
-erreurs de classement sont fréquentes, de 12.5% sur la base Mussidae à 29, 35% pour la base
-Faviinae. La méthode la plus robuste est la méthode de type k-voisins, qui exploite la totalité
-de l’information disponible lors du calcul des similarités 2 à 2. Les taux d’échec pour celle-ci
-ce situent entre 14.29% (base Poritidae) et 3.58% (base Mussidae). La méthode CVS offre
-un score intermédiaire relativement proche de la méthode K-voisins et parfois très supérieur à
-la méthode par arbre. Observer par exemple les résultats de la base Faviinae qui montrent un
-écart de plus de 20% de bonnes identifications avec la méthode CVS.
-D. Grosser et al.
-La méthode K-voisins donne de bons résultats, mais est difficilement exploitable par des
-utilisateurs non-experts dans des cas réels d’utilisation. Il est en effet très difficile de choisir
-a priori un sous-ensemble de caractères discriminants, sans une connaissance approfondie du
-domaine. Il est donc très utile de disposer d’un processus interactif qui guide l’observation
-et suggère les caractères à décrire. L’approche monothétique (un caractère à la fois) propo-
-sée par la méthode des arbres d’identification offre cette facilité. C’est la raison pour laquelle
-cette méthode est très utilisée, par les utilisateurs d’IKBS, experts et biologistes et par toutes
-les personnes qui ont besoin d’identifier des organismes, en particulier pour l’évaluation et la
-conservation de la biodiversité. Nous pensons que la méthode CVS offre une solution alterna-
-tive intéressante, monothétique et interactive, plus performante que les méthodes par arbres.
-6 Conclusion
-Dans le cadre de nos travaux sur la représentation et le traitement de connaissances en Sys-
-tématique, plusieurs méthodes d’identification et de classification de données complexes issues
-de bases de connaissances ont été développées. Ces méthodes ont été implantées et évaluées
-à l’aide de l’outil IKBS. Ce logiciel a été utilisé par un groupe d’experts pour la conception
-d’une base de connaissances sur les coraux des Mascareignes. Les données que nous consi-
-dérons dans cet article sont des descriptions morphologiques d’objets biologiques. Elles sont
-structurées en arborescences selon un modèle descriptif construit par les experts et peuvent
-être multi-valuées et incomplètes. Le modèle descriptif présente un plan d’organisation des
-variables descriptives (les caractères) utilisées pour décrire les objets. Cette modélisation offre
-l’avantage de représenter les relations de dépendances entre caractères, ainsi que de permettre
-l’expression de connaissances de fond relative au domaine (poids des caractères, illustrations,
-valeurs par défaut, commentaires, etc.).
-Afin de comparer ce type de données structurées, un ensemble de mesures de similarités
-prenant en compte à la fois la structure et le contenu des descriptions a été développé et évalué.
-Une méthode itérative originale de classification par construction de voisinages successifs a
-également été présentée. C’est une méthode hybride qui utilise conjointement ce type d’indice
-pour la construction de l’espace des voisins (stratégie de type k-plus-proches voisins) ainsi
-qu’une méthode de sélection de variables discriminantes (stratégie de type arbre de décision)
-pour le choix des variables à chaque itération. La structure du modèle descriptif est utilisée à
-chaque étape du processus pour guider le choix des variables, garantir la cohérence des des-
-criptions partielles et calculer les similarités. Une expérimentation sur différentes bases montre
-que la méthode présente une assez bonne résistance aux bruits comparativement aux méthodes
-de classement par arbres d’identification, tout en offrant des caractéristiques intéressantes d’in-
-teractivité et d’explication.
-Références
-Bille, P. (2005). A survey on tree edit distance and related problems. Theoret. Comput.
-Sci. 337(1-3), 217–239.
-Breiman, L., J. H. Freidman, R. A. Olshen, et C. J. Stone (1984). Classification and regression
-trees. Wadsworth, Belmont.
-Classification par voisinages successifs
-Conruyt, N. (1994). Amélioration de la robustesse des systèmes d’aide à la description, à la
-classification et à la détermination des objets biologiques. Thèse de doctorat, Université
-Paris IX-Dauphine.
-Dalamagas, T., T. Cheng, K. Winkel, et T. K. Sellis (2006). A methodology for clustering xml
-documents by structure. Information System 31(3), 187–228.
-Dulucq, S. et L. Tichit (2003). RNA secondary structure comparison: exact analysis of the
-zhang-shasha tree edit algorithm. Theor. Comput. Sci. 306(1-3), 471–484.
-Estabrook, G. F. et D. Rogers (1966). A general method of taxonomic description for a
-computed similarity measure. Bioscience 16, 789–793.
-Faure, G., N. Conruyt, M. Pichon, M. Guillaume, D. Grosser, et Y. Geynet (1999). Devel-
-opment of a knowledge base for the corals of the mascarene archipelago. Int. Conf. on
-Scientific Aspects of Coral Reef Assessment, Monitoring and Restoration.
-Grosser, D. (2002). Construction de bases de connaissances descriptives et classificatoires
-avec la plate-forme à objets IKBS. Application à la systématique des coraux des Mas-
-careignes. Ph. D. thesis, Université de la Réunion.
-Grosser, D., N. Conruyt, et Y. Geynet (2003). Représentation de connaissances descriptives
-et classificatoires: le modèle codesc. In Actes des 9èmes journées francophones "Langages
-et modèles à objets", Revue Sciences et Technologies de l’information (RSTI), série l’Objet,
-Hermès (Ed.).
-Grosser, D., J. Diatta, et N. Conruyt (2000). Improving dissimilarity functions with domain
-knowledge, applications with ikbs system. In PKDD, pp. 409–415.
-Kaizhong, Z. et D. Shasha (1989). Simple fast algorithms for the editing distance between
-trees and related problems. SIAM J. Comput. 18(6).
-Quinlan, J. (1986). Induction of decision trees. Machine Learning 1, 81–106.
-Quinlan, J. R. (1993). C4.5: Programs for Machine Learning. Morgan Kaufmann Series in
-Machine Learning.
-Renard, J. L., C. Lévi, N. Conruyt, et M. Manago (1996). Sur la représentation et le traite-
-ment des connaissances descriptives : une application au domaine des éponges du genre
-hyalonema. Bulletin de l’Institut Royal des Sciences 66, 37–48.
-Sokal, R. et P. Sneath (1963). Principles of numerical taxonomy. San Francisco et Londres:
-W.H. Freeman et Cie.
+j;v
+L'évaluation que nous proposons consiste en des séries de 10 exécutions des algorithmes
+OKM et k-moyennes dans des conditions initiales identiques, sur un sous-ensemble de 300 do-
+cuments pour un nombre de classes variant de 5 à 30. On appelle association issue de R, une
+paire d'objets appartenant à une même classe de R ; on dira de plus que cette association est
+correcte si ces deux objets contiennent au moins une étiquette de catégorie en commun dans la
+classication préétablie. Chaque partition ou recouvrementR est alors évalué relativement au
+nombre d'associations deR (noté na), qui sont correctes (nb) par rapport au nombre total d'as-
+sociations correctes attendues (nc). Nous recourons aux indicateurs traditionnels en Recherche
+d'Information : la précision, le rappel et l'indice de Fscore (avec =1).
+précision = nb
+na
+; rappel = nb
+nc
+; Fscore() =
+(2 + 1) précision rappel
+2  précision+ rappel
+7Un mot désigne en fait un radical : chaîne de caractères résultant d'un processus de segmentation puis de radica-
+lisation (Porter, 1980).
+G. Cleuziou
+Nous présentons en gure 7 les moyennes comparatives des mesures de Fscore obtenues
+sur les recouvrements générés par OKM d'une part et les partitions obtenues avec k-moyennes
+d'autre part. La diminution observée du Fscore s'explique dans les deux méthodes par la ré-
+duction logique du nombre d'associations (et donc du rappel) lorsque le nombre de classes
+augmente. Pourtant, si dans le cas des partitions, l'augmentation en précision ne permet pas de
+compenser la diminution importante du rappel, cette compensation est possible lorsqu'il s'agit
+de recouvrements du fait d'une perte de rappel atténuée sous l'effet des intersections.
+5 Conclusion et Perspectives
+Cette étude part du constat suivant : les méthodes de classication actuelles ne sont pas
+adaptées à la recherche d'une organisation des données en classes recouvrantes ; ce type de
+schéma de classication devient pourtant indispensable pour appréhender les domaines d'ap-
+plication actuels tels que les documents multimédia ou les données biologiques.
+Nous avons alors proposé une première solution visant à rechercher dans l'ensemble des re-
+couvrements possibles des données, un schéma correspondant au mieux à l'organisation de ces
+données. Cette proposition s'appuie d'une part sur la dénition d'un critère objectif permettant
+d'évaluer les recouvrements, et d'autre part sur une méthode d'exploration de cet espace des
+possibilités (l'algorithme OKM).
+Des expérimentations menées sur deux ensembles de données ont mis en évidence la cohé-
+rence globale de la méthode proposée (sur les données Iris) et justié de l'intérêt d'organiser
+les données en classes recouvrantes an d'en conserver une synthèse riche en informations (sur
+les données Reuters). Cependant cette première contribution suggère plusieurs améliorations
+et perspectives importantes à mener.
+Tout d'abord on peut noter que, an d'assurer la convergence du critère objectif, la méthode
+d'affectation proposée dans OKM favorise mais ne garantie pas que chaque objet soit affecté
+uniquement à ses centres les plus proches (cf. gure 3). Si cette situation est en pratique suf-
+samment rare pour ne pas remettre en cause la cohérence globale du schéma, il conviendra de
+proposer une solution théorique à ce problème.
+Nous serons également amené à conrmer la justication de cette approche en montrant sur
+des études comparatives plus larges son intérêt par rapport à d'autres méthodes mentionnées
+dans ce papier, en particulier les algorithmes CBC, POBOC ou encore des algorithmes de
+classication oue complétés par une étape supplémentaire d'affectation.
+Enn, nous envisageons d'étudier l'intégration d'une pondération différente des descrip-
+teurs pour chaque classe en construction (Modha et Spangler, 2003). Cette perspective s'appuie
+sur l'hypothèse qu'un objet multi-classé doit l'être sur la base de critères différents.
+RØfØrences
+Apté, C., F. Damerau, et S. M. Weiss (1994). Automated learning of decision rules for text
+categorization. ACM Trans. Inf. Syst. 12(3), 233251.
+Banerjee, A., C. Krumpelman, J. Ghosh, S. Basu, et R. J. Mooney (2005). Model-based over-
+lapping clustering. In KDD ’05 : Proceeding of the eleventh ACM SIGKDD international
+conference on Knowledge discovery in data mining, New York, NY, USA, pp. 532537.
+ACM Press.
+OKM : une extension des k-moyennes pour la recherche de classes recouvrantes
+Bertrand, P. et M. F. Janowitz (2003). The k-weak hierarchical representations : An extension
+of the indexed closed weak hierarchies. Discrete Applied Mathematics 127(2), 199220.
+Cleuziou, G., L. Martin, et C. Vrain (2004). PoBOC : an Overlapping Clustering Algorithm.
+Application to Rule-Based Classication and Textual Data. In R. López de Mántaras and L.
+Saitta, IOS Press (Ed.), Proceedings of ECAI’04, Valencia, Spain, pp. 440444.
+Dempster, A., N. Laird, et D. Rubin (1977). Maximum Likelihood from Incomplete Data via
+the EM Algorithm. Journal of Royal Statistical Society B 39, 138.
+Diday, E. (1984). Une représentation visuelle des classes empiétantes : Les pyramides. Tech-
+nical report, INRIA num.291, Rocquencourt 78150, France.
+D.J. Newman, S. Hettich, C. B. et C. Merz (1998). UCI repository of machine learning data-
+bases. University of California, Irvine, Dept. of Information and Computer Sciences.
+Jain, A. K., M. N. Murty, et P. J. Flynn (1999). Data clustering : a review. ACM Computing
+Surveys 31(3), 264323.
+Lelu, A. (1994). Clusters and factors : neural algorithms for a novel representation of huge and
+highly multidimensional data sets. In E. D. Y. L. . al. (Ed.),New Approaches in Classication
+and Data Analysis, Berlin, pp. 241248. Springer-Verlag.
+MacQueen, J. (1967). Some methods for classication and analysis of multivariate obser-
+vations. In Proceedings of the Fifth Berkeley Symposium on Mathematical statistics and
+probability, Volume 1, Berkeley, pp. 281297. University of California Press.
+Modha, D. S. et W. S. Spangler (2003). Feature weighting in k-means clustering. Mach.
+Learn. 52(3), 217237.
+Pantel, P. (2003). Clustering by Committee. Ph.d. dissertation, Department of Computing
+Science, University of Alberta.
+Porter, M. F. (1980). An algorithm for sufx stripping. Program 14, 130137.
+Salton, G. et M. J. McGill (1983). Introduction to Modern Information Retrieval. McGraw-
+Hill, Inc.
+Sneath, P. H. A. et R. R. Sokal (1973). Numerical Taxonomy - The Principles and Practice of
+Numerical Classication. San Francisco, W. H. Freeman and Compagny.
 Summary
-The formalization of scientific knowledge in life sciences by experts in Biology or System-
-atics produces arborescent representations whose values could be present, absent or unknown.
-To improve the robustness of the classification process of those complex objects, often par-
-tially described, we propose a new classification method which is iterative, interactive and
-semi-directed. It combines inductive techniques for the choice of discriminating variables and
-search for nearest neighbors based on various similarity measures which take into account
-structures and values of the objects for the neighborhood computation.
+This paper deals with overlapping clustering, a trade off between crisp and fuzzy cluster-
+ing. This kind of clustering is motivated by recent applications such as clustering multimedia
+documents. Even if several contributions have been proposed in this eld of research, we
+observe that no theoretical solution exists.
+Our study consists in reformulating the partitioning problem for clustering in order to dis-
+cover a coverage of the data with overlapping clusters of similar objects. The proposed ap-
+proach combines an objective criterion that evaluates the quality of a coverage with an algo-
+rithmic solution that optimizes this criterion.
+A rst experimentation on a simple well known dataset helps in understanding the global
+process of the algorithm ; a second evaluation gives a quantitative point of view of the approach
+on the task of text clustering.

@@ -1,247 +1,498 @@
-TMD-MINER : Une nouvelle approche pour la détection des
-diffuseurs dans un système communautaire
-Mohamed Nidhal Jelassi∗,∗∗, Christine Largeron∗, Sadok Ben Yahia∗∗
-∗ Laboratoire Hubert CURIEN, Université Jean Monnet, Saint-Etienne, France.
-Christine.Largeron@univ-st-etienne.fr,
-∗∗Faculté des Sciences de Tunis, Université de Tunis-El Manar, Tunis, Tunisie.
-Sadok.Benyahia@fst.rnu.tn
-Résumé. Plusieurs méthodes ont été développées ces dernières années pour dé-
-tecter, dans un réseau social, les membres qualifiés, selon les auteurs, d’influen-
-ceurs, de médiateurs, d’ambassadeurs ou encore d’experts. Dans cet article, nous
-proposons un nouveau cadre méthodologique permettant d’identifier des diffu-
-seurs dans le contexte où seule l’information sur l’appartenance des membres du
-réseau à des communautés est disponible. Ce cadre, basé sur une représentation
-du réseau sous forme d’hypergraphe, nous a permis de formaliser la notion de
-diffuseur et d’introduire l’algorithme TMD-MINER, dédié à la détection des dif-
-fuseurs et basé sur les itemsets essentiels.
+Extraction de règles d’association séquentielle à l’aide de
+modèles semi-paramétriques à risques proportionnels
+Nicolas S. Müller∗, Matthias Studer∗, Gilbert Ritschard∗, Alexis Gabadinho∗
+∗Institut d’études démographiques et des parcours de vie, Université de Genève
+{nicolas.muller, matthias.studer, gilbert.ritschard, alexis.gabadinho}@unige.ch
+Résumé. La recherche de liens entre objets fréquents a été popularisée par les
+méthodes d’extraction de règles d’association. Dans le cas de séquences d’évé-
+nements, les méthodes de fouille permettent d’extraire des sous-séquences qui
+peuvent ensuite être exprimées sous la forme de règles d’association séquen-
+tielle entre événements. Cette utilisation de la fouille de séquences pour la re-
+cherche de liens entre des événements pose deux problèmes. Premièrement, le
+critère principal utilisé pour sélectionner les sous-séquences d’événements est
+la fréquence, or les occurrences de certains événements peuvent être fortement
+liées entre elles même lorsqu’elles sont peu fréquentes. Deuxièmement, les me-
+sures actuelles utilisées pour caractériser les règles d’association ne tiennent pas
+compte du caractère temporel des données, comme l’importance du timing des
+événements ou le problème des données censurées. Dans cet article, nous pro-
+posons une méthode pour rechercher des liens significatifs entre des événements
+à l’aide de modèles de durée. Les règles d’association sont construites à partir
+des motifs séquentiels observés dans un ensemble de séquences. L’influence sur
+le risque que l’événement « conclusion » se produise après le ou les événements
+« prémisse » est estimée à l’aide d’un modèle semi-paramétrique à risques pro-
+portionnels. Outre la présentation de la méthode, l’article propose une compa-
+raison avec d’autres mesures d’association 1.
 1 Introduction
-C’est en s’appuyant sur des représentations et des concepts issus de la théorie des graphes
-que les réseaux sociaux ont été étudiés en sciences sociales dès les années soixante (Moreno
-(1934), Cartwright et Harary (1977)). Parmi les questions essentielles que l’analyse de ré-
-seau s’efforce de traiter figure l’identification d’individus occupant un rôle déterminant dans
-le réseau. Avec l’explosion des réseaux sociaux sur Internet, des travaux plus récents se sont
-attachés à repérer des acteurs qualifiés selon les auteurs d’influenceurs, de médiateurs, d’am-
-bassadeurs ou encore d’experts (Opsahl et Hogan (2010); Scripps et al. (2007a,b); Agarwal
-et al. (2008)).
-En particulier, plusieurs algorithmes ont été présentés récemment pour résoudre le pro-
-blème de recherche d’influenceurs, redéfini comme un problème de maximisation (Richardson
-et Domingos (2002); Kempe et al. (2003)). Cependant, ces algorithmes exploitent la matrice
-d’adjacence associée au graphe décrivant le réseau ; ce qui suppose connues les relations entre
-les acteurs pris deux à deux. Or, dans de nombreuses applications, cette information n’est pas
-forcément accessible. Par contre, on sait à quelle(s) communauté(s) appartient un acteur. On
-cherche alors à identifier des acteurs, appelés diffuseurs, en nombre le plus limité possible, qui
-appartiennent à plusieurs groupes et qui du fait de cette position sont susceptibles d’assurer des
-échanges d’un groupe à un autre. Il peut s’agir par exemple des chercheurs qui ont participé à
-la conférence EGC et ceux qui ont assisté à Coria ou encore des clients ayant acheté différentes
-- 423 -
-TMD-MINER : détection des diffuseurs dans un système communautaire
-versions d’un article et pour lesquels on ne ne connait pas les liens directs existants entre ces
-personnes. Dans le premier cas, les diffuseurs seront susceptibles de diffuser des idées, dans le
-second de faire connaître aux utilisateurs de l’ancien modèle les avantages du nouveau et plus
-généralement d’émettre des recommandations d’un groupe à un autre. L’objectif de cet article
-est de proposer un cadre méthodologique permettant de détecter de tels diffuseurs et d’ana-
-lyser le réseau dans ce contexte d’information incomplète où on ne dispose pas de la matrice
-d’adjacence associée au graphe représentant le réseau mais où, en revanche, les communautés
-sont données.
-Pour ce faire, nous représentons le système communautaire sous la forme d’un hypergraphe
-dans lequel les sommets représentent les acteurs et les hyperarêtes représentent les communau-
-tés. Dans cet hypergraphe, les diffuseurs pourront être déterminés à partir des traverses mini-
-males de l’hypergraphe, elles-mêmes définies comme un ensemble de sommets, minimal au
-sens de l’inclusion, qui intersecte toutes les hyperarêtes (Berge,1989). Dans la section 2, nous
-rappelons des notions-clés, issues de la théorie des graphes et de la fouille de données, que
-nous utilisons pour définir formellement la notion de diffuseur dans un hypergraphe puis, dans
-la section 3, nous introduisons notre approche pour la détection des diffuseurs et présentons un
-algorithme original, appelé TMD-MINER, pour le calcul des traverses minimales diffuseurs.
-2 Définition d’un diffuseur dans un hypergraphe
-Un réseau social peut être défini comme un ensemble d’entités interconnectées les unes
-avec les autres (Wasserman et Faust (1994)). Les relations décrivent des interactions entre les
-entités. Dans la pratique, on ne connaît pas toujours de façon précise les relations existants
-entre les entités prises deux à deux. En revanche, il peut exister des sous-groupes formant des
-communautés au sein du réseau et on peut savoir à quelle(s) communauté(s) appartient chaque
-entité. C’est dans ce cadre, que nous proposons de définir la notion de diffuseur au sein du
-réseau, en faisant appel aux concepts d’hypergraphe et de traverse minimale.
-Définition 1 HYPERGRAPHE (Berge (1989)) Soit le coupleH = (X , ξ) avec X = {x1, x2, . . . ,
-xn } un ensemble fini et ξ = {E1, E2, . . . , Em } une famille de parties de X . H constitue un
-hypergraphe sur X si Ei 6= ∅, i ∈{1,. . . , m} et
-⋃
-i=1,...,m
-Ei = X .
-Les éléments xi de X , appelés sommets de l’hypergraphe, correspondent aux entités du réseau
-et les éléments de ξ, appelées hyperarêtes de l’hypergraphe, correspondent aux communautés.
-Exemple 1 La figure 1 illustre un hypergraphe H = (X , ξ) tel que X = (1, 2, 3, 4, 5, 6, 7, 8)
-et ξ = ({1, 2}, {2, 3, 7}, {3, 4, 5}, {4, 6}, {6, 7, 8}, {7}).
-Définition 2 ENSEMBLE TRANSVERSAL (Berge (1989)) Un ensemble transversal (ou tra-
-verse) des arêtes d’un hypergrapheH = (X , ξ) où ξ = {E1, E2, . . . , Em } est un ensemble T
-⊂ X avec T ⋂ Ei 6= ∅ ∀i = 1, . . . ,m.
-On note γH , l’ensemble des traverses définies surH , une traverse T de γH est ditminimale
-si il n’existe pas une autre transverse S telle que S est un sous-ensemble de T . Le nombre
-minimum de sommets d’un ensemble transversal est appelé le nombre de transversalité de
-l’hypergraphe H et on le désigne par : τ (H) = min |T|.
-On notera parMH , les traverses minimales définies sur H .
-- 424 -
-JELASSI et al.
-FIG. 1 – Un exemple d’hypergraphe.
-Dans l’exemple illustré par la figure 1, l’ensembleMH de l’hypergraphe est : { {1, 4, 7}, {2,
-4, 7}, {1, 3, 6, 7}, {1, 5, 6 7}, {2, 3, 6, 7} et {2, 5, 6, 7} }. Il importe de mettre en exergue
-que dans le contexte d’un hypergraphe, où nous ne disposons que des communautés présentes
-dans le réseau, nous considérons qu’il doit y avoir au moins un diffuseur par communauté et
-que le nombre de ces diffuseurs doit être minimum. Ainsi, il apparaît qu’une traverse minimale
-constitue un cadre idéal pour localiser ces diffuseurs. Ceci nous conduit à formaliser la notion
-de traverse minimale diffuseur de la façon suivante.
-Définition 3 TRAVERSE MINIMALE DIFFUSEUR SoitH = (X , ξ), un hypergraphe et I ⊂ X ,
-on dit que I est une traverse minimale diffuseur, notée TMD, si I vérifie les trois conditions
-suivantes :
-1. (Condition Nécessaire) I est une traverse minimale : I ∈MH .
-2. (Condition de composition) Le nombre de transversalité de I est minimal dansMH au
-sens de la cardinalité : τ (H) = Min {|T|, ∀T∈MH}.
-3. (Condition de recouvrement maximum) :
-∑
-Ei/Ei
-⋂
-I 6=∅
-|Ei| = Max {
-∑
-Ei/Ei
-⋂
-T 6=∅
-|Ei|, ∀ T
-∈MH tel que |T| = τ (H) }.
-Ainsi, un ensemble de sommets constitue une TMD s’il forme une traverse minimale, si sa
-taille est la plus petite possible et s’il maximise la condition de recouvrement. Plus précisé-
-ment, la première condition indique qu’il y aura au moins un diffuseur présent dans chaque
-communauté. La seconde condition vise à prendre un ensemble de diffuseurs le plus petit pos-
-sible. Ainsi l’objectif est de représenter toutes les communautés à l’aide d’un minimum de
-sommets du graphe. Enfin, la troisième condition, dite de recouvrement maximum, permet,
-s’il existe plusieurs traverses minimales vérifiant la condition de composition, de privilégier
-celles qui sont composées de noeuds appartenant aux communautés de plus grandes tailles.
-Avant de présenter TMD-MINER, nous allons définir la notion de contexte d’extraction,
-montrer son équivalence avec la notion d’hypergraphe et fournir une autre définition d’une
-traverse minimale en termes d’itemset essentiel, utilisée dans l’algorithme.
-Définition 4 CONTEXTE D’EXTRACTION Un contexte d’extraction est un triplet
-K = (ξ,X ,R) où ξ et X sont, respectivement, des ensembles finis d’hyperarêtes (ou
-transactions) et de sommets (ou items), etR⊆ ξ ×X est une relation binaire entre les hyper-
-arêtes et les sommets.
-Ainsi, il existe une relation entre les notions d’hypergraphe et de contexte d’extraction. En
-effet, le contexte d’extraction K = (ξ,X ,R) associé à l’hypergraphe H = (X , ξ) permet de
-- 425 -
-TMD-MINER : détection des diffuseurs dans un système communautaire
-représenter la matrice d’incidence de H :
-∀xj ∈ X and ∀Ei ∈ ξ on a :R(xj , Ei) = 1 si xj ∈ Ei etR(xj , Ei) = 0 si xj /∈ Ei.
-Le tableau 1 représente le contexte d’extraction relatif à l’hypergraphe de la figure 1.
-1 2 3 4 5 6 7 8
-{1, 2} 1 1 0 0 0 0 0 0
-{2, 3, 7} 0 1 1 0 0 0 1 0
-{3, 4, 5} 0 0 1 1 1 0 0 0
-{4, 6} 0 0 0 1 0 1 0 0
-{6, 7, 8} 0 0 0 0 0 1 1 1
-{7} 0 0 0 0 0 0 1 0
-TAB. 1 – Le contexte d’extraction relatif à l’hypergraphe de la figure 1
-Définition 5 SUPPORT DISJONCTIF D’UN MOTIF ET MOTIF ESSENTIEL SoientK = (ξ,X ,R)
-un contexte d’extraction et un motif formé d’un sous-ensemble non vide de sommets I de X .
-Le support disjonctif du motif I , noté Supp(∨I ), et désignant le nombre d’hyperarêtes (ou
-transactions) qui contiennent au moins un sommet (ou item) de I est défini par : Supp(∨ I) =|
-{E ∈ E | (∃ x ∈ I,R(x,E) = 1)} |. I ∈ X est un motif essentiel si et seulement si :
-Supp(∨I) > max{Supp(∨I\i) | i ∈ I}
-Corollaire 1 TRAVERSE ET TRAVERSE MINIMALE
-Un motif I ⊆ I du contexte d’extraction K = (ξ,X ,R) est une traverse de l’hypergraphe
-H = (X , ξ) si son support disjonctif est égal au nombre d’hyperarêtes (ou transactions) de
-H : Supp( ∨ I) = |ξ|. Un motif I ⊆ I est dit Traverse minimale si et seulement si I est un
-itemset essentiel dont le support disjonctif est égal au nombre d’hyperarêtes de H .
-Dans la section suivante, nous proposons un algorithme de recherche des diffuseurs dans un
-hypergraphe basé sur une détection efficace des traverses minimales qui vérifient la condition
-de composition puis celle de recouvrement.
-3 Méthodologie et algorithme d’extraction des diffuseurs
-La recherche des diffuseurs dans un hypergraphe nécessite l’extraction des traverses mini-
-males dans un hypergraphe. Berge a été le premier à proposer un algorithme (Berge (1989)),
-dont plusieurs extensions ont été présentées dans la littérature comme celle de (Kavvadias et
-Stavropoulos (2005)) ou celle de (Hébert et al. (2007)).
-Dans ce qui suit, nous introduisons, un nouvel algorithme, appelé TMD-MINER pour l’ex-
-traction des traverses minimales diffuseurs basé sur la fonction Apriori_Gen (Agrawal et
-Ramakrishnan (1994)). L’algorithme TMD-MINER, dont le pseudo-code est décrit par l’Algo-
-rithme 1 prend en entrée un contexte d’extraction (ou hypergraphe) et donne en sortie l’en-
-semble des TMD. L’algorithme effectue un parcours en largeur, i.e il opère par niveau pour
-calculer les itemsets essentiels, et exploite la propriété d’idéal d’ordre vérifié par l’ensemble
-des itemsets essentiels.
-A chaque niveau k, un appel à Apriori_Gen (Agrawal et Ramakrishnan (1994)), avec un
-support minimal égal à zéro, permet de calculer les candidats de taille k, à partir des itemsets
-- 426 -
-JELASSI et al.
-Algorithme 1: TMD-MINER
-Données :H : Contexte d’extraction K = (ξ,X ,R)
-Résultat : TMD
-1 début
-2 L1 := {1-itemsets};
-3 i := 1;
-4 si ∃x ∈ Li/supp(x) = |ξ| alors
-5 TMD = {x};
-6 retourner TMD;
-7 trouve = false ;
-8 tant que Li 6= ∅ or trouve = false faire
-9 Ci+1 := Apriori_Gen(Li);
-10 Li+1 := {X ∈ Ci+1 | @ x ∈ X : Supp(∨X) = Supp(∨X\x)};
-11 pour chaqueX ∈ Li+1 faire
-12 si supp(∨X) = |ξ| alors
-13 TMD = TMD ∪ {x};
-14 trouve = true ;
-15 i := i + 1;
-16 TMD = Recouvrement(TMD) ; retourner TMD
-essentiels de taille k-1. TMD-MINER calcule, ensuite, le support disjonctif des k-candidats,
-générés dans la ligne 9, et vérifie si ce dernier est strictement supérieur à ceux de ses sous-
-ensembles directs (ligne 10). Si parmi les itemsets essentiels calculés dans un niveau k, il en
-existe, au moins un, dont le support disjonctif est égal au nombre d’hyperarêtes de l’hyper-
-graphe d’entrée (ligne 12), alors la boucle de la ligne 8 s’arrête, ne passe pas au niveau k+1
-et TMD contient l’ensemble des plus petites traverses minimales qui sont aussi minimales
-au sens des cardinalités. Ces traverses candidates vérifient donc la condition nécessaire et la
-condition de composition de la définition 3. Au final, les TMD sont déterminés, à partir des
-traverses minimales qui vérifient la condition de composition par la fonction Recouvrement
-(ligne 16).
-4 Conclusion
-Dans cet article, nous avons introduit une nouvelle approche pour la détection des diffu-
-seurs au sein d’un système communautaire représenté sous la forme d’un hypergraphe. Les
-perspectives de prolongement du présent travail sont nombreuses, à commencer par l’optimi-
-sation de TMD-MINER, en utilisant un encodage des données sous forme de nombres premiers
-et le PGCD et le PPCM comme opérateurs de décodage.
-Remerciements Ce travail est partiellement soutenu par St-Etienne Metropole
-(http://www.agglo-st-etienne.fr/) et le projet Utique CMCU 11G1417
-- 427 -
-TMD-MINER : détection des diffuseurs dans un système communautaire
+La recherche de motifs fréquents et de règles d’association entre des objets a fait l’ob-
+jet de nombreux travaux en data mining. Son extension à la recherche de motifs séquentiels
+fréquents a été également un domaine en plein essor ces dernières années. En revanche, la ca-
+ractérisation des règles d’association séquentielle restent un problème moins exploré. Il existe
+néanmoins des critères, comme la confiance ou le rappel, qui ont été reformulés dans le cadre
+de la fouille de règles d’association à l’intérieur d’une séquence unique (Mannila et al., 1997).
+Toujours dans le cadre d’une séquence unique, Blanchard et al. (2008) ont développé un indice
+d’intensité d’implication séquentielle inspiré de l’indice d’implication (Gras et al., 2004).
+Nous proposons dans cet article une nouvelle méthode qui extrait des règles d’associa-
+tion entre événements à partir de séquences multiples. Nous utilisons pour cela des modèles
+1Etude soutenue par le Fonds national suisse de la recherche (FNS) FN-100015-122230
+RNTI-E-19- 25 -
+Règles d’association séquentielle et modèles à risques proportionnels
+de durée, également appelés modèles de survie. Ces modèles de durée, et en particulier les
+modèles de régression semi-paramétrique à risques proportionnels, permettent d’évaluer l’in-
+fluence d’une variable ou d’un événement sur le risque qu’un événement, prédéfini, se pro-
+duise. L’intérêt de l’utilisation des modèles de durée dans le cadre de l’analyse de séquences
+d’événements est multiple. Premièrement, ces modèles permettent de tenir compte des don-
+nées censurées, c’est-à-dire des séquences qui s’arrêtent avant que l’événement d’intérêt ait
+été observé. Deuxièmement, le timing des événements, c’est-à-dire les écarts qui existent entre
+eux, sont également pris en compte et apparaissent dans la valeur des coefficients estimés.
+Troisièmement, l’utilisation de modèles de régression permet de mettre en évidence des rela-
+tions statistiquement significatives entre des événements, même peu fréquents. Cette méthode
+permet donc de s’affranchir du critère de support minimum utilisé pour réduire le nombre de
+règles explorées. Enfin, les coefficients produits par les modèles de durée que nous utilisons
+sont facilement interprétables comme des multiplicateurs du risque de subir un événement
+selon que l’on a ou non subi d’autres événements auparavant.
+En plus de la simulation présentée dans cet article, l’extraction de règles d’association
+séquentielle a été utilisée pour analyser des données sur les événements de vie familiale ex-
+traites du Panel suisse de ménages. Cette méthode permet ainsi d’explorer de quelle manière
+les événements de vie s’influencent et de mettre en évidence une structure séquentielle entre
+eux. L’intérêt de l’utilisation de cette méthode en sciences sociales réside dans le fait que les
+données d’observation sont souvent censurées. La prise en compte de la censure permet ainsi
+d’évaluer correctement le risque de subir un événement en considérant les périodes durant
+lesquelles les individus sont soumis au risque sans que l’événement se produise.
+Dans cet article, nous introduisons en premier lieu la problématique de la fouille de sé-
+quences d’événements et des règles d’association séquentielle entre événements. Ensuite, nous
+présentons le type de modèle de régression particulier que nous utilisons dans notre méthode,
+le modèle semi-paramétrique à risques proportionnels de Cox. Un algorithme qui permet la
+fouille automatique d’un ensemble de sous-séquences pour en extraire les règles significatives
+est décrit, ainsi qu’un moyen de visualiser les règles extraites. Finalemement, des données
+artificielles sont créées afin de tester la pertinence de la méthode proposée pour l’extraction
+de règles. Une comparaison entre les résultats obtenus par notre algorithme et les mesures de
+support, de confiance et de rappel est également présentée.
+2 Fouille de séquences
+La fouille de séquences a comme objectif d’extraire à partir d’un ensemble de séquences
+d’événements des motifs séquentiels fréquents, appelés également sous-séquences. Elle a été
+formalisée pour la première fois par Agrawal et Srikant (1995). Nous présentons ici une for-
+mulation inspirée de celle de Zaki (2001).
+On a I = {i1, i2, ..., im}, un ensemble d’éléments distincts. Un événement e est composé
+d’éléments non-ordonnés, noté (i1i2...ik), et une séquence est une liste ordonnée d’événe-
+ments. Une séquence α se représente de la manière suivante : e1 → e2 → ... → eq, chaque
+ei étant un événement. On considère α comme une sous-séquence de β si chaque événement
+de α est un sous-ensemble de β et que l’ordre entre les événements est préservé. Une sous-
+séquence est dite fréquente si son nombre d’occurrences, aussi appelé support, est supérieur
+à un seuil fixé par l’utilisateur. Le nombre d’occurrences correspond au nombre de séquences
+RNTI-E-19 - 26 -
+N. S. Müller et al.
+qui contiennent la sous-séquence. Une extension de la formulation originelle de Agrawal et
+Srikant (1995) a été proposée par Srikant et Agrawal (1996) sous le nom de motifs séquentiels
+généralisés. Cette extension ajoute au critère de support minimum des contraintes de temps lors
+de l’extraction des motifs séquentiels, telles que l’écart maximal entre deux événements ou la
+fenêtre d’observation. Ces méthodes de fouille de motifs séquentiels constituent une approche
+intéressante pour l’analyse de données séquentielles issues de nombreux domaines, comme par
+exemple pour l’étude des parcours de vie en sciences sociales (Ritschard et al., 2008).
+3 Règles d’association
+De la même manière que pour la fouille de motifs fréquents (Agrawal et al., 1993), il
+est possible d’extraire des règles d’association entre événements à partir des sous-séquences
+fréquentes. L’extraction de règles à partir de motifs, séquentiels ou non, consiste à séparer
+le motif en une partie « prémisse » et une partie « conclusion ». Ainsi, à partir d’une sous-
+séquence composée de trois événements, A → B → C, deux règles d’association peuvent être
+extraites : A ⇒ (B → C) ou (A → B) ⇒ C. Dans le cas de règles d’association extraites à
+partir de séquences, l’ordonnancement des événements doit être pris en compte dans le calcul
+de la mesure (Mannila et al., 1997; Blanchard et al., 2008). Les trois mesures, dérivées des
+mesures classiques de règles d’association, que nous utiliserons pour caractériser les règles
+séquentielles sont les mesures de support, c’est-à-dire la probabilité qu’une séquence contienne
+la règle, la confiance, qui est la probabilité conditionnelle d’observer la conclusion sachant
+qu’on a observé le prémisse (Eq. 1), et le rappel, qui représente la probabilité d’observer la
+règle sur la probabilité d’observer la conclusion (Eq. 2).
+confiance(A ⇒ B) = P (A → B)
+P (A) (1)
+rappel(A ⇒ B) = P (A → B)
+P (B) (2)
+Il existe un grand nombre de mesures pour caractériser les règles d’association, et le choix
+d’une mesure dépend en grande partie du domaine d’application et des critères que la mesure
+doit satisfaire (Lenca et al., 2004; Lallich et Teytaud, 2004). Dans le cadre des règles séquen-
+tielles, les mesures requièrent une adaptation non-triviale pour tenir compte de l’ordre entre
+les événements qui composent la règle. Par exemple, un indice d’intensité de l’implication
+séquentielle a été développé (Blanchard et al., 2008) dans le cadre de la fouille d’épisodes fré-
+quents au sein d’une séquence unique. Cet indice nécessiterait une adaptation supplémentaire
+pour être utilisé dans le cadre de multiples séquences.
+En plus des problèmes d’ordonnancement des événements évoqués plus haut, le cas de
+la recherche et de la caractérisation de règles d’association séquentielle pose deux nouveaux
+problèmes inhérents aux données longitudinales se présentant sous la forme de séquences mul-
+tiples. Le premier problème concerne le phénomène de censure de certaines observations. La
+question de la censure des observations est particulièrement importante dans des domaines
+d’application telles que les sciences sociales ou l’épidémiologie, puisqu’il est fréquent de
+perdre la trace d’un individu. Dans le cas de figure où l’observation d’un individu s’arrête
+avant qu’il ait connu un événement d’intérêt, il est important de considérer toute la période
+RNTI-E-19- 27 -
+Règles d’association séquentielle et modèles à risques proportionnels
+d’observation comme une période durant laquelle cet individu a été soumis au risque de subir
+l’événement. L’utilisation de modèles de durée, aussi appelés modèles de survie, permet de te-
+nir compte de ce phénomène de censure et d’obtenir une estimation plus réaliste de l’influence
+de variables sur l’occurrence d’un événement.
+Le deuxième problème concerne l’écart qui existe entre la survenue de deux événements :
+dans le cas des mesures classiques d’association, c’est uniquement l’occurrence ou la non-
+occurrence des événements qui est prise en compte. Les modèles de durées, quant à eux, es-
+timent l’influence de l’occurrence d’un événement sur l’occurrence d’un autre événement en
+tenant compte des écarts entre les événements. Ainsi, plus les écarts entre deux événements
+sont courts, plus le coefficient indiquant le risque d’observer l’événement B après avoir subi
+l’événement A sera élevé.
+4 Analyse de durée
+L’analyse de durée, également appelé analyse de survie, est un domaine de la statistique
+qui s’intéresse à la modélisation de la durée s’écoulant jusqu’à la survenue d’un événement.
+Cette durée peut correspondre au temps passé dans un état particulier, ou alors au temps qui
+s’est écoulé entre deux événements. La particularité de ce type d’analyse est de tenir compte
+des données censurées. Une observation est dite censurée lorsque l’événement auquel on s’in-
+téresse ne s’est pas produit durant la période d’observation. Ces modèles sont utilisés, entre
+autres, dans les domaines de la santé, de la biologie, de la microéconométrie, de la démogra-
+phie ou de la sociologie (Cameron et Trivedi, 2005; Therneau et Grambsch, 2000; Yamaguchi,
+1991).
+4.1 Modèles de régression semi-paramétriques à risques proportionnels
+Nous décrivons ici le modèle de régression semi-paramétrique à risques proportionnels
+tel qu’il a été défini par Cox (1972). Dans ce type de modèle, on s’intéresse à l’influence de
+prédicteurs sur le risque qu’un événement se produise. La fonction λ(t) est le risque instantané
+de subir l’événement au temps t sachant qu’il ne s’est pas produit avant le temps t (Eq. 3).
+λ(t) = lim
+Δt→0
+P [t ≤ T < t+Δt|T ≥ t]
+Δt
+(3)
+Les modèles de régression semi-paramétrique à risques proportionnels décomposent le
+risque conditionnel λ(t|x, β), x étant un vecteur de prédicteurs et β les paramètres à esti-
+mer, en deux composants : un risque de base λ0 et une fonction φ(x, β). La spécificité de ce
+modèle est de ne pas spécifier la forme fonctionnelle de λ0. Dans le cas du modèle de Cox,
+la fonction φ est spécifiée comme étant exponentielle (φ(x, β) = exp(x′β)) (Cox, 1972). Le
+qualificatif de semi-paramétrique découle de la non-spécification de la forme de λ0 associé à
+la spécification complète de la forme de la relation avec les prédicteurs. L’avantage de ne pas
+spécifier la forme de λ0 est de s’affranchir d’hypothèses sur la relation entre le temps et le
+risque. Le modèle se présente ainsi sous la forme de l’équation 4.
+λ(t|x, β) = λ0(t) · exp(x′β) (4)
+RNTI-E-19 - 28 -
+N. S. Müller et al.
+La relation entre le risque et les prédicteurs est multiplicative. Faisons varier le prédicteur
+xk de x en augmentant sa valeur de 1 et notons ce nouveau profil y. Cette variation d’une unité
+du prédicteur implique un effet multiplicatif sur le risque égal à exp(βk) (équation 5).
+λ(t|y, β) = λ0(t) · exp(x′β + βk) = exp(βk) · λ(t|x, β) (5)
+En d’autres termes, l’exponentiel du coefficient βk peut s’interpréter comme un rapport
+de risque (hazard ratio) entre un profil de référence (x) et un profil pour lequel la valeur du
+prédicteur xk a augmenté de 1.
+exp(βk) =
+λ(t|y, β)
+λ(t|x, β) =
+λ0(t) · exp(x′β + βk)
+λ0(t) · exp(x′β) =
+exp(x′β + βk)
+exp(x′β)
+(6)
+Comme on le voit dans l’équation 6, le coefficient βk est indépendant du temps. Le rapport
+de risque est donc proportionnel et ne varie pas au cours du temps, d’où le nom de modèle
+à risques proportionnels. L’estimation des coefficients se fait par la maximimisation d’une
+vraisemblance partielle (Andersen et al., 1993). La significativé statistique d’un paramètre βk
+peut ensuite être évaluée à l’aide de la statistique de Wald qui suit une loi du χ2 à 1 degré de
+liberté sous l’hypothèse que le paramètre vaut 0 (équation 7).
+βˆ2k
+σˆ2k
+∼ χ2 sous H0 : βˆk = 0 (7)
+4.2 Format de données
+Dans un modèle de régression de durée, on s’intéresse à la survenue d’un événement précis
+(même s’il est possible d’étendre les modèles pour gérer l’occurrence de plusieurs événements,
+Hougaard 2000). Les données de durée d’un événement sont constituées de paires (ti, δi), où
+ti représente la durée de l’observation et δi indique si l’observation est censurée. Si δi = 0,
+cela signifie que l’événement ne s’est pas produit entre le début de l’observation et le temps ti.
+L’enregistrement d’un événement A se présente donc sous la forme suivante du tableau 1.
+i ti(A) δi(A) sexe
+1 24 1 M
+2 36 0 F
+TAB. 1 – Exemple de données de durée
+L’exemple montre que l’individu 1 a subi l’événement au temps 24, tandis que l’individu
+2 a été observé jusqu’au temps 36 sans avoir subi l’événement A. Ce type de représentation
+permet l’intégration de variables supplémentaires qui ne varient pas dans le temps, tel que
+le sexe dans l’exemple précédent. Dans le but de modéliser l’influence de la survenue d’un
+événement sur un autre, par exemple dans le cadre d’une règle B ⇒ A, l’événement A sera
+considéré dans le modèle de régression comme l’événement à prédire tandis que l’événement
+B devra être considéré comme une variable qui varie avec le temps. Si l’événement B n’est
+pas considéré de cette manière, il n’est pas possible de prendre en compte l’écart qui existe
+entre la survenue des deux événements ; on ne peut que savoir si l’événement s’est produit
+RNTI-E-19- 29 -
+Règles d’association séquentielle et modèles à risques proportionnels
+à un moment ou à un autre de la période d’observation complète, donc soit avant soit après
+l’événement A.
+i intervalle B δi(A)
+1 (0 ;18] 0 0
+1 (18 ;24] 1 1
+2 (0 ;36] 0 0
+TAB. 2 – Exemple de données de durée avec une variable qui varie dans le temps
+Il est possible d’intégrer des variables variant avec le temps en utilisant la reformulation
+du modèle de Cox sous la forme d’un counting process. Cette reformulation a été établie par
+Andersen et Gill (Andersen et Gill, 1982; Andersen et al., 1993) et implémentée par Therneau
+et Grambsch (2000) dans les logiciels R et S-plus. Cette formulation permet de spécifier plu-
+sieurs épisodes par observation qui correspondent au changement de valeur des variables au
+cours du temps. Pour reprendre l’exemple du tableau 2, on introduit une variableB qui indique
+si l’individu a subi ou non l’événement B durant sa période d’observation.
+Dans cet exemple, l’individu 1 a subi l’événement B au temps 18, puis l’événement A au
+temps 24. L’événement A étant l’événement de censure, la valeur de 1 signifie qu’à la fin de
+l’intervalle l’événement se produit. L’événement B étant considéré comme une variable qui
+varie dans le temps, sa valeur de 1 signifie que durant l’intervalle (18,24], l’individu avait déjà
+subi l’événement B. On remarque que cette représentation des données de durée est spécifique
+à l’événement qui est considéré comme l’événement à prédire.
+5 Extraction des règles
+La méthode que nous proposons sélectionne des règles d’association dont les statistiques
+de Wald sur les coefficients estimés par un modèle de régression de Cox sont significatifs. La
+statistique de Wald correspond au carré du ratio entre le coefficient et son erreur standard. Il
+serait également envisageable d’utiliser un autre critère pour la sélection des règles, tels que le
+test du rapport des vraisemblances partielles ou le test du score (Hosmer et Lemeshow, 1999).
+Une sous-séquence qui contient plus de deux événements produit plusieurs règles d’associa-
+tion. Par exemple, à partir d’une sous-séquence A → B → C, deux règles d’association sont
+testées : la règleA ⇒ B et la règle B ⇒ C|A. La première règle peut s’interpréter directement
+comme l’influence de l’événement A sur le risque de subir l’événement B. La deuxième règle
+évalue l’influence de l’événement B sur le risque de subir l’événement C pour la période qui
+suit la survenue de l’événement A. Plutôt que de créer une nouvelle variable qui varie dans le
+temps et qui prend la valeur 1 lorsque l’événement B s’est produit après l’événement A, seuls
+les épisodes correspondant aux périodes qui suivent la survenue de l’événement A sont sélec-
+tionnés lors de l’estimation du rapport de risque. Notons que cette règle pourrait également
+s’écrire A − B ⇒ C ou encore A ⇒ B ⇒ C si le risque de subir B après A est également
+estimé.
+RNTI-E-19 - 30 -
+N. S. Müller et al.
+5.1 Algorithme
+On a pu voir dans la section précédente que les données sont formatées en fonction de
+l’événement qui sera prédit dans le modèle de régression de Cox. La première étape consiste
+par conséquent à créer une représentation des données pour chaque type d’événement. Soit
+E = e1, e2, ..., em l’ensemble des événements distincts. Pour chaque événement ei, il est né-
+cessaire de créer une représentation des données de durée avec ei comme variable dépendante,
+c’est-à-dire qu’une valeur de 1 représente un événement et une valeur de 0 représente une cen-
+sure, et tout ek =i comme variable variant dans le temps. Ces différentes représentations des
+données serviront à l’ajustement des modèles de régression de Cox, la représentation néces-
+saire étant choisie en fonction de l’événement « conclusion » , c’est-à-dire à prédire, de la règle.
+La deuxième étape est d’obtenir la liste des motifs séquentiels grâce une fouille sur l’ensemble
+des séquences effectuée avec un support minimum fixé à 1. Les règles sont ensuite extraites à
+partir de ces motifs séquentiels en utilisant l’algorithme suivant :
+1. On fixe un seuil p qui correspond au niveau de significativité minimale requis pour
+conserver une règle.
+2. Ce seuil p est ajusté pour pallier le problème des tests d’hypothèse multiples (Schaffer,
+1995) en appliquant une correction de Bonferroni (pajuste´ = p/n où n = nombre de
+tests).
+3. Pour chaque motif séquentiel, si le nombre d’événement n > 1, alors pour k de 1 à n :
+(a) Si k > 1, on ne sélectionne que les individus ayant déjà vécu l’événement ek−1,
+et pour chacun d’entre eux on ne conserve que la période postérieure à l’occurence
+de ek−1.
+(b) On ajuste un modèle de Cox avec comme variable dépendante ek+1 et comme
+variable indépendante ek.
+(c) Si le test de Wald sur le coefficient est significatif, on passe à la paire d’événements
+suivante dans la sous-séquence. S’il n’est pas significatif, la règle est abandonnée
+et on passe au motif séquentiel suivant.
+4. Une représentation graphique des règles retenues est produite.
+5.2 Visualisation des résultats
+La visualisation des résultats se fait sous la forme de graphes, un par événement. Seules
+les règles retenues sont représentées, avec à chaque fois l’événement « prémisse » à gauche,
+l’événement « conclusion » à droite et entre les deux les rapports de risque estimés (HR pour
+hazard ratio) par le modèle de Cox. Les règles retenues par l’algorithme sont représentées sous
+la forme d’un graphe (Figure 1).
+Dans cet exemple, les informations concernant trois règles sont représentées. Pour cha-
+cune des règles, le chiffre entre parenthèses indique la p-valeur de la statistique de Wald. Les
+résultats s’interprétent de la manière suivante :
+– A ⇒ C : lorsque A s’est produit, le risque de voir C se produire est multiplié par 2.51.
+– B ⇒ C : lorsque B s’est produit, le risque de voir C se produire est multiplié par 4.63.
+– A−B ⇒ C ou B ⇒ C | A : lorsque B s’est produit après A, le risque que C se produise
+est 2.63 plus élevé.
+RNTI-E-19- 31 -
+Règles d’association séquentielle et modèles à risques proportionnels
+A HR= 2.51 (p < 1e-16) | none
+B
+C
+HR= 4.63 (p < 1e-16) | none
+HR= 2.63 (p < 1e-10) | A
+FIG. 1 – Représentation graphique des règles d’association
+5.3 Complexité
+Les performances de l’extraction de l’extraction de règles d’association séquentielle ont
+été évaluées de manière empirique en faisant varier le nombre de séquences créées artificielle-
+ment ainsi que le nombre d’événements 3. Les essais ont été effectués sur une machine avec
+un processeur Xeon à 3.2Ghz et 8GB de mémoire vive. Pour chaque essai, les durées de la
+transformation des données, de l’extraction des sous-séquences et de l’extraction des règles
+d’association ont été additionnées. L’algorithme est implémenté en R et en C++ et sera dispo-
+nible dans la librairie R TraMineR (Gabadinho et al., 2009).
+nombre de séquences
+500 1000 2000 4000 8000
+5 13.29 23.321 43.617 89.953 199.98
+événements 6 50.356 93.794 193.871 414.831 963.911
+7 156.855 319.839 721.821 1807.56 4622.17
+TAB. 3 – Performances de l’algorithme en secondes
+On remarque que le temps d’exécution a une relation linéaire avec le nombre de séquences
+considérées, tandis qu’il semble avoir une relation exponentielle avec le nombre d’événene-
+ments.
+6 Simulation
+Afin d’évaluer la capacité de cet algorithme à mettre en évidence les liens existant entre des
+événements, des données ont été créées artificiellement à partir d’une distribution de probabi-
+lité de Weibull (Eq. 8 représente sa fonction de densité), fréquemment utilisée pour modéliser
+des durées. Une distribution de Weibull possède deux paramètres, le paramètre a qui est un
+paramètre d’échelle et le paramètre b qui est un paramètre de forme.
+f(x) = exp
+[
+−
+(x
+b
+)a]
+· a
+b
+· x
+b
+(a−1)
+(8)
+RNTI-E-19 - 32 -
+N. S. Müller et al.
+paramètre a # événements médiane
+A 240 732 182
+B ti(A) + 48 708 174
+C ti(B) + 48 706 163
+G 192 803 148
+H 384 589 302
+TAB. 4 – Données simulées à partir d’une distribution de Weibull
+6.1 Création des données artificielles
+Les temps d’occurrence de cinq événements, A,B, C,G et H, ont été simulés en utilisant
+la procédure suivante. Un premier tirage de 1000 valeurs est effectué à partir d’une distribution
+de Weibull avec comme paramètres a = 240 et b = 1.5. Nous avons choisi la valeur de 240
+pour simuler des données proches des événements de vie en prenant comme unité de temps
+le mois ; 240 correspond à un âge de 20 ans. Ce premier tirage correspond à ti(A), le temps
+d’occurrence de l’événement A. Ensuite, pour chaque observation i, les temps d’occurrence
+ti(B) sont tirés à partir d’une distribution de Weibull avec comme paramètre ai = ti(A) + 48.
+Les temps d’occurrence ti(C) sont tirés de la même manière en utilisant comme paramètre
+ai = ti(B) + 48. Dans les deux cas, le paramètre b ne varie pas par observation et reste égal à
+1.5. Les valeurs ti(G) et ti(H) sont quant à elles tirées de manière indépendante aux trois autres
+événements. Un dernier tirage, indépendant des cinq autres, est effectué afin de fixer les durées
+d’observation. Tout événement qui apparaît après la durée d’observation est ainsi censuré. Les
+données résultant de cette simulation sont résumées dans le tableau 4 ; le paramètre a de la loi
+de Weibull est spécifié, ainsi que le nombre d’événements après censure et le temps médian au
+moment de l’occurrence de l’événement.
+Cette génération d’événements artificiels permet d’avoir des données comportant trois évé-
+nements statistiquement liés par la distribution qui les génère ainsi que deux événements indé-
+pendants de tous les autres. Nous comparons ensuite les coefficients obtenus avec les mesures
+de support, de confiance et de rappel.
+6.2 Résultats
+Le tableau 5 présente les règles d’association séquentielle retenues par l’algorithme pré-
+cédemment présentées et classées en fonction de la taille du rapport de risque (HR = hazard
+ratio). Le seuil p a été fixé à 0.01, puis ajusté à 3 · 10−5. L’algorithme a conclu à la présence
+de 10 règles d’association significatives. On remarque que les deux premières règles corres-
+pondent à l’association entre les deux événements générés à la suite l’un de l’autre (voir les
+paramètres du tableau 4). Il est également intéressant de constater que la valeur du rapport de
+risque est moins grande entre deux événements associés mais plus éloignés. L’écart temporel
+moyen entre les événements A et B est de 5.53 mois, tandis qu’entre A et C elle est de 14.74
+mois. Le coefficient tient compte de la durée entre les événements et respecte donc le caractère
+temporel des données séquentielles. Le tableau 5 indique également que le support de certaines
+règles, telles que A − C ⇒ B, est tellement bas qu’elles auraient certainement été éliminées
+RNTI-E-19- 33 -
+Règles d’association séquentielle et modèles à risques proportionnels
+durant une fouille de séquences fondée sur un support minimal. On voit pourtant que cette
+règle est clairement significative selon un modèle de régression de Cox.
+Condition Règle Rapport de Risque Confiance Rappel Support
+B ⇒ C 4.63 0.465 0.466 0.329
+A⇒ B 3.6 0.425 0.439 0.311
+C ⇒ B 3.15 0.422 0.421 0.298
+C A ⇒ B 2.65 0.263 0.292 0.087
+A B ⇒ C 2.63 0.341 0.375 0.106
+A⇒ C 2.51 0.387 0.401 0.283
+B ⇒ A 2.32 0.456 0.441 0.323
+A C ⇒ B 2.2 0.265 0.241 0.075
+C ⇒ A 1.82 0.469 0.452 0.331
+C B ⇒ A 1.81 0.369 0.332 0.110
+TAB. 5 – Résultats de l’extraction des règles
+Le tableau 6 présente les cinq premières règles avec le plus grand support. On remarque
+clairement que les trois mesures représentées ne permettent pas de distinguer les règles perti-
+nentes. En effet, même des règles entre événements non-associés dans les données, telles que
+G ⇒ A ou C ⇒ G, possèdent des valeurs élevées pour le support, la confiance et le rappel.
+Règle Support Confiance Rappel
+G ⇒ A 0.378 0.47 0.52
+G ⇒ H 0.369 0.46 0.63
+C ⇒ A 0.331 0.47 0.45
+B ⇒ C 0.329 0.46 0.47
+C ⇒ H 0.327 0.46 0.56
+TAB. 6 – Règles extraites avec un support minimum
+Il existe des mesures plus appopriées pour le calcul de règles d’association séquentielle,
+notamment un indice d’implication séquentielle (Blanchard et al., 2008). Il faut cependant
+noter que l’indice d’implication séquentielle tel qu’il est présenté par Blanchard et al. (2008)
+nécessiterait une adaptation pour le cas où l’on ne travaille pas sur une longue séquence unique
+mais, comme dans cet article, sur des séquences multiples.
+7 Conclusion
+La méthode présentée dans cet article pour extraire des règle d’association séquentielle à
+partir d’un ensemble de séquences possède plusieurs avantages. Premièrement, elle permet une
+gestion des données censurées, un problème récurrent dans de nombreux domaines tels que les
+sciences sociales ou la recherche médicale. Deuxièmement, cette méthode fournit un coeffi-
+cient de rapport de risque qui tient compte de la durée « moyenne » entre deux événements
+RNTI-E-19 - 34 -
+N. S. Müller et al.
+et permet d’estimer l’influence de l’un sur l’autre ainsi que d’évaluer la rapidité avec laquelle
+un événement en entraîne un autre. Le coefficient de rapport de risque a également l’avantage
+d’être interprétable très facilement. Finalement, la significativité statistique nous donne un cri-
+tère de sélection des règles, sans se baser sur leur fréquence, même si la fréquence joue un rôle
+dans le calcul de la significativité. Notons que ceci pourrait conduire à retenir trop de règles
+dès lors que l’on applique la méthode sur de grands jeux de données et pourrait lui faire perdre
+son caractère discriminant.
+Cet article ouvre la perspective à d’autres travaux. En premier lieu, une adaptation de l’in-
+dice d’implication séquentielle (Blanchard et al., 2008) aux séquences multiples permettrait
+d’obtenir une comparaison des performances de notre méthode avec une mesure plus perti-
+nente que la confiance ou le rappel. En deuxième lieu, nous avons montré que la méthode
+fournit des résultats pertinents sur des données générées artificiellement. Il est par conséquent
+envisageable d’utiliser cette méthode sur des données réelles, comme des données sur les évé-
+nements de vie issues de questionnaires rétrospectifs.
 Références
-Agarwal, N., H. Liu, L. Tang, et P. S. Yu (2008). Identifying the influential bloggers in a
-community. In Proceedings of the International Conference on Web Search and web Data
-Mining (WSDM ’08), Stanford, USA.
-Agrawal, R. et S. Ramakrishnan (1994). Fast algorithms for mining association rules in large
-databases. In Proceedings of the 20th International Conference on Very Large Data Bases
-(VLDB ’94), Santiago, Chili, pp. 487–499.
-Berge, C. (1989). Hypergraphs : Combinatorics of finite sets. pp. 256.
-Cartwright, D. et F. Harary (1977). A graph theoretic approach to the investigation of system-
-environment relationships. Journal of Mathematical Sociology 5, 87–111.
-Hébert, C., A. Bretto, et B. Crémilleux (2007). A data mining formalization to improve hyper-
-graph minimal transversal computation. Fundamenta Informaticae. 80(4), 415–433.
-Kavvadias, D. J. et E. C. Stavropoulos (2005). An efficient algorithm for the transversal hy-
-pergraph generation. Journal of Graph Algorithms and Applications 9(2), 239–264.
-Kempe, D., J. Kleinberg, et E. Tardos (2003). Maximizing the spread of influence through
-a social network. In Proceedings of the 9th ACM SIGKDD International Conference on
-Knowledge Discovery and Data mining (KDD’03), Washington, USA, pp. 137–146.
-Moreno, J. (1934). Who shall survive ? : a new approach to the problem of Human Interrela-
-tions, Volume 58 of Nervous and mental disease monograph series.
-Opsahl, T. et B. Hogan (2010). Growth mechanisms in continuously-observed networks :
-Communication in a facebook-like community. CoRR.
-Richardson, M. et P. Domingos (2002). Mining knowledge-sharing sites for viral marketing. In
-Proceedings of the of the 8th International Conference on Knowledge Discovery and Data
-mining (KDD ’02), Edmontom, Canada, pp. 61–70.
-Scripps, J., P.-N. Tan, et A.-H. Esfahanian (2007a). Exploration of link structure and
-community-based node roles in network analysis. In Proceedings of the 7th IEEE Inter-
-national Conference on Data Mining (ICDM’07), Omaha, USA, pp. 649–654.
-Scripps, J., P.-N. Tan, et A.-H. Esfahanian (2007b). Node roles and community structure in
-networks. In Proceedings of the 1st Workshop on Web Mining and Social Network Analysis
-(SNA-KDD’07), San José, California, pp. 26–35.
-Wasserman, S. et K. Faust (1994). Social Network Analysis, methods and application.
+Agrawal, R., T. Imielinski, et A. N. Swami (1993). Mining association rules between sets
+of items in large databases. In P. Buneman et S. Jajodia (Eds.), Proceedings of the 1993
+ACM SIGMOD International Conference on Management of Data, Washington, D.C., pp.
+207–216.
+Agrawal, R. et R. Srikant (1995). Mining sequential patterns. In P. S. Yu et A. S. P. Chen
+(Eds.), Eleventh International Conference on Data Engineering, Taipei, Taiwan, pp. 3–14.
+IEEE Computer Society Press.
+Andersen, P., O. Borgan, R. D. Gill, et N. Keiding (1993). Statistical models based on counting
+processes. Springer Series in Statistics. New York : Springer-Verlag.
+Andersen, P. et R. Gill (1982). Cox’s regression model for counting processes, a large sample
+study. Annals of statistics 10, pp. 1100–1120.
+Blanchard, J., F. Guillet, et R. Gras (2008). Assessing the interestingness of temporal rules
+with sequential implication intensity. In R. Gras, E. Suzuki, F. Guillet, et F. Spagnolo (Eds.),
+Statistical Implicative Analysis : Theory and Applications, pp. 55–71. Springer.
+Cameron, A. C. et P. K. Trivedi (2005). Microeconometrics : Methods and applications. Cam-
+bridge : Cambridge University Press.
+Cox, D. (1972). Regression models and life-tables. Journal of the Royal Statistical Society.
+Series B (Methodological) 34(2), pp. 187–220.
+Gabadinho, A., G. Ritschard, M. Studer, et N. S. Müller (2009). Mining sequence data in R
+with the TraMineR package : A user’s guide. Technical report, Department of Econometrics
+and Laboratory of Demography, University of Geneva.
+Gras, R., R. Couturier, J. Blanchard, H. Briand, P. Kuntz, et P. Peter (2004). Quelques critères
+pour une mesure de la qualité des règles d’association. Revue des Nouvelles Technologies
+de l’Information RNTI E-1, pp. 3–30.
+Hosmer, D. W. J. et S. Lemeshow (1999). Applied Survival Analysis, Regression Modeling of
+Time to Event Data. New York: Wiley.
+RNTI-E-19- 35 -
+Règles d’association séquentielle et modèles à risques proportionnels
+Hougaard, P. (2000). Analysis of Multivariate Survival Data. New York: Springer-Verlag.
+Lallich, S. et O. Teytaud (2004). Evaluation et validation de l’intérêt des règles d’association.
+Revue des Nouvelles Technologies de l’Information RNTI-E-1, pp. 193–218.
+Lenca, P., P. Meyer, B. Vaillant, P. Picouet, et S. Lallich (2004). Evaluation et analyse multi-
+critères des mesures de qualité des règles d’association. Revue des Nouvelles Technologies
+de l’Information RNTI-E-1, pp. 219–246.
+Mannila, H., H. Toivonen, et A. I. Verkamo (1997). Discovery of frequent episodes in event
+sequences. Data Mining and Knowledge Discovery 1(3), 259–289.
+Ritschard, G., A. Gabadinho, N. S. Müller, et M. Studer (2008). Mining event histories: A
+social science perspective. International Journal of Data Mining, Modelling and Manage-
+ment 1(1), 68–90.
+Schaffer, J. (1995). Multiple hypothesis testing. Annual Review of Psychology 46, 561–582.
+Srikant, R. et R. Agrawal (1996). Mining sequential patterns: Generalizations and perfor-
+mance improvements. In P. M. G. Apers, M. Bouzeghoub, et G. Gardarin (Eds.), Proc.
+5th Int. Conf. Extending Database Technology, EDBT, Volume 1057, pp. 3–17. Springer-
+Verlag.
+Therneau, T. et P. Grambsch (2000). Modeling Survival Data: Extending the Cox Model. New
+York: Springer-Verlag.
+Yamaguchi, K. (1991). Event History Analysis, Volume 28 of Applied Social Research Meth-
+ods Series. Newbury Park: SAGE.
+Zaki, M. J. (2001). SPADE: An efficient algorithm for mining frequent sequences. Machine
+Learning 42(1/2), 31–60.
 Summary
-With the spread of collaborative systems of Web 2.0. looking for influencers is grasping a
-renewed interest. Indeed, the dedicated literature witnesses a wealthy number of approaches
-looking for influencers (aka mediators, ambassadors or experts). In this paper, we introduce
-a new approach to "unveil" influencers even in the absence of an adjacency matrix associated
-to graph-based network. The main thrust of the approach stands in its consideration of as
-hypergraph to reformalize the concept of influencer using the snugness connection with the
-"essentiel" pattern".
-- 428 -
+Association rules mining is a thriving research field in data mining. These methods can
+also be applied to sequential data. Two problems arise when one wants to apply association
+rules mining to sequential data. First, the main criterium used to extract sequential patterns
+is their frequency. However, two events might be strongly associated even if they do not
+happen frequently. Second, association rules measures do not take into account the tempo-
+ral aspect of sequential data, like the importance of the duration between two events or the
+problem of censured obsevations. In this article, we propose a method to extract significant
+associations between events using duration models. Association rules are extracted from each
+sequential pattern observed in a set of sequences. Then, the influence on the risk that the “con-
+clusion” event occurs after the “premise” event(s) is estimated using a proportional hazard
+semi-parametric duration model. This paper presents the method and a comparison with some
+classical association measures.
+RNTI-E-19 - 36 -

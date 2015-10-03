@@ -1,970 +1,537 @@
- Chapitre 9 : Une étude comparative pour la détection de 
-dépendances multiples  
- 
-Elham Salehi, Jayashree Nyayachavadi, Robin Gras
- 
-Université de Windsor 
-401 Sunset Avenue 
-N9B 3P4 Windsor, Ontario Canada 
-rgras@uwindsor.ca 
-http://cs.uwindsor.ca/faculty/rgras 
- 
-Résumé.  La recherche de dépendances entre variables à partir d’exemples est 
-un problème important en optimisation. De nombreuses méthodes ont été 
-proposées pour résoudre ce problème mais peu d’évaluations à grande échelle 
-ont été effectuées.  La plupart de ces méthodes reposent sur des mesures de 
-probabilité conditionnelle. L’ASI proposant un autre point de vue sur les 
-dépendances, il était important de comparer les résultats obtenus grâce à cette 
-approche avec l’une des meilleures méthodes existantes actuellement pour 
-cette tâche : l’heuristique max-min. L’ASI n’étant pas directement utilisable 
-pour traiter ce problème, nous avons conçu une extension à cette mesure 
-spécifiquement adaptée. Nous avons réalisé un grand nombre d’expériences en 
-faisant varier des paramètres tels que le nombre de dépendances, le nombre de 
-variables concernées ou le type de prédiction effectuée pour comparer les deux 
-approches. Les résultats montrent une forte complémentarité des deux 
-méthodes. 
-1 Introduction 
-Il existe de nombreuses situations pour lesquelles il est nécessaire de trouver une relation 
-entre les variables d’un domaine. Cela est particulièrement vrai lorsque l’on s’intéresse à des 
-problèmes d’optimisation.  La notion d’optimisation est une notion très répandue du fait que 
-la résolution dans grand nombre de problèmes concrets nécessite, à un moment ou à un autre 
-du processus de résolution, d’optimiser un ensemble de paramètres (ou variables) vis-à-vis 
-d’une fonction objectif F donnée. Dans beaucoup de problèmes réels, en particulier en 
-bioinformatique, la fonction objectif n’est partiellement voire pas du tout connue. On dispose 
-cependant de la possibilité d’évaluer la valeur de la fonction en chaque point de l’espace de 
-recherche. On appelle ce type de problème, des problèmes “boite noire”. 
-De nombreux travaux ont été menés pour étudier la complexité des problèmes 
-d’optimisation combinatoire. Dans un premier temps, ce sont principalement des preuves de 
-NP-complétude qui ont été réalisées pour certains problèmes classiques (sac à dos, le 
-coloriage de graphe, la recherche d’une clique de taille k…) (Garey M.R. and Johnson D.S., 
-1979; Papadimitriou C.H. and Steiglitz K., 1998). Ce n’est cependant pas un indice de 
-complexité très informatif. On sait que pour une classe de problèmes démontrés NP-complet 
-- 251 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-il existe dans la plupart des cas des instances de ces problèmes solubles en temps 
-polynomial. Malheureusement, les propriétés des problèmes qui les rendent plus ou moins 
-faciles à résoudre sont souvent mal connues. Cette information est d’autant plus importante à 
-découvrir qu’elle est en général la clé permettant la conception d’un algorithme de résolution 
-efficace. Des notions comme la décomposabilité d’un problème ou le nombre de solutions du 
-problème ont une implication forte sur sa complexité. La principale propriété influant sur la 
-complexité est le degré d’épistasie d’un problème, c’est-à-dire le nombre maximum de 
-variables dont dépend, dans le calcul de F, chacune des n variables. Par exemple, un 
-problème d’épistasie zéro est un problème où toutes les variables sont indépendantes.  
-L’épistasie est un concept plus général que celui de décomposabilité puisqu’un problème de 
-degré d’épistasie k n’implique pas que le problème soit décomposable en n/k sous-problèmes 
-complètement indépendants. En effet, les sous-problèmes peuvent contenir des variables 
-communes et on peut, par exemple, tout à fait avoir n sous-problèmes de taille k. k variables 
-dépendantes sont appelées un bloc. Les blocs peuvent être ou non chevauchants s’ils 
-partagent des variables. Dès que k est égal à deux et que le problème n’est pas décomposable 
-en problèmes indépendants (une même variable est contenue dans plusieurs contextes 
-différents), il a été démontré que le problème est NP-complet1 (Thompson R.K. and Wright 
-A.H., 1996). 
-Disposer d’un modèle décrivant les dépendances entre les variables de la fonction à 
-optimiser apporte des informations essentielles sur la structure de cette fonction et permet 
-donc de simplifier considérablement le problème d’optimisation. Par exemple, savoir 
-quelle(s) variable(s) influe(nt) sur quelle(s) autre(s) peut être très utile pour le problème de 
-sélection de variables (feature selection), Zeng et Hernandez (2008), Goldebberg et Moore 
-(2004)  ainsi que pour la décomposition du problème en sous-problèmes indépendants ; 
-pouvoir prédire la valeur d’une variables en fonction de celles d’autres variables permet de 
-résoudre le problème de la classification ; savoir quelles combinaisons d’instanciation d’un 
-ensemble de variables conduisent à la valeur optimale d’une certaine fonction… 
-Le modèle utilisé classiquement pour cette tâche de détection de dépendances est le 
-réseau bayésien. Ce réseau correspond en fait à la factorisation de la distribution de 
-probabilités représentant un ensemble d’exemples composé de l’instanciation  de l’ensemble 
-des variables de F. L’avantage majeur d’un tel modèle, en plus de donner une représentation 
-visuelle des dépendances du problème, est qu’il peut servir de générateur de nouveaux 
-exemples compatibles avec le modèle. On peut ainsi l’utiliser pour explorer l’espace de 
-recherche de F en tenant compte de propriétés précédemment découvertes. Les approches de 
-types Algorithmes Génétiques par Construction de Modèles Probabilistes (AGCMP)  
-reposent sur ce principe. A chaque génération, un modèle (réseau bayésien) de l’ensemble 
-d’exemples courants est construit. Ce modèle est ensuite utilisé pour générer un nouvel 
-ensemble d’exemples. Puis F est évaluée sur chacun de ces nouveaux exemples et un nouvel 
-ensemble est constitué par tirage aléatoire biaisé avec remise dans l’ensemble précèdent. Le 
-biais de sélection donne la préférence aux exemples pour lesquels la valeur de F est la plus 
-grande, ce qui conduit à un nouvel ensemble d’exemples dont la valeur moyenne est plus 
-haute que celle du précèdent. En itérant ce procédé, à chaque étape un nouveau modèle, plus 
-représentatif de la fonction F, est construit, permettant lui-même de générer de nouveaux 
-exemples pour lesquels la valeur de F sera plus élevée. Il a été démontré que ce processus 
-converge vers l’optimum global de la fonction. 
-                                                 
-1 Le problème peut en effet être transformé en MAX-2-SAT qui est NP-complet. 
-- 252 -RNTI-E-16
-E. Salehi et al. 
-Cependant, avec cette approche, chaque étape demande la construction d’un réseau 
-bayésien à partir d’un nouvel ensemble d’exemples. Or il est bien connu que la construction 
-d’un réseau bayésien à partir d’exemples est un problème qui est en lui-même NP-difficile. 
-Ainsi, pour résoudre un problème NP-difficile, il faudrait résoudre une succession de 
-problèmes eux aussi NP-difficiles. Il faut toutefois remarquer qu’à chaque étape de cette 
-méthode il n’est pas nécessaire de construire un modèle parfait, une simple approximation 
-peut suffire. Chaque étape permet de découvrir de nouvelles propriétés du problème qui 
-seront transmises à l’étape suivante par l’intermédiaire d’un nouvel ensemble d’exemples 
-représentatif de ces propriétés. Il est donc important de disposer d’algorithmes heuristiques 
-efficaces permettant de construire un réseau bayésien de bonne qualité. La difficulté de cette 
-tâche réside bien évidemment dans la détection des dépendances du problème pour éviter 
-d’avoir à considérer un nombre exponentiellement grand (en fonction du nombre de 
-variables) de réseaux. Toute méthode permettant de découvrir où se situent les dépendances 
-les plus fortes au sein d’un ensemble de variables est donc particulièrement importante. Une 
-tâche connexe à celle là, et toute aussi importante, est de détecter les sous-ensembles de 
-variables de telle sorte que toute variable au sein d’un même sous-ensemble a une relation de 
-dépendance avec toutes les autres variables du même sous-ensemble et d’indépendance avec 
-celles des autres sous-ensembles. Un cas particulier de cette situation est de détecter les 
-variables qui ne dépendent d’aucune autre. Ce genre d’information est essentiel dans 
-l’optique d’une décomposition du problème. En effet, chaque sous-ensemble peut être 
-optimisé indépendamment des autres ce qui réduit considérablement la complexité du 
-problème. 
-2 L’heuristique max-min 
-La détection de dépendances multiples à partir d’un ensemble d’exemples est un 
-problème difficile. Il est clair que ce problème ne peut être résolu de manière exacte dès que 
-le nombre de variables considérées dépasse cinq ou six et que le nombre maximum de 
-variables dont peut dépendre une variable approche la dizaine. Or, pour certains problèmes, 
-le nombre de variables peut atteindre plusieurs centaines ou plusieurs milliers. Il est donc 
-particulièrement important de disposer de méthodes permettant d’obtenir une solution 
-approchée de bonne qualité. L’approche utilisée généralement est une approche par 
-recherche locale. Dans ce cas, un modèle des dépendances est recherché incrémentalement, 
-chaque étape consistant à ajouter ou retirer une ou plusieurs dépendances dans le modèle. Le 
-choix des dépendances à ajouter ou retirer se fait en utilisant un score qui évalue la qualité du 
-nouveau modèle en fonction de l’ensemble d’exemples. L’espace de recherche de cette 
-approche reste exponentiel en fonction du nombre maximum de variables dont peut dépendre 
-une variable. Il est donc nécessaire de disposer de méthodes permettant d’augmenter les 
-chances de construire un modèle de bonne qualité sans explorer exhaustivement tout l’espace 
-de recherche. Une approche possible est d’utiliser une méthode moins coûteuse en temps de 
-calcul pour déterminer un sous-ensemble de l’espace de recherche prometteur sur lequel on 
-peut appliquer ultérieurement une méthode plus systématique et plus coûteuse.    
-Un intérêt de cette approche est que l’on peut utiliser une mesure de dépendance pour la 
-première phase permettant la réduction de l’espace de recherche puis une autre mesure pour 
-la construction du modèle final. Le modèle final utilisé le plus fréquemment est le réseau 
-bayésien qui permet de représenter des dépendances correspondant à des probabilités 
-- 253 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-conditionnelles. Cependant, pour construire ce modèle, il est tout à fait possible d’utiliser des 
-informations provenant d’autres mesures que les probabilités conditionnelles. Dans cette 
-optique, les mesures effectuées lors de la première phase sont utilisées comme filtre pour 
-éliminer les variables indépendantes ou grouper les variables en sous-groupes partageant des 
-dépendances. La deuxième phase utilise ces informations filtrées pour construire un réseau 
-bayésien. Le but de notre étude est de comparer la capacité de deux approches pour la 
-détection des dépendances pour la première phase. Dans cette section nous considérons 
-directement la mesure de probabilité conditionnelle et elle sera comparée dans la section 
-suivante à une mesure basée sur ASI. 
-2.1 Définitions et notations 
-Nous considérons un problème composé de n variables {v1, v2, …, vn}. Chaque variable vi 
-peut prendre différentes valeurs parmi l’ensemble de modalités  Mi = {mi,1, mi,2, … mi,k}. 
-Pour la détection des dépendances un ensemble de N exemples est disponible. Chaque 
-exemple correspond à l’instanciation de chacune des n variables dans l’une des k modalités 
-possibles.  
-Soit Pari, l’ensemble parent de vi, l’ensemble des variables dont dépend la variable vi. 
-On dira que vj∈Pari est un parent de vi et que vi est un enfant de vj. 
-2.2 L’approche grimpeur max-min 
-Bien que la construction de réseaux bayesiens soit un domaine de recherche suscitant de 
-nombreuses publications et que des algorithmes exacts aient été donnés pour des problèmes 
-pour lesquels le nombre de variables est inférieur à 30, Koivisto et Sood (2004), l’application 
-de ces algorithmes de construction à des problèmes réels, tels que l’étude des réseaux 
-biologiques ou sociaux, doit toujours faire face au problème du grand nombre de dimensions. 
-Ces dernières années, plusieurs algorithmes ont été développés spécifiquement pour résoudre 
-ses problèmes par des approches basées sur la restriction de l’espace de recherche des 
-structures de réseaux possibles en utilisant différentes heuristiques, Friedman et al. (1999), 
-Tsamardinos et al. (2006). L’un de ces algorithmes, le « Spare Candidate », Friedman et al. 
-(1999), a une complexité polynomiale. Le principe de cette méthode est de restreindre les 
-ensembles parents de chaque variable en supposant que, si deux variables sont quasiment 
-indépendantes dans l’ensemble d’exemples, il est très improbable qu’elles soient connectées 
-dans le réseau bayésien. En utilisant ce principe, l’algorithme « Spare Candidate » construit 
-des ensembles parents de taille identique et contenant peu d’éléments pour toutes les 
-variables. Le problème majeur avec cette approche est de choisir quelle taille d’ensemble 
-parent utiliser ce qui nécessite une très bonne connaissance préalable du problème à 
-résoudre. Du plus, cette taille étant la même pour toutes les variables, cela induit une 
-présupposition très contraignante d’uniformité de densité du réseau.  
-Plus récemment, un autre algorithme, permettant d’obtenir de meilleurs résultats sur un 
-plus large panel de structure de réseau, a été proposé, Tsamardinos et al. (2006). Cet 
-algorithme, appelé grimpeur max-min (MMHC pour max-min Hill Climber), permet de 
-découvrir les possibles relations parents-enfants en utilisant une méthode par contrainte et les 
-utilise pour construire un réseau bayésien. La première étape de cet algorithme, celle qui 
-nous intéresse car c’est elle qui détecte les dépendances, est appelée max-min parents-enfants 
-(MMPC pour max-min Parent Children). L’algorithme MMPC utilise une structure de 
-- 254 -RNTI-E-16
-E. Salehi et al. 
-données appelée ensemble parents-enfants associée à chaque variable vi qui contient 
-l’ensemble des variables qui sont soit parent soit enfant de vi en respectant les distributions 
-mesurées dans l’ensemble d’exemples. Cette notion de respect des distributions des 
-exemples est définie dans Tsamardinos et al. (2006), Neapolitan (2003). MMPC utilise pour 
-cela le test statistique G2, Spirtes et al. (2000), appliqué sur l’ensemble d’exemples pour 
-déterminer les indépendances conditionnelles entre des paires de variables sachant un 
-ensemble d’autres variables. L’algorithme MMPC est composé de deux phases. Dans la 
-première, un ensemble vide de candidat parents-enfants (CPC) est associe à vi. Il essaie 
-ensuite d’ajouter des variables une par une dans cet ensemble en utilisant l’heuristique max-
-min. Cette heuristique sélectionne une variable vj qui maximise l’association minimale de vi 
-relativement au CPC courant de vi. L’association minimale de vj et vj relativement à 
-l’ensemble de variable CPC est définie par : 
- 
-MinAssoc(vi ;vj|CPC) = argmin Assoc(vi ;vj|S) pour tout sous-ensemble S de CPC 
- 
-Assoc(vi ;vj|S) est une estimation de l’importance de la corrélation entre vi et vj sachant le 
-CPC et est égale à zéro si vi et vj sont indépendantes conditionnellement sachant le CPC. La 
-fonction Assoc utilise la p-value renvoyée par le test d’indépendance G2 comme une mesure 
-de corrélation : plus la valeur de la p-value est petite plus la corrélation est forte. La première 
-phase de MMPC s’arrête lorsque toutes les variables restantes sont considérées comme 
-indépendantes de vi sachant le CPC courant. Cette approche étant gloutonne, une variable 
-ajoutée à une étape de cette première phase peut très bien être en fait inutile après que 
-d’autres variables aient été ajoutées au CPC. La deuxième phase de MMPC essaie de 
-corriger ce problème en effectuant un deuxième passage pour toutes les variables du CPC de 
-vi et en enlevant toutes celles qui sont indépendantes de vi sachant un sous-ensemble de CPC. 
-Ce qui n’apparaît pas clairement dans les publications associées à ces méthodes c’est leur 
-capacité à découvrir tout type de structure et comment différentes distributions de 
-probabilités conditionnelles et structures du réseau du modèle réel (celui que l’on cherche à 
-découvrir)  influent sur la qualité des résultats obtenus. Nous présentons dans la section 
-suivante les résultats que nous avons obtenus en utilisant l’algorithme MMPC sur des 
-exemples générés à partir de différents réseaux bayésiens. 
-2.3 Effet de la structure du model utilisé pour générer les exemples sur 
-l’efficacité de l’heuristique max-min 
-Dans cette section, nous étudions la capacité de l’algorithme max-min à découvrir les 
-bons ensembles parents-enfants des variables d’un réseau bayésien à partir de données 
-générées par ce réseau. 
-Un réseau bayésien est un outil permettant de présenter la distribution conjointe d’un 
-ensemble de variables aléatoires. Les propriétés de dépendances de cette distribution sont 
-codées sont la forme d’un graphe acyclique direct (GAD). Les noeuds de ce graphe sont les 
-variables aléatoires et les arcs correspondent aux influences directes entre les variables. Une 
-table de distribution de probabilités conditionnelles (DPC), appelée aussi paramètres locaux 
-d’une variable, est associée à chaque nœud du graphe. Elle représente la distribution de 
-probabilités P(vi|Pari). 
-Dans les sections 2.3.1-2.3.3, nous utilisons des données artificielles générées à partir de 
-réseaux bayésiens construits aléatoirement. Chacun de ces réseaux comporte A arcs et n = 
-- 255 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-100 variables divisées en deux ensembles : un ensemble D de variables pour lesquelles il 
-existe des relations de dépendances directes avec au moins une des n-D-1 autres variables ; 
-un ensemble de I de variables ne possédant aucune relation de dépendance avec aucune des 
-n-1 autres variables. La DPC de chaque variable est générée aléatoirement en tenant compte 
-des éventuelles relations de dépendance. Le nombre de modalités de chaque variable est k = 
-3. Dans notre étude, nous changeons les caractéristiques des réseaux pour analyser les 
-conséquences de ces changements sur l’efficacité de l’algorithme MMPC. Ces changements 
-incluent la distribution des variables indépendantes I, le nombre de variables dépendantes D 
-et le nombre de dépendances parmi les D variables dépendantes (c'est-à-dire le nombre 
-d’arcs A dans le réseau). Les résultats sont présentés dans les tables 1 à 3. Chaque ligne de 
-ces tables représente une moyenne des résultats obtenus pour 10 ensembles d’exemples 
-différents générés à partir de 10 réseaux différents mais possédant les même caractéristiques. 
-Dans chaque expérimentation, nous calculons la moyenne et l’écart type du nombre de Vrais 
-Positifs (VP), Faux Positifs (FP), Faux Négatifs (FN) et du temps de calcul. VP correspond 
-au nombre de relations parent-enfant correctement prédîtes par l’algorithme sans tenir 
-compte du sens de la dépendance. Donc, le nombre de VP peut être au maximum égal au 
-double du nombre d’arcs du réseau. De la même façon, le nombre de FN, c'est-à-dire les arcs 
-existants dans le réseau mais qui n’ont pas été prédits par l’algorithme, peut au maximum 
-être égal au double du nombre d’arcs. La somme VP + FN est donc égale au double du 
-nombre d’arcs du réseau. Le nombre de FP est le nombre de dépendances prédîtes par 
-l’algorithme et qui n’existent pas dans le réseau. 
-2.3.1 Distribution des variables indépendantes 
-Dans cette section, nous étudions l’effet de la distribution des variables indépendantes sur 
-l’efficacité de l’algorithme max-min. Les réseaux bayésiens utilisés dans cette section 
-comportent I = 75 variables indépendantes et D = 25 variables dépendantes. La distribution 
-utilisée pour générer les variables indépendantes varie de pratiquement constante à 
-complètement uniforme. Nous représentons la distribution des variables indépendantes 
-comme un triplet tel que (p1, p2 ,p3). Par exemple, (80, 10, 10) signifie que chaque variable 
-aléatoire a une probabilité de 0.8 de prendre comme valeur l’une des trois modalités 
-possibles, et une probabilité de 0.1 pour les deux autres. La modalité ayant une probabilité de 
-0.8 est choisie aléatoirement parmi les trois pour chaque variable aléatoire. Les résultats sont 
-présentés dans la table 1. Le nombre d’arcs pour tous ces réseaux est A = 40. Chaque ligne 
-du tableau correspond à un résultat moyen obtenu pour 10 réseaux différents mais de mêmes 
-caractéristiques. On peut constater, à partir de ces résultats, que la distribution des variables 
-indépendantes n’a pratiquement aucun effet sur l’efficacité de l’algorithme max-min. 
-L’algorithme max-min, dans ces conditions, permet de découvrir environ 37% des 
-dépendances. On peut remarquer également que le nombre de FP est élevé, ce qui signifie 
-que l’algorithme a tendance à prédire beaucoup plus de dépendances qu’il n’en existe 
-réellement. 
- 
-- 256 -RNTI-E-16
-E. Salehi et al. 
-Distribution 
-des variables 
-independantes 
-Moyenne 
-des VP 
-DS 
-des 
-VP 
-Moyenne 
-des FP 
-DS 
-des 
-FP 
-Moyenne 
-des FN 
-DS 
-des 
-FN 
-Temps 
-de 
-calcul 
-(s) 
-Précision= 
-VP/(VP+FN) 
-(80, 10, 10) 30 7.29 116 11.33 49 7.28 6.5 37.5% 
-(50, 25, 25) 30 8.12 113 11.9 49 8.16 6.4 37.5% 
-(40, 30, 30) 29 7.28 117 11.63 51 7.28 6.7 36.25% 
-(33, 33, 33) 29 6.76 118 10.54 50 6.78 6.2 36.25% 
-TAB. 1 – Efficacité de l’algorithme max-min en fonction de la distribution des variables 
-indépendantes. Chaque ligne comporte la moyenne et la déviation standard (DS) du nombre 
-de VP, de FP, de FN et du temps de calcul pour dix exécutions de l’algorithme sur des 
-données générées à partir de dix réseaux différents mais présentant les mêmes propriétés. 
-Chaque réseau possède 25 variables dépendantes, 75 variables indépendantes et 40 arcs. 
-2.3.2 Proportion de variables dépendantes 
-Dans cette seconde expérimentation, nous avons fait varier les nombres D et I (n reste 
-égal à 100). Nous avons également fait varier A de façon à conserver pratiquement constant 
-le ratio A/D. Comme l’on peut le constater dans les résultats présentés dans la table 2, 
-lorsque le réseau ne comporte que des variables dépendantes (D = 100), l’algorithme max-
-min a de bien meilleurs performances : plus de 80% des dépendances sont découvertes. En 
-revanche, comme on peut le voir dans les deux premières lignes de la table, lorsque le 
-nombre de variables dépendantes est égal à 25 ou 50, seules environ 35% des dépendances 
-sont découvertes. Le nombre de FP est aussi très faible lorsque toutes les variables sont 
-dépendantes. Cela semble donc indiquer que cette méthode a des difficultés à déterminer que 
-certaines des variables sont indépendantes. On peut cependant remarquer que le temps de 
-calcul augmente considérablement dans le cas où toutes les variables sont dépendantes. Cela 
-peut s’avérer problématique lorsque le nombre de variables dans le problème est très 
-supérieur a 100.   
- 
-D A Moyenne 
-des VP 
-DS 
-de 
-VP 
-Moyenne 
-des FP 
-DS 
-des 
-FP 
-Moyenne 
-des FN 
-DS 
-des 
-FN 
-Temps 
-de 
-calcul 
-(s) 
-Précision 
-= VP/(VP 
-+ FN) 
-25 40 29 6.76 118 10.54 50 6.78 0.31 36.2% 
-50 80 53.4 8.81 99.4 11.35 106.6 8.81 0.34 33.4% 
-100 150 243.8 8.17 16.6 6.81 56.2 8.17 21.1 81.3% 
-TAB. 2 – Efficacité moyenne de l’algorithme max-min en fonction du nombre de variables 
-dépendantes. Chaque ligne comporte la moyenne et la déviation standard (DS) du nombre de 
-VP, de FP, de FN et du temps de calcul pour dix exécutions de l’algorithme sur des données 
-générées à partir de dix réseaux différents mais présentant les mêmes propriétés. Chaque 
-réseau possède 100 arcs. 
-- 257 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-2.3.3 Complexité des réseaux 
-Dans cette section, nous étudions l’effet de la complexité du réseau sur l’efficacité de 
-l’algorithme max-min. Nous faisons varier le nombre de variables n et le nombre d’arcs A. 
-Toutes les variables sont dépendantes, donc D = n. Comme dans l’étude précédente, 
-puisqu’il n’y a pas de variables indépendantes, le pourcentage de dépendances découvertes 
-est élevé. En revanche, ce pourcentage diminue légèrement avec le nombre d’arcs et le 
-nombre de variables. Il semble que la complexité du réseau ait moins d’importance que la 
-mixité des variables (dépendantes et indépendantes). La complexité du réseau influe tout de 
-même fortement sur le temps de calcul. 
- 
-D A Moyenne 
-des VP 
-DS 
-des 
-VP 
-Moyenne 
-des FP 
-DS 
-des 
-FP 
-Moyenne 
-des FN 
-DS 
-des 
-FN 
-Temps 
-de 
-calcul 
-(s) 
-Précision 
-= VP/(VP 
-+ FN) 
-25 30 52.4 3.55 2.4 1.96 7.6 3.55 0.31 87.3% 
-25 40 65.6 4.17 2.2 1.89 14.4 4.17 1.83 82% 
-25 60 91.8 4.51 3.2 3.37 28.2 4.51 6.63 76.5% 
-100 120 200.6 5.51 25.2 7.28 39.4 5.52 9.98 83.6% 
-100 150 243.8 8.17 16.6 6.81 56.2 8.17 21.1 81.3% 
-100 200 312.4 9.67 10.8 3.37 87.6 9.67 28.3 78.1% 
-TAB. 3 - Efficacité moyenne de L’algorithme max-min en fonction de la complexité du réseau 
-bayésien. Chaque ligne comporte la moyenne et la déviation standard (DS) du nombre de 
-VP, de FP, de FN et du temps de calcul pour dix exécutions de l’algorithme sur des données 
-générées à partir de dix réseaux différents mais présentant les mêmes propriétés. 
- 
-2.3.4 Problèmes classiques 
-Les réseaux que nous avons utilisés dans les expériences précédentes ont tous été générés 
-aléatoirement. Pour évaluer l’efficacité de l’algorithme max-min sur des données provenant 
-de problèmes réels, nous l’avons appliqué sur un ensemble de problèmes classiquement 
-utilisés pour valider les algorithmes de construction de réseaux bayésiens, Binder et al. 
-(1997), Jensen et Jensen (1996), Kristensen et Rasmussen (2002), Beinlich et al. (1989). Les 
-résultats obtenus semblent meilleurs que ceux présentés dans les tables 1 et 2 et de qualité 
-similaire à ceux présentés dans la table 3. Cela peut s’expliquer vraisemblablement par le fait 
-que les problèmes réels comportent plus de régularités que ceux générés aléatoirement et que 
-les dépendances sont de ce fait plus faciles à localiser. 
- 
-- 258 -RNTI-E-16
-E. Salehi et al. 
-Problèmes VP FP FN Temps de calcul 
-(s) 
-insurance 70 2 34 137 
-halfinder 124 136 8 1200 
-barley 136 160 32 205 
-alarm 84 2 8 68 
-TAB.. 4 – Résultats obtenus avec l’algorithme max-min pour quatre problèmes classiques. 
-Chaque ligne contient le nombre de VP, de FP, de FN et le temps de calcul. 
- 
-2.4 Utilisation de l’algorithme max-min pour la « sélection de 
-variables » 
-Nous avons évoqué dans l’introduction la possibilité d’utiliser les méthodes de détection 
-des dépendances pour la sélection de variables. L’idée est de décomposer le problème initial 
-en localisant les variables indépendantes (celles pour lesquelles Pari est vide après 
-application de l’algorithme max-min) pour lesquelles l’optimisation peut être réalisée 
-indépendamment des autres variables.  On sélectionne alors uniquement le sous-ensemble 
-des variables pour lesquelles on soupçonne qu’il existe des liens de dépendances avec 
-d’autres variables pour n’appliquer la méthode d’optimisation combinatoire que sur le sous- 
-problème correspondant. L’espace de recherche ayant ainsi été réduit par cette étape 
-préliminaire, les chances de découvrir une solution de bonne qualité s’en trouvent 
-augmentées. Le problème est donc ici légèrement plus facile que celui étudié dans la section 
-2.3 car on cherche uniquement à déterminer la listes des variables impliquées dans des 
-relations de dépendances sans vouloir découvrir précisément ces dépendances. Nous avons 
-donc réalisé une série d’expériences pour mesurer les capacités de l’algorithme max-min sur 
-ce problème réduit. 
-Nous avons utilisé des réseaux en utilisant la méthode présentée dans la section 2.3.1 
-pour la distribution des variables indépendantes. Pour la distribution (33, 33, 33) nous avons 
-également fait varier la complexité du réseau en changeant le nombre d’arcs. Nous donnons 
-les résultats de ces expérimentations dans la table 5. Chaque ligne représente la moyenne 
-obtenue pour 10 réseaux différents mais possédant les mêmes propriétés. Il apparaît que bien 
-que la méthode max-min puisse découvrir plus de 90% des variables dépendantes (les Vrai 
-Positif de la table 5), elle ne découvre qu’environ 17% des variables indépendantes (les Vrai 
-Négatifs de la table 5). Une méthode basique qui prédirait toutes les variables comme 
-indépendantes aurait des résultats à peine moins bons. Cela signifie que cette méthode a 
-tendance à surestimer fortement le nombre de dépendances. Les résultats sont peu affectés 
-par les différentes distributions de variables indépendantes et par la complexité du réseau. Il 
-semble donc que cette méthode ne puisse pas être utilisée pour le problème de la sélection de 
-variables car pratiquement toutes les variables sont sélectionnées. 
- 
-- 259 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-Distribution D A VP VN 
-(33, 33, 33) 25 60 24.2 11.4 
-(33, 33, 33) 25 40 23.2 12.4 
-(33, 33, 33) 25 30 24 10.6 
-(80, 10, 10) 25 40 23.8 12.6 
-(50, 25, 25) 25 40 23.8 13.6 
-(40, 30, 30) 25 40 23.8 13.8 
-TAB.. 5 – Résultats obtenus par l’algorithme max-min pour le problème de la sélection de 
-variables. Chaque ligne comporte la moyenne du nombre de VP et de VN pour dix 
-exécutions de l’algorithme sur des données générées à partir de dix réseaux différents mais 
-présentant les mêmes propriétés. 
- 
-3 Approche basée sur l’analyse statistique implicative 
-Nous nous intéressons aux capacités de la méthode d’Analyse Statistique Implicative 
-pour la détection de dépendances multiples. Nous voulons étudier plus particulièrement si les 
-spécificités de l’ASI, Gras et Kuntz (2008), Gras et al. (2004), permettant de prendre en 
-considération les contre-exemples à une hypothèse d’implication, peuvent être utiles pour 
-découvrir des dépendances dans des situations qui sont difficiles pour les méthodes 
-classiques se basant sur des mesures de probabilités conditionnelles. Par exemple, une 
-situation dans laquelle deux variables sont indépendantes mais prennent toutes les deux très 
-souvent la même modalité dans un grand nombre d’exemples. Dans cette situation, une 
-mesure basée sur la probabilité conditionnelle détectera une dépendance. Or si cette modalité 
-est bien présente fréquemment simultanément pour les deux variables, il n’en reste pas moins 
-que les occurrences des ces modalités sont décorrélées, puisque les variables sont 
-indépendantes, donc la prise en compte du nombre de contre-exemples, même peu 
-nombreux, pourrait permettre de réfuter l’hypothèse de dépendance. 
-Cependant, pour pouvoir utiliser l’ASI dans des situations très générales, certaines 
-modifications sont nécessaires. En effet, nous ne voulons a priori pas nous limiter aux 
-modalités binaires ni présupposer une relation d’ordre entre les différentes modalités d’une 
-variable. Nous voulons également pouvoir détecter une situation où une conjonction de 
-variables implique une autre variable et, dans ce cas, en tenir compte dans une mesure 
-globale. C'est-à-dire que nous voulons pouvoir mesurer qu’une ou plusieurs combinaisons de 
-modalités des variables parents impliquent une ou plusieurs modalités de la variable enfant. 
-Par exemple, soit les variables A, B et C ∈ {0, 1, 2}. Nous voulons définir une mesure 
-capable de détecter une dépendance de A vis-à-vis de B et C parce que : quand B=0 ∧ C=2 
-alors ‘souvent’ A = 1 et quand B = 0 ∧ C = 0 alors ‘souvent’ A = 0. La version actuelle de 
-l’ASI ne permet pas de prendre en compte simultanément toutes les combinaisons des 
-modalités des variables considérées pour produire un score unique déterminant le niveau de 
-dépendance global de A vis-à-vis de B et C. Nous avons donc défini une extension à l’ASI 
-pour prendre en compte ces différentes situations. 
- 
-- 260 -RNTI-E-16
-E. Salehi et al. 
-3.1 Définitions et notations 
-Ces définitions et notations s’ajoutent à celles présentées dans la section 2.1. Soit 
-Card(mi,j) le nombre de fois où la variable vi prend la valeur mi,j dans les N exemples. On 
-note Card(m-i,j) le nombre de fois où la variable vi prend une valeur différente de mi,j et 
-Card(mi1,j1∧mi2,j2) le nombre de fois où la variable vi1 prend la valeur mi1,j1 et la variable vi2 
-prend la valeur mi2,j2 dans les N exemples. 
-On note πi une instanciation de chacune des variables parents de vi choisie dans la liste de 
-modalités que chacune d’elles peut prendre et Πi l’ensemble de toutes les combinaisons 
-d’instanciations des variables parents de vi. Par exemple, en reprenant l’exemple précédent 
-avec les variables A, B et C, ΠA = {(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 
-2)}. Si on note k = |Mi| alors pour tout vj ∈ Pari : 
-iPar
-i k=Π . 
-Soit Card(πi) le nombre de fois où l’ensemble des variables parents de vi prend la valeur 
-πi dans les N exemples. La mesure q de l’ASI est alors donnée par : 
- 
-N
-)m(Card)(Card
-N
-)m(Card)(Card
-)m(Card
+Approche binaire pour la g¶en¶eration des fortes
+rµegles d'association
+Thabet Slimani, Boutheina Ben Yaghlane, Khaled Mellouli
+LARODEC, IHEC Carthage, Carthage Pr¶esidence 2016, Tunisia
+thabet.slimani@issatm.rnu.tn
+boutheina.yaghlane@ihec.rnu.tn
+khaled.mellouli@ihec.rnu.tn
+R¶esum¶e. Dans ce papier, nous proposons une nouvelle m¶ethode d'ex-
+traction des rµegles d'association dans des bases de donn¶ees relationnelles
+bas¶ee sur la technologie des arbres de Peano (Ptree). La structure de
+donn¶ees utilis¶ee pour repr¶esenter la base de donn¶ees est un ensemble
+de Ptrees de base repr¶esentant chacun un vecteur binaire et tous ces
+Ptrees sont stock¶es dans des ¯chiers binaires. Nous montrons que la struc-
+ture Ptree combin¶ee avec la technique de r¶eduction appel¶ee ¶elagage par
+support minimum produisent des rµegles d'association fortes et r¶eduisent
+consid¶erablement le temps de construction de l'association. En e®et, notre
+approche pr¶esente l'avantage de ne pas e®ectuer des parcours cou^teux de
+la base de donn¶ees. Cette approche a ¶et¶e test¶ee µa travers un prototype
+que nous avons impl¶ement¶e. Les r¶esultats exp¶erimentaux montrent que
+les rµegles d'association fortes sont g¶en¶er¶ees dans un temps minimum com-
+parativement µa d'autres travaux.
+Keywords : Fouille de donn¶ees, Rµegle d'association, Itemsets fr¶equents,
+Arbres de Peano (Ptree), Rµegles ANDing.
+1 Introduction
+L'extraction de connaissances µa partir des donn¶ees ECD (KDD en anglais pour
+"Knowledge Discovery in Data") constitue un thµeme important du domaine de la fouille
+de donn¶ees. Elle consiste en la recherche des connaissances implicites, cach¶ees dans un
+ensemble volumineux d'informations stock¶ees dans des bases de donn¶ees. L'extraction
+des rµegles d'association est l'un des principaux problµemes trait¶es de l'ECD. Ce thµeme
+a ¶et¶e initialement abord¶e par (Agrawal et al 1993) pour l'analyse des bases de donn¶ees
+de transactions de ventes oµu chaque transaction est constitu¶ee d'une liste d'articles
+achet¶es (items), le but ¶etant de d¶ecouvrir les groupes d'articles (itemsets) achet¶es le
+plus fr¶equemment ensembles. Une rµegle d'association est une relation d'implication
+X!Y entre deux itemsets disjoints X et Y. Dans l'exemple du panier de la m¶enagµere,
+cette rµegle indique que les transactions qui contiennent les items de l'ensemble X ont
+tendance µa contenir les items de l'ensemble Y. Il existe deux mesures de quali¶e associ¶ees
+µa chaque rµegle, con¯ance et support. Une rµegle appara^³t dans l'ensemble de transactions
+D avec une con¯ance c si c% des transactions dans D qui contiennent X contiennent
+aussi Y. Une rµegle d'association X!Y a comme support s si s% des transactions
+dans D contiennent X[Y. Une rµegle d'association forte est une rµegle dont le support
+Approche binaire pour la g¶en¶eration des fortes rµegles d'association
+d¶epasse un seuil du support minimum (MinSup) et dont la con¯ance d¶epasse un seuil
+de con¯ance minimale (MinConf ). Les seuils du support minimum et de la con¯ance
+minimale doivent e^tre ¯x¶es d'avance par l'expert.
+L'extraction des rµegles d'association µa partir de larges bases de donn¶ees est une ta^che
+cruciale, la principale application est "l'analyse du panier de la m¶enagµere", mais au-
+jourd'hui, cette technique a fait l'objet de plusieurs applications r¶eelles dans di®¶erents
+domaines n¶ecessitant la recherche des groupements potentiels de produits ou de ser-
+vices, par exemple secteur bancaire, secteur de t¶el¶ecommunications, secteur m¶edical
+pour la recherche de complications du^es µa des associations de m¶edicaments, ou encore
+traitement d'images (donn¶ees spatiales), analyse des accµes internet, ... N¶eanmoins, cette
+ta^che est cou^teuse en temps de calcul car elle consiste µa faire plusieurs parcours de la
+base de donn¶ees relationnelle pour l'identi¯cation des itemsets fr¶equents1. Les algo-
+rithmes de d¶ecouverte de connaissances sont devenus ine±caces devant l'abondance de
+donn¶ees d'oµu la n¶ecessit¶e d'utiliser des algorithmes rapides.
+C'est dans ce cadre que se situe notre travail qui a pour objectif de proposer une
+nouvelle m¶ethode permettant d'extraire des rµegles d'association fortes µa partir des
+bases de donn¶ees volumineuses. En e®et, ¶etant donn¶ee une base de donn¶ees relation-
+nelle repr¶esent¶ee sous forme d'un ensemble de tuples appel¶es aussi ensemble d'attri-
+buts2 de nature diverse (des attributs de domaine binaire ou non binaire), nous pro-
+posons d'abord de convertir les donn¶ees non binaires de la base relationnelle origi-
+nale en une table binaire (Bitmap). Cette transformation est une caract¶eristique de
+la m¶ethode rough set d¶ecrite dans (Munkata 1998). Ensuite, nous utilisons une struc-
+ture de donn¶ees, appel¶ee arbre de Peano (Ptree), pour stocker, d'une fa»con compacte,
+toutes les informations utiles. Les Ptrees sont utilis¶es, dans ce cadre, pour ¶etendre
+les op¶erations ANding (Ding et al. 2002b) des Ptrees sur les attributs de la base de
+donn¶ees. En utilisant Ptrees, nous n'avons pas µa faire des parcours cou^teux de la base
+de donn¶ees pour calculer les supports des itemsets puisque la base de donn¶ees, comme
+nous l'avons d¶ejµa mentionn¶e, est charg¶ee dans un ¯chier binaire, et par cons¶equent l'al-
+gorithme B-ARM (en anglais "Binary Association Rule Mining"), que nous proposons,
+permettra d'extraire les itemsets fr¶equents sur divers types de bases de donn¶ees en un
+temps minimum comparativement µa d'autres travaux.
+L'organisation de ce papier est la suivante : la Section 2 pr¶esente un ¶etat de l'art des
+travaux e®ectu¶es sur les rµegles d'association. La Section 3 est une pr¶esentation som-
+maire de la technique Ptree, ensuite la section 4 est consacr¶ee pour les caract¶eristiques
+des attributs d'une base de donn¶ees. Dans la Section 5, nous pr¶esentons le principe
+et le modµele de la g¶en¶eration des rµegles d'association. La conversion des attributs aux
+Ptrees est abord¶ee dans la Section 6. Notre algorithme de g¶en¶eration des rµegles d'asso-
+ciation est pr¶esent¶e dans la Section 7 et les r¶esultats exp¶eriementaux de notre prototype
+impl¶ement¶e dans la Section 8. En¯n, dans la Section 9, nous concluons par quelques
+voies de recherche.
+1Un itemset est dit "fr¶equent" si son support est sup¶erieur µa un seuil correspondant au support
+minimum (MinSup) sp¶eci¯¶e pr¶ealablement par l'expert.
+2Dans le cas des applications du panier de la m¶enagµere, ces tuples sont repr¶esent¶es par un ensemble
+de transactions ou ensemble d'items.
+RNTI - 2
+Thabet Slimani et al.
+2 Etat de l'art
+Les travaux e®ectu¶es sur les rµegles d'association dans le domaine de fouille de
+donn¶ees sont trµes nombreux. L'algorithme de base Apriori (Agrawal et Srikant 1994)
+est l'algorithme le plus populaire, il a ¶et¶e d¶evelopp¶e pour la d¶ecouverte des rµegles d'as-
+sociations dans des bases de donn¶ees larges. Une extension de l'algorithme Apriori,
+appel¶ee algorithme DHP (Direct Hashing and Pruning), est propos¶ee dans (Park et al
+1995) utilisant la technique de hachage. Un algorithme plus r¶ecent appel¶e FDM (Fast
+Distributed Mining of association rules) a ¶et¶e propos¶e par (Cheung et al 1996), il est
+caract¶eris¶e par la g¶en¶eration d'un plus petit ensemble d'itemsets candidats et par la
+r¶eduction du nombre de messages µa passer. Pincer Search (Lin et Kedem 1998) ¶etend
+l'algorithme Apriori pour g¶en¶erer les itemsets fr¶equents. Depth-project (Agarwal et al
+2000) parcourt le treillis des itemsets en profondeur et utilise un r¶eordonnancement
+dynamique a¯n de r¶eduire l'espace de recherche. Un travail assez r¶ecent r¶ealis¶e par
+(Delic et al 2002) procµede µa l'am¶elioration de la qualit¶e des rµegles d'association par
+des techniques rough sets. En¯n, plus proches de notre travail, d'une part, l'algorithme
+FP-growth qui repr¶esente la base de transactions sous forme d'un arbre compress¶e
+appel¶e FP-tree (Han et al 2000) et d'autre part, l'algorithme MFItemsets (Maximal
+Frequent Itemsets) qui repr¶esente la base des transactions sous forme d'un arbre binaire
+et renvoie un ensemble de produits bool¶eens correspondants aux itemsets fr¶equents
+maximaux associ¶es aux transactions donn¶ees (Salleb et Maazouzi 2002).
+3 La technique Ptree
+La structure de donn¶ees arbre de Peano (Ptree), appel¶ee aussi "Peano Count Tree"
+est une repr¶esentation compacte et e±cace utilis¶ee pour le stockage de la base de
+donn¶ees sous forme de bits binaires (0 et 1). Cette structure a ¶et¶e initialement introduite
+pour la repr¶esentation de donn¶ees spatiales telles que les donn¶ees des applications RSI
+(Remotely Sensed Imagery) (Perrizo et al 2001a, Ding et al 2002a, Ding et al 2002b).
+Un Ptree est un arbre bas¶e sur des quadrants. Le principe de Ptree consiste µa diviser
+r¶ecursivement la totalit¶e des donn¶ees spatiales en des quadrants et µa compter les bits 1
+pour chaque quadrant, en formant de ce fait un arbre de calcul de quadrants. Dans la
+¯gure 1, 55 est le nombre de bits 1 dans l'image entiµere, Ce niveau racine est ¶etiquet¶e
+de niveau 0. Les nombres 16, 8, 15 et 16 du niveau suivant (niveau 1) sont les nombres
+de bits 1 pour les quatre principaux quadrants dans l'ordre Z de la trame (sup¶erieur-
+gauche, sup¶erieur-droite, bas-gauche, bas-droite). Puisque les premiers et les derniers
+quadrants de niveau 1 se composent entiµerement de 1-bits (appel¶es quadrants pure-1 ),
+les sous-arbres ne sont pas n¶ec¶essaires et ces branchements se terminent. De me^me, des
+quadrants compos¶es entiµerement de 0-bits s'appellent des quadrants pure-0 et causent
+¶egalement l'arre^t des banchements. Ce processus se r¶epµete r¶ecursivement en utilisant
+l'ordre Z des quatre sous-quadrants µa chaque nouveau niveau. Eventuellement, chaque
+niveau se termine puisqu'au niveau "feuille" tous les quadrants sont purs.
+Les Ptrees sont un peu semblables, dans leur construction, µa d'autres structures de
+donn¶ees dans la litt¶erature, par exemple Quadtrees (Samet 1984) et HHcodes3. Lors de
+3http ://www.statkart.no/nlhdb/iveher/hhtext.html
+RNTI - 2
+Approche binaire pour la g¶en¶eration des fortes rµegles d'association
+l'utilisation de la structure Ptree, tout calcul de l'information peut e^tre e®ectu¶e d'une
+maniµere acc¶el¶er¶ee. L'analyse de performance e®ectu¶ee dans (Ding et al 2002a) montre
+que Ptree produit un cou^t de calcul faible (en temps microprocesseur) et un espace de
+stockage r¶eduit compar¶e avec les donn¶ees originales.
+Un PM-tree (Peano mask tree) est une variante de Ptree, particuliµerement utile pour
+l'optimisation de l'op¶eration ANDing entre deux Ptrees. PM-tree consiste µa utiliser une
+logique de 3-valeurs, dans laquelle 1 est employ¶e pour repr¶esenter un quadrant pure-1,
+0 est employ¶e pour repr¶esenter un quadrant de pure-0 et m est utilis¶e pour repr¶esenter
+un quadrant mixte. Un exemple de PM-tree est donn¶e dans la ¯gure 1.
+Fig. 1 { Image 8*8 et ses Ptree et PM-tree (Perrizo et al 2001b).
+4 Caract¶eristique de la m¶ethode
+Une base de donn¶ees est repr¶esent¶ee par une table binaire ou table Bitmap dont les
+colonnes sont des attributs et chaque attribut possµede un ensemble limit¶e de valeurs
+(items) connues par domaine d'attribut de la base de donn¶ees. La base de donn¶ees peut
+avoir deux types de domaines : des attributs de domaine binaire DB et des attributs
+de domaine non binaire NDB.
+4.1 Les attributs de domaine binaire
+Un attribut de domaine binaire est repr¶esent¶e par un vecteur ¡!v ½ fv1; v2g de
+taille k tels que les valeurs v1 et v2 sont prises dans l'ensemble f0,1g et k est le nombre
+des k-uplet de valeurs prises dans f0,1g. Un 1-uplet repr¶esente un tuple de la base de
+donn¶ees ou une transaction en terme du panier de la m¶enagµere.
+Une base de donn¶ees An de dimension n est constitu¶ee de n vecteurs binaires,
+chacun de taille 2n et chaque vecteur est constitu¶e µa son tour de 4 vecteurs binaires
+de taille 2n/4 (pour des raisons de simplicit¶e, nous avons d¶ecompos¶e chaque vecteur
+binaire en 4 quadrants). Les lignes de An rep¶esentent alors, toutes les combinaisons
+possibles de n valeurs binaires 0 et 1. Dans l'exemple donn¶e dans TAB.1, la pr¶esence
+d'un article ordinateur dans une transaction ou son absence repr¶esente son domaine
+fachet¶e, non achet¶eg et la transformation binaire rend la valeur de l'attribut a1=1 si
+l'ordinateur est achet¶e ou a1=0 si l'ordinateur n'est pas achet¶e.
+RNTI - 2
+Thabet Slimani et al.
+T id Ordinateur
+1 Achet¶e
+2 Non achet¶e
+3 Achet¶e
+4 Non achet¶e
+::: :::
+=)
+T id a1
+1 1
+2 0
+3 1
+4 0
+::: :::
+Tab. 1 { Transformation des donn¶ees brutes en une repr¶esentation Bitmap pour des
+attributs de domaine binaire
+4.2 Les attributs de domaine non binaire
+Un attribut de domaine non binaire Aj est constitu¶e de j items et la base de donn¶ees
+est repr¶esent¶ee de
+Pn
+i=1 j ¤ i vecteurs binaires tel que n est le nombre d'attributs du
+domaine non binaire (NDB). A titre d'exemple, pour une meilleure repr¶esentation du
+pro¯t d'un client, on associe µa l'attribut revenu le domaine constitu¶e de j = 3 items
+fhaut, moyen, faibleg d¶e¯ni comme suit : a1=\revenu haut", a2=\revenu moyen" et
+a3=\revenu faible" et repr¶esent¶e par la table binaire suivante :
+T id Revenu
+1 Haut
+2 Moyen
+3 Faible
+4 Haut
+::: :::
+=)
+T id a1 a2 a3
+1 1 0 0
+2 0 1 0
+3 0 0 1
+4 1 0 0
+::: ::: ::: :::
+Tab. 2 { Transformation des donn¶ees brutes en une repr¶esentation Bitmap pour des
+attributs de domaine non binaire.
+5 G¶en¶eration des rµegles d'association
+5.1 Principe
+Etant donn¶ee une base de donn¶ees compos¶ee de n attributs associ¶es µa m tuples,
+l'id¶ee principale de notre algorithme s'appuie sur l'algorithme Apriori (Agrawal et
+Srikant 1994) qui consiste µa balayer la base de donn¶ees pendant des passages multiples
+dans le but de rechercher des itemsets fr¶equents. Aprµes chaque passage, le nombre des
+items dans les sous-ensembles des itemsets larges s'incr¶emente de 1 jusqu'µa ce que les
+ensembles possibles dans la base de donn¶ees sont construits, ensuite, l'algorithme utilise
+les larges itemsets pour g¶en¶erer les rµegles d'association. L'algorithme Apriori s'arre^te
+lorsqu'aucun itemset large ne peut e^tre cr¶ee. Ainsi, pour un nombre ¶elev¶e d'items n
+et un nombre de tuples m trµes grand, on peut associer 2n combinaisons possibles qui
+augmente le temps de calcul puisque le calcul s'e®ectue directement sur la base de
+donn¶ees, d'oµu la n¶ecessit¶e d'architectures plus e±cace qui permettent des accµes rapides
+µa de grands jeux de donn¶ees.
+RNTI - 2
+Approche binaire pour la g¶en¶eration des fortes rµegles d'association
+Pour cela, nous avons adopt¶e la technique Ptree dont l'avantage est de ne pas
+e®ectuer des parcours cou^teux sur la base de donn¶ees car les donn¶ees originales sont
+converties en donn¶ees spatiales (ou binaires), puis stock¶ees dans un ¯chier binaire. En
+utilisant l'organisation REL (repr¶esentation de la base de donn¶ees sous forme d'une
+table Bitmap), l'id¶ee de Ptree consiste, d'une part, µa diviser r¶ecursivement les donn¶ees
+spatiales dont les colonnes de la table Bitmap forment chacune une bande de bits et
+d'¶eviter, d'autre part, de comparer µa chaque fois les items 1 par 1 et de proc¶eder, au
+contraire, µa la comparaison des blocs de tuples, ce qui diminue le temps de calcul.
+5.2 Modµele
+La g¶en¶eration des rµegles d'association est mod¶elis¶ee sur la base du modµele rough
+set (Munkata 1998), dont l'univers ­ des attributs de la table Bitmap est divis¶e en
+deux ensembles disjoints, un ensemble constituant les attributs de condition ­c et un
+deuxiµeme ensemble constituant les attributs de d¶ecision ­d.
+Soit la TAB. 3 oµu les attributs de l'ensemble des donn¶ees sont repr¶esent¶es par fXg,
+fYg et fZg. L'attribut X a deux valeurs fA et Bg= fCompte d¶ebit¶e, Compte nulg,
+l'attribut Y a trois valeurs fC, D et Eg=frevenu faible, revenu haut, revenu moyeng et
+l'attribut de d¶ecision Z a deux valeurs fF, Gg=faccorder pre^t, ne pas accorder pre^tg.
+Il y en a 7 items pour la table Bitmap r¶esultante fA, B, C, D, E, F et Gg.
+T idclient Compte Revenu Accorder pre^t
+1 D¶ebit¶e Moyen Oui
+2 D¶ebit¶e Faible Non
+3 D¶ebit¶e Moyen Oui
+4 D¶ebit¶e Haut Oui
+5 Nul Haut Non
+=)
+T id A B C D E F G
+1 1 0 0 0 1 1 0
+2 1 0 1 0 0 0 1
+3 1 0 0 0 1 1 0
+4 1 0 0 1 0 1 0
+5 0 1 0 1 0 0 1
+Tab. 3 { Table de donn¶ees originales et son ¶equivalente Bitmap
+Dans la premiµere ¶etape, toutes les rµegles possibles sont construites µa partir de tous
+les attributs de la table Bitmap. Par exemple, pour X!Y ; 6 rµegles di®¶erentes peuvent
+e^tre form¶ees. Elles sont obtenues par le produit cart¶esien des items des deux attributs
+X et Y fA!C, A!D, A!E, B!D, B!Eg. Le choix d'une rµegle d'association est bas¶e
+sur les quantit¶es num¶eriques, support et con¯ance, d¶e¯nies par l'utilisateur, qui vont
+servir µa valider l'intere^t d'une telle rµegle, ainsi toutes les rµegles qui ne satisfont pas les
+contraintes du support minimum et de la con¯ance minimale sont ¶elimin¶ees.
+6 Des attributs aux Ptrees
+Dans notre approche, chaque item est repr¶esent¶e par un Ptree. Un ensemble de
+tuples, selon la repr¶esentation Ptree, doit e^tre une puissance de 2. Le nombre des tuples
+dans une base de donn¶ees est transform¶e µa la plus proche puissance de 2, sachant que les
+tuples compl¶et¶es sont des itemsets incluant uniquement la valeur 0. La table des tuples
+est repr¶esent¶ee d'une maniµere analogique µa la repr¶esentation ensembliste sous formes
+d'itemsets. Soit I un itemset, la transformation binaire consiste µa mettre la valeur 1 µa
+RNTI - 2
+Thabet Slimani et al.
+l'item Ij s'il appartient µa ~I, et 0 sinon. Dans l'approche Ptree, chaque colonne de la
+table Bitmap est repr¶esent¶ee par un vecteur de bits dont la taille est divisible par 4,
+appell¶e Ptree de base.
+Consid¶erons la base de donn¶ees de la table 4. Soient les attributs de condition de
+l'espace ­c form¶es par les attributs fA, B, C, D, E, Fg d¶esignant l'ensemble des pro-
+duits fcartouche imprimante, lecteur vid¶eo, voiture, ordinateur, cam¶era, imprimanteg
+et l'attribut de d¶ecision de l'espace ­d form¶e par fGg d¶esignant l'attribut flogiciel
+graphiqueg. Soit MinSup=10% et MinConf=30% repr¶esentant le support minimum
+et la con¯ance minimale. TAB.4 pr¶esente cette base de donn¶ees convertie sous forme
+d'une table Bitmap.
+Tid A B C D E F G
+Tid1 oui oui non non non non non
+Tid2 oui oui oui oui oui oui non
+Tid3 non oui non oui non non oui
+Tid4 non oui non non oui non oui
+Tid5 non non non oui non oui oui
+Tid6 non non non oui oui non oui
+Tid7 non oui non non oui non non
+Tid8 non oui non oui oui oui non
 )
-j,i
-j,i
-j,i
-−
-−
-−
-×π
-×π−∧π
-=π
-i
-i
-i
-ji,i m,q(  
-De la même façon, nous calculons la mesure de l’ASI τ(πi, mi,j). Puis le score que nous 
-cherchons à maximiser est donne par : 
-)m,(q)m,(i)m,(s j,iij,iij,ii π×π−=π  
-où i(.,.) est l’indice d’inclusion défini dans la partie 1, chap. 1, § 8.2. 
-3.2 Extension de l’ASI 
-Nous avons expérimenté plusieurs mesures permettant de prendre en considération les 
-différents critères que nous avons énoncés plus haut. Pour une variable vi nous voulons une 
-mesure unique qui représente globalement son degré de dépendance vis-à-vis de son 
-ensemble parent. Nous devons donc tenir compte de l’ensemble des combinaisons possibles 
-∏i et déterminer, en utilisant les mesures s(πi, mi,j),  comment elles impliquent l’ensemble Mi 
-des modalités de vi. Nous construisons donc une table Ti, contenant l’ensemble ∏si des 
-mesures de s pour toutes les combinaisons de πi et de Mi et de taille : 
-1)( +=× ivPari kk π  
-Nous avons essayé différentes méthodes pour combiner toute l’information provenant de 
-cette table en une seule mesure. La méthode la plus simple pour cela est de considérer 
-uniquement le maximum des ∏si. D’autres possibilités sont de considérer la moyenne des 
-∏qi, ou la moyenne des x% plus hauts scores de ∏si. Nous avons réalisé de nombreux tests 
-avec ces différentes approches et aucun n’a donné de résultats satisfaisants. Dans cette 
-première série de mesures nous avons considéré indépendamment les scores obtenus pour 
-- 261 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-une même valeur de πi mais différentes valeurs de Mi. Or, ce que l’on souhaite détecter c’est 
-qu’une valeur de πi, c'est-à-dire une instanciation particulière des variables parents de vi, 
-implique une instanciation particulière de vi, et que ça soit le cas pour plusieurs 
-instanciations différentes de πi. Il faut donc une mesure qui permette de détecter que q est 
-fort pour un couple (πi, mi,j) avec mi,j ∈ Mi et faible pour tous les autre mi,j’ ∈ Mi et que cela  
-soit vrai pour plusieurs πi. Nous avons donc défini un score qui tient en compte, pour un πi 
-donné, de la valeur de s maximum Supπi pour tout mi,j ∈ Mi et de l’entropie Eπi de s pour 
-toutes les valeurs mi,j ∈ Mi. 
-Soit                              ))m,(s(maxSup j,iikji
-π=
-≤≤π 1  
-Et                                  
-)log(
-))),((log()),(( ,,
-1 k
-mspmsp
-E jiijii
-k
-j
-i
-ππ
-π ∑
-=
-−=  
-Avec                             
-∑
-=
-= k
-j
-jii
-jii
-jii
-mq
-mq
-msp
-1'
-',
-,
-,
-),(
-),(
-)),((
-π
-ππ  
-Pour calculer la mesure associée à une table Ti, on considère l’ensemble H, de taille h, 
-des πi correspondant aux x% des valeurs de  Supπi les plus élevées de la table. Le score de la 
-table est alors : 
-∑
-∑
-∈π
-π
-∈π
-π
-=
-H
-H
-Par,i
-i
-i
-i
-i
-i E
-Sup
-S
- 
-C’est cette mesure que l’on cherche finalement à maximiser. 
- 
-En reprenant l’exemple avec les variables A, B et C, la table TA correspond à : 
-B C A = 0 A = 1 A = 2 Sup E 
-0 0 0 1.3 0.6 1.3 0.272 
-0 1 0 0 0 0 0 
-0 2 2.1 0 0.2 2.1 0.129 
-1 0 0 0 0 0 0 
-1 1 0.4 0.2 0.5 0.5 .45 
-1 2 1.1 0 0 1.1 0 
-2 0 0 0 0 0 0 
-2 1 0 0 0 0 0 
-2 2 0 0 0 0 0 
-TAB. 6 – Exemple de calcul de la table Ti avec A, B et C ∈ {0, 1, 2} et ΠA = {(0, 0), (0, 1), (0, 
-2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)}. 
- 
-Si on sélectionne les 20% Sup les plus élevés, seules les lignes 1 et 3 seront sélectionnées 
-et c’est avec les valeurs de Sup et de E correspondantes qu’est calculée SA qui  est égale à 
-- 262 -RNTI-E-16
-E. Salehi et al. 
-8.48 dans cet exemple. Plus la valeur de S est élevée plus on considère que la dépendance est 
-forte. Dans la section suivant nous donnons un algorithme qui va utiliser cette mesure pour 
-déterminer quelles sont les dépendances principales d’un problème.  
-3.3 Algorithme de détection des dépendances 
-Nous avons défini la mesure Si, associée à chaque variable vi. Il faut cependant connaître 
-l’ensemble parent de vi pour pouvoir la calculer. Pour déterminer les dépendances d’un 
-problème il faut examiner différentes configurations possibles d’ensembles parents pour 
-toutes les variables et choisir la configuration qui mène à un score total maximal. Cependant 
-le nombre de configurations à examiner est exponentiel avec le nombre de variables. Il faut 
-donc définir une heuristique pour construire les ensembles parents. Nous avons choisi une 
-approche incrémentale pour cette heuristique. L’algorithme associé commence avec des 
-ensembles parents vides pour chaque variable, puis à chaque étape une nouvelle variable est 
-ajoutée dans l’un des ensembles parents. C’est la mesure S qui est utilisée pour choisir à 
-chaque étape quelle variable ajouter dans quel ensemble parent. Ce processus est appliqué 
-jusqu'à ce qu’un nombre total maxVariable, fixé à l’avance, de variables ait été ajouté. Le 
-calcul de la table Ti étant lui aussi exponentiel en fonction du nombre de variables parents de 
-vi, nous utilisons des contraintes supplémentaires, limitant à quatre le nombre maximal de 
-variables que peut comporter chaque ensemble parent et le nombre total de variables ajoutées 
-maxVariable. L’algorithme utilisé est également glouton.  
-Le choix de la prochaine variable à ajouter dans un ensemble parent se fait en comparant 
-le meilleur score de quatre différentes tables. L’algorithme 1, que nous avons défini permet 
-d’éviter de calculer le score pour toutes les combinaisons ayant 2, 3 et 4 variables dans 
-l’ensemble parent. Seules les combinaisons qui ont été sélectionnées avec x variables parents 
-conduiront au calcul du score avec x + 1 variables parents. Dans cet algorithme, la variable 
-structMax contient trois informations : le score de dépendance de la variable enfant vis-à-vis 
-de ses variables parents,  le numéro de la variable enfant et le numéro de la variable parent 
-candidate à être ajoutée à l’ensemble parent. Après initialisation, la table Max1 contient la 
-liste triée de façon décroissante de tous les scores de toutes les combinaisons comportant une 
-variable enfant et une variable parent. Il y a donc n2 scores dans la table initialement. Les 
-tables Max2, Max3 et Max4 sont initialement vides. Elles servent à mémoriser les scores des 
-combinaisons enfant-parents dans les cas respectifs où il y a 2, 3 et 4 variables dans 
-l’ensemble parent. Ainsi, à chaque étape de l’algorithme, la variable à ajouter dans 
-l’ensemble parent d’une autre variable sera déterminée en sélectionnant le score le plus élevé 
-des 4 tables. Si c’est la table Maxi qui est sélectionnée, l’ensemble parent de la variable 
-associée au score maximal de cette table passera de i-1 à i variables. Le score est alors retiré 
-de la table maxi et un nouveau score est calculé et inséré dans la table maxi+1. Les quatre 
-tables sont maintenues triées par ordre décroissant de telle manière que la valeur maximale 
-de chaque table se trouve toujours en position 0. 
-- 263 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-Pour tout vi  
- Pari = {∅} 
- structMax = {0, 0, 0}  
- max1 = ∅ 
- pour tout vi { 
-  pour tout vj { 
-  si ( ji vPar,iS + > structMax.score) { 
-   sturctMax.score = ji vPar,iS +  
-   structMax.enfant = i 
-   structMax.parent = j 
-  } 
-       }  
-       max1 = max1 + structMax 
- } 
- TrieDecroissant(max1) 
- max2 = ∅, max3 = ∅, max4 = ∅  
- nbVariable = 0 
- tant que (nbVariable < maxVariable) { 
-  k = maximum(max1[0].score, max2[0].score, max3[0].score, max4[0].score) 
-  enf = maxk[0].enfant 
-  parenf = parenf + maxk[0].parent 
-  si (k < 4) { 
-   structMax = {0, 0, 0} 
-   pour tout vj ∉ parenf { 
-   si ( ji vPar,iS + > structMax.score) { 
-   sturctMax.score = ji vPar,iS +  
-   structMax.enfant = i 
-   structMax.parent = j 
-   } 
-  } 
-  maxk+1 = maxk+1 + structMax 
-  TrieDecroissant(maxk+1) 
-  maxk[0] = {0, ∅, ∅} 
-  TrieDecroissant(maxk) 
-  nbVariable = nbVariables + 1 
- } 
- 
-Algorithme 1 – Détermination des maxVariable ensembles parents par heuristique 
-gloutonne. 
- 
-- 264 -RNTI-E-16
-E. Salehi et al. 
-3.4 Evaluation de l’algorithme de détection des dépendances basé sur 
-l’ASI 
-Pour réaliser la comparaison la plus honnête possible, nous avons réutilisé les mêmes 
-expériences que celles de la section 2 pour évaluer notre algorithme de détection de 
-dépendances basé sur l’ASI. Il faut cependant remarquer que cette procédure défavorise 
-l’ASI. En effet, les données ont été générées à partir de modèles, des réseaux bayésiens, 
-basés sur la mesure de probabilité conditionnelle qui est celle qui est utilisée également par 
-l’approche max-min. Or, l’approche ASI utilise une autre mesure qui n’a pas les mêmes 
-propriétés. En particulier, une différence très importante est que le modèle du réseau 
-bayésien est non transitif alors que celui de l’ASI l’est. Mais une comparaison totalement 
-équitable n’étant pas possible et en tenant compte de ces différences dans notre analyse, cela 
-nous a paru être la meilleure façon de procéder. 
-3.4.1 Distribution des variables indépendantes 
-Nous avons repris les mêmes données que dans la section 2.3.1. Notre algorithme utilise 
-plusieurs paramètres : le pourcentage x% des meilleurs Sup de chaque table Ti et le nombre 
-maximal maxVariable de variables ajoutées dans les ensembles parents. Pour chacun d’eux 
-nous avons expérimenté de nombreuses valeurs. Celles qui nous ont semblé les plus 
-pertinentes et que nous présentons ici sont 10% et 50% pour x% et 35, 50 et 150 variables 
-pour max variables. Pour ce dernier paramètre nous pouvons évaluer ainsi trois 
-configurations importantes correspondant à une situation réelle dans laquelle on ne sait pas à 
-l’avance combien il y a de dépendances dans le problème. Avec 35 variables on recherche 
-moins de variables qu’il n’en existe réellement, avec 50 variables on en recherche 
-légèrement plus et avec 150 on en recherche nettement plus qu’il n’en existe réellement. 
-Les résultats présentés dans les tables 7 et 8 confirment que notre algorithme ne découvre 
-que peu de dépendances. La mesure utilisée semble toutefois plus sensible à la distribution 
-utilisée pour générer les variables indépendantes. Les résultats obtenus avec la valeur x% = 
-10% sont cependant légèrement meilleurs. Le temps de calcul est également plus élevé 
-qu’avec l’algorithme max-min mais notre programme n’a pas encore été optimisé pour cela. 
- 
-- 265 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-X% = 10% Moyenne 
-des VP 
-Moyenne 
-des FP 
-Moyenne 
-des FN 
-Précision 
-=VP/(VP+FN) 
-Temps de 
-calcul (s) 
-(80, 10, 10) 35 var 0.9 34.1 39.1 2.25% 37 
-(50, 25 ,25) 35 var 6.7 28.3 33.3 16.7% 61.7 
-(40, 30, 30) 35 var 7.8 27.2 32.2 19.5% 69.3 
-(33, 33, 33) 35 var 0.6 34.4 39.4 1.5% 44.6 
-(80, 10, 10) 50 var 1 49 39 2.25% 46.1 
-(50, 25 ,25) 50 var 8.4 41.6 31.6 21% 76.4 
-(40, 30, 30) 50 var 11 39 29 27.5% 89.8 
-(33, 33, 33) 50 var 1.2 48.8 38.8 3% 57.4 
-(80, 10, 10) 150 var 1.2 148.8 38.8 3% 63.6 
-(50, 25 ,25) 150 var 12.3 137.7 27.7 30.7% 179 
-(40, 30, 30) 150 var 15.3 134.7 24.7 38.2% 184 
-(33, 33, 33) 150 var 4.9 145.1 36.1 12.2% 194 
-TAB. 7- Efficacité de notre algorithme en fonction de la distribution des variables 
-indépendantes lorsque x% = 10%. Le paramètre maxVariable prend successivement les 
-valeurs 35, 50 et 150 variables.  Chaque ligne comporte la moyenne du nombre de VP, de 
-FP, de FN et du temps de calcul pour dix exécutions de l’algorithme sur des données 
-générées à partir de dix réseaux différents mais présentant les mêmes propriétés. Chaque 
-réseau possède 25 variables dépendantes, 75 variables indépendantes et 40 arcs. 
- 
-X% = 50% Moyenne 
-des VP 
-Moyenne 
-des FP 
-Moyenne 
-des FN 
-Précision 
-= VP/(VP 
-+ FN) 
-Temps de 
-calcul (s) 
-(80, 10, 10) 35 var 0.2 34.8 39.8 0.5% 33.8 
-(50, 25 ,25) 35 var 7.7 27.3 32.3 19.25% 59.7 
-(40, 30, 30) 35 var 5.1 29.9 34.9 12.7% 66.4 
-(33, 33, 33) 35 var 0.4 34.6 39.6 1% 36.9 
-(80, 10, 10) 50 var 0.2 49.8 39.8 0.5% 42.3 
-(50, 25 ,25) 50 var 6.2 43.8 33.8 15.5% 70.2 
-(40, 30, 30) 50 var 7.1 42.9 32.9 17.7% 80.9 
-(33, 33, 33) 50 var 0.5 49.5 39.5 1.25% 41.3 
-(80, 10, 10) 150 var 0.3 149.7 39.7 0.75% 55.5 
-(50, 25 ,25) 150 var 6.6 143.3 33.4 16.5% 164.2 
-(40, 30, 30) 150 var 8 142 32 20% 177.9 
-(33, 33, 33) 150 var 4.2 145.8 36.8 10.5% 140.9 
-TAB. 8 - Efficacité de notre algorithme en fonction de la distribution des variables 
-indépendantes lorsque x% = 50%.. Le paramètre maxVariable prend successivement les 
-valeurs 35, 50 et 150 variables.  Chaque ligne indique la moyenne du nombre de VP, de FP, 
-de FN et du temps de calcul pour dix exécutions de l’algorithme sur des données générées à 
-partir de dix réseaux différents mais présentant les mêmes propriétés. Chaque réseau 
-possède 25 variables dépendantes, 75 variables indépendantes et 40 arcs. 
- 
-- 266 -RNTI-E-16
-E. Salehi et al. 
-3.4.2 Problème de la « sélection de variables » 
-Nous avons réutilisé les mêmes jeux de données pour tester la capacité de notre 
-algorithme à résoudre le problème de la sélection de variables. Les résultats présentés dans 
-les tables 9 et 10 montrent un très fort potentiel de notre algorithme pour ce problème. Les 
-résultats obtenus sont en effet bien meilleurs que ceux obtenus avec l’algorithme max-min. 
-Si le nombre de VP est légèrement plus faible, le nombre de VN est considérablement plus 
-élevé. Ce qui est particulièrement important c’est le constat que le niveau de prédiction est 
-ici bien meilleur à ce que l’on pourrait attendre du hasard. Comme le ratio du nombre de 
-variables dépendantes sur le nombre de variables indépendantes est de 1/3 dans le modèle 
-utilisé pour générer les données, une prédiction aléatoire donnerait le même ratio de VP/FP 
-(c'est-à-dire donc ce cas VP/(75-VN)). Nous présentons dans la colonne VP/(0.33xFP) des 
-tables 9 et 10, le gain par rapport à une sélection aléatoire des variables dépendantes.  Dans 
-les cas de distributions des variables indépendantes (40, 30, 30) et (50, 25, 25) le gain est très 
-important allant jusqu'à 16.1. A titre de comparaison, les résultats de l’algorithme max-min 
-montre plus de stabilité mais un gain qui ne dépasse jamais 1.18. Notre algorithme semble 
-avoir plus de difficulté lorsque les variables indépendantes ont des distributions extrêmes 
-(33, 33, 33) ou (80, 10, 10). Avec x%=10% et dans le cas où l’on recherche moins de 
-dépendances qu’il en existe (35 variables) le gain est toujours d’au moins 1. Bien que ce soit 
-une première version, notre algorithme semble donc avoir un très fort potentiel pour détecter 
-les variables dépendantes et donc résoudre le problème de la sélection de variables. Nous 
-avons également testé notre algorithme sur les jeux de données présentées en section 2.3.2 
-dans lesquels D = 50, I = 50 et A = 80 (résultats non présentés ici). Les résultats montrent 
-qu’avec la configuration x% = 10%, le gain est compris entre 1.28 et 1.82. 
- 
-X% = 10% Moyenne des VP Moyenne des VN VP/(0.33xFP) 
-(80, 10, 10) 35 var 6.7 55.5 1.03 
-(50, 25 ,25) 35 var 15.5 71.8 14.7 
-(40, 30, 30) 35 var 15.4 72.1 16.1 
-(33, 33, 33) 35 var 3.4 64.7 1 
-(80, 10, 10) 50 var 6.8 46.4 0.73 
-(50, 25 ,25) 50 var 18.3 68.7 8.79 
-(40, 30, 30) 50 var 18.3 69.7 10.5 
-(33, 33, 33) 50 var 6.1 61.3 1.36 
-(80, 10, 10) 150 var 9.2 13 0.45 
-(50, 25 ,25) 150 var 22.8 31.8 1.6 
-(40, 30, 30) 150 var 21.8 46.7 2.33 
-(33, 33, 33) 150 var 17.3 32.6 1.24 
-TAB. 9 - Résultats obtenus par notre algorithme pour le problème de la sélection de 
-variables avec le paramètre x% = 10%. Chaque ligne comporte la moyenne du nombre de 
-VP et de VN pour dix exécutions de l’algorithme sur des données générées à partir de dix 
-réseaux différents mais présentant les mêmes propriétés. Les résultats sont présentés pour 
-trois valeurs du paramètre maxVariable : 35, 50 et 150 variables. 
- 
-- 267 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-X% = 50% Moyenne des VP Moyenne des VN VP/FP 
-(80, 10, 10) 35 var 7.6 60.4 1.58 
-(50, 25 ,25) 35 var 16.8 66.2 5.79 
-(40, 30, 30) 35 var 14.8 67 1.85 
-(33, 33, 33) 35 var 4 57 0.67 
-(80, 10, 10) 50 var 8 53.5 1.13 
-(50, 25 ,25) 50 var 18.3 59.9 3.67 
-(40, 30, 30) 50 var 18.1 63.7 4.85 
-(33, 33, 33) 50 var 5.5 50 0.67 
-(80, 10, 10) 150 var 11.8 6.7 0.52 
-(50, 25 ,25) 150 var 22.1 22.8 1.28 
-(40, 30, 30) 150 var 22 41.2 1.97 
-(33, 33, 33) 150 var 22 16.5 1.14 
-TAB. 10 - Résultats obtenus par notre algorithme pour le problème de la sélection de 
-variables avec le paramètre x% = 50%. Chaque ligne comporte la moyenne du nombre de 
-VP et de VN pour dix exécutions de l’algorithme sur des données générées à partir de dix 
-réseaux différents mais présentant les mêmes propriétés. Les résultats sont présentés pour 
-trois valeurs du paramètre maxVariable : 35, 50 et 150 variables. 
- 
-4 Conclusion 
-Nous avons réalise une étude sur la capacité de découverte des dépendances d’un 
-problème de deux méthodes basées sur des mesures différentes. La première, l’algorithme 
-max-min repose sur le test de dépendance conditionnelle G2. La deuxième est un algorithme 
-que nous avons conçu basé sur une extension de la mesure ASI. Nous avons appliqué ces 
-algorithmes à de nombreux jeux de données en faisant varier les paramètres du problème tels 
-que la distribution des variables indépendantes, le nombre de variables dépendantes et le 
-nombre de dépendances. Nous avons également considéré deux problèmes différents : 
-déterminer quelles sont les dépendances et déterminer quelles sont les variables impliquées 
-dans des relations de dépendance. Bien entendu être capable de résoudre le premier problème 
-permet de résoudre également le second. Il n’est cependant généralement pas possible de 
-résoudre directement et intégralement ce problème. Avoir la possibilité de découvrir dans un 
-premier temps uniquement quel est le sous-ensemble des variables concernées par des 
-relations de dépendance permet de réduire la complexité du premier problème et donc de 
-fournir une solution de meilleure qualité. 
-Nos résultats ont montré une bonne efficacité pour l’algorithme max-min pour découvrir 
-les dépendances lorsque toutes les variables du problème sont impliquées dans des relations 
-de dépendance. L’algorithme semble peu affecté par la variation de complexité du modèle et 
-par les différentes distributions des variables indépendantes. Il a cependant d’importantes 
-limitations pour détecter les dépendances lorsqu’une partie des variables sont indépendantes. 
-L’algorithme max-min ne semble pas non plus être efficace pour le deuxième problème : la 
-sélection de variables. Notre algorithme, basé sur l’ASI, en revanche ne semble pas capable 
-de détecter directement les dépendances et ce quelles que soient les configurations. Il paraît 
-cependant très efficace pour déterminer quelles sont les variables indépendantes et quelles 
-- 268 -RNTI-E-16
-E. Salehi et al. 
-sont les variables dépendantes. Il a toutefois plus de difficulté dans les situations où les 
-variables indépendantes ont des distributions extrêmes (80, 10, 10) ou (33, 33, 33).  
-Les deux approches paraissent donc complémentaires et prometteuses. Il serait très 
-intéressant de développer une méthode combinant ces deux approches. Dans une première 
-phase notre algorithme, utilisant la version étendue de l’ASI, permettrait de sélectionner un 
-sous-ensemble des variables pour lesquelles il y a une forte présomption de dépendances. 
-Puis, dans une deuxième phase, l’approche max-min serait appliquée à ce sous-ensemble 
-pour déterminer plus précisément où sont ces dépendances. L’ensemble de ces informations 
-permettrait alors de construire un réseau bayésien modélisant bien l’ensemble des exemples 
-disponibles et donc pouvant être utilisé pour résoudre le problème d’optimisation associé. Il 
-serait intéressant également d’étudier d’autres variantes de l’extension de la mesure ASI pour 
-voir dans quelle mesure il serait possible d’améliorer les résultats obtenus pour la détection 
-directe de dépendances. 
-Références 
-Beinlich I.A., H.J. Suermondt, R.M. Chavez, G.F. Cooper (1989) The ALARM monitoring 
-system: A case study with two probabilistic inference techniques for belief networks. 
-Second European Conference in Artificial Intelligence in Medicine, 247-256 
-Binder J., D. Koller, S. Russell, K. Kanazawa (1997). Adaptive probabilistic networks with 
-hidden variables. Machine Learning, 29(2-3):213-244 
-Friedman N., I. Nachman et D. Peèr (1999). Learning bayes network structure from massive   
-datasets: The "sparse candidate" algorithm. 15th Conference on Uncertainty in Artificial 
-Intelligence 206-215. 
-Garey M. R. et D. S. Johnson (1979). Computers and Intractability: a Guide to the Theory of 
-NP-Completeness. Freeman. 
-Goldebberg A. et A. Moore (2004). Tractable learning of large Bayes net structures from 
-sparse data. 21ft International Conference on Machine Learning  44-51 
-Gras R., R. Couturier, J. Blanchard, H. Briand, P. Kuntz, P. Peter (2004). Quelques critères 
-pour une mesure de qualité de règles d’association. Un exemple : l’implication 
-statistique,  Mesures de qualité pour la fouille de données, RNTI-E-1, Cepaduès –
-Editions,  3-32 
-Gras R. et P. Kuntz (2008). An overview of the Statistical Implicative,  Statistical 
-Implicative Analysis, R.Gras, E. Suzuki, F.Guillet and F.Spagnolo, Eds,  Springer-Verlag. 
-Jensen A.L., F.V. Jensen (1996). MIDAS: An Influence Diagram for Management of 
-Mildew in Winter Wheat. In Proceedings of 12th Annual Conference on Uncertainty in 
-Artificial Intelligence, 349-356 
-Koivisto M. et K. Sood (2004). Exact Bayesian structure discovery in Bayesian networks, 
-Journal of Machine Learning Research 5:549-573 
-Kristensen K., I.A. Rasmussen (2002). The use of a Bayesian network in the design of a 
-decision support system for growing malting barley without use of pesticides. Computers 
-and Electronics in Agriculture, 33: 197–217 
-- 269 - RNTI-E-16
-Une étude comparative pour la détection de dépendances multiples  
-Larranaga P. et J.A. Lozano (2002). Estimation of Distribution Algorithms: A new tool for 
-evolutionary computing: Kluwer Academic Publishers.  
-Muhlenbein H. et T. Mahnig (2001). Evolutionary Algorithms: From Recombination to 
-Search Distributions. Theoretical Aspects of Evolutionary Computing: Springer Verlag, 
-135-173. 
-Neapolitan, R. (2003) Learning Bayesian networks. Prentice Hall 
-Papadimitriou C. H. et K. Steiglitz (1998). Combinatorial Optimization: Algorithms and 
-Complexity. Dover. 
-Spirtes P., C. Glymour et R. Scheines (2000). Causation, prediction, and search. The MIT 
-Press, second Edition 
-Thompson R. K. et A. H. Wright (1996). Additively decomposable fitness functions.  
-University of Montana, Computer Science department. 
-Tsamardinos I., L. E. Brown et C. F. Aliferis (2006). The max-min hill-climbing Bayesian 
-network structure  learning algorithm. Machine Learning, 65(1):31–78. 
-Zeng Y. et C. Hernandez (2008).  A Decomposition Algorithm for Learning Bayesian 
-Network Structures from Data. PAKDD 2008, Lecture Notes in Artificial Intelligence 
-5012:441–453. 
-Summary 
-Searching for dependencies between variables using a set of examples is an important 
-problem in combinatorial optimization. Numerous methods have been proposed to solve this 
-problem but few large scale evaluations have been performed. Most of these methods rely on 
-conditional probability measures. The SIA propose another point of view on dependency 
-measurement. It is therefore important to compare the results obtained using this approach 
-with the ones obtained with one of the currently most efficient method for this task: the max-
-min heuristic. However, the SIA can not be used directly for this problem. We have therefore 
-defined a dedicated extension to this measure. We have performed a large number of 
-experiments varying several parameters like the number of dependencies, the number of 
-variables or the goal of the prediction task. The results show a strong synergy of the two 
-methods. 
- 
-- 270 -RNTI-E-16
+Tid A B C D E F G
+Tid1 1 1 0 0 0 0 0
+Tid2 1 1 1 1 1 1 0
+Tid3 0 1 0 1 0 0 1
+Tid4 0 1 0 0 1 0 1
+Tid5 0 0 0 1 0 1 1
+Tid6 0 0 0 1 1 0 1
+Tid7 0 1 0 0 1 0 0
+Tid8 0 1 0 1 1 1 0
+Tab. 4 { Exemple d'une base de donn¶ees et sa table Bitmap correspondante
+6.1 Construction des Ptrees
+Pour des raisons de simplicit¶e, nous supposons que le fan-out (les noeuds sortants)
+est quatre. Pour chaque vecteur de bits, on associe un Ptree de base. Il y en a six Ptrees
+de base pour l'univers ­c de la table 4, et puisque chaque Ptree pr¶esente un nombre de
+bits divisible par 4, donc, il est constitu¶e par quatre sous-quadrants dont le quadrant
+d'origine est la totalit¶e des bits formant un item de la table Bitmap. Il y a toujours
+n Ptrees de base pour une table Bitmap form¶ee de n items. Comme nous l'avons d¶ejµa
+expliqu¶e, l'id¶ee de construction d'un Ptree consiste µa diviser p¶eriodiquement le vecteur
+binaire (item) en des sous-quadrants et d'enregistrer le nombre des bits 1 pour chaque
+sous-quadrant en formant, de ce fait, un arbre de calcul des quadrants.
+6.2 Stockage de Ptrees
+D'une maniµere similaire µa la g¶en¶eration de la s¶equence de Peano µa partir des
+trames de donn¶ees spatiales, on doit cr¶eer l'arbre Ptree d'une maniµere ascendente.
+La g¶en¶eration de Ptree d¶epend du nombre de fan-out dans les noueds internes de
+l'arbre Ptree et dans le noeud racine. Pour repr¶esenter Ptree avec di®¶erents fan-outs,
+on introduit la notation P-tree-(r-i) ; oµu r=fan-out du noeud racine et i=fan-out de
+tous les noeuds internes du niveau 1. On utilise dans notre travail la repr¶esentation
+P-tree-(4-4-n) cµad on divise le nombre des tuples composant la base de donn¶ees par 4
+blocs (les blocs de transactions doivent avoir au minumum 4 tuples). Par exemple, si
+le nombre de tuples est inf¶erieur µa 16, on complµete par des 0 pour obtenir le format
+Ptree sur 16 tuples. En rµegle g¶en¶erale, si le nombre de transactions est inf¶erieur µa 2n+1
+et sup¶erieur µa 2n alors le Ptree de base est stock¶e avec un nombre ¶egal µa 2n+1:
+RNTI - 2
+Approche binaire pour la g¶en¶eration des fortes rµegles d'association
+6.3 Les op¶erations d'intersection (ANDing) des Ptrees
+ANDing est une op¶eration trµes importante et fr¶equemment utilis¶ee pour les Ptrees.
+Il y a plusieurs voies d'ex¶ecuter l'op¶eration ANDing de Ptree. Nous pouvons l'ex¶ecuter
+niveau par niveau µa partir du niveau racine. TAB 5 donne les rµegles de l'op¶eration
+ANDing de Ptrees. L'op¶erande 1 et l'op¶erande 2 sont deux Ptrees avec la racine X1 et
+X2 respectivement. En utilisant PM-trees, X1 et X2 pourraient e^tre n'importe quelle
+valeur parmi 1, 0 et m. Par exemple, µa l'op¶eration ANDing, un Ptree des bits pures-1
+avec n'importe quel Ptree aura comme cons¶equence la deuxiµeme op¶erande et un Ptree
+des bits pures-0 avec n'importe quel Ptree aura comme cons¶equence le Ptree pure-0.
+Op¶erande1 Op¶erande2 R¶esultat
+1 X2 Sous-Arbre avec comme racine X2
+0 X2 0
+X1 1 Sous-Arbre avec comme racine X1
+X1 0 0
+m m 4 si le r¶esultat de 4 sous-quadrants = 0 ; m sinon
+Tab. 5 { Les rµegles d'intersection des Ptrees.
+7 Algorithme B-ARM (Binary Association Rule Mi-
+ning)
+Dans Apriori et la plupart des algorithmes ARM, la base de donn¶ees doit e^tre
+balay¶ee entiµerement pour calculer le support de chaque itemset candidat. Lorsque l'en-
+semble de transactions est large, le cou^t sera extre^mement ¶elev¶e. Alors qu'µa partir de
+l'op¶eration ANDing des Ptrees, le support de chaque itemset candidat peut e^tre obtenu
+directement, cµad le compte du support est juste le compte de la racine de chaque Ptree
+de base, et par cons¶equent, il n'y a aucun besoin de balayer la base de donn¶ees. En se
+basant sur cette id¶ee, on a d¶evelopp¶e un nouveau algorithme, appel¶e B-ARM, pour la
+g¶en¶eration des rµegles d'association en utilisant des Ptrees. Comme pour l'algorithme
+Apriori, l'algorithme B-ARM sert µa la d¶ecouverte des itemsets fr¶equents.
+A¯n de g¶en¶erer des itemsets fr¶equents, l'algorithme B-ARM procµede comme suit :
+Il commence par le stockage des Ptrees de base dans deux vecteurs, un vecteur pour le
+stockage des quadrants (les blocs des bits de chaque noeud interne) et un autre pour
+le stockage des noeuds racines, ensuite il s'agit de d¶egager les attributs fr¶equents dont
+le support est sup¶erieur ou ¶egal au support minimum sp¶eci¯¶e par l'utilisateur. L'¶etape
+suivante consiste µa it¶erer r¶ecursivement l'intersection par des op¶erations ANDing des
+Ptrees de base de la partie condition avec les Ptrees de base des attributs de d¶ecision,
+a¯n de d¶egager l'ensemble des nouveaux itemsets admissibles de la partie condition.
+Les rµegles sont g¶en¶er¶ees aprµes v¶eri¯cation de la con¯ance de la partie condition et
+la partie conclusion. L'algorithme s'arre^te lorsqu'aucun itemset fr¶equent n'existe dans
+l'ensemble des attributs candidats Ck.
+RNTI - 2
+Thabet Slimani et al.
+Algorithm B-ARM
+Discr¶etisation de donn¶ees ;
+Stockage Ptrees ;
+Pour chaque attribut i ½ ­c
+C1 = F1 ;
+FinPour
+Ck = C1 ;
+Tant que (Ck 6= ;) faire
+Pour chaque attribut i ½ Ck
+Pour chaque attribut j ½ ­d
+Fij = AND Ptreebase(i,j) ;
+Stockage Ptrees ;
+FinPour
+Fk = Fk[ Fi; == itemsets candidats
+FinPour
+C k = Fkfc 2 Ckj c:count >=MinSupg ;
+FinTantque
+Dans la proc¶edure de stockage de Ptree, on stocke les noeuds racines de Ptree dans
+un vecteur et les noeuds binaires (formant les sous-quadrants) dans un autre vecteur
+a¯n de faciliter l'accµes aux donn¶ees des sous-quadrants de chaque bande (colonne de la
+table Bitmap), en vue de les comparer pour v¶eri¯er les associations entre ces bandes.
+Soit Nt = nombre de tuples ; n est initialis¶e µa 3 ; I d¶esigne le nombre total des attributs.
+Proc¶edure Stockage Ptrees
+Pour (bandej=1 ; j<I ; j++)
+racine[j] :=rootcount(1 ; bandej)//vecteur qui stocke les racines des Ptrees.
+Si(2n ·Nt et Nt < 2
+n+1) alors
+Pour (i :=Nt ; i· 2
+n+1 ; i++)
+bandj[i+1] :=0 ;
+Finpour
+Finsi
+k :=0 ;
+Pour (i :=1 ; i· 2n; 2n=4) // calcul des racines ou sous-quadrants
+k :=k+1 ;
+rootsBandj[k] :=rootcount (1 ; bandj) ;// vecteur racines internes
+FinPour
+Pour (i :=1 ; i· 2n; 2n=4)
+Si (rootsBandj[i]<>2n ou rootsBandj[i]<>0) alors
+bitsBandj[i] :=rootsBandj[i] ;//vecteur des bits
+Finsi
+Finpour
+FinPour
+La liste des rµegles fortes g¶en¶er¶ees dans l'exemple d¶ecrit pr¶ec¶edemment est r¶esum¶ee
+dans la table 6. Les rµegles sont classi¯¶ees par attribut de d¶ecision G ou F.
+RNTI - 2
+Approche binaire pour la g¶en¶eration des fortes rµegles d'association
+Att d¶ecision = G Att d¶ecision = F
+Rµegles fortes µa deux attributs B!G A!F
+D!G B!F
+E!G C!F
+F!G D!F
+E!F
+Rµegles fortes µa 3 attributs B,D!G A, B!F
+A,C!F
+A,D!F
+A,E!F
+B,C!F
+B,D!F
+C,D!F
+Rµegles fortes µa 4 attributs A,B,C!F
+A,B,D!F
+A,B,E!F
+A,C,D!F
+B,C,D!F
+B,C,E!F
+B,D,E!F
+C,D,E!F
+Rµegles fortes µa 5 attributs A,B,C,D!F
+A,B,C,E!F
+A,C,D,E!F
+B,C,D,E!F
+Rµegles fortes µa 6 attributs A, B,C,D,E!F
+Tab. 6 { Sch¶ema illustratif des rµegles fortes retenues.
+8 Impl¶ementation et expr¶ementation
+Nous avons d¶evelopp¶e un prototype de g¶en¶eration des rµegles fortes. La structure de
+donn¶ees utilis¶ee pour repr¶esenter la base de donn¶ees (BD) est un ensemble de Ptrees
+de base repr¶esentant chacun un vecteur binaire de la table Bitmap et tous ces Ptrees
+sont stock¶es dans des ¯chiers binaires. Cette structure de donn¶ees permet de charger
+complµetement la BD volumineuse dans un ¯chier binaire. L'objectif de cette op¶eration
+est d'¶eviter le balayage direct de la BD.
+La transformation d'une BD en une repr¶esentation Bitmap et l'utilisation du sch¶ema
+de production des rµegles d'association n¶ecessite une comparaison objective de cette
+m¶ethode avec d'autres travaux. La comparaison de notre travail est facilit¶ee par l'uti-
+lisation d'un benchmark data4. On a choisi une BD (car evaluation database) µa travers
+laquelle on a compar¶e notre travail. Cette BD comprend 1728 tuples et 25 valeurs
+d'attributs (items) dans la table Bitmap.
+Nous avons compar¶e notre travail par rapport µa deux approches Apr+ (Apriori+)
+et Rs+ (RS-Rules+) (Delic et al 2002). La proc¶edure Apr+ est une extension de
+la m¶ethode "faster association rule" combin¶ee avec la proc¶edure "rough set". Cette
+proc¶edure utilise un attribut de d¶ecision ¯xe comme le principe de notre travail, mais,
+en plus de cela, notre travail ajoute la notion de la technique Ptree pour acc¶el¶erer le
+temps de g¶en¶eration des rµegles d'association admissibles uniquement et utilise µa chaque
+¶etape la partie condition de ces me^mes rµegles pour g¶en¶erer d'autres rµegles. Les rµegles
+d¶eriv¶ees sont produites sur la base de la r¶eduction successive des rµegles inutiles.
+4Le \benchmark data" se trouve dans \UCI Repository of Machine Learning Database and Domain
+Theories"(URL : ftp.ics.uci.edu/pub/machine learning-databases/Adult, /car, /mushroom).
+RNTI - 2
+Thabet Slimani et al.
+Dans notre travail, on ne produit pas des rµegles redondantes, alors que dans Rs+
+et Apr+, des rµegles redondantes sont produites et enlev¶ees par la suite. Les premiµers
+r¶esultats, non d¶e¯nitifs, donn¶es dans TAB.7 montre que notre travail produit un temps
+de g¶en¶eration des rµegles d'association ¶egale µa 0,083 min pour des attributs ayant comme
+valeurs d'items ¶egale µa 1 et un temps ¶egale µa 0,067 min pour des attributs ayant comme
+valeurs d'items ¶egale µa 0 qui est un temps r¶eduit par rapport µa Rs+ et Apr+. Notons
+que notre approche produit les me^mes rµegles g¶en¶er¶ees par les m¶ethodes Rs+ et Apr+.
+Database Car Evaluation
+Support minimum 0,10
+Con¯ance minimale 0,75
+Attribut de d¶ecision 1 0
+M¶ethode Rs+ Apr+ B-ARM Rs+ Apr+ B-ARM
+Temps CPU (min) 1,15 1,12 0,083 1,10 3,15 0,067
+Tab. 7 { Tableau comparatif des algorithmes de g¶en¶eration des rµegles d'association
+9 Conclusion
+La m¶ethode de g¶en¶eration des rµegles d'association de notre algorithme B-ARM est
+bas¶ee sur l'¶elagage par con¯ance minimale et support minimum. La d¶ecouverte des
+similarit¶es entre des attributs/items a ¶et¶e bas¶ee sur des rµegles de comparaison des
+Ptrees. Notre travail est avantageux car, d'une part, il ¶evite le balayage direct de la
+base de donn¶ees qui est une op¶eration cou^teuse en m¶emoire et en temps de calcul
+qui d¶epasse largement la capacit¶e des ordinateurs, malgr¶e leurs ¶evolutions rapide et,
+d'autre part, il o®re un gain de comparaison des attributs/items car la comparaison
+s'e®ectue par bloc des tuples de la base de donn¶ees.
+Comme extension de ce travail, nous comptons utiliser la me^me m¶ethode pour
+g¶en¶erer des rµegles d'association dans un temps limit¶e tout en ajoutant aux rµegles d'as-
+sociation la contrainte du temps (domaine nouveau pour l'identi¯cation des s¶equences).
+R¶ef¶erences
+Agarwal R.C., Aggarwal C.C. & Prasad V.V.V. (2000). Depth First Generation of
+Long Patterns. In Proc. of the 6th Int. Conf. on Knowledge Discovery and Data
+Mining, pp. 108-118.
+Agrawal R., Imielinski T. & Swami A.N. (1993). Mining Association Rules between
+Sets of Items in Large Databases. In Proc. of the ACM SIGMOD International
+Conference on Management of Data, pp. 207-213.
+Agrawal R. & Srikant R. (1994). Fast Algorithms for Mining Association Rules. In
+Proc. 20th Int. Conf. Very Large Data Bases (VLDB), pp. 487-499.
+RNTI - 2
+Approche binaire pour la g¶en¶eration des fortes rµegles d'association
+Cheung C., Han J., Ng V.T., Fu A.W. & Fu Y. (1996). A Fast Distributed Algorithm for
+Mining Association Rules. In Proc. of 1996 Int'l Conf. on Parallel and Distributed
+Information Systems (PDIS'96), Miami Beach, Florida, USA.
+Delic D., Lenz L. & Neiling N. (2002). Improving the Quality of Association Rule
+Mining by means of Rough Sets. Free university of Berlin, Institute of Applied
+Computer Science, Garystr. 21, D-14195, Berlin, Germany.
+Ding Q., Ding Q. & Perrizo W. (2002a). Association Rule Mining on Remotely Sensed
+Images using P-trees. In Proceedings of the PAKDD, Taipei, Taiwan, pp. 66-79.
+Ding Q., Khan M., Roy A. & Perrizo W. (2002b). The Ptree Algebra. In Proc. of
+ACM Symposium on Applied Computing (SAC'02), Madrid, Spain, pp. 413-417.
+Han J., Pei J. & Yin Y. (2000). Mining Frequent Patterns without Candidate Gene-
+ration. In Proc. 2000 ACM SIGMOD Intl. Conference on Management of Data,
+Chen W., Naughton J. & Bernstein P.A. (Eds), ACM Press, pp. 1-12.
+Lin D. & Kedem Z. M. (1998). Pincer Search : A New Algorithm for Discovering the
+Maximum Frequent Set. In Proc. Int. Conf. on Extending Database Technology.
+Munkata T. (1998). Rough Sets. In Fundamentals of the New Arti¯cial Intelligence,
+New York : Springer-Verlag, pp. 140-182.
+Park J.S., Chen M.S. & Yu P.S. (1995). An E®ective Hash-based Algorithm for Mi-
+ning Association Rules. In Proc. 1995 ACM SIGMOD International Conference on
+Management of Data, pp. 175-186.
+Perrizo W., Ding Q., Ding Q. & Roy A. (2001a). On Mining Satellite and other
+Remotely Sensed Images. In Proc. of Workshop on Research Issues on Data Mining
+and Knowledge Discovery, pp. 33-44.
+Perrizo W., Ding Q., Ding Q. & Roy A. (2001b). Deriving High Con¯dence Rules
+from Spatial Data using Peano Count Trees. In Advances in Web-Age Information
+Management : Second International Conference WAIM 2001, Wang X.S., Yu G.
+and Lu H. (Eds), Springer-Verlag, LNCS 2118, pp. 91-102.
+Salleb A. & Maazouzi Z. (2002). Approche Bool¶eenne pour l'extraction des itemsets
+fr¶equents maximaux. In Conf. d'Apprentissage (CAp'02), Orl¶eans, pp. 111-122.
+Samet H. (1984). The Quadtree and Related Hierarchical Data Structures. In Com-
+puting Surveys, 16(2), pp. 187-260.
+Summary
+In this paper, we propose a new method for the association rule mining in relationnel
+data bases by the use of Peano tree (Ptree) technology. The data of the association
+rules model are organized in format REL which is a converted organization of the not-
+spatial data to spatial data (binary). A data base is seen as a Bitmap table whose each
+column represents an attribute and each row represents a tuple of data base. We show,
+in this work, that the Ptree structure, combined with the technique of reduction called
+pruning by minimum support, can produce strong rules by reducing considerably the
+time of association construction. Our prototype and experiments have shown that it is
+possible to produce a strong rules in a minimum time comparing to other works.
+RNTI - 2

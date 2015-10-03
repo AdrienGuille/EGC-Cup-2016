@@ -1,477 +1,583 @@
-REGLO : une nouvelle stratégie pour résumer un flux de
-séries temporelles
-Alice Marascu∗, Florent Masseglia∗ and Yves Lechevallier∗∗
-∗INRIA Sophia-Antipolis, 2004 route des lucioles - BP 93 , 06902 Sophia-Antipolis
-∗∗INRIA Paris-Rocquencourt, Domaine de Voluceau , 78150 Rocquencourt
-Prenom.Nom@inria.fr
-Résumé. Les flux de séries temporelles sont aujourd’hui produits dans de nom-
-breux domaines comme la finance (Zhu et Shasha (2002)), la surveillance de
-réseaux (Borgne et al. (2007); Airoldi et Faloutsos (2004)), la gestion de l’his-
-torique des usages fréquents (Giannella et al. (2003); Teng et al. (2003)), etc.
-Résumer de tels flux est devenu un domaine important qui permet de surveiller
-et d’enregistrer des informations fiables sur les séries observées. À ce jour, la
-majorité des algorithmes de ce domaine s’est concentrée sur des résumés sépa-
-rés et indépendants (Giannella et al. (2003); Zhu et Shasha (2002); Chen et al.
-(2002)), en accordant à chaque série le même espace en mémoire. Toutefois, la
-gestion de cet espace mémoire est un sujet important pour les flux de données
-et une stratégie accordant la même quantité de mémoire à chaque série n’est pas
-forcément appropriée. Dans cet article, nous considérons que les séries doivent
-être en compétition vis à vis de l’espace mémoire, selon leur besoin de préci-
-sion. Ainsi, nous proposons : (1) une stratégie de gestion de l’espace mémoire
-optimisée et (2) une nouvelle méthode de résumé des séries temporelles par ap-
-proximation. Dans ce but, nous observons à la fois l’erreur globale et les erreurs
-locales. La répartition de la mémoire suit les étapes suivantes : (1) recherche
-de la séquence la mieux représentée et (2) recherche de la partie à compresser
-en minimisant l’erreur. Nos expérimentations sur des données réelles montrent
-l’efficacité et la pertinence de notre approche.
+Arbresde décision sur des données de type intervalle :
+évaluation et comparaison
+Chérif Mballo **,* & Edwin Diday **
+* ESIEA Recherche, 38 Rue des Docteurs Calmette et Guérin 53000 Laval France
+mballo@esiea-ouest.fr
+** LISE-CEREMADE, Université Paris Dauphine, Place du Maréchal de Lattre de Tassigny,
+75775 Paris cedex 16, France
+diday@ceremade.dauphine.fr
+Résumé. Le critère de découpage binaire de Kolmogorov-Smirnov nécessite
+un ordre total des valeurs prises par les variables explicatives. Nous pouvons
+ordonner des intervalles fermés bornés de nombres réels de différentes façons.
+Notre contribution dans cet article consiste à évaluer et à comparer des arbres
+de décision obtenus sur des données de type intervalle à l’aide du critère de
+découpage binaire de Kolmogorov-Smirnov étendu à ce type de données
+(Mballo et al. 2004). Pour ce faire, nous axons notre attention sur le taux
+d’erreur mesuré sur l’échantillon de test. Pour estimer ce paramètre, nous
+divisons aléatoirement chaque base de données en deux parties égales en terme
+d’effectif (à un objet près) pour construire deux arbres. Ces deux arbres sont
+d’abord testés par un même échantillon puis par deux échantillons différents.
 1 Introduction
-Les résumés de séries temporelles sont l’objet de travaux de plus en plus importants en
-raison de leurs nombreuses applications mais aussi de leur complexité. Parmi les applications
-liées à ce domaine citons la recherche d’information (Ding et al. (2008); Palpanas et al. (2008)),
-la fouille (Chen et al. (2002); Papadimitriou et al. (2005); Lin et al. (2003)) ou encore la
-prévision (Cheng et Tan (2008); Borgne et al. (2007)) de données. La difficulté associée à la
-production de ces résumés est due aux très grands volumes de données (qui sont produites en
-continu et à grande vitesse). En effet, ces données arrivant sous forme de flux, le temps de
-traitement de chaque donnée doit être le plus faible possible. De plus, la taille d’un flux étant
-potentiellement illimitée, il est inévitable de traiter des problèmes liés à la mémoire nécessaire
-pour le résumer.
-RNTI-E-19- 217 -
-REGLO : résumer un flux de séries temporelles
-Un flux ne peut donc pas être stocké et doit être (au mieux) résumé. Il n’est alors pas tou-
-jours possible de répondre avec exactitude à des requêtes sur les données passées. Néanmoins,
-une réponse approximative très proche de la valeur demandée peut-être satisfaisante. Produire
-des résumés de séries temporelles, permettant de répondre à ce problème, est un sujet très étu-
-dié ces dernières années (Chang et Lee (2003); Chen et al. (2002); Cohen et Strauss (2003);
-Papadimitriou et al. (2005); Teng et al. (2003); Zhu et Shasha (2002)). Considérons M , la
-quantité de mémoire disponible. Imaginons que nous souhaitions résumer le comportement de
-n séries temporelles et considérons que nous disposons d’unemémoire organisée sous la forme
-d’une matrice à n lignes. Dans le cas d’indépendance entre les séries nous pouvons alors sto-
-cker en mémoire au maximum t = M/n valeurs pour chaque série. Après t itérations du flux
-la mémoire est pleine et nous devons appliquer une méthode pour résumer les séries et quand t
-devient très grand ce résumé ne peut pas se faire sans introduire un degré d’approximation. Ce
-degré d’approximation se traduit alors par une erreur locale à chaque série et une erreur globale
-(cumul des erreurs locales) du modèle. Les questions qui se posent sont alors les suivantes :
-“quelle série doit être résumée pour minimiser l’erreur globale ?”, “Comment résumer une sé-
-rie pour minimiser l’erreur locale ?”, “quel algorithme utiliser pour calculer l’approximation
-aussi vite que possible ?”.
-Exemple 1 De nombreux sites Web souhaitent mesurer la fréquence des requêtes sur leurs
-URLs et la variation de cette fréquence dans le temps. Ces données ne peuvent toutefois pas
-être stockées étant donnés leur volume et la durée d’observation. Ainsi, un résumé fiable de ces
-données doit être calculé. Ce résumé doit permettre de montrer, pour chaque URL observée, la
-fréquence des requêtes et son évolution dans le temps avec une qualité d’approximation aussi
-bonne que possible.
-Il existe de nombreuses techniques capables de répondre au problème de l’exemple 1.
-Une première classe de techniques consiste à minimiser l’erreur locale. Une autre classe de
-techniques utilise un facteur d’ancienneté des données. La majorité des solutions existantes
-dans les flux de données est basée sur la deuxième classe de méthodes (utilisant l’ancienneté).
-Dans cet article, notre objectif et de proposer la méthode REGLO capable (1) de se res-
-treindre à l’espace mémoire disponible et (2) de calculer une approximation efficace et fiable
-d’une série temporelle. REGLO est une méthode rapide et fiable de compression des séries
-ayant une stratégie d’optimisation basée sur la minimisation de l’erreur globale des résumés
-de plusieurs séries. De plus, REGLO fonctionne en temps réel.
-Ce papier est organisé de la manière suivante. La section 2 présente les techniques exis-
-tantes. En section 3 nous présentons notre méthode REGLO minimisant l’erreur globale. En
-section 4 nous exposons les formules de calcul de la fusion de deux segments et de l’erreur rési-
-duelle pour notre nouvelle technique d’approximationApproximation par les Millieux (AMi)et
-pour la Régression Linaire(RL). Enfin, la section 5 donne nos résultats d’expérimentations.
-2 Etat de l’art
-Concernant l’approximation d’une série temporelle, de très nombreuses techniques ont été
-proposées dans la littérature. Ce sujet a été étudié dans de nombreux domaines comme la
-finance (Zhu et Shasha (2002)), l’extraction de motifs fréquents (Giannella et al. (2003); Teng
-RNTI-E-19 - 218 -
-Alice Marascu et al.
-et al. (2003)), la surveillance de réseaux (Borgne et al. (2007); Airoldi et Faloutsos (2004))
-ou encore dans des applications comme la gestion des capteurs d’un réseau de distribution
-d’eau potable (Papadimitriou et al. (2005)). Les méthodes d’approximation proposées sont
-basées sur les ondelettes (Popivanov (2002); Chan et Fu (1999)), la transformée de Fourier
-(Faloutsos et al. (1994); Rafiei et Mendelzon (1997)), la régression linaire (RL) (Shatkay et
-Zdonik (1996); Keogh et Pazzani (1998)), etc.
-Dans Lin et al. (2003), les auteurs proposent une représentation symbolique des séries tem-
-porelles avec l’algorithme SAX. SAX permet de discrétiser les données d’origine à l’aide de
-chaînes de symboles. Les manipulations se faisant ensuite sur les symboles plutôt que sur les
-données. Dans Yi et Faloutsos (2000), les auteurs proposent segmented-means, une méthode
-d’extraction du vecteur de caractéristiques des série temporelles. segmented-means découpe
-chaque série en plusieurs segments de longueur égale. Ensuite, pour chaque segment, les ca-
-ractéristiques sont obtenues en calculant la moyenne des valeurs de ce segment. Un avantage
-important de segmented-means est son adaptation à n’importe quelle norme Lp. Cependant la
-majorité des approches se placent dans le cadre de la norme L2. Dans ce cas, l’erreur qua-
-dratique est utilisée comme mesure de qualité de l’approximation entre le modèle choisi et
-les valeurs des séries temporelles. Par exemple la régression linéaire permet de construire une
-droite qui approche au mieux, au sens des moindres carrés, les séries temporelles d’origine.
-Bellman (1961) utilise la programmation dynamique pour trouver une solution optimale
-à l’approximation d’une série temporelle par M modèles. Les contraintes sont (1) la mise à
-jour des modèles doit être récursive, (2) l’erreur quadratique globale d’approximation doit se
-décomposer en une somme d’erreurs locales sur chaque modèle. Comme la complexité de
-cette approche est en O(N2) où N est le nombre de valeurs observées cette approche n’est
-pas utilisable dans le cadre des flux de données. De plus une version incrémentale générique
-de l’algorithme de programmation dynamique est impossible Cependant quand M = 2 la
-complexité devient linéaire et la formule de mise à jour de l’erreur quadratique globale est
-calculable à partir des erreurs locales associées à chaque modèle. Ce sont ces propriétés qui
-seront utilisées pour mettre en IJuvre une approche incrémentale. Une approche incrémentale
-basée sur la transformée de Fourier est proposée dans Ogras et Ferhatosmanoglu (2006). Les
-auteurs proposent de trouver les coefficients qui minimiseraient l’erreur quadratique entre la
-séquence d’origine et sa représentation, le tout dans un contexte dynamique.
-Chen et al. (2002) et Palpanas et al. (2008) proposent des techniques pour un calcul incré-
-mental de la RL sur une série temporelle. Dans Chen et al. (2002) les auteurs proposent un
-principe intéressant de fusion des segments en temps linéaire mais ils ne donnent pas d’infor-
-mation sur le calcul de l’erreur. Dans Palpanas et al. (2008) les auteurs reprennent le principe
-de fusion des segments donné par Chen et al. (2002) et proposent un théorème qui montre
-que l’erreur entre l’approximation obtenue sur deux segments et les points d’origine peut être
-calculée, de manière récursive, comme la somme des erreurs entre (a) les deux segments et
-les points d’origine et (b) les deux segments et l’approximation sur ces deux segments. En-
-suite, Palpanas et al. (2008) propose une étude sur l’intégration du facteur d’ancienneté dans
-le calcul de la RL. Chen et al. (2002) propose également l’utilisation d’un facteur d’ancienneté
-en stockant des résumés de séries temporelles dans des cubes. Le modèle d’ancienneté utilisé
-est celui des fenêtres logarithmiques (le facteur d’oubli des données augmente de manière lo-
-garithmique dans le temps). Teng et al. (2003) et Giannella et al. (2003) proposent de gérer
-l’historique des fréquents extraits à partir d’un flux en appliquant également un facteur d’an-
-RNTI-E-19- 219 -
-REGLO : résumer un flux de séries temporelles
-cienneté. Dans Giannella et al. (2003), le principe des fenêtres logarithmiques est appliqué afin
-d’accorder une plus grande importance à l’historique récent. Dans Teng et al. (2003), l’histo-
-rique est représenté sous la forme d’une série temporelle et l’approximation est appliquée en
-priorité sur les segments anciens.
-Citons également Zhu et Shasha (2002) qui propose de gérer plusieurs séries temporelles
-simultanément. Les auteurs proposent StatStream, une méthode permettant de gérer un en-
-semble de séries et de détecter les paires de séries ayant un coefficient de corrélation supérieur
-à un seuil donné. Les comparaisons sont faites sur les représentations condensées (basées sur
-les ondelettes) des données d’origine.
-3 REGLO : principe général et algorithme
-La sous-section 3.1 présente le principe général de notre approche afin de résumer un flux
-de séries temporelles. L’algorithme REGLO est décrit en sous-section 3.2.
-3.1 Principe général
-Soit T [1..n], un ensemble de n séries temporelles à observer. Soit T [j] la jeme série de T
-alors à l’étape s on a T [j] = (T [j][1], ..., T [j][s]] comme ensemble des observations (valeurs)
-de T [j]. Soit M la quantité de mémoire disponible (en d’autres termes, on peut stocker M
-équations de ces segments en mémoire). Nous considérons le cas de temps discrétisé. A chaque
-étape s nous avons une valeur pour chaque série (la valeur par défaut étant zéro). La valeur
-maximum de s permettant de stocker les mesures sans compression est s = M/n. Quand
-(s × n) > M , la représentation des séries doit être compressée et la perte d’information est
-liée à la différence entre ces deux nombres.
-Soit R[1..n], l’ensemble des représentations des n séries et S[i] la taille de R[i] (i.e. le
-nombre de segments utilisés par la représentationR[i]). La représentationR[i] de la série i est
-une approximation de cette série en S[i] segments avec comme contrainte globale
-∑n
-i=1 S[i] =
-M .
-Soit E[i], l’erreur de R[i] par rapport aux données d’origine de la série i et E(R), l’erreur
-globale de R[1..n]. Alors E(R) =
-∑n
-i=1 E[i].
-Le premier problème traité dans cet article porte sur la recherche d’une distribution opti-
-male desM segments disponibles afin de minimiser l’erreur globale E(R) dans un traitement
-en ligne. Ainsi, à chaque étape s nous avons le choix entre :
-1. étendre le dernier segment des séries en incluant s.
-2. ou bien créer un nouveau segment et réunir les deux segments ayant la plus faible erreur
-locale.
-Ce choix se fait en fonction de l’erreur globale E(R) de ces mises à jour.
-3.2 L’algorithme REGLO
-Le principe de REGLO repose sur une mesure fondamentale mais compliquée à calculer
-rapidement : l’erreur résiduelle de la fusion de deux segments. Dans un environnement dy-
-namique tel qu’un flux de données, l’optimisation la plus importante est de rendre récursif le
-RNTI-E-19 - 220 -
-Alice Marascu et al.
-calcul de l’erreur résiduelle c’est-à-dire que l’erreur résiduelle de la fusion de deux segments
-se calcule en fonction de l’erreur résiduelle de chaque segment et du coût de fusion de ces
-deux segments. LŠautre avantage de REGLO est dŠavoir une gestion globale de la mémoire
-que lŠon ne retrouve pas dans les algorithmes qui résument les séries temporelles.
-Algorithme REGLO
-Entrée : T , un flux composé de n séries temporelles etM le nombre de segments disponibles
-pour le modèle.
-Sortie : à chaque étape s, R[1..n], les représentations de T avec une erreur globale optimisée.
-R[i] est la représentation de la série i. R[i][j] est la jeme valeur de la ieme série. R[i].der et
-R[i].avantder sont le dernier et l’avant-dernier élément de R[i].
-1. Tant que (s× n) < M , ∀i ∈ [1..n]
-(a) Affecter un segment à chaque nouvelle valeur de T .
-(b) Calculer l’erreur de fusion entre le dernier élément arrivé dans une série et le pré-
-cédent élément et mettre a jour la pileC qui conserve les coûts de fusion deR[1..n]
-triés par ordre croissant.1
-2. Pour chaque nouvel ensemble de n valeurs de l’étape s (s > M/n) :
-(a) ∀i ∈ [1..n]
-i. Calculer l’erreur de fusion de la nouvelle valeur T [i][s] avec le segment pré-
-cédent ;
-ii. Mise à jour de l’erreur de R[i] et, au cas échéant, de la pile C.
-(b) Exécuter n fois les pas suivants2 :
-i. Fusionner les deux segments, t et t′, correspondants au premier élément de la
-pile C et obtenir le segment t′′ ;
-ii. Mettre à jour le(s) coût(s)3 de fusion de t′′ avec les segments adjacents et la
-pile C.
-Dans la section 4 nous présentons les moyens de calculer la fusion de deux segments et
-l’erreur résiduelle pour (RL) et (AMi).
-4 Fusion de deux segments
-4.1 Fusion de deux segments dans la cadre de la régression linéaire
-Comme mentionné en section 2, Chen et al. (2002) donne un ensemble de formules per-
-mettant d’obtenir la RL sur deux segments en O(1) et Palpanas et al. (2008) donne la formule
-permettant de mettre à jour en O(1) l’erreur issue de cette fusion.
-1La pile est utilisée afin de retrouver, à chaque étape, l’élément avec le moindre coût de fusion.
-2Afin de libérer n segments de mémoire
-3Pour un élément intérieur à la série on a deux mise à jour à faire (liens gauche et droite) et pour le dernier élément
-d’une séries on a une seule mise à jour (lien gauche).
-RNTI-E-19- 221 -
-REGLO : résumer un flux de séries temporelles
-Considérons deux ensembles S1 = {i|i = 1, . . . , k} et S2 = {i|i = k + 1, . . . , s} et S la
-fusion. Palpanas et al. (2008) montre que les coefficients de l’équation Y = α1.X + β1 de la
-régression linéaire de S sont dérivés des paramètres des régressions des ensembles S1 et S2.
-Dans Palpanas et al. (2008), le théorème 2 est important car il permet de calculer la somme
-des erreurs carrées sur S avec les erreurs carrées sur S1 et S2 et l’erreur entre les régressions
-locales sur S1 et S2 et la régression globale sur S. Ce qui s’exprime comme :
-E(S) = E(S1) + E(S2) + Eˆ(S1 ∪ S2) (1)
-Selon le lemme 1 de Palpanas et al. (2008), l’erreur Eˆ(S1 ∪ S2) qui est le coût de cette
-fusion, peut être calculée enO(1). La mise à jour de l’erreurE(S) permet de calculer le coût de
-la fusion de S1 avec S2. Ce coût est égal àC(S1∪S2) = E(S)−E(S1)−E(S2) = Eˆ(S1∪S2)
-et est utilisé dans l’étape 2 de l’algorithme REGLO.
-4.2 Une approche rapide pour la fusion des segments
-Bien que les résultats précédents permettent de fusionner et d’évaluer l’erreur et le coût de
-fusion en O(1), nous voulons optimiser encore cette étape. En effet, ces calculs sont au cœur
-de notre algorithme d’approximation destiné à résumer un flux de données. Toute optimisation
-de ces calculs sera donc nécessaire. Si l’opération de fusion est en temps linéaire, de meilleurs
-temps d’exécution peuvent être obtenus en diminuant le nombre d’opérations, ce qui peut être
-crucial dans le contexte des flux de données. Dans cette section, nous proposons de calculer
-une approximation de la RL grâce à une idée innovante basée sur l’observation suivante : quand
-le coût de fusion de deux segments est faible alors les points de croisements entre la droite de
-régression et les segments sont proches des milieux de ces segments.
-Fusion de deux segments
-La RL a pour résultat une représentation d’une série temporelle telle que chaque segment
-minimise la somme des erreurs quadratiques entre la représentation et les données d’origine.
-Notre approche consiste à élaborer une approximation intuitive et efficace de ces valeurs d’ori-
-gine. AMi, notre technique d’approximation, sera représentée par la ligne qui coupe les seg-
-ments d’origine en leurs milieux. Cette technique présente deux avantages principaux :
-1. Elle ne demande pas de nombreux calculs impliquant autant de variables que la RL, ce
-qui la rend plus rapide que cette dernière.
-2. Son interprétation est naturelle. Cette technique ne minimise pas la somme du carré des
-erreurs, mais nous montrons que l’approximation obtenue est très fidèle aux données
-d’origine. En effet, la somme du carré des erreurs a pour but de pénaliser les représen-
-tations qui ne tiennent pas compte des valeurs aberrantes. L’erreur sur ces valeurs étant
-rendues très importante dans le calcul global en raison de la puissance de deux utili-
-sée. Privilégier les valeurs aberrantes n’est pas forcément le meilleur moyen d’avoir une
-représentation fidèle des données d’origine. Comme nous le montrerons, les représenta-
-tions obtenues par AMi et la RL sont comparables. Toutefois, nous voulons être moins
-sensibles aux valeurs aberrantes. Ainsi, la représentation obtenue par AMi est un bon
-compromis entre les normesL1 et L2. En effet, nos expérimentationsmontrent que AMi
-peut avoir de meilleurs résultats quand l’erreur est mesurée dans la norme L1.
-RNTI-E-19 - 222 -
-Alice Marascu et al.
-FIG. 1 – Illustration de la RL (minimisant l’erreur quadratique) en comparaison d’AMi (ligne
-qui passe par les milieux des segments).
-Exemple 2 La figure 1 illustre la différence entre la RL (gauche) et AMi (droite). Avec AMi,
-un premier ensemble de 4 segments est construit entre les points 1 et 2, les points 3 et 4, les
-points 5 et 6 et les points 7 et 8. Ensuite, le deuxième niveau d’approximation fusionne les deux
-premiers segments en passant par les milieux des segments et on obtient le segment S1 de la
-figure 1. Le même principe est appliqué aux deux segments restants (points 5 à 8) pour donner
-le segment S2. Le troisième niveau d’approximation fusionnera les deux segments S1 et S2
-avec pour résultat S, le segment qui passe par leurs milieux (i.e. (¯i1, j¯1) et (¯i2, j¯2)).
-Soit (¯i1, j¯1) et (¯i2, j¯2) les milieux des segments S1 et S2 avec i¯1 = (k + 1)/2 et i¯2 =
-(s + k + 1)/2. L’équation du segment S est obtenue par résolution des équations linéaires
-j¯1 = α.¯i1 + β et j¯2 = α.¯i2 + β. La pente α et l’ordonnée β sont donnés par α =
-(j¯1 − j¯2)/(¯i1 − i¯2) et β = (j¯2 .¯i1 − j¯1 .¯i2)/(¯i1 − i¯2) et le nouveau point milieu (¯i, j¯) de
-S est égal à i¯ = (s+1)/2 et j¯ = α.¯i+β. Le calcul de j¯ est donné par j¯ = k.j¯1+(s−k)j¯2/s
-Mise à jour de l’erreur de AMi
-Théorème 1 L’erreur commise par AMi sur le segment S = S1 ∪ S2 peut être calculée de
-manière récursive à partir des erreurs pondérées des segments S1 et S2 et de la pente α du
-segment S.
-Preuve : La somme des erreurs carrées de S peut être décomposée en deux parties :
-E(S) =
-k∑
-i=1
-(ji − α.i− β)2 +
-s∑
-i=k+1
-(ji − α.i− β)2
-La première partie de cette décomposition peut être réécrite de la manière suivante :
-k∑
-i=1
-(ji − α.i− β − (α1.i+ β1) + (α1.i+ β1))2
+Dans le domaine de la discrimination par arbre de décision binaire, les variables
+explicatives sont souvent quantitatives ou qualitatives classiques. Le critère de découpage
+binaire de Kolmogorov-Smirnov a été introduit par (Friedman 1977 ; Utgoff et Clouse 1996)
+pour une partition binaire à expliquer avec des variables explicatives quantitatives classiques.
+Ce critère a été étendu aux variables explicatives qualitatives classiques par (Asseraf 1998).
+Cependant, depuis quelques années, avec l’avènement de l’analyse des données symboliques
+(Bock et Diday 2000), on assiste à la mise au point de méthodes de construction d'arbres de
+décision sur des données symboliques, notamment de type intervalle et histogramme (Périnel
+1996 ; Yapo 2002). Ces auteurs utilisent les critères de découpage classiques (entropie, Gini,
+gain ratio, likelihood) pour construire l’arbre de décision. Nous privilégions ici la méthode
+basée sur le critère de découpage binaire de Kolmogorov-Smirnov. Ce critère est basé sur un
+ordre total des valeurs prises par les variables explicatives. Nous pouvons ordonner des
+intervalles fermés bornés de ℜ (ensemble des nombres réels) de différentes façons (Diday et
+al. 2003) et chacune des relations d’ordre proposées est totale sur l’ensemble des intervalles
+fermés bornés. Nous présentons ici une approche exploratoire de construction d’arbres de
+décision. Cette approche consiste à construire un arbre pour chaque ordre et à comparer ces
+arbres obtenus selon le taux d’erreur réel mesuré sur l’échantillon de test. Pour estimer ce
+paramètre, nous utilisons l’approche suivante : chaque base de données utilisée est divisée
+aléatoirement en deux parties pour construire deux arbres et ces arbres sont d’abord testés
+par un même échantillon puis par deux échantillons différents (section 5). Comme les
+RNTI-E-367
+Arbresde décision sur des intervalles : Evaluation et Comparaison
+RNTI - 1
+échantillons de test et d’apprentissage sont indépendants et pris aléatoirement dans le fichier
+de données, la précision de l’estimation ne dépend que du nombre d’objets de l’ensemble de
+test et de la valeur du risque réel (Cornuéjols et Miclet 2002).
+2 Présentation du type de données des variables explicatives
+Désignons par ℑ l’ensemble des intervalles fermés et bornés de ℜ et par Ω l’ensemble
+des individus de la population. Pour un intervalle fermé x, notons r(x) sa borne supérieure et
+l(x) sa borne inférieure. Une variable de type intervalle (Bock et al. 2000) X est une
+application de Ω →ℑ telle que, pour tout Ω∈w , il existe deux nombres réels α et β
+(avec βα ≤ ) tels que ],[)( βα=wX .
+2.1 Ordonner des intervalles (Diday et al. 2003)
+Différentes méthodes permettent d’ordonner des intervalles selon leur positionnement.
+Un ordre d’intervalles est une relation anti-réflexive et transitive (un ordre d’intervalles est
+alors un ordre strict du fait que la relation est anti-réflexive).
+2.1.1 Intervalles disjoints
+Soit D un ensemble d’intervalles fermés disjoints (D ⊂ ℑ ). Désignons par xRy pour
+indiquer que l’intervalle x est « strictement avant » l’intervalle y (avec x, y des éléments de
+D). Nous utilisons le qualificatif « strictement » pour faire ressortir le fait que les intervalles
+sont disjoints. Mathématiquement, la relation R sur D se définit par : xRy ⇔ r(x) < l(y).
+Cette relation R est transitive et anti-réflexive et définit ainsi un ordre total strict sur D.
+2.1.2 Intervalles non disjoints
+Par analogie au cas disjoint, nous utilisons ici le qualificatif « presque » pour faire
+ressortir le fait que les intervalles sont non disjoints. Soient x et y deux intervalles non
+disjoints. Suivant leur positionnement, nous distinguons deux cas :
+– Ordonner « par la borne inférieure » : désignons par xIy : l’intervalle x est « presque
+avant » l’intervalle y. Nous distinguons deux cas: si les deux bornes inférieures sont égales,
+alors l’ordre sera déterminé par la position des bornes supérieures et si les deux bornes
+inférieures sont différentes, alors l’ordre sera déterminé par la position de ces bornes
+inférieures. Mathématiquement, la relation I se définit par :
+si l(x) = l(y) alors xIy⇔ r(x) < r(y) et si l(x) ≠ l(y) alors xIy⇔ l(x) < l(y).
+La relation I est transitive et anti-réflexive et définit un ordre total strict sur ℑ .
+– Ordonner « par la borne supérieure » : désignons par xSy : l’intervalle y est « presque
+après » l’intervalle x. Nous distinguons deux cas comme précédemment : si les deux bornes
+supérieures sont égales, alors l’ordre sera déterminé par la position des bornes inférieures et
+si les deux bornes supérieures sont différentes, alors l’ordre sera déterminé par la position de
+ces bornes supérieures. Mathématiquement, la relation S se définit par :
+si r(x) = r(y) alors xSy⇔ l(x) < l(y) et si r(x) ≠ r(y) alors xSy⇔ r(x) < r(y).
+RNTI-E-3 68
+Mballoet Diday
+RNTI - 1
+La relation S est transitive et anti-réflexive et définit un ordre total strict sur ℑ .
+Remarque : Soient deux intervalles x et y tels que l(x) < l(y) et r(y) < r(x) (l’intervalle y
+est strictement inclus dans l’intervalle x).
+[[]]
+l(x) l(y) r(y) r(x)
+En ordonnant par la relation I, on dira que x est « presque avant » y (xIy) car l(x) < l(y) et
+en ordonnant par la relation S, x est « presque après » y (ySx) car r(x) > r(y). Pour n’importe
+quelle autre configuration de deux intervalles x et y (mis à part ce cas d’inclusion stricte), si x
+est « presque avant » y (xIy), alors y est « presque après » x (xSy). Cela veut dire que I et S
+indiquent une même relation de précédence entre deux intervalles. La principale différence
+entre les deux relations I et S est le cas de l’inclusion stricte entre intervalles.
+Une méthode alternative simple consisterait à ordonner les intervalles par leurs centres.
+2.2 Présentation du tableau de données en entrée
+L’ensemble Ω est constitué d’objets (individus) destinés à être classés à l’aide d’un
+arbre de décision utilisant le critère de découpage binaire de Kolmogorov-Smirnov. Au
+départ, l’ensemble Ω est muni d’une partition en k classes (les classes a priori). Désignons
+par { }kK ,...,2,1= l’ensemble de ces classes et par Y la variable déterminant
+l’appartenance d’un objet ∈w Ω à l’une de ces classes (variable classe). Cette variable
+définit une fonction de classement Y de Ω→K telle que KiwY ∈=)( pour tout
+∈w Ω . La variable Y est la variable à expliquer. Chaque objet est aussi décrit par un
+vecteur X de p variables intervalles ),...,,( 21 PXXX appelées variables explicatives ou
+prédicteurs. Chaque variable explicative jX a pour espace de description ℑ⊂jXD ( jXD
+est un ensemble fini d’intervalles fermés bornés de ℜ). Le vecteur X est alors défini de
+Ω→ ∏
 =
-k∑
-i=1
-(ji − α1.i− β1)2 + (α1.i+ β1 − α.i− β)2
-RNTI-E-19- 223 -
-REGLO : résumer un flux de séries temporelles
-+2(ji − α1.i− β1)
-(
-(α1 − α).i+ (β1 − β)
-)
-La première somme des erreurs quadratiques dans la première ligne de cette réécriture
-représente la somme des erreurs quadratiques de S1 obtenue avec AMi. La seconde partie
-représente les erreurs entre le segment S1 obtenu par AMi et le segment S obtenu par AMi
-calculé sur S1. Comme le modèle obtenu par la RL, AMi vérifie que
-∑k
-i=1(ji−α1.i−β1) = 0
-et la dernière partie peut être simplifiée parΔ(S1/α) = 2(α1 − α)
-∑k
-i=1(ji − α1.i− β1)i
-Avec AMi, la somme des erreurs quadratiques de E(S) est plus complexe que la somme
-des erreurs quadratiques de la RL définie par l’équation 1 mais la complexité par rapport à s
-est inchangée. E(S) peut être exprimé de la manière suivante :
-E(S) = E(S1) + E(S2) + Eˆ(S1 ∪ S2) + Δ(S1/α) + Δ(S2/α) (2)
-Le calcul de Δ(S1/α) ou Δ(S2/α) dépend de la pente du nouveau segment S et des
-valeurs δ(S1) =
-∑k
-i=1 i.ji et δ(S2) =
-∑s
-i=k+1 i.ji. Ainsi, la relation linéaire δ(S) = δ(S1)+
-δ(S2) existe et δ est maintenu pour chaque segment.
-De plus,Δ(S1/α) peut se calculer facilement : Δ(S1/α) = −α.δ(S1) + Λ(S1) où Λ(S1)
-dépend seulement du segment S1 et on obtient :
-E(S) = (E(S1) + Λ(S1)) + (E(S2) + Λ(S2)) + Eˆ(S1 ∪ S2)− α(δ(S1) + δ(S2))
-5 Expérimentations
-Dans cette section, nous évaluons l’efficacité et la qualité de notre méthode d’approxima-
-tion grâce à un ensemble d’expérimentations. Nous avons implémenté deux versions de RE-
-GLO. Dans la première version, l’approximation et le calcul de l’erreur sont basés sur la RL.
-Dans la deuxième version, l’approximation et le calcul de l’erreur sont basés sur AMi (C.f. sec-
-tion 4.2). Nous avons également implémenté une compression basée sur les ondelettes et une
-autre basée sur les fenêtres logarithmiques afin de comparer REGLO avec les techniques les
-plus importantes. Une description des ondelettes peut être trouvée en Daubechies (1992). Les
-fenêtres logarithmiques sont décrites en Chen et al. (2002); Giannella et al. (2003). Nous avons
-évalué nos algorithmes sur deux jeux de données réelles. Le premier jeu de données, “NYSE”,
-est construit sur les données téléchargées depuis http://icf.som.yale.edu/nyse.Ce
-jeu contient 134 séries temporelles, chacune contenant 804 valeurs correspondant aux valeurs
-du marché de New-York de 1815 à 1925. Le deuxième jeu de données, “WEB”, vient des logs
-d’accès Web anonymisés de l’Inria Sophia-Antipolis. Nous avons recueilli un an d’usage, pour
-un total de 14 Go. Un premier prétraitement a permis d’extraire les URLs les plus fréquentes
-de ce jeu. Avec un support minimum de 1%, nous en avons trouvé 223. Ensuite, nous avons
-reporté les variations du nombre de requêtes à ces URLs avec une fenêtre sautante de taille
-1000. En d’autres termes, chaque série est mise à jour toutes les 1000 requêtes et la valeur
-affectée à la série correspond au nombre de requêtes sur l’URL pendant cet intervalle.
-REGLO (versions RL et AMi) est implémenté en Java. Les expérimentations sont effec-
-tuées sur un PC équipé de 2 Gb de mémoire et un pentium à 4 processeurs cadencés à 2,2
-Ghz.
-RNTI-E-19 - 224 -
-Alice Marascu et al.
-5.1 Comparaison entre AMi et la RL
-Dans ce premier ensemble d’expérimentations nous évaluons, sur les deux jeux de don-
-nées :
-– L’impact de AMi sur l’erreur moyenne à chaque étape.
-– La différence des temps d’exécutions entre AMi et la RL.
-FIG. 2 – Erreur moyenne étape par étape pour AMi et la RL sur NYSE et WEB.
-La figure 2 montre l’erreur moyenne des approximations obtenues par AMi et la RL pour
-les données NYSE (haut) et WEB (bas) sur les 251 premières valeurs. L’erreur est la moyenne
-des erreurs entre les représentations de l’enregistrement i dans les n séries et la valeur réelle
-de i. Ainsi, pour chaque unité de temps, nous connaissons l’erreur moyenne du modèle pour
-les n séries temporelles. Pour NYSE les erreurs moyennes commises par AMi et la RL sont
-très proches. La qualité de l’approximation obtenue par AMi est illustrée sur le jeu de données
-WEB. Pour ce jeu, AMi obtient une très bonne erreur moyenne en comparaison de la RL. La
-sous-section 5.2 donne les erreurs globales moyennes des deux méthodes d’approximation et
-AMi obtient de meilleurs résultats (0,87) que la RL (2,52). Cela est dû au fait que AMi ne tente
-pas d’optimiser la somme des erreurs carrées. En effet, notre but est trouver un compromis
-entre l’erreur minimale en L1 et celle en L2, ce pour quoi AMi obtient des résultats meilleurs
-que la RL (comme illustré par la figure 2).
-La figure 3 montre les temps d’exécution de REGLO sur les deux jeux de données, sont sys-
-tématiquement plus faible pour AMi. L’explication vient du nombre considérablement réduit
-d’opérations (Cf. les formules de la section 4.2) nécessaires à AMi pour calculer l’approxima-
-tion et l’erreur résiduelle en comparaison des formules complexes (que nous avons pourtant
-simplifiées autant que nous le pouvons) de la RL (Cf. section 4.1).
-RNTI-E-19- 225 -
-REGLO : résumer un flux de séries temporelles
-FIG. 3 – Temps d’exécution de AMi et de la RL sur NYSE et WEB en fonction de la mémoire
-disponible.
-5.2 Ondelettes et fenêtres logarithmiques
-L’objectif de cette section est de comparer l’erreur commise par REGLO avec celles des
-ondelettes et des fenêtres logarithmiques.
-Le tableau 1 donne l’erreur globale moyenne de chaque modèle en comparaison aux don-
-nées d’origine. Pour chaque modèle, l’erreur moyenne est calculée à chaque étape (comme
-décrit à la section 5.1). Ensuite, la valeur moyenne des erreurs de chaque modèle est reportée
-dans la table 1. Les modèles obtenus par AMi et la RL disposent chacun de 5000 segments.
-Les modèles basés sur les fenêtres logarithmiques demandent 11 segments par série (11 étant
-obtenu par le logarithme de s, le nombre maximum de valeurs dans les séries du jeu de don-
-nées). Le modèle basé sur les ondelettes dispose d’un nombre de segments correspondant à
-celui de REGLO.
-TAB. 1 – Erreurs globales des ondelettes, des fenêtres logarithmiques, de la RL et de AMi
-WEB NYSE
-Fenêtres 17.245627 2.451278
-Ondelettes 14.0588 1.55812
-RL 2.529895911 0.857884432
-AMi 0.879335223 0.868300858
-6 Conclusion
-Dans cet article, nous avons présenté (1) REGLO, une stratégie de résumé d’un flux de
-séries temporelles et (2) AMi, un principe rapide d’approximation des valeurs d’une série.
-REGLO est capable de gérer de nombreuses séries temporelles sans limite de taille grâce à
-son principe d’équilibre et de distribution de la mémoire entre les représentations. Ce prin-
-cipe permet à chaque série d’obtenir ou de restituer de l’espace mémoire selon ses besoins
-de précision. Notre principe d’approximation rapide est comparé à la régression linéaire dans
-ses aspects formels mais aussi grâce à une batterie d’expérimentations. Notre étude sur les
-RNTI-E-19 - 226 -
-Alice Marascu et al.
-relations entre AMi et la RL montre que AMi permet un calcul récursif de l’erreur entre la
-représentation et les données d’origine. Nous avons évalué nos algorithmes sur des données
-réelles afin de montrer les performances de notre technique d’approximation et de la distribu-
-tion de l’espace mémoire. Ces expérimentations montrent que nos objectifs (diminuer l’erreur
-globale et accélérer les temps de calcul des résumés) sont atteints. Parmi les pistes ouvertes
-par ce travail citons l’étude des caractéristiques des données sur lesquelles l’approximation
-obtenue par AMi est meilleure que celle de la RL.
+=
+p
+j
+XX j
+DD
+1
+telle que Xp DxxxwX ∈= ),...,,()( 21 pour tout ∈w Ω ( jx
+est un intervalle fermé borné de ℜ pour tout pj ,...,1= ). Avec ces applications X et Y ,
+un objet ∈w Ω est alors modélisé par le couple XDyx ∈),( xK . Au départ du processus
+de construction d’un arbre de décision par le critère de Kolmogorov-Smirnov, notre tableau
+de données en entrée se présente alors comme le tableau (TAB 1) ci-dessous.
+Variables
+Individus (objets) 1X
+……………
+pX Y
+Objet_1 ],[ 11 ba …………….. ],[ 11 dc 1
+………. ………. ……………. …..
+Objet_n ],[ nn ba ……………. ],[ nn dc j
+TAB 1 – Format standard du tableau de données en entrée
+RNTI-E-369
+Arbresde décision sur des intervalles : Evaluation et Comparaison
+RNTI - 1
+A partir d’un tel tableau, nous pouvons appliquer les méthodes exposées précédemment
+(section 2.1) pour ordonner les intervalles afin de dérouler l’algorithme de Kolmogorov-
+Smirnov pour la construction d’arbres binaires de décision. A l’arrêt de la construction de
+l’arbre de décision, chaque objet est affecté à une classe (classe majoritaire du nœud terminal
+auquel appartient l’objet). Si on note par
+^
+Y cette fonction permettant d’affecter une classe à
+un objet à l’arrêt du processus de construction de l’arbre (
+^
+Y est définie sur l’ensemble
+d’arrivée XD de X à valeurs dans l’ensemble d’arrivée K de Y ), alors le problème se
+présente sous la forme suivante :
+Ω K
+X
+XD
+L’objectif est alors de rechercher (ou de s’approcher au mieux) de la situation idéale
+suivante : Y =
+^
+Y ο X où « ο » désigne la composition des applications.
+3 Le critère de découpage binaire de Kolmogorov-Smirnov
+Dans cette section, nous utiliserons certaines notations de la section 2.2. Pour construire
+un arbre de décision, nous avons besoin d’un critère d’évaluation de la coupure d’un nœud
+en deux nœuds fils. Le critère de Kolmogorov-Smirnov (noté KS dans la suite) a été introduit
+par (Friedman 1977) pour une partition binaire à expliquer (les variables explicatives sont
+quantitatives classiques). Pour utiliser ce critère KS, Friedman suppose que les coûts de
+mauvais classement et les probabilités a priori des classes sont inversement proportionnels
+(pour ne pas faire des estimations des probabilités a priori). Ce critère KS permet de séparer
+une population en deux sous-populations plus homogènes en se basant sur les deux fonctions
+de répartition des classes a priori (cas de deux classes) pour chaque variable explicative.
+Dans le cas où le nombre de classes a priori est k avec k >2, les fonctions de répartition
+sont induites par le regroupement de ces k classes a priori en deux groupes appelés super
+classes par la méthode « twoing splitting process » (Breiman et al. 1984). Il y a ( 12 1 −−k )
+possibilités de regrouper k classes en deux groupes, mais cette complexité exponentielle a été
+réduite à une complexité polynomiale par (Asseraf 1998), qui a d’ailleurs étendu ce critère
+KS au cas où les variables explicatives sont qualitatives classiques. Cette méthode « twoing
+splitting process » est utilisée pour générer deux super classes 1G et 2G auxquelles sont
+associées deux fonctions de répartitions 1F et 2F d’une variable aléatoire (variable
+explicative). La fonction de répartition a pour rôle de compter toutes les valeurs inférieures à
+un certain seuil. Les deux fonctions de répartition théoriques 1F et 2F ne sont pas connues
+en pratique. S’il n’y a pas d’ordre sur les observations, on ne peut pas estimer la fonction de
+répartition théorique iF par la fonction de répartition empirique iFˆ (i = 1,2) comme dans le
+cas continu. Par ailleurs, on peut estimer car on a un ordre des observations (intervalles
+Y
+^
+Y
+RNTI-E-3 70
+Mballoet Diday
+RNTI - 1
+fermés bornés de ℜ) et l’ensemble { } { }iXX GyDyxyDy jj ∈∈∩≤∈ // est toujours
+fini en pratique ( pj ,...,2,1= ; 2,1=i et « ≤ » un ordre d’intervalles). Selon l’ordre
+choisi pour ordonner les observations d’une variable explicative de type intervalle jX , la
+fonction de répartition empirique
+^
+j
+iF (i = 1,2) qui estime
+j
+iF en jXDx∈ est donnée par :
+^
+j
+iF
+{ } { }( )
+{ }( )iX
+iXX
+GyDyCardinal
+GyDyxyDyCardinal
+x
+j
+jj
+∈∈
+∈∈∩≤∈
+=
+/
+//)(
+Ce sont les proportions réelles des observations pour chaque variable explicative jX
+relative à une classe a priori (ou super classe) iG . Ainsi le critère KS est défini par :
+jXDx
+KS
+∈
+= sup )()(
+^
+2
+^
+1 xFxF
+jj
+− pj ,...,2,1=∀ .
+C’est une extension naturelle du critère KS, seulement l’argument sélectionné pour le
+seuil de coupure est ici un intervalle et non un réel comme dans le cas classique. On peut
+donc utiliser toutes les autres étapes (communes à tout type de variable) pour construire
+l’arbre de décision. Les auteurs ayant construit des arbres de décision sur des variables de
+type intervalle (Périnel 1996) avec les critères classiques (Gini, likelihood et gain ratio)
+prennent le centre de l’intervalle comme seuil de coupure.
+4 Un exemple illustratif
+Nous présentons dans cette section un exemple pour illustrer le mécanisme de
+construction d’un arbre de décision binaire à l’aide du critère KS sur des variables
+explicatives de type intervalle. Le tableau (TAB 2) ci-dessous est un extrait de la base de
+données « développement des pays du monde »1. C’est une base de données sur quelques
+pays du monde en 2000, constituée à partir des indicateurs composites du développement
+acceptés par la banque mondiale, le fond monétaire international et les Nations Unies. Au
+début, il y avait une cinquantaine de pays répertoriés sur les cinq continents. Ces pays sont
+divisés en deux catégories économiques : pays développés (catégorie 0) et pays en
+développement (catégorie 1). Le croisement de ces deux catégories économiques avec les
+cinq continents donne dix concepts (ces concepts sont les individus de cet exemple). Par
+exemple les concepts DEUR et SDEUR signifient respectivement « pays développés » et
+« pays en développement » dans le continent Européen. Les variables explicatives sont :
+X 1 = Population (en milliers); X 2 = Taux de croissance de la population (par an); X 3 =
+Superficie totale du pays (en milliers de kilomètres carrés); X 4 = Espérance de vie (en
+années) et X 5 = Taux d’analphabétisme des femmes. La variable à expliquer est Y =
+Nom_catégorie.
+1 Rapport de Stage (DESS Informatique Décisionnelle) de Ravelomanantsoa H., Université Paris
+Dauphine (2002), disponible à l’URL http://www.ceremade.dauphine.fr/~touati/exemples.htm
+RNTI-E-371
+Arbresde décision sur des intervalles : Evaluation et Comparaison
+RNTI - 1
+Variables
+Individus
+X 1 X 2 X 3 X 4 X 5 Y
+DAMQ [15211;283230] [0.9;1.8] [757;9976] [67.2;78.5] [0;14.6] 0
+SDAMQ [2576;25662] [0.8;2.6] [11;1285] [64;76] [4.3;38.7] 1
+DEUR [4469;82017] [0;0.5] [41;547] [77.2;79.3] [0;0] 0
+SDEUR [1988;145491] [-0.4;0.2] [20;17075] [66.1;78.2] [0;0] 1
+DOCE [814;19138] [0.9;1.2] [18;7682] [68.4;78.7] [0;9.2] 0
+SDOCE [159;4809] [0;2.7] [3;462] [55.6;70.5] [21;52] 1
+DAFR [1161;67884] [0.8;1.9] [2;1221] [56.7;70.7] [15.4;63.9] 0
+SDAFR [1757;35119] [0.9;2.9] [196;945] [40.6;52.3] [15.3;72.3] 1
+DASI [4913;1275130] [0.3;2.9] [20;9597] [65.1;80.5] [1;23.7] 0
+SDASI [16189;1008940] [1.4;2.6] [185;3287] [62.3;71.9] [4.8;54.6] 1
+TAB 2 – Données initiales.
+Le critère KS requiert un ordre des valeurs des variables explicatives. Pour simplifier,
+nous présentons ici les résultats obtenus en ordonnant les intervalles par la borne inférieure
+(TAB 3, le nombre entre parenthèses est la classe a priori de l’intervalle selon la variable Y).
+X 1 X 2 X 3 X 4 X 5
+[159;4809] (1) [-0.4;0.2] (1) [2;1221] (0) [40.6;52.3] (1) [0;0] (0)
+[814;19138] (0) [0;0.5] (0) [3;462] (1) [55.6;70.5] (1) [0;0] (1)
+[1161;67884] (0) [0;2.7] (1) [11;1285] (1) [56.7;70.7] (0) [0;9.2] (0)
+[1757;35119] (1) [0.3;2.9] (0) [18;7682] (0) [62.3;71.9] (1) [0;14.6] (0)
+[1988;145491] (1) [0.8;1.9] (0) [20;9597] (0) [64;76] (1) [1;23.7] (0)
+[2576;25662] (1) [0.8;2.6] (1) [20;17075] (1) [65.1;80.5] (0) [4.3;38.7] (1)
+[4469;82017] (0) [0.9;1.2] (0) [41;547] (0) [66.1;78.2] (1) [4.8;54.6] (1)
+[4913;1275130] (0) [0.9;1.8] (0) [185;3287] (1) [67.2;78.5] (0) [15.3;72.3] (1)
+[15211;283230] (0) [0.9;2.9] (1) [196;945] (1) [68.4;78.7] (0) [15.4;63.9] (0)
+[16189;1008940] (1) [1.4;2.6] (1) [757;9976] (0) [77.2;79.3] (0) [21;52] (1)
+TAB 3 – Ordre des intervalles par la borne inférieure
+Nous obtenons la figure (FIG 1) en déroulant l’algorithme KS sur le tableau (TAB 3).
+FIG. 1 – Arbre de décision obtenu en ordonnant les intervalles par la borne inférieure
+5 | 5
+X 4 ≤ [64;76]1 | 4 4 | 1
+X 3 ≤ [2;1221] X 2 ≤ [-0.4;0.2]1 4
+41
+DAFR
+class 0
+SDOCE,SDAMQ,
+SDASI,SDAFR
+class 1
+SDEUR
+class 1 DEUR,DASI,
+DOCE,DAMQ
+class 0
+RNTI-E-3 72
+Mballoet Diday
+RNTI - 1
+5 Evaluation et comparaison
+Dans cette section, l’objectif consiste à explorer les différents ordres d’intervalles afin de
+voir celui qui présente les meilleurs résultats en terme de risque réel (mesuré sur la matrice
+de confusion de l’ensemble de test). Les fichiers2 que nous utilisons sont présentés au tableau
+(TAB 4). Ce sont des fichiers obtenus à partir de bases de données classiques à l’aide du
+module DB2SO (Data Base two Symbolic Objects) du logiciel libre Sodas3. En fait nos
+individus (ou objets) ne sont pas des individus au sens classique du terme (individus de
+premier ordre), mais des concepts (individus de second ordre) comme ceux présentés au
+tableau (TAB 2). La colonne « Nb_cl » indique le nombre de classes a priori de la variable à
+expliquer (variable nominale) et la colonne « Répartition par classe a priori » donne la
+répartition des objets par classe a priori. Par exemple la notation (20 ;10) indique que vingt
+(20) objets sont de la classe « 1 » et dix (10) de la classe « 2 » pour une variable nominale
+ayant deux modalités notées « 1 » et « 2 ». La dernière colonne « Nb_var » indique le
+nombre de variables explicatives (toutes de type intervalle).
+Le procédé que nous utilisons pour estimer le risque réel est le suivant : pour chaque
+fichier, nous partageons aléatoirement le nombre d’objets en deux parties égales (en terme
+d’effectif) à un objet près (nous prenons deux parties car la taille de nos fichiers est
+relativement modeste) et nous construisons ainsi un arbre pour chaque partie. Le taux
+d’erreur réel estimé
+^¨
+rR sera alors la moyenne des deux taux d’erreur estimés obtenus des
+deux arbres. Pour la construction des deux arbres, nous utilisons deux approches : le cas où
+les deux arbres sont testés par un même échantillon (section 5.1) et le cas où ils sont testés
+par des échantillons différents (section 5.2). Le nombre d’objets minimum d’un nœud
+terminal (fixé à 2 pour les fichiers F_1 à F_9 ; 5 pour les fichiers F_10 à F_12 ; 10 pour les
+fichiers F_13 à F_15 et 25 pour le fichier F_16) permet d’arrêter le développement de
+l’arbre. Nous désignons par n la taille totale d’un fichier de données et t celle de son
+ensemble de test. Dans le cas où le cardinal de l’ensemble de test est assez grand (au-delà de
+100 objets), l’intervalle de confiance de l’estimateur
+^¨
+rR à x% est donné par (Cornuéjols et
+Miclet 2002) : [
+^¨
+rR −ϕ(x) )1(
+^
+^
+r
+r R
+t
+R
+− ;
+^¨
+rR + ϕ(x) )1(
+^
+^
+r
+r R
+t
+R
+− ] où ϕ(x) prend en
+particulier les valeurs du tableau TAB 5. Cela signifie que la probabilité que le risque réel
+soit à l’intérieur de cet intervalle est supérieur à x%. Les intervalles de confiance ne
+dépendent que de la taille t de l’échantillon de test. Nous présenterons les intervalles de
+confiance des estimateurs des risques réels des fichiers ayant un ensemble de test de plus de
+cent objets.
+Dans la légende de chaque figure, « Borne sup » signifie que les valeurs des variables
+explicatives (c’est-à-dire les intervalles) ont été ordonnées par la borne supérieure (idem
+pour « Borne inf » et « Moyenne »).
+2 Fichiers Sodas disponibles à l’URL http://www.ceremade.dauphine.fr/~touati/exemples.htm
+3 disponible à l’URL http://www.ceremade.dauphine.fr/%7Etouati/sodas-pagegarde.htm
+RNTI-E-373
+Arbresde décision sur des intervalles : Evaluation et Comparaison
+RNTI - 1
+Numéro Nom du fichier Taille du
+fichier
+Nb_cl Répartition par classe a
+priori
+Nb_var
+F_1 Voyage 21 5 (5 ;4 ;3 ;6 ;3) 2
+F_2 Wine 23 9 (2 ;2 ;2 ;2 ;6 ;5 ;2 ;1 ;1) 21
+F_3 Joueur 29 2 (11 ;18) 7
+F_4 Iris de Fisher 30 3 (10 ;10 ;10) 4
+F_5 Wave 30 3 (10 ;10 ;10) 21
+F_6 Auto 33 4 (10 ;8 ;8 ;7) 8
+F_7 Football 45 4 (16 ;21 ;7 ;1) 7
+F_8 Accident 48 3 (36 ;9 ;3) 5
+F_9 Temperature_1988 60 10 (8 ;4 ;7 ;7 ;8 ;7 ;4 ;5 ;6 ;4) 12
+F_10 Shuttle 102 7 (78 ;1 ;1 ;15 ;5 ;1 ;1) 9
+F_11 Cholesterol 193 2 (85 ;108) 2
+F_12 Age_color 231 2 (126 ;105) 10
+F_13 Glucose 690 2 (335 ;355) 2
+F_14 Prof-size 720 5 (36 ;441 ;32 ;35 ;176) 1
+F_15 Temperature_74-88 900 2 (475 ;425) 12
+F_16 Regions_NU 10000 4 (1900 ;2300 ;3620 ;2180) 4
+TAB 4 – Inventaire des fichiers utilisés
+x% 50% 68% 80% 90% 95% 98% 99%
+ϕ(x) 0,67 1 1,28 1,64 1,96 2,33 2,58
+TAB 5 – Valeurs de ϕ(x) en fonction de x
+5.1 Cas où les deux arbres sont testés par un même échantillon
+Pour chaque fichier de données, le principe est le suivant :
+- on tire aléatoirement t objets. On partage aléatoirement le nombre d’objets restants
+)( tn − en deux parties égales en terme d’effectif (à un objet près) pour construire
+deux arbres par la méthode du « hold-out method ». Comme la taille de l’ensemble
+de test doit être le tiers de celle de l’ensemble d’apprentissage selon le principe de
+« hold-out method », on voit que t est la division entière de n par sept.
+- on construit un arbre pour chaque partie (les deux parties ont le même effectif à un
+objet près, l’effectif est
+2
+tn − ) et on teste chaque arbre par les objets retenus à
+l’ensemble de test.
+Les résultats obtenus sur les estimateurs des risques réels pour chaque ordre d’intervalles
+sont présentés à la figure (FIG 2). Les tableaux (TAB 6 ; TAB 7 et TAB 8) donnent les
+intervalles de confiance pour les fichiers F_14, F_15 et F_16 (cardinal de l’ensemble de test
+t au-delà de 100).
+RNTI-E-3 74
+Mballoet Diday
+RNTI - 1
+0
+0,1
+0,2
+0,3
+0,4
+0,5
+0,6
+0,7
+0,8
+F_1 F_2 F_3 F_4 F_5 F_6 F_7 F_8 F_9 F_10 F_11 F_12 F_13 F_14 F_15 F_16
+Fichiers
+Ta
+u
+x
+d'
+e
+rr
+e
+u
+r
+e
+n
+%
+Borne sup
+Borne inf
+Moyenne
+FIG 2 - Estimation du risque réel pour chaque ordre
+x%
+Fichiers
+50% 68% 80% 90% 95% 99%
+F_14 [0.40;0.47] [0.39;0.48] [0.37;0.50] [0.35;0.52] [0.34;0.53] [0.31;0.56]
+F_15 [0.45;0.50] [0.43;0.52] [0.42;0.53] [0.40;0.55] [0.39;0.56] [0.36;0.59]
+F_16 [0.27;0.28] [0.26;0.28] [0.26;0.29] [0.25;0.29] [0.25;0.30] [0.24;0.30]
+TAB 6 – Intervalles de confiance des risques réels pour l’ordre par la borne supérieure
+x%
+Fichiers
+50% 68% 80% 90% 95% 99%
+F_14 [0.35;0.42] [0.34;0.44] [0.33;0.45] [0.31;0.47] [0.29;0.48] [0.26;0.51]
+F_15 [0.41;0.47] [0.40;0.48] [0.38;0.50] [0.37;0.51] [0.35;0.53] [0.33;0.55]
+F_16 [0.27;0.28] [0.26;0.28] [0.26;0.29] [0.25;0.29] [0.25;0.30] [0.24;0.30]
+TAB 7 – Intervalles de confiance des risques réels pour l’ordre par la borne inférieure
+x%
+Fichiers
+50% 68% 80% 90% 95% 99%
+F_14 [0.36;0.43] [0.35;0.44] [0.33;0.46] [0.32;0.48] [0.30;0.49] [0.27;0.52]
+F_15 [0.44;0.50] [0.42;0.51] [0.41;0.52] [0.39;0.54] [0.38;0.55] [0.35;0.58]
+F_16 [0.27;0.28] [0.26;0.28] [0.26;0.29] [0.25;0.29] [0.25;0.30] [0.24;0.30]
+TAB 8 – Intervalles de confiance des risques réels pour l’ordre par la moyenne
+5.2 Cas où les deux arbres sont testés par des échantillons différents
+Le principe est le suivant :
+RNTI-E-375
+Arbresde décision sur des intervalles : Evaluation et Comparaison
+RNTI - 1
+- on partage aléatoirement le fichier de données en deux parties égales en terme
+d’effectif (à un objet près) ;
+- pour chaque partie, on applique la méthode du « hold-out method » pour construire
+l’arbre (on prend aléatoirement un tiers de l’effectif pour le test et le reste est destiné
+à l’apprentissage).
+Pour les intervalles de confiance des estimateurs des risques réels, seuls les fichiers F_13
+à F_16 ont un ensemble de test de cardinal supérieur à 100. Nous obtenons les résultats
+suivants (FIG 3 ; TAB 9 ; TAB 10 et TAB 11) :
+0
+0,1
+0,2
+0,3
+0,4
+0,5
+0,6
+0,7
+F_1 F_2 F_3 F_4 F_5 F_6 F_7 F_8 F_9 F_10 F_11 F_12 F_13 F_14 F_15 F_16
+Fichiers
+Ta
+u
+x
+d'
+e
+rr
+e
+u
+r
+e
+n
+%
+Borne sup
+Borne inf
+Moyenne
+FIG 3 - Estimation du risque réel pour chaque ordre
+x%
+Fichiers
+50% 68% 80% 90% 95% 99%
+F_13 [0.44;0.50] [0.43;0.52] [0.41;0.53] [0.40;0.55] [0.38;0.56] [0.35;0.59]
+F_14 [0.39;0.45] [0.38;0.47] [0.37;0.48] [0.35;0.50] [0.34;0.51] [0.31;0.54]
+F_15 [0.49;0.55] [0.48;0.56] [0.47;0.57] [0.45;0.59] [0.44;0.60] [0.42;0.63]
+F_16 [0.27;0.29] [0.27;0.30] [0.26;0.29] [0.27;0.30] [0.26;0.30] [0.25;0.31]
+TAB 9 – Intervalles de confiance des risques réels pour l’ordre par la borne supérieure
+x%
+Fichiers
+50% 68% 80% 90% 95% 99%
+F_13 [0.42;0.48] [0.40;0.49] [0.39;0.51] [0.37;0.52] [0.36;0.54] [0.33;0.57]
+F_14 [0.36;0.42] [0.34;0.43] [0.33;0.44] [0.31;0.46] [0.30;0.47] [0.27;0.50]
+F_15 [0.44;0.50] [0.43;0.51] [0.42;0.52] [0.40;0.54] [0.39;0.55] [0.37;0.58]
+F_16 [0.27;0.29] [0.27;0.30] [0.26;0.29] [0.27;0.30] [0.26;0.30] [0.25;0.31]
+TAB 10 – Intervalles de confiance des risques réels pour l’ordre par la borne inférieure
+RNTI-E-3 76
+Mballoet Diday
+RNTI - 1
+x%
+Fichiers
+50% 68% 80% 90% 95% 99%
+F_13 [0.44;0.50] [0.42;0.51] [0.41;0.53] [0.39;0.54] [0.38;0.56] [0.35;0.59]
+F_14 [0.39;0.45] [0.37;0.47] [0.36;0.48] [0.35;0.49] [0.33;0.51] [0.30;0.54]
+F_15 [0.39;0.44] [0.37;0.46] [0.36;0.47] [0.35;0.48] [0.34;0.49] [0.31;0.52]
+F_16 [0.27;0.29] [0.27;0.30] [0.26;0.29] [0.27;0.30] [0.26;0.30] [0.25;0.31]
+TAB 11 – Intervalles de confiance des risques réels pour l’ordre par la moyenne
+5.3 Commentaire des résultats
+Comme les échantillons de test et d’apprentissage sont aléatoires et indépendants, la
+précision de l’estimation ne dépend que du nombre d’objets t de l’ensemble de test et de la
+valeur du risque réel estimé
+^¨
+rR (Cornuéjols et Miclet 2002). Les résultats des sections (5.1
+et 5.2) nous montrent des risques réels très similaires pour les trois méthodes d’ordre
+d’intervalles mais variant fortement d’un fichier à un autre suivant la taille (très élevés pour
+les fichiers de petite taille notamment). La même tendance est observée sur les deux
+approches (section 5.1 et section 5.2). Les risques réels diminuent en fonction de
+l’augmentation du nombre d’objets de l’ensemble de test. Plus la taille de l’échantillon de
+test est grande, plus l’intervalle de confiance est réduit (exemple de F_16 ayant des
+intervalles de confiance très réduits par rapport aux intervalles de confiance des autres
+fichiers).
+6 Conclusion et Perspectives
+Cette approche exploratoire du critère de Kolmogorov-Smirnov a permis de l’étendre aux
+données de type intervalle en proposant un seuil de coupure différent (un intervalle) de celui
+utilisé par les différents auteurs (seuil de coupure classique) ayant construit des arbres de
+décision sur ce type de données. Nous envisageons de :
+- prospecter une autre approche pour la construction d’arbres de décision par ce
+critère KS : une approche décisionnelle qui consistera à sélectionner le meilleur
+ordre d’intervalles à chaque nœud (meilleur en terme d’homogénéité des nœuds fils
+générés) pendant la construction de l’arbre (dans ce cas l’utilisateur n’aura pas à
+sélectionner un ordre d’intervalles) ;
+- comparer ce critère avec quelques critères classiques (Gini, entropie).
+Le but est de synthétiser un nouveau tableau de données (à partir des nœuds et des règles
+de décision) qui peut être étudié à son tour par une autre méthode d’analyse de données.
 Références
-Airoldi, E. et C. Faloutsos (2004). Recovering latent time-series from their observed sums :
-network tomography with particle filters. In KDD ’04 : Proceedings of the tenth ACM
-SIGKDD international conference on Knowledge discovery and data mining, New York,
-NY, USA, pp. 30–39. ACM.
-Bellman, R. (1961). On the approximation of curves by line segments using dynamic program-
-ming. Commun. ACM 4(6), 284–292.
-Borgne, Y.-A. L., S. Santini, et G. Bontempi (2007). Adaptive model selection for time series
-prediction in wireless sensor networks. Signal Process. 87(12), 3010–3020.
-Chan, K. P. et A. W. C. Fu (1999). Efficient time series matching by wavelets. In ICDE ’99 :
-Proceedings of the 15th International Conference on Data Engineering, Washington, DC,
-USA, pp. 126. IEEE Computer Society.
-Chang, J. H. et W. S. Lee (2003). Finding recent frequent itemsets adaptively over online data
-streams. In KDD’03 : Proceedings of the ninth ACM SIGKDD international conference on
-Knowledge discovery and data mining, pp. 487–492.
-Chen, Y., G. Dong, J. Han, B. Wah, et J. Wang (2002). Multidimensional regression analysis
-of time-series data streams. In VLDB ’02 : Proceedings of the 28th Int. Conf. on Very Large
-Data Bases. VLDB Endowment.
-Cheng, H. et P.-N. Tan (2008). Semi-supervised learning with data calibration for long-term
-time series forecasting. In KDD ’08 : Proceeding of the 14th ACM SIGKDD international
-conference on Knowledge discovery and data mining, New York, NY, USA, pp. 133–141.
-ACM.
-Cohen, E. et M. Strauss (2003). Maintaining time-decaying stream aggregates. In PODS
-’03 : Proceedings of the twenty-second ACM SIGMOD-SIGACT-SIGART symposium on
-Principles of database systems, pp. 223–233.
-Daubechies, I. (1992). Ten lectures on wavelets. Philadelphia, PA, USA : Society for Industrial
-and Applied Mathematics.
-Ding, H., G. Trajcevski, P. Scheuermann, X. Wang, et E. Keogh (2008). Querying and mining
-of time series data : experimental comparison of representations and distance measures.
-Proc. VLDB Endow. 1(2), 1542–1552.
-Faloutsos, C., M. Ranganathan, et Y. Manolopoulos (1994). Fast subsequence matching in
-time-series databases. In SIGMOD ’94 : Proceedings of the 1994 ACM SIGMOD interna-
-tional conference on Management of data, New York, NY, USA, pp. 419–429. ACM.
-RNTI-E-19- 227 -
-REGLO : résumer un flux de séries temporelles
-Giannella, C., J. Han, J. Pei, X. Yan, et P. Yu (2003).Mining Frequent Patterns in Data Streams
-at Multiple Time Granularities. In H. Kargupta, A. Joshi, K. Sivakumar, and Y. Yesha (eds.),
-Next Generation Data Mining. AAAI/MIT.
-Keogh, E. J. et M. J. Pazzani (1998). An enhanced representation of time series which allows
-fast and accurate classification, clustering and relevance feedback. In KDD, pp. 239–243.
-Lin, J., E. J. Keogh, S. Lonardi, et B. Y. chi Chiu (2003). A symbolic representation of time
-series, with implications for streaming algorithms. In DMKD, pp. 2–11.
-Ogras, Y. et H. Ferhatosmanoglu (2006). Online summarization of dynamic time series data.
-The VLDB Journal 15(1), 84–98.
-Palpanas, T., M. Vlachos, E. J. Keogh, et D. Gunopulos (2008). Streaming time series sum-
-marization using user-defined amnesic functions. IEEE Trans. Knowl. Data Eng. 20(7),
-992–1006.
-Papadimitriou, S., J. Sun, et C. Faloutsos (2005). Streaming pattern discovery in multiple
-time-series. In VLDB ’05 : Proceedings of the 31th Int. Conf. on Very Large Data Bases, pp.
-697–708. VLDB Endowment.
-Popivanov, I. (2002). Similarity search over time-series data using wavelets. In ICDE ’02 :
-Proceedings of the 18th International Conference on Data Engineering, Washington, DC,
-USA, pp. 212. IEEE Computer Society.
-Rafiei, D. et A. Mendelzon (1997). Similarity-based queries for time series data. In SIGMOD
-’97 : Proceedings of the 1997 ACM SIGMOD international conference on Management of
-data, New York, NY, USA, pp. 13–25. ACM.
-Shatkay, H. et S. B. Zdonik (1996). Approximate queries and representations for large data
-sequences. In ICDE ’96 : Proceedings of the Twelfth International Conference on Data
-Engineering, Washington, DC, USA, pp. 536–545. IEEE Computer Society.
-Teng, W.-G., M.-S. Chen, et P. S. Yu (2003). A Regression-Based Temporal Pattern Mining
-Scheme for Data Streams. In VLDB ’03 : Proceedings of the 29th Int. Conf. on Very Large
-Data Bases, pp. 93–104. VLDB Endowment.
-Yi, B.-K. et C. Faloutsos (2000). Fast time sequence indexing for arbitrary lp norms. In VLDB
-’00 : Proceedings of the 26th Int. Conf. on Very Large Data Bases, pp. 385–394. VLDB
-Endowment.
-Zhu, Y. et D. Shasha (2002). Statstream : statistical monitoring of thousands of data streams in
-real time. In VLDB ’02 : Proceedings of the 28th Int. Conf. on Very Large Data Bases, pp.
-358–369. VLDB Endowment.
+Asseraf M. (1998), Extension et optimisation pour la segmentation de la distance de Kolmogorov-
+Smirnov, Thèse de Doctorat, Mathématiques Appliquées, Université Paris IX Dauphine, France.
+Bock H. H. et Diday E. (2000), Analysis of symbolic data : Exploratory methods for extracting
+statistical information from complex data, Springer-Verlag, Berlin-Heidelberg.
+RNTI-E-377
+Arbresde décision sur des intervalles : Evaluation et Comparaison
+RNTI - 1
+Breiman L., Freidman J. H., Ohlsen R. A. et Stone C. J. (1984), Classification and regression trees, The
+Wadsworth Statistics/Probability Series, Belmont, CA.
+Cornuéjols A. et Miclet L. (2002), Appretissage Artificiel : concepts et algorithmes, eyrolles.
+Diday E., Gioia F. et Mballo, C. (2003), Codage qualitatif d’une variable intervalle, Journées de
+Statistique, 35, pp 415-418, Lyon, France.
+Friedman J. H. (1977), A recursive partitioning decision rule for non parametric classification; IEEE
+Transactions on Computers, C-26, Number 4, pp 404-408.
+Mballo C. et Diday E. (2004), The criterion of Kolmogorov-Smirnov for binary decision tree:
+Application to interval valued variables; Proceedings of the Workshop of Symbolic and Spatial
+Data Analysis: Mining complex Data Structures; Editors: P. Brito et M. Noirhomme-Fraiture;
+ECML/PKDD 2004; Pisa, Italy, September, 20-24, 2004; pp 79-90.
+Mballo C. et Diday E. (2004), Kolmogorov-Smirnov for decision tree on interval and histogram
+variables; in Studies in classification, Data Analysis and Knowledge organization: Classification,
+Clustering and Data Mining Applications, editors: D. Banks, L. House, F. R. McMorris, P. Arabie,
+and W. Gaul; Springer; pp 341-350, Proceedings of the International Federation of the
+Classification Societies; Chicago, USA, July, 15-18; 2004.
+Mballo C., Asseraf M. et Diday E. (2004), Binary decision trees for interval and taxonomic variables ;
+A Statistical Journal for Graduates Students (incorporating Data & Statistics), Volume 5, Number
+1, April 2004, pp 13-28.
+Perinel E. (1996), Segmentation et Analyse de données symboliques : Application à des données
+probabilistes imprécises, Thèse de Doctorat, Spécialité Mathématiques Appliquées, Université
+Paris Dauphine, France.
+Utgoff P. E. et Clouse J. A. (1996), A Kolmogorov-Smirnov metric for decision tree induction,
+University of Massachusetts, technical report 96-3.
+Yapo J. P. A. (2002), Méthodes de segmentation sur un tableau de variables aléatoires, Thèse
+de Doctorat, Spécialité Mathématiques Appliquées, Université Paris Dauphine, France.
 Summary
-Summarizing a set of streaming time series is an important issue that allows monitoring
-and storing reliable information. At this time, most efforts have been done for summarizing
-time series separately. However, in the case of data streams, algorithms have to be ressource-
-aware, which involves several different strategies for memory management. In this paper, our
-point of view is that memory should be partitionned in order to optimize the global error of the
-model.
-RNTI-E-19 - 228 -
+The binary splitting criterion of Kolmogorov-Smirnov (Friedman 1977) require a total
+order of the values of the explanatory variables. We can order closed and bounded intervals
+of real numbers in different ways (Diday et al. 2003). Our contribution in this paper consists
+of evaluating and comparing decision trees obtained on explanatory variables of interval type
+with the binary splitting criterion of Kolmogorov-Smirnov. This criterion have been
+extended to this type of variables (Mballo and al. 2004; Mballo and Diday 2004). We center
+our attention on the rate of misclassification obtained in the test set. To estimate this
+parameter, we divide randomly each data base in two equal parts in term of size (to within an
+object) to construct two decision trees. These two decision trees are first tested by a same test
+set and then by two different test sets.
+RNTI-E-3 78

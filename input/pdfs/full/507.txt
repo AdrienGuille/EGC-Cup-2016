@@ -1,462 +1,301 @@
-Modélisation de la dynamique de phénomènes
-spatio-temporels par des séquences de motifs
-Loïc Mabit∗, Nazha Selmaoui-Folcher∗ Frédéric Flouvat∗
-∗PPME - Université de la Nouvelle-Calédonie, BP R4, Nouméa, Nouvelle-Calédonie
-{loic.mabit,frederic.flouvat,nazha.selmaoui}@univ-nc.nc
-Résumé. Dans ce papier, nous proposons un nouveau cadre théorique permet-
-tant de modéliser la dynamique de phénomènes spatio-temporels. Nous défi-
-nissons le concept de séquences spatio-temporelles de motifs afin de capturer
-les interactions entre des ensembles de propriétés et un phénomène à obser-
-ver. Un algorithme incrémental est proposé pour extraire des séquences spatio-
-temporelles de motifs sous contraintes, et une nouvelle structure de données est
-mise en place afin d’améliorer ses performances. Un prototype a été développé
-et testé sur des données réelles.
+Apprentissage actif d’émotions dans les dialogues
+Homme-Machine
+Alexis Bondu∗, Vincent Lemaire∗, Barbara Poulain∗
+∗France Telecom R&D TECH/SUSI/TSI
+2 avenue Pierre Marzin 22300 Lannion
+prenom.nom@orange-ft.com
+Résumé.
+La prise en compte des émotions dans les interactions Homme-machine permet
+de concevoir des systèmes intelligents, capables de s’adapter aux utilisateurs.
+Les techniques de redirection d’appels dans les centres téléphoniques automati-
+sés se basent sur la détection des émotions dans la parole. Les principales dif-
+ficultés pour mettre en œuvre de tels systèmes sont l’acquisition et l’étiquetage
+des données d’apprentissage. Cet article propose l’application de deux stratégies
+d’apprentissage actif à la détection d’émotions dans des dialogues en interaction
+homme-machine. L’étude porte sur des données réelles issues de l’utilisation
+d’un serveur vocal et propose des outils adaptés à la conception de systèmes
+automatisés de redirection d’appels.
 1 Introduction
-Dans un grand nombre d’applications, la compréhension et la modélisation de la dyna-
-mique spatio-temporelle est un problème majeur. Yuan (2008) utilise le terme "dynamique"
-pour caractériser les forces qui affectent dans l’espace et le temps le comportement d’un sys-
-tème. Par exemple, une épidémie de dengue est caractérisée par un ensemble de facteurs en
-interaction et causant la propagation de la maladie dans l’espace et le temps. Lorsque la dengue
-est déclarée dans un quartier, la question est de savoir comment, et en fonction de quels fac-
-teurs, elle va se propager dans les autres quartiers. Même si cette propagation semble dépen-
-dante de l’environnement direct des zones (points d’eau, mangroves à proximité, etc.) ainsi
-que d’un ensemble de circonstances évoluant dans le temps (humidité, chaleur, précipitation,
-etc.), la dynamique globale de propagation est loin d’être maîtrisée si on considère toutes les
-interactions possibles entre facteurs. D’autres applications ont le même type de problèmes. Par
-exemple, le phénomène d’érosion des sols est aussi influencé par un ensemble de facteurs en-
-vironnementaux (type de sol, type de végétation, etc.) et de circonstances temporelles (pluie
-forte, cyclone, etc.). L’étude des dynamiques de propagation de l’érosion est une probléma-
-tique majeure pour une gestion efficace des risques naturels et le développement durable de
-beaucoup de territoires.
-Face à ces questions, les experts ont besoins de méthodes formelles leur permettant de
-valider ou de découvrir les dynamiques de propagation de ces phénomènes. Les méthodes de
-fouille de données spatio-temporelles visent à apporter des solutions pour mieux comprendre
-et décrire ces phénomènes complexes. Le but est de chercher alors des relations entre variables
-et événements sans hypothèse a priori. Parmi les méthodes de fouille de données, l’extraction
-de motifs caractérisant l’évolution d’un phénomène dans l’espace et dans le temps reste un
-Modélisation de la dynamique de phénomènes spatio-temporels par des séquences
-problème ouvert en raison de la complexité des systèmes étudiés et de la complexité des don-
-nées disponibles. En effet, nous sommes en présence d’une masse de données hétérogènes et
-complexes (données géographiques, données météorologiques, images satellites, etc.).
-Comme le montre Yao (2003), pendant longtemps, les travaux de recherche se sont fo-
-calisés sur une seule dimension (spatiale ou temporelle) sans prendre en compte l’autre. Ces
-dernières années, de plus en plus de travaux en fouille de données spatio-temporelles ana-
-lysent conjointement l’aspect spatial et temporel. Généralement, ces travaux traitent deux types
-de problèmes : les trajectoires d’objets en mouvement (Yao, 2003; Cao et al., 2005; Yuan,
-2008; Du et al., 2009; Monreale et al., 2009; Verhein, 2009) et les séquences d’événements
-(Wynne Hsu, 2009a,b; Celik et al., 2008, 2006; Mohan et al., 2010).
-Dans Cao et al. (2005); Yuan (2008); Du et al. (2009), les auteurs caractérisent les trajectoires
-d’objets en mouvement par des séquences de tuples (l, t), où l est la localisation de l’objet au
-temps t. Dans ce type de problème, les trajectoires de chaque objet sont explicitement décrites
-dans les données. Les auteurs cherchent alors à extraire les trajectoires les plus fréquentes dans
-la base de trajectoires. Notre problématique est plus complexe car la dynamique des objets
-(i.e. les trajectoires) n’est pas explicitement stockée dans la bases de données. De plus, les
-objets d’étude ne sont pas clairement identifiés. Nous avons uniquement une base de données
-géographique stratifiée en couches temporelles, avec au niveau de chaque couche des variables
-d’environnements et des variables temporelles localisées dans des zones.
-Dans le cadre de l’extraction des séquences d’événements, Mohan et al. (2010) définissent
-la notion de motifs spatio-temporels en cascades, et les appliquent à une base de données de
-crimes. Leurs motifs se présentent sous la forme de graphes d’événements et leur algorithme
-d’extraction est basé sur le principe "générer-tester" (cf algorithme Apriori, Agrawal et Srikant
-(1994)). Leurs travaux s’appuient sur le concept de co-localisation spatio-temporelle (Celik
-et al., 2006, 2008; Wang et al., 2009; Qian et al., 2009; Lin et Lim, 2009). Une co-localisation
-spatio-temporelle est un ensemble d’événements dont les instances sont voisines dans l’es-
-pace et dans le temps. Ces motifs sont associés à une nouvelle mesure d’intérêt anti-monotone
-(l’index de participation), afin de pouvoir exploiter une stratégie de type Apriori. Les motifs
-étudiés dans ces travaux permettent de représenter l’évolution d’événements dans l’espace et
-le temps, mais ils ne permettent pas de prendre en compte l’environnement de ces évènements
-(p.ex. l’occupation du sol pour l’érosion). De plus, les mesures d’intérêt proposées sont diffi-
-ciles à interpréter pour les experts. L’obtention de la propriété d’anti-monotonie s’est faite au
-détriment de l’interprétabilité des mesures. Pour finir, les algorithmes d’extraction proposés
-ne sont pas incrémentaux, i.e. l’ajout de données pour une nouvelle date nécessite de recalcu-
-ler l’ensemble des solutions. Notre démarche est différente de ces travaux sur ces différents
-points. Nous avons défini un nouveau concept de séquences spatio-temporelles de motifs (i.e.
-des séquences d’ensembles), appelée STSP (Spatio-Temporal Sequence of Patterns), afin de
-capturer les interactions entre les différents facteurs. Nous utilisons une mesure d’intérêt facile
-à interpréter (proche du support des ensembles fréquents) mais qui n’est pas anti-monotone.
-Nous proposons un algorithme incrémental permettant l’extraction des séquences de motifs
-intéressantes grâce à un ensemble de contraintes (non nécessairement monotones). Une nou-
-velle structure de données, appelée STP-tree, est aussi définie afin de rendre cet algorithme
-performant.
-La section 2 introduit le concept de séquence spatio-temporelle de motifs (STSP). La sec-
-tion 3 présente notre approche incrémentale de générations des STSP et son optimisation grâce
-L. Mabit et al.
-au STP-Tree. La section 4 présente un algorithme d’extraction de STSP sous contraintes. Pour
-finir, nous présenterons les résultats expérimentaux préliminaires.
-2 Concepts et définitions
-Soient un ensemble de temps ordonné T = {t1 < t2 < ... < t|T |}, un ensemble de zones
-géographiques (une carte de zones) géo-référencées Z = {z1, z2, ..., z|Z|}, et un ensemble de
-caractéristiques booléennes I = {i1, i2, ..., i|I|} décrivant ces zones à un temps donné.
-Nous noterons par Ωt le triplet (Z, I,ℜB) où ℜB ⊆ ZxI est la relation binaire telle que
-ℜB(z, i) = 1 si la caractéristique i ∈ I est associée à la zone z ∈ Z au temps t.
-Ωt est appelé une couche temporelle et Ω =
-⋃
-t∈T
-Ωt est appelé une base de données spatio-
-temporelles. Une base de données spatio-temporelles est donc une suite de couches tempo-
-relles décrivant l’évolution d’un ensemble de zones géographiques dans le temps.
-Par exemple, dans la figure 1, T = {t1, t2, t3}, Z = {z1, z2, z3, z4, z5, z6, z7, z8, z9, z10} et
-I = {i1, i2, i3, i4, i5, i6}. (a),(b) et (c) représentent respectivement Ωt1 , Ωt2 , Ωt3 , et consti-
-tuent la base de données spatio-temporelles Ω aux temps t1, t2 et t3.
-FIG. 1 – Exemple de base de données spatio-temporellesΩ
-SoitX ⊆ I un ensemble de caractéristiques booléennes appelémotif (itemset). Le support
-de X dans Ωt, noté supportΩt(X), est égal au nombre de zones z associés à l’ensemble des
-caractéristiques X au temps t ∈ T , i.e. supportΩt(X) = |{z ∈ Z/ℜB(z, i) = 1 ∀i ∈ X}|.
-Soit α un seuil de support minimum, X est appelé motif fréquent (FI) si supportΩt(X) ≥
-α. On note FI(Ωt) l’ensemble de tous les motifs fréquents dans Ωt, i.e. FI(Ωt) = {X ⊆
-I/supportΩt(X) ≥ α}. Pour simplifier les notations, un motif {ik, ..., il} sera noté ik...il.
-Soit une zone z ∈ Z , le couple (X, z), appelé motif fréquent géoréférencé, représente
-l’apparition du motif fréquent X dans la zone z. On notera GFIz(Ωt) l’ensemble des mo-
-tifs fréquents caractérisant (apparaissant dans) la zone z au temps t ∈ T , i.e. GFIz(Ωt) =
-{(X, z) ⊆ (I, Z)/X ∈ FI(Ωt) et ∀i ∈ X,ℜB(z, i) = 1}. Par exemple, dans la figure 1(a),
-GFIz7(Ωt1) = {i1, i2, i1i2}, le motif fréquent i1i2 caractérise la zone z7 ∈ Ωt1 (pourα = 2).
-Notons ℜn ⊆ ZxZ une relation de voisinage telle que ℜn(za, zb) = 1 si za et zb sont
-voisins dans Z . Par exemple, dans la figure 1, si ℜn est la relation d’adjacence, nous avons
-ℜn(z5, z8) = 1 (car z5 et z8 sont des zones adjacentes) alors que ℜn(z1, z3) = 0.
-Modélisation de la dynamique de phénomènes spatio-temporels par des séquences
-Une séquence spatio-temporelle de motifs (STSP) s = 〈s1, s2, ..., sm〉ℜn est une liste
-ordonnée (si)i=1..m de motifs fréquents tels que sk et sk+1 caractérisent deux zones voisines
-dans deux couches temporelles consécutives. Le nombre de motifs dans la séquence est appelé
-la taille de la STSP. Nous noterons Sℜn l’ensemble de toutes les STSP de Ω pour la relation
-ℜn. Sℜn est un multi-ensemble car une même séquence peut apparaître plusieurs fois.
-Par exemple, dans Ωt1 (figure 1(a)), le motif fréquent i1i2 caractérise les zones z7 et z8. Dans
-Ωt2 (figure 1(b)), i1i3 caractérise z3 et z5. Or z7 est une zone voisine (ℜn relation d’adjacence)
-de z3, 〈i1i2, i1i3〉ℜn est donc une STSP de taille 2 (voir figure 2(d)). De même, z8 est une zone
-voisine de z5, 〈i1i2, i1i3〉ℜn est donc une autre STSP (voir figure 2(d)). Ainsi, 〈i1i2, i1i3〉ℜn
-apparait deux fois dans Sℜn . Au temps suivant (Ωt3 , figure 1(c)), le motif fréquent i2i6 carac-
-térise la zone z2. Or z3 est une zone voisine de z2, la séquence STSP 〈i1i2, i1i3〉ℜn générée
-entre le temps t1 et t2 peut être prolongée par i2i6 pour former la STSP 〈i1i2, i1i3, i2i6〉ℜn de
-taille 3 (figure 2(e)).
-FIG. 2 – Exemple de génération de STSP dans une base de données spatio-temporelles
-Une STSP s′ = 〈s′1, s′2, ...s′n〉ℜn est une sous-STSP (sous-séquence) d’une STSP s =
-〈s1, s2, ..., sm〉ℜn (et s une sur-STSP de s′), s’il existe des entiers 1 ≤ j1 < j2 < ... < jn ≤
-m tel que s′1 ⊆ sj1 , s′2 ⊆ sj2 ,...,s′n ⊆ sjn .
-Soit Sℜn un multi-ensemble de STSP. Le support absolu de la STSP
-s′ = 〈s′1, s
-′
-2, ...s
-′
-n〉ℜn dans Sℜn , noté supportabs(s′, Sℜn), est le nombre de
-chemins 〈(zl, tk), (zl+1, tk+1), ..., (zl+n−1, tk+n−1)〉ℜn empruntés par s′ dans
-Ω, i.e. supportabs(s′, Sℜn) = |{〈(zl, tk), (zl+1, tk+1), ..., (zl+n−1, tk+n−1)〉ℜn /
-{tk, tk+1, ..., tk+n−1} ⊆ T, ∀za ∈ {zl, zl+1, ...zl+n−1}, za ∈ Z, ℜn(za, za+1) = 1}.
-Notons que, contrairement au support d’un motif, le support d’une STSP n’est pas né-
-cessairement décroissant (ni croissant). Par exemple, dans la figure 2 (e), nous avons
-supportabs(〈i1i2, i1i3, i2i6〉ℜn , Sℜn) = 3, alors que supportabs(〈i1i2, i1i3〉ℜn , Sℜn) = 2.
-Soit β un seuil minimum de support, une STSP s′ est fréquente dans Sℜn si
-supportabs(s
-′, Sℜn) ≥ β. Notons que le seuil α peut être assimilé à un seuil de support spatial
-et que β peut être assimilé à un seuil de support temporel.
-L. Mabit et al.
-3 Construction incrémentale des séquences spatio-
-temporelles de motifs
-Cette section présente le principe de notre approche pour générer incrémentallement les
-STSP d’une base de données spatio-temporelles, ainsi que la structure de données développée
-pour optimiser cette génération.
-3.1 Principe de l’approche
-Le principe de notre algorithme (algorithme 1) est basé sur la construction bout à bout (in-
-crémentallement ) des séquences de Sℜn (ensemble de toutes les séquences STSP apparaissant
-dans Ω) en suivant les étapes suivantes :
-Etape 1 : Caractérisation des zones aux temps t et t+ 1 par les motifs fréquents. Cette
-étape consiste à extraire les motifs fréquents (avec un seuil minimum de support α) aux
-temps t et t+ 1 (Algorithme 1, lignes 3-5). Chaque motif est ensuite associé aux zones
-dans lequel il apparait (Algorithme 1, lignes 7-8). On obtient ainsi les motifs fréquents
-géo-référencés (GFI).
-Etape 2 : Modélisation de la dynamique entre t et t+ 1. Cette étape génère toutes les sé-
-quences de taille 2 (2-STSP) apparaissant entre t et t + 1. Nous rappelons qu’une sé-
-quence de taille 2 notée par 〈s′from, s′to〉ℜn est telle que s′from et s′to sont respectivement
-des motifs fréquents de Ωt et Ωt+1 géo-référencés dans des zones voisines par rapport à
-la relation ℜn (Algorithme 1, ligne 9). En d’autres termes, étant donné deux zones voi-
-sines zfrom et zto (i.e. ℜn(zfrom, zto) = 1), l’algorithme effectue un produit cartésien
-entreGFIzfrom (Ωt) et GFIzto(Ωt+1).
-Etape 3 : Extension des STSP Cette étape étend les STSP existantes et met à jour l’en-
-semble des STSP, noté Sℜn . Plus précisément, étant donné une séquence de taille 2
-〈s′from, s
-′
-to〉ℜn , chaque STSP s = 〈s1, ..., slast〉ℜn de Sℜn est prolongée par s′to si slast
-= s′from au même temps (Ωt) et dans la même zone (zfrom) (Algorithme 1, lignes 11 à
-13).
-S’il n y a pas d’extension possible, alors 〈s′from, s′to〉ℜn est insérée dans Sℜn comme
-une nouvelle séquence de taille 2 (lignes 10 à 18).
-Cette construction incrémentale des STSP est très importante car les bases de données
-spatio-temporelles peuvent être mises à jour régulièrement avec de nouvelles couches tempo-
-relles. Notre approche évite ainsi une re-construction de toutes les STSP à chaque nouvelle
-couche ajoutée. L’algorithme 1 présente le principe général de la construction des séquences.
-Cependant, le nombre des STSP peut être très grand (jusqu’à plusieurs millions), rendant leur
-construction impossible. Face à ce problème, il est donc nécessaire d’optimiser cette algo-
-rithme, et plus particulièrement le stockage et l’extension des STSP.
-3.2 STP-tree : une structure de données optimisée pour les STSP
-Dans cette section, nous proposons une nouvelle structure adaptée au traitement des STSP,
-et l’exploitons dans l’étape 3 de l’algorithme 1. Cette structure de données a été appelée STP-
-tree (Spatio-Temporal Pattern tree). Pour illustrer l’utilisation de cette structure de données,
-Modélisation de la dynamique de phénomènes spatio-temporels par des séquences
-Algorithm 1 Algorithme incrémental de génération des STSP
-1: Sℜn = ∅
-2: t = 1 // entier représentant les différents temps
-3: FIt = mine_freq_itemsets(Ω, t, α)
-4: while t < |T | do
-5: FIt+1 = mine_freq_itemsets(Ω, t+ 1, α)
-6: for each zfrom ,zto ∈ Z tel queℜn(zfrom, zto) = true do
-7: GFIt,zfrom = georeference_freq_itemsets(FIt,zfrom )
-8: GFIt+1,zto = georeference_freq_itemsets(FIt+1,zto )
-9: 2-STSP= generate_size2_STSP (GFIt,zfrom ,GFIt+1,zto )
-10: for each STSP de taille 2< s′from, s′to >ℜn∈ 2-STSP do
-11: for each STSP< s1, ..., slast >ℜn∈ Sℜn tel que slast = s′from avec slast dans zfrom au temps t do
-12: Etendre< s1, ..., slast >ℜn avec s′to
-13: end for
-14: if Sℜn = ∅ ou si aucune séquence s ∈ Sℜn n’a été étendue then
-15: Ajouter< s′from, s′to >ℜn à Sℜn
-16: end if
-17: end for
-18: end for
-19: t = t+ 1
-20: end while
-21: return Sℜn
-nous considérons un nouvel exemple (figure 3). Les deux figures de gauche représentent les
-STSP obtenues lors des transitions t1− t2 et t2− t3. La figure à droite représente le STP-tree
-obtenu à la fin du temps t3. Notons que, dans cet exemple, les motifs fréquents on déjà été
-extraits et géoréférencés. Pour simplifier les notations, ces motifs ont été notés P1, P2, P3,...
-(Pi représente donc un ensemble de caractéristiques).
-FIG. 3 – Exemple de STSP et de STP-tree
-Comme le montre l’exemple, un STP-tree est un arbre préfixé associé à un tableau de zones
-ZR (Zonal Referencing). L’arbre est utilisé pour stocker les STSP et leur support. Chaque
-noeud n est composé d’un motif fréquent et d’un compteur. Le lien entre les noeuds repré-
-sente le lien de précédence temporelle et de proximité spatial entre les motifs fréquents de la
-séquence. Le compteur représente le support de la STSP commençant à la racine de l’arbre et
-finissant au noeud n. Par exemple, la STSP < P3, P5 >ℜn apparaît trois fois (support de 3)
-et la STSP< P3, P5, P6 >ℜn apparaît deux fois dans la base de données spatio-temporelles.
-Le tableau ZR fait le lien entre les zones et les dernière STSP mises à jour. Plus précisément,
-L. Mabit et al.
-chaque cellule du tableau est associée à une zone géographique et contient une liste de liens
-vers des noeuds de l’arbre. Chacun de ces liens pointe sur le dernier motif d’une STSP "ex-
-tensible", i.e. une STSP qui est toujours en construction (son dernier motif a été ajouté lors
-de l’itération précédente dans l’algorithme 1). Autrement dit, toutes les STSP extensibles à
-partir de la zone zfrom sont référencées dans la cellule ZR[zfrom]. Par exemple, dans la fi-
-gure 3, ZR montre qu’au temps t4 : < P3, P5 >ℜn peut être étendue à partir de la zone z4,
-< P3, P5, P7 >ℜn peut être étendue à partir de la zone z5, et < P3, P5, P6 >ℜn peut être
-étendue à partir des zones z5 et z9.
-Le STP-tree a l’avantage de compresser l’ensemble des STSP stockés en factorisant les
-préfixes communs entre les STSP. Par exemple, < P3, P5 > n’est pas dupliquée bien
-qu’il y ait deux STSP commençant par cette sous-séquence (< P3, P5, P6 >Sℜn et <
-P3, P5, P7 >Sℜn ). De plus, les compteurs maintenus au niveau des noeuds permettent de
-conserver le support associé à chaque STSP. A titre d’exemple, l’utilisation d’une liste clas-
-sique pour stocker les STSP aurait augmenté les traitements à effectuer. Par exemple, dans
-la figure 2 (d), la sous-séquence < (i1, i2), (i1, i3) >ℜn aurait pu être comptabilisée 3 fois
-(car elle apparaît dans 3 sur-STSP stockée dans Sℜn ), alors qu’en réalité elle n’apparaît que
-deux fois dans les données. Pour finir, comme nous allons le montrer dans la suite, cette struc-
-ture de données va permettre une mise à jour efficace des STSP (étape 3, lignes 11 à 16 de
-l’algorithme 1).
-Pour rappel, pour chaque 2-STSP < s′from, s′to >ℜn construite à l’étape 2, l’étape 3
-de le génération (ligne 11) consiste d’abord à trouver les STSP "extensibles" à partir de
-< s′from, s
-′
-to >ℜn parmi toutes celles générées. Comme nous l’avons vu précédemment, le
-STP-tree permet de les avoir directement. En fait, un simple parcours de la liste des liens
-contenus dans les cases Zfrom du tableau ZR permet de les trouver, où Zfrom est l’ensemble
-des zones utilisées pour construire < s′from, s′to >ℜn à l’étape 2 et associées au motif s′from.
-Ensuite, deux cas sont possibles :
-1. Les cases ne contiennent aucun lien vers un motif s′from (lignes 14-15). Autrement dit,
-il n’existe aucune STSP extensible à partir des zones de< s′from, s′to >ℜn . Dans ce cas,
-une nouvelle STSP < s′from, s′to >ℜn est ajoutée dans le STP-tree. Cette insertion dans
-le STP-tree consiste à mettre à jour un compteur si < s′from, s′to >ℜn est déjà dans le
-STP-tree ou à créer de nouveaux noeuds sinon. La figure 4 illustre ces deux sous-cas sur
-l’exemple de la figure 3.
-2. Les cases contiennent des liens vers un motif s′from (lignes 11-13). Autrement dit,
-il existe une STSP extensible < s1, s2..., s′from >ℜn à partir des zones de <
-s′from, s
-′
-to >ℜn . Dans ce cas, la STSP extensible est étendue avec le motif s′to. Cette
-extension consiste à ajouter un nouveau noeud s′to lié au dernier noeud de la STSP si
-celui-ci n’existe pas déjà, ou à mettre à jour le compteur du dernier noeud sinon. La
-figure 5 illustre ces deux sous-cas. Notons que lorsque ti+1 > t2, il est nécessaire de
-conserver le tableau ZR de l’itération précédente pendant le traitement de ti − ti+1
-afin de pouvoir toujours trouver les STSP extensible au temps ti (à la fin du traitement
-de ti − ti+1, ZR(ti) pourra être supprimé). La figure 5 illustre ces deux sous-cas sur
-l’exemple de la figure 3.
-Modélisation de la dynamique de phénomènes spatio-temporels par des séquences
-FIG. 4 – Exemple d’insertions de nouvelles STSP dans le STP-tree entre t1-t2
-FIG. 5 – Exemple d’extensions d’une STSP dans le STP-tree entre t2-t3
-4 Extraction de STSP sous-contraintes
-4.1 Contraintes sur les sous-séquences
-La définition de STSP donnée dans la section 2 est générale. Extraire toutes les sous-
-séquences reste un problème combinatoire. Toutefois, suivant les applications, toutes les sous-
-L. Mabit et al.
-séquences ne sont pas nécessairement utiles. Nous introduisons dans la suite de cette sous-
-section plusieurs contraintes permettant d’extraire des sous-séquences intéressantes pour nos
-applications.
-Contrainte 1 : Seules sont extraites les sous-séquences s′ =< s′1, s′2, ...s′n >ℜn de s =<
-s1, s2, ..., sm >ℜn tel qu’il existe des entiers 1 ≤ j1 < j2 < ... < jn ≤ m avec
-s′1 = sj1 , s
-′
-2 = sj2 ,...,s
-′
-n = sjn . Cette contrainte considère les motifs comme étant
-atomique, i.e. les sous-motifs ne sont pas étudiés. En effet, dans certaines applications,
-un motif représente une interaction de caractéristiques qui n’auraient pas nécessairement
-eu lieu si une des caractéristiques avait été enlevée.
-Contrainte 2 : Seules sont extraites les sous-séquences s′ =< s1, s2, ...si >ℜn de s =<
-s1, s2, ..., sm >ℜn avec 1 < i < m. Les sous-séquences doivent ainsi avoir le même
-préfixe que la STSP originelle. Cette contrainte représente le fait que le motif si est ap-
-paru à cause de l’interaction de tous les autres motifs qui le précède dans la séquence.
-Par exemple, si on considère la séquence < bulldozers, construction, erosion >ℜn ,
-erosion n’aurait peut être pas eu lieu si construction avait été absent (i.e. c’est l’asso-
-ciation dans le temps de bulldozers et d’une construction qui a entraîné l’érosion).
-Contrainte 3 : Cette contrainte fixe à 1 l’intervalle de temps entre deux motifs consécutifs
-de la séquence. On se focalise ainsi sur les dynamiques de propagation entre des temps
-consécutifs.
-Contrainte 4 : Une sous-séquence est fréquente si son support relatif est supérieure ou égal
-au seuil de support β ∈ [0, 1] donné. Le support relatif d’une STSP est égal au support
-absolu de la STSP (cf section 2) divisé par le nombre total de STSP générées.
-4.2 Extraction de sous-séquences intéressantes
-Nous avons introduit dans la section 3.2 la structure de données STP-tree qui permet de
-construire et de stocker efficacement les STSP. Dans cette partie, nous allons exploiter le STP-
-tree obtenu à la fin de la génération des STSP pour extraire efficacement des sous-séquences
-intéressantes (i.e. respectant les contraintes définies ci-dessus).
-Algorithm 2 Extraction des STSP intéressantes à partir du STP-tree
-1: ISTSP = ∅
-2: nb_STSP =
-X
-node∈STP−tree
-node.counter
-3: for each node that is not a child of the root node do
-4: if node.counter
-nb_STSP
-≥ β then
-5: s = generate STSP starting from root and ending at the node
-6: Add s to ISTSP
-7: end if
-8: end for
-9: return ISTSP
-L’algorithme 2 d’extraction prend en entrée le STP-tree généré à la fin de l’algorithme 1
-ainsi qu’un seuil minimum de support relatif β ∈ [0, 1], et retourne en sortie l’ensemble des
-sous-STSP intéressantes (noté ISTSP ). Le principe de l’algorithme est le suivant :
-1. calculer le nombre total de STSP dans le STP-tree (ligne 2)
-Modélisation de la dynamique de phénomènes spatio-temporels par des séquences
-2. parcourir tous les noeuds du STP-tree (ligne 3) et pour chacun
-– vérifier la contrainte de seuil minimum β à partir du support absolu stocker dans le
-noeud (ligne 4)
-– si la contrainte est vérifiée, générer la STSP correspondante simplement en parcourant
-l’arbre, du noeud en cours jusqu’à la racine (lignes 5-6)
-Comme nous venons de le constater, l’extraction des STSP intéressantes est simple grâce au
-STP-tree. Sa complexité est en O(|Sℜn |). En effet, cette structure de données permet de générer
-rapidement les STSP vérifiant les contraintes 1, 2 et 3 avec leur support absolu. Pour obtenir
-leur support relatif (et ainsi appliquer la contrainte 4), il suffit de calculer le nombre total de
-STSP dans l’arbre. En pratique, ce nombre est déjà calculé pendant la phase de génération (son
-calcul ne requiert donc aucun traitement supplémentaire).
-5 Résultats expérimentaux préliminaires
-Notre proposition a été implémentée dans un prototype en C++. Notons que pour amélio-
-rer la pertinence des motifs et diminuer leur nombre, ce prototype extrait les motifs fermés
-fréquents pour caractériser les zones à chaque date, et non pas tous les motifs fréquents. Pour
-faire cela, nous avons intégré l’implémentation de l’algorithme LCM de Uno et al. (2004).
-Des expérimentations ont été réalisées à partir d’une bases de données spatio-temporelles
-associée à une surface de 12 km2 (divisée en 42 zones). Ce jeu de données est constitué de
-5 couches temporelles, chacune composée d’informations sur la nature du sol, l’occupation
-du sol, le type de végétation et un indice de végétation (NDVI). Au total, ce jeu de données
-contient 25 caractéristiques. La suite de cette section présente les résultats préliminaires de ces
-expérimentations.
-Dans un premier temps, nous avons étudié le temps d’exécution de l’algorithme et plus
-particulièrement l’impact des STP-tree sur les performances (expérimentations réalisées avec
-Linux Ubuntu et un Intel Core 2 duo 2.66 Ghz). Nous avons notamment comparé deux va-
-riantes de notre approche : la première utilise une liste pour stocker les STSP et la deuxième
-utilise un STP-tree. Comme le montre le tableau 1, l’utilisation des STP-tree est beaucoup plus
-efficace que l’approche naïve consistant à utiliser une liste. Cette différence est d’autant plus
-importante que les expérimentations réalisées avec les listes ont été faite sur un sous-ensemble
-du jeu de données initial limité à 9 zones (au lieu de 42 zones pour les expérimentations avec
-les STP-tree).
-α Utilisation d’une liste (9 zones) Utilisation d’un STP-tree (42 zones)
-0.9 1 sec 1 sec
-0.8 4 sec 1 sec
-0.7 19 sec 2 sec
-0.6 332 sec 9 sec
-0.5 process killed by OS 30 sec
-0.4 process killed by OS 39 sec
-0.3 process killed by OS 135 sec
-0.2 process killed by OS 177 sec
-0.1 process killed by OS 283 sec
-TAB. 1 – Temps d’exécution de l’algorithme avec une structure de liste et avec les STP-tree
-Ensuite, nous avons étudié l’impact des seuils de support spatio-temporels α et β sur le
-nombre de STSP générées (tableau 2). Le tableau suivant montre que le nombre de STSP
-L. Mabit et al.
-générées augmente de manière exponentielle quand α diminue. En effet lorsque α diminue, le
-nombre de motifs fréquents augmente, et donc le nombre de STSP possibles augmente aussi.
-On peut même obtenir près de 80 millions de STSP avec un seuil de support α de 0.6 (seuil
-relatif). Notons néanmoins que, parmi ces 80 millions de STSP, seule 64 278 STSP différentes
-sont générées. Ce nombre important de STSP a pour conséquence d’entraîner une baisse du
-nombre STSP fréquentes (pour un même seuil de support β), qui est liée à la diminution du
-support absolu des STSP (qui dépend du nombre total de STSP). De manière plus classique,
-on constate aussi que le nombre de STSP fréquente augmente avec la diminution du seuil de
-support β.
-α nb moyen de motifs nb de STSP nb de STSP fréquentes
-fermés fréquents β = 0.01 β = 0.005 β = 0.001 β = 0.0001
-0.9 4 9350 (27 distinctes) 10 18 25 27
-0.8 7 372313 (292 distinctes) 35 64 145 243
-0.7 10 4640331 (2951 distinctes) 0 0 162 2061
-0.6 19 82939975 (64278 distinctes) 0 0 0 1
-TAB. 2 – Impact des seuils de supports minimaux α et β sur le nombre de STSP
-Les résultats préliminaires mettent en avant des relations connues. Par exemple, une faible
-sensibilité à l’érosion est souvent observée près de forêts associées à un certain type de sol.
-Autre exemple, la savane arborée est souvent associée à une faible quantité de végétation lors-
-qu’elle est seule, alors qu’elle est souvent associée à une forte quantité de végétation lorsqu’elle
-est dans des zones avec des forêts.
-6 Conclusion & Perspectives
-Ce travail s’est focalisé sur la fouille de données spatio-temporelles. Dans ce domaine
-émergent, l’un des défis est d’extraire des motifs spatio-temporels dans des bases de données
-où la dynamique des objets n’est pas explicitement stockée (contrairement aux bases de trajec-
-toires). Cette problématique est particulièrement importante dans un grand nombre d’applica-
-tions telles que la prévention d’épidémies ou le suivi de l’impact humain sur l’environnement.
-Face à ce problème, nous avons proposé un nouveau concept : les séquences spatio-temporelles
-de motifs (STSP). Ce séquences ont pour objectifs de décrire la propagation de certains phé-
-nomènes dans le temps et dans l’espace. Afin d’extraire les séquences les plus intéressantes,
-nous avons développé un algorithme efficace s’appuyant sur une nouvelle structure de don-
-nées, le STP-tree, et avons intégré des contraintes afin d’améliorer la pertinence des résultats.
-Les résultats expérimentaux préliminaires ont mis en avant l’intérêt de cette approche.
-Les perspectives de ce travail sont nombreuses. L’une des premières est de faire une étude
-expérimentale plus poussée des STSP extraites, avec les experts, afin de mettre en avant de
-nouvelles contraintes permettant d’améliorer encore la pertinence des solutions. Par ailleurs,
-il serait particulièrement intéressant de relâcher certaines contraintes imposées dans ce papier,
-et plus particulièrement celles limitant les sous-STSP possibles (contraintes 1 et 2). De même,
-il pourrait être intéressant de relâcher la contrainte sur l’intervalle temporel entre les motifs
-de la séquence. La modification de ces contraintes impliquent de mettre en place une nouvelle
-stratégie pour extraire les STSP intéressantes à partir du STP-tree stockant l’ensemble des
-STSP générées. Une autre perspective importante est de développer une approche de visuali-
-sation adaptée aux STSP et aux besoins des experts. En effet, actuellement, les résultats sont
-présentés sous une forme textuelle ce qui rend leur analyse par les experts difficile.
-Modélisation de la dynamique de phénomènes spatio-temporels par des séquences
+Grâce à des techniques récentes de traitement de la parole, de nombreux centres d’ap-
+pels téléphoniques automatisés voient le jour. Ces serveurs vocaux permettent aux utilisateurs
+d’exécuter diverses tâches en dialoguant avec une machine. Les entreprises cherchent à amé-
+liorer la satisfaction de leurs clients en les redirigeant en cas de difficulté vers un opérateur
+humain. L’aiguillage des utilisateurs mécontents revient à détecter les émotions négatives dans
+leurs dialogues avec la machine, sous l’hypothèse qu’un problème de dialogue génère un état
+émotionnel particulier chez le sujet.
+La détection d’émotions dans la parole est généralement traitée comme un problème d’ap-
+prentissage supervisé. Cela s’explique par le fait que les descripteurs utilisés sont relativement
+éloignés du concept d’émotion, dans la pratique l’étiquetage d’exemples s’avère nécessaire.
+La détection d’émotions se limite généralement à une classification binaire, la prise en compte
+de labels plus fins pose le problème de l’objectivité de l’étiquetage (Liscombe et al., 2005).
+Dans ce cadre, les données sont coûteuses à acquérir et à étiqueter. L’apprentissage actif peut
+diminuer ce coût en étiquetant uniquement les exemples jugés informatifs pour le modèle.
+Cet article propose une approche d’apprentissage actif pour la redirection automatique
+d’appels. La première section présente le contexte de l’étude ainsi que les données utilisées.
+Les différentes stratégies d’apprentissage envisagées ainsi que le modèle utilisé sont traités
+dans la section 2. La dernière section est consacrée aux résultats obtenus et à leur discussion.
+Apprentissage actif d’émotions
+2 Classification d’émotions : caractérisation des données
+Cet article se base sur des travaux antérieurs (Poulain, 2006) cherchant à caractériser au
+mieux des échanges vocaux en vue d’une classification d’émotions. Le but est de réguler le
+dialogue entre des utilisateurs et un serveur vocal. Cette étude porte plus particulièrement sur
+la pertinence des variables décrivant les données par rapport à la détection d’émotions.
+Les données utilisées sont issues d’une expérience mettant en jeu 32 utilisateurs qui testent
+un service boursier fonctionnant sur un serveur vocal. Du point de vue de l’utilisateur, le test
+consiste à gérer un portefeuille fictif d’actions, le but étant de réaliser la plus forte plus va-
+lue. Les traces vocales obtenues constituent le corpus de cette étude, soit 5496 "tours de pa-
+role" échangés avec la machine. Les tours de parole sont caractérisés par 200 variables acous-
+tiques, décrivant notamment la variation du volume sonore, la variation de la hauteur de voix,
+le rythme d’élocution. Les données sont également caractérisées par 8 variables dialogiques
+décrivant notamment l’âge du locuteur, le rang du dialogue, la durée du dialogue. Chaque tour
+de parole est étiqueté manuellement comme étant porteur d’émotions positives ou négatives.
+Le sous-ensemble des variables les plus informatives vis-à-vis de la détection d’émotions
+est déterminé grâce à un sélecteur bayésien naïf (Boullé, 2006). Au début de ce procédé, l’en-
+semble des attributs est vide, à chaque itération on ajoute l’attribut qui améliore au plus la qua-
+lité prédictive du modèle. L’algorithme s’arrête lorsque l’ajout d’attributs n’améliore plus la
+qualité dumodèle. Finalement, 20 variables ont été sélectionnées pour caractériser les échanges
+vocaux1. Dans le cadre de cet article, les données utilisées sont issues du même corpus et de
+cette étude antérieure. Chaque tour de parole est donc caractérisé par 20 variables.
+Étant donnés :
+• M un modèle prédictif muni d’un algorithme d’apprentissage L
+• Les ensembles Ux et Lx d’exemples non étiquetés et étiquetés
+• N le nombre d’exemples d’apprentissage souhaités.
+• L’ensemble d’apprentissage T constitué de couples "instance, étiquette" notés (u, f(u)).
+• La fonction Utile : X×M→ ℜ qui estime l’utilité d’une instance pour l’apprentissage.
+Condition initiale : ‖T‖ < N
+Répéter
+(A) Entraîner le modèleM grâce à L et T (et éventuellement Ux ).
+(B) Rechercher l’instance q = argmaxu∈Ux Utile(u,M)
+(C) Retirer q de Ux et demander l’étiquette f(q) à l’oracle.
+(D) Ajouter q à Lx et ajouter (q, f(q)) à T
+Tant que ‖T‖ < N
+Algorithme 1: échantillonnage sélectif, Muslea (Muslea, 2002)
+1Il est important de noter que parmi les 20 variables retenues, certaines sont obtenues de manière non automatique.
+On suppose dans la suite de l’article qu’on dispose d’un moyen pour les évaluer toutes.
+A. Bondu, V. Lemaire et B. Poulain
+3 Classification active d’émotions
+3.1 Introduction
+La mise en œuvre d’un système automatique de détection d’émotions requiert générale-
+ment l’entraînement d’un classifieur. Ici, le modèle qui va classifier les émotions est réalisé
+grâce à un processus d’apprentissage actif. A la différence de l’apprentissage passif, qui utilise
+un ensemble de données déjà étiquetées, l’apprentissage actif permet au modèle de construire
+lui-même son ensemble d’apprentissage au cours de son entraînement. Parmi les stratégies
+d’apprentissage actif existantes (Castro et Nowak, 2005), on se place dans le cadre de l’échan-
+tillonnage sélectif où le modèle dispose d’un "sac" d’instances non étiquetées dont il peut
+demander les labels.
+Muslea (Muslea, 2002) a formalisé de manière générique l’échantillonnage sélectif à tra-
+vers l’Algorithme (1). Celui-ci met en jeu la fonction Utile(u,M) qui estime l’intérêt d’une
+instance u ∈ Ux pour l’apprentissage du modèleM. La problématique centrale de l’appren-
+tissage actif est de "préjuger efficacement" de l’intérêt des exemples avant de les étiqueter.
+3.2 Le choix du modèle
+La grande variété des modèles capables de résoudre des problèmes de classification et
+parfois le grand nombre de paramètres nécessaires à leur utilisation rend souvent l’apport d’une
+stratégie d’apprentissage difficile à mesurer. On choisit d’utiliser une fenêtre de Parzen à noyau
+gaussien et de norme L2 (Parzen, 1962) car ce modèle prédictif n’utilise qu’un seul paramètre
+et est capable de fonctionner naturellement avec peu d’exemples. La "sortie" de ce modèle est
+une estimation de la probabilité d’observer l’étiquette yi conditionnellement à l’instance un :
+Pˆ (yi|un) =
+∑N
+j=1 1{f(lj)=yi} K(un, lj)∑N
+j=1K(un, lj)
+avec lj ∈ Lx et un ∈ Ux ∪ Lx (1)
+K(un, lj) = e
+||un−lj ||
+2
+2σ2
+La valeur optimale (σ2=0.24) du paramètre du noyau a été déterminée grâce à une cross-
+validation sur l’erreur quadratique moyenne (Chappelle, 2005). Cette valeur est utilisée par la
+suite pour fixer le paramètre de la fenêtre de parzen.
+Pour que le modèle puisse affecter une étiquette fˆ(un) à l’instance un, un seuil de décision
+noté Seuil(Lx) est calculé. Ce seuil minimise l’erreur de prédiction2 sur l’ensemble d’appren-
+tissage. L’étiquette attribuée est fˆ(un) = 1 si {Pˆ (y1|un) > Seuil(Lx)}, et fˆ(un) = 0 sinon.
+Puisque le seul paramètre de la fenêtre de Parzen est fixé, l’apprentissage du modèle se réduit
+au "comptage" des instances (au sens du noyau gaussien). Cela permet de comparer unique-
+ment les stratégies de sélection d’exemples sans être influencé par l’apprentissage du modèle.
+3.3 Deux stratégies d’apprentissage actif
+La première stratégie d’apprentissage actif proposée a pour but de réduire l’erreur de géné-
+ralisation du modèle, cette erreur peut être estimée par le risque empirique (Zhu et al., 2003).
+2La mesure d’erreur utilisée est le BER, voir section 4.1
+Apprentissage actif d’émotions
+Ici, le risque R(M)est définit comme étant la somme des probabilités que le modèle prenne
+une mauvaise décision sur l’ensemble d’apprentissage. On note P (yi|ln) la probabilité réelle
+d’observer la classe yi pour l’instance ln ∈ Lx. Le risque empirique s’écrit alors selon l’équa-
+tion 2, avec 1 la fonction indicatrice égale à 1 si f(ln) 6= yi et égale à 0 sinon. La fenêtre de
+parzen estime P (yi|ln), on peut donc approximer le risque empirique en adoptant un apriori
+uniforme sur les P (ln) (voir équation 3). Le but de cette stratégie est de sélectionner l’instance
+non étiquetée ui ∈ Ux qui minimisera le risque à l’itération t + 1. On estime R(M+un) le
+risque "attendu" après l’étiquetage de l’instance un. Pour se faire, on se base sur les données
+étiquetées dont on dispose et on suppose que f(un) = y1 [resp f(un) = y0] pour estimer
+Rˆ(M+(un,y1)) [resp Rˆ(M+(un,y0))]. L’équation 4 montre comment agréger les estimations
+de risque selon les probabilités d’observer chacune des classes. Pour exprimer la stratégie de
+réduction du risque sous forme algorithmique, il suffit de remplacer l’étape (B) de l’algorithme
+1 par : "Rechercher l’instance q = argminu∈Ux Rˆ(M+un)".
+R(M) =
+N∑
+n=1
+∑
+yi=0,1
+1{f(ln) 6=yi} P (yi|ln)P (ln) avec ln ∈ Lx (2)
+Rˆ(M) =
+1
+N
+N∑
+n=1
+1{f(ln) 6=yi} Pˆ (yi|ln) (3)
+Rˆ(M+un) = Pˆ (y1|un)Rˆ(M
++(un,y1)) + Pˆ (y0|un)Rˆ(M
++(un,y0)) avec un ∈ Ux (4)
+La deuxième stratégie d’apprentissage consiste à choisir l’instance pour laquelle la prédic-
+tion du modèle est la plus incertaine possible. On considère que l’incertitude d’une prédiction
+est maximale quand la probabilité de sortie du modèle se rapproche du seuil de décision (voir
+équation 5). L’algorithme correspondant à cette stratégie s’obtient en remplaçant l’étape (B)
+de l’algorithme 1 par : "Rechercher l’instance q = argmaxu∈Ux Incertain(un)".
+Incertain(un) =
+∑
+yi=0,1
+1{fˆ(un)=yi}
+1
+|Pˆ (yi|un)− Seuil(Lx)|
+(5)
+En dehors de ces deux stratégies actives, une approche "stochastique" sélectionne unifor-
+mément les exemples selon leur distribution de probabilité. Cette dernière approche est notre
+juge de paix et tient lieu de référence pour mesurer l’apport des stratégies actives.
+4 Résultats
+4.1 Résultats et Discussion
+Les résultats présentés sont issus d’expériences répétées cinq fois pour chaque straté-
+gie d’apprentissage3. Au début de l’expérience, l’ensemble d’apprentissage ne possède que
+deux exemples (un positif et un négatif) choisis de manière aléatoire. A chaque itération, dix
+3les moustaches sur les courbes de la figure 1 correspondent à 4 fois la variance des résultats.
+A. Bondu, V. Lemaire et B. Poulain
+exemples sont choisis pour être étiquetés et ajoutés à l’ensemble d’apprentissage. Le pro-
+blème de classification traité est déséquilibré au profit d’une des deux classes. On possède
+92% d’émotions "positives ou neutres" et 8% d’émotions "négatives". Afin de réprésenter cor-
+rectement les gains en terme de classification l’évaluation du modèle est réalisée en utilisant le
+"Balanced Error Rate" (BER) (Yi-Wei et Chih-Jen, 2006) sur un ensemble de test4.
+Selon les résultats de la figure 1, la "réduction du risque" est la stratégie qui maximise la
+qualité dumodèle. En étiquetant 60 exemples grâce à cette approche, la performance dumodèle
+est très proche du BER asymptotique5 (l’écart n’est que de 0.04). La stratégie de "maximisa-
+tion de l’incertitude" n’est pas performante au début de l’apprentissage. Il faut étiqueter 180
+exemples pour que cette stratégie donne de meilleurs résultats que l’approche "stochastique".
+Cette approche à l’avantage d’être rapide, pour 300 exemples étiquetés on observe une perfor-
+mance comparable à la "réduction du risque", avec un temps de calcul 5 fois moins important.
+La figure 2 compare les performances d’un modèle passif entraîné sur la totalité de l’en-
+semble d’apprentissage et de deux modèles actifs entraînés sur 100 exemples. Les résultats
+sont présentés sous la forme de courbes de lift réalisées sur l’ensemble de test. Ces courbes
+montrent la proportion d’émotions "négatives" détectées par le modèle, en considérant une
+certaine proportion de la population totale. Par exemple, le modèle entraîné grâce à la minimi-
+sation du risque détecte 74% des émotions négatives en utilisant 20% de la population totale
+(voir point "A" de la figure 2). La "maximisation de l’incertitude" permet de détecter plus ef-
+ficacement les émotions négatives que la "réduction du risque" (ce résultat ne prend pas en
+compte le taux de fausses alertes). Les deux modèles actifs offrent des performances proches
+de celle du modèle passif, en utilisant 37 fois moins d’exemples d’apprentissage.
+ 0.15
+ 0.2
+ 0.25
+ 0.3
+ 0.35
+ 0.4
+ 0.45
+ 0.5
+ 0  50  100  150  200  250  300
+BE
+R
+ s
+ur
+ l’
+en
+se
+m
+bl
+e 
+de
+ te
+st
+Nombre d’exemples d’apprentissage
+Aleatoire
+Maximisation incertitude
+Reduction du Risque
+BER asymptotique
+FIG. 1 – BER en fonction du nombre
+d’exemples d’apprentissage utilisés.
+ 0
+ 0.2
+ 0.4
+ 0.6
+ 0.8
+ 1
+ 1.2
+ 0  0.2  0.4  0.6  0.8  1
+Ta
+ux
+ d
+e 
+de
+te
+ct
+io
+n 
+de
+s 
+em
+ot
+io
+ns
+ n
+eg
+at
+ive
+s
+Population Totale de l’ensemble de test
+A+0.74
+Apprentissage passif : 3783 exemples
+Minimisation risque : 100 exemples
+Maximisation incertitude : 100 exemples
+FIG. 2 – Courbes de lift : Apprentissage Ac-
+tif / Passif (moyenne sur 5 expériences)
+4.2 Conclusion et perspectives
+Cet article montre l’intérêt de l’apprentissage actif pour un domaine où l’acquisition et
+l’étiquetage des données sont particulièrement coûteux. Au vu des résultats obtenus lors de
+nos expériences, l’apprentissage actif est pertinent pour la détection d’émotions dans la parole.
+4L’ensemble de test comporte 1613 exemples et l’ensemble d’apprentissage 3783 exemples
+5Le BER asymptotique est calculé en considérant les 3783 exemples d’apprentissage.
+Apprentissage actif d’émotions
+D’une manière générale, les stratégies d’apprentissage actif permettent d’estimer l’utilité
+des exemples d’apprentissage. Ces mêmes critères pourraient être utilisés dans le cadre d’un
+apprentissage en ligne. L’ensemble d’apprentissage serait constitué des N exemples les plus
+"utiles" vus jusqu’à présent (avec N fixé). Cette approche permettrait de considérer des pro-
+blèmes d’apprentissage non stationnaires.
+La détection d’émotions pourait être traitée par une double stratégie diminuant le coût
+d’acquisition des données : (i) une sélection de variables permettant de conserver uniquement
+les caractéristiques nécessaires et suffisantes à la classification ; (ii) une sélection d’exemples
+permettant de ne conserver que les instances utiles à l’apprentissage. Ceci sera exploré dans
+des travaux futurs.
 Références
-Agrawal, R. et R. Srikant (1994). Fast algorithms for mining association rules in large data-
-bases. In J. B. Bocca, M. Jarke, et C. Zaniolo (Eds.), VLDB, pp. 487–499. Morgan Kauf-
-mann.
-Cao, H., N. Mamoulis, et D. W. Cheung (2005). Mining frequent spatio-temporal sequential
-patterns. In ICDM, pp. 82–89. IEEE Computer Society.
-Celik, M., S. Shekhar, J. P. Rogers, et J. A. Shine (2006). Sustained emerging spatio-temporal
-co-occurrence pattern mining : A summary of results. In ICTAI, pp. 106–115.
-Celik, M., S. Shekhar, J. P. Rogers, et J. A. Shine (2008). Mixed-drove spatiotemporal co-
-occurrence pattern mining. IEEE Trans. Knowl. Data Eng. 20(10), 1322–1335.
-Du, X., R. Jin, L. Ding, V. E. Lee, et J. H. T. Jr. (2009). Migration motif : a spatial - temporal
-pattern mining approach for financial markets. In KDD, pp. 1135–1144.
-Lin, Z. et S. Lim (2009). Optimal candidate generation in spatial co-location mining. In S. Y.
-Shin et S. Ossowski (Eds.), SAC, pp. 1441–1445. ACM.
-Mohan, P., S. Shekhar, J. A. Shine, et J. P. Rogers (2010). Cascading spatio-temporal pattern
-discovery : A summary of results. In SDM, pp. 327–338.
-Monreale, A., F. Pinelli, R. Trasarti, et F. Giannotti (2009). Wherenext : a location predictor
-on trajectory pattern mining. In KDD, pp. 637–646.
-Qian, F., Q. He, et J. He (2009). Mining spatial co-location patterns with dynamic neighbo-
-rhood constraint. In ECML/PKDD’09, Volume 5782 of LNCS, pp. 238–253. Springer.
-Uno, T., M. Kiyomi, et H. Arimura (2004). Lcm ver. 2 : Efficient mining algorithms for
-frequent/closed/maximal itemsets. In FIMI.
-Verhein, F. (2009). Mining complex spatio-temporal sequence patterns. In SDM, pp. 605–616.
-Wang, L., L. Zhou, J. Lu, et J. Yip (2009). An order-clique-based approach for miningmaximal
-co-locations. Inf. Sci. 179(19), 3370–3382.
-Wynne Hsu, Mong Li Lee, J. W. (2009a). Mining generalized flow patterns. In Temporal and
-spatio-temporal Data Mining, pp. 189–208. IGI Publishing.
-Wynne Hsu, Mong Li Lee, J. W. (2009b). Mining spatio-temporal trees. In Temporal and
-spatio-temporal Data Mining, pp. 209–226. IGI Publishing.
-Yao, X. (2003). Research issues in spatio-temporal data mining. InWhite paper UCGIS.
-Yuan, M. (2008). Toward knowledge discovery about geographic dynamics in spatiotempo-
-ral databases. In J. Han et H. J. Miller (Eds.), Geographic Data Mining and Knowledge
-Discovery, Taylor and Francis, pp. 347–365.
+Boullé, M. (2006). An enhanced selective naive bayes method with optimal discretization. In
+I. Guyon, S. Gunn, M. Nikravesh, et L. Zadeh (Eds.), Feature extraction, foundations and
+Application, pp. 499–507. Springer.
+Castro, R. andWillett, R. et R. Nowak (2005). Faster rate in regression via active learning. In
+NIPS (Neural Information Processing Systems), Vancouver.
+Chappelle, O. (2005). Active learning for parzen windows classifier. In AI & Statistics,
+Barbados, pp. 49–56.
+Liscombe, J., G. Riccardi, et D. Hakkani-Tür (2005). Using context to improve emotion
+detection in spoken dialog systems. In InterSpeech, Lisbon.
+Muslea, I. (2002). Active Learning With Multiple View. Phd thesis, University of southern
+california.
+Parzen, E. (1962). On estimation of a probability density function and mode. Annals of
+Mathematical Statistics 33, 1065–1076.
+Poulain, B. (2006). Sélection de variables et modélisation d’expressions d’émotions dans des
+dialogues hommes-machine. In EGC (Extraction et Gestion de Connaissance), Lille. + Note
+technique http ://perso.rd.francetelecom.fr/lemaire.
+Yi-Wei, C. et Chih-Jen (2006). Combining SVMs with various feature selection strategies. In
+I. Guyon, S. Gunn, M. Nikravesh, et L. Zadeh (Eds.), Feature extraction, foundations and
+Application, pp. 315–323. Springer.
+Zhu, X., J. Lafferty, et Z. Ghahramani (2003). Combining active learning and semi-supervised
+learning using gaussian fields and harmonic functions. In ICML (International Conference
+on Machine Learning), Washington.
 Summary
-In this paper, we propose a new theoretical framework for modeling the dynamics of spatio-
-temporal phenomena. We define a new concept: spatio-temporal sequences of patterns. We
-propose a new incremental algorithm for the construction and mining of these sequences in
-spatio-temporal database. A prototype has been developed and tested on real data.
+Taking into account emotions in Human-machine interactions can be helpfull for intelligent
+systems designing. The main difficulty, for the conception of calls center’s automatic shunting
+system, is the cost of data labelling. This paper propose to reduce this cost thanks to active
+learning strategies. The study is based on real data resulting from the use of a vocal stock
+exchange server.

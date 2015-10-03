@@ -1,1947 +1,520 @@
-Prévision des trajectoires d’avions par les méthodes
-d’apprentissage automatique : Approche par CART et forêts
-aléatoires
-Norbert Fouemkeu∗,∗∗∗ Nour-Eddin El Faouzi∗
-Jacques Sau∗∗, Rémy Fondacci∗
-∗LICIT - Laboratoire d’Ingénierie Circulation Transports,
-Unité mixte IFSTTAR/ENTPE
-25, avenue François Mitterrand - Case 24 - F- 69675 Bron
-Cedex - France
-{norbert.fouemkeu, elfaouzi, remy.fondacci}@ifsttar.fr
-http://www.ifsttar.fr
-∗∗LMFA - Laboratoire de Mécanique des Fluides et d’Acoustique,
-UMR 5509, Université Lyon 1,
-43, blvd du 11 Novembre 1918,
-F - 69622, Villeurbanne Cedex - France
-sau@univ-lyon1.fr
-http://www.univ-lyon1.fr
-∗∗∗Ecole Polytechnique Universitaire de Lyon 1,
-MAM - Mathématiques Appliquées et Modélisation,
-15, Boulevard Latarjet, 69622 Villeurbanne Cedex - France
-norbert.fouemkeu@univ-lyon1.fr
-http://www.istil-epu-lyon1.fr
-Résumé. La forte croissance du trafic aérien dans l’espace européen (5% par an)
-indique que le contrôle aérien à l’avenir devra faire face à un nombre d’avions
-de plus en plus important. La prévision de l’incertitude sur les trajectoires des
-avions s’impose alors comme une nécessité opérationnelle. Cet article vise un
-double objectif : (i) A partir des données réelles du trafic aérien, nous montrons
-que les méthodes d’apprentissage automatique CART et les forêts aléatoires per-
-mettent de réaliser les prévisions efficaces des instants de passage des avions en
-des points de leur trajectoire. Nous quantifions le pouvoir prédictif du modèle
-construit par la méthode CART et de celui des forêts aléatoires. Ces modèles
-sont évalués sur les données test. (ii) Nous montrons que sous certaines condi-
-tions, le modèle des forêts aléatoires présente un risque de surapprentissage.
+Caractérisation automatique des classes découvertes en
+classification non supervisée
+Nistor Grozavu∗, Younès Bennani∗
+Mustapha Lebbah∗
+∗LIPN UMR CNRS 7030, Université Paris 13,
+99, avenue Jean-Baptiste Clément, 93430 Villetaneuse
+Prénom.Nom@lipn.univ-paris13.fr
+Résumé. Dans cet article, nous proposons une nouvelle approche de classifi-
+cation et de pondération des variables durant un processus d’apprentissage non
+supervisé. Cette approche est basée sur le modèle des cartes auto-organisatrices.
+L’apprentissage de ces cartes topologiques est combiné à un mécanisme d’esti-
+mation de pertinences des différentes variables sous forme de poids d’influence
+sur la qualité de la classification. Nous proposons deux types de pondérations
+adaptatives : une pondération des observations et une pondération des distances
+entre observations. L’apprentissage simultané des pondérations et des prototypes
+utilisés pour la partition des observations permet d’obtenir une classification op-
+timisée des données. Un test statistique est ensuite utilisé sur ces pondérations
+pour élaguer les variables non pertinentes. Ce processus de sélection de variables
+permet enfin, grâce à la localité des pondérations, d’exhiber un sous ensemble
+de variables propre à chaque groupe (cluster) offrant ainsi sa caractérisation.
+L’approche proposée a été validé sur plusieurs bases de données et les résultats
+expérimentaux ont montré des performances très prometteuses.
 1 Introduction
-Le niveau important d’incertitude sur les trajectoires de vols est un facteur de baisse de
-capacité dans l’espace aérien, et donc du dysfonctionnement de la gestion du trafic aérien
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-en général. Nous proposons dans cet article des modèles d’apprentissage automatique pour
-la prévision des trajectoires 4D d’avions en fonction des données opérationnelles du trafic
-aérien. Autrement dit, pour un avion en vol, observé à un instant to à une positionM(to) de sa
-trajectoire prévue dans son plan de vol, les modèles développés doivent permettre de prévoir
-l’instant t de passage de cet aéronef au point futur M(t) de cette trajectoire. Un tel modèle
-peut être formulé par l’équation (1) :
-t = tp +Φ(X) + . (1)
-où :
-– t est l’instant de passage d’un avion au pointM de sa trajectoire prévue.
-– tp est l’instant prévu dans le plan de vol. Cet instant est connu à partir des plans de vols
-déposés1.
-– X est un vecteur de variables explicatives de la différence t− tp. Il s’agit : Des plans de
-vols, des conditions météorologiques et atmosphériques, de la complexité du trafic et les
-paramètres courants des vols. Ces groupes de variables sont décrits ci-dessous.
-– Φ est une fonctionnelle à ajuster en fonction deX.
-–  est une composante résiduelle.
-1.1 Plan de vol d’origine et plan de vol simulé par OPERA
-Lorsqu’un avion est observé à l’instant t0 à la position courante M(t0) de sa trajectoire
-réelle, nous utilisons le simulateur du trafic aérien OPERA développé au LICIT pour simuler
-la trajectoire de vol restante. M(t0) est considéré comme le point de départ de la trajectoire
-à prévoir. Les points balises de la trajectoire simulée sont celles du plan de vol d’origine qui
-jalonnent la portion de la trajectoire de vol prévue qui reste à parcourir. Ce simulateur prend
-en entrée les paramètres de performances des avions issues de la base BADA (Base of Aircraft
-Data) d’Eurocontrol2. Il s’agit des paramètres nominaux des avions disponibles dans Euro-
-control (2009). Les nouveaux instants prévus pour survoler le reste des points balises ont été
-calculés en initialisant le temps à t0 surM(t0). Pour ces instants nous gardons la notation tp.
-Dans la suite, lorsque nous parlerons de plan de vol ou de la trajectoire prévue, nous ferons
-référence à cette trajectoire simulée par OPERA.
-1.2 Vecteur de variables explicativesX
-Le vecteur de variables explicatives X contient quatre groupes de variables susceptibles
-d’avoir une influence directe sur le temps de passage des avions sur les points de leur trajectoire
-prévue :
-– Plans de vols : Chaque plan de vol contient les points balises à traverser, les heures de
-survol de ces balises, les secteurs à traverser par le vol, les heures d’entrée et de sortie
-des secteurs, les aéroports de départ et de destination du vol, le niveau de vol de croisière
-prévu, le type d’avion utilisé, la compagnie aérienne exploitante du vol, etc.
-1Un vol commence par le dépôt d’un plan de vol auprès des autorités de gestion des flux de trafic. Ce plan de vol
-contient un ensemble d’informations sur la route prévue pour le vol.
-2Organisation européenne pour la sécurité de la circulation aérienne.
-N. Fouemkeu et al.
-– Conditions météorologiques et atmosphériques : Il s’agit des prévisions du vent (son
-intensité et sa direction), la température, la pression, la densité de l’air et l’humidité
-spécifique sur le reste de la trajectoire prévue à partir du point courantM(to).
-– Complexité du trafic : Il s’agit de la complexité du trafic sur le reste de la trajectoire de
-vol prévue à partir du point courant M(to). Elle dépend de la géométrie des secteurs
-traversés, de type de flux d’avions (horizontal, vertical) entrant ou sortant des secteurs,
-des interactions potentielles entre les avions pendant le vol et de l’hétérogénéité des
-performances entre les avions.
-– Paramètres courants : Les paramètres courants du vol à l’instant to comprennent la vi-
-tesse, le taux de montée ou de descente de l’aéronef, le retard du vol par rapport au plan
-de vol d’origine, la distance sur le plan de vol entre le point M(to) et le point M(t),
-la différence entre l’altitude du point courant M(to) et l’altitude du point M(t) de la
-trajectoire prévue.
-Une description plus détaillée de ces variables est présentée en annexe (TAB 1 et TAB 2).
-1.3 Identification du modèle
-L’équation (1) définie précédemment peut de façon équivalente s’écrire :
-t− tp = Φ(X) + . (2)
-Pour un avion et un pointM de sa trajectoire prévue, la différence « t−tp » est l’écart entre
-l’instant t de passage réel de cet avion au pointM et l’instant tp prévu dans son plan de vol.
-La prévision de l’instant t en fonction des variables explicatives du vol est alors équivalente à
-la prévision de l’écart « t− tp » en fonction de ces mêmes variables. Dans le reste de l’article,
-nous parlerons tout simplement de l’écart temporel pour faire référence à cette différence que
-nous notons :
-4τ = t− tp.
-La modélisation consiste maintenant à trouver un estimateur de 4τ en fonction de l’en-
-semble des caractéristiques du vol représentées par le vecteur X. En moyenne, cet estimateur
-que nous notons 4̂τ vérifie la relation suivante :
-4̂τ = Φ(X). (3)
-En effet, la variable résiduelle issue de la modélisation est supposée de moyenne nulle.
-En utilisant les données d’archives du trafic réel enregistrées par le système CPR (Correlated
-Position Report), on peut construire un tel estimateur en minimisant les écarts résiduels par la
-méthode des moindres carrés.
-Comme il est ardu, voire impossible de disposer de tous les points constitutifs de la trajec-
-toire réelle d’un avion, nous construisons les modèles en utilisant les données sur les points
-d’entrée et sortie des secteurs. Par ailleurs, nous supposons que le point courant M(t0) est
-situé après le décollage de l’avion.
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-Cet article est organisé comme suit : Le paragraphe (2) est consacré d’abord sur la mé-
-thodologie et les données utilisées sont ensuite présentées. Le paragraphe (3) consacré à la
-méthode CART rappelle d’abord la spécification de ce type de modèle avant de présenter le
-critère optimisé dans le processus de division des nœuds. La modélisation de l’écart temporel
-est présentée en mettant en évidence les variables explicatives ayant le plus contribué au par-
-titionnement des données. Le paragraphe (4) expose les principes fondateurs du modèle des
-forêts aléatoires et la modélisation proprement dite par cette méthode est présentée au para-
-graphe (5). Le paragraphe (6) est dédié à la présentation des résultats. Les pouvoirs prédictifs
-des modèles sont présentés en fonction de l’horizon de prévision, une quantification du sur-
-apprentissage du modèle des forêts aléatoires est ensuite présentée. Une conclusion clôt ce
-travail.
-2 Méthodologie et données utilisées
-Nous proposons dans un premier temps un modèle fondé sur la méthode CART pour la
-prévision de l’écart temporel. Ensuite, nous proposons un second modèle fondé sur les fo-
-rêts aléatoires. En utilisant comme indicateur, le coefficient de Theil (1958), nous comparons
-ces deux modèles selon leurs performances du point de vue apprentissage des données. Leur
-pouvoir prédictif est ensuite évalué sur les nouvelles données test et nous en tirons parti pour
-finalement montrer le risque de surapprentissage de la technique des forêts aléatoires lorsque
-l’horizon de prévision croît.
-Les données utilisées dans cette étude résultent du couplage de données du trafic aé-
-rien fournies par Eurocontrol et de données météorologiques et atmosphériques collectées par
-Météo-France sur la même zone de l’espace aérien. Elles couvrent le mois de septembre 2007.
-Nous avons extrait de cette masse de données les caractéristiques pertinentes susceptibles de
-contribuer à la prévision au travers de la modélisation statistique le temps de passage des
-avions en des points de leur trajectoire, donc de prévoir l’écart temporel. Notre étude porte sur
-un échantillon de 25000 observations avec 22 variables explicatives. Les avions considérés ont
-été observés aux intants courants t0 égaux à 8, 11, 14 et 17 heures.
-3 Méthode CART
-La méthode de régression par CART (Classification And Regression Trees) a été déve-
-loppée par Breiman et al. (1984). Cette méthode qui fait partie de l’ensemble des techniques
-largement citées dans la littérature de l’apprentissage automatique est inspirée des méthodes
-de partitionnement récursif initialement initiées par Messenger et Mandell (1972) et Morgan et
-Messenger (1973) à la suite des travaux de Morgan et Sonquist (1963) et Sonquist et Morgan
-(1964) portant sur les arbres de décision. La méthode CART a été étendue au traitement des
-données censurées avec les travaux de Davis et Anderson (1989), Olshen et al. (1990) et de Le-
-blanc et Crowley (1992). En partant de CART, Gelfand et al. (1991) ont proposé une méthode
-itérative qui construit et élague l’arbre alternativement.
-La popularité de la méthode de régression par arbre est en grande partie due aux avantages
-qu’elle présente et dont les principaux sont :
-N. Fouemkeu et al.
-– Absence ou tout au moins des faibles hypothèses dans la mise en place des modèles par
-rapport aux méthodes classiques. Par exemple, aucune hypothèse n’est exigée sur la dis-
-tribution de probabilité, ni pour la variable à expliquer, ni pour les variables explicatives.
-– Elle est particulièrement adaptée au cas où les variables explicatives sont nombreuses.
-Ces variables peuvent être soit qualitatives ou soit quantitatives.
-– Elle permet la sélection des variables les plus informatives avec la prise en compte des
-interactions entre les variables explicatives.
-– Grâce aux divisions suppléantes définies comme les divisions les plus semblables à la
-meilleure division retenue, cette méthode gère l’existence de données manquantes.
-En revanche, le principal inconvénient de cette méthode est l’instabilité des arbres de régres-
-sion. En effet, une légère modification des entrées, c’est-à-dire des mesures des variables expli-
-catives peut conduire aux arbres avec des structures très différentes Breiman (1996b), Ghattas
-(1999)
-Afin de palier cet inconvénient des nouvelles approches innovantes sont apparues et tentent
-d’apporter des améliorations relatives à la stabilité des arbres. Il s’agit notamment duBagging
-Breiman (1996a), du Boosting Freund et Schapire (1997); Schapire (2002) et les forêts aléa-
-toires Breiman (2001). Toutes ces méthodes ont pour principe commun de construire plusieurs
-arbres de décision ou de régression à partir des données d’apprentissage et de les agréger en-
-suite. Dans le contexte d’arbre de régression, le modèle agrégé s’obtient par le calcul de la
-moyenne des prévisions obtenues sur les différents échantillons bootstrap. L’application de ces
-méthodes par Quinlan (1996) montre une amélioration considérable des performances des mo-
-dèles agrégés en terme de stabilité et de précision. Le modèle des forêts aléatoires est une va-
-riante du bagging avec une deuxième randomisation sur l’ensemble des variables explicatives.
-Une partie de son efficacité est due au fait que les éventuelles valeurs extrêmes de l’échan-
-tillon initial ne se retrouvent que dans certains échantillons bootstrap et que la moyenne des
-estimations bootstrap fait perdre ou tout au moins diminue les effets de ces valeurs extrêmes
-dans le modèle agrégé, Tuffery (2006). L’étape de randomisation des variables explicatives est
-introduite pour rendre les arbres de régression plus indépendants des données d’apprentissage.
-Dans le cadre de cette étude nous utilisons la version originale de la méthode CART pour
-disposer d’un benchmark de la prévision de l’écart temporel. Ensuite, le modèle des forêts
-aléatoires est utilisé et nous illustrons le gain de performance induit par ce dernier.
-3.1 Spécification du modèle CART
-Dans son principe, la méthode CART construit une partition de l’ensemble des observations
-à l’aide d’un arbre binaire en minimisant la somme des carrés des erreurs intra-classes. Les
-arbres de régression divisent l’espace des variables explicatives en un ensemble d’hypercubes.
-Le modèle de régression par arbre est un modèle simple et non paramétrique où une constante
-est ajustée sur chaque hypercube. Ce modèle est spécifié par la fonction de régression suivante :
-M(X) =
-n0∑
+La classification automatique - clustering - est une étape importante du processus d’extraction
+de connaissances à partir de données. Elle vise à découvrir la structure intrinsèque d’un en-
+semble d’objets en formant des regroupements - clusters - qui partagent des caractéristiques
+similaires (Fisher, 1996; Cheeseman et al., 1988). La complexité de cette tâche s’est forte-
+ment accrue ces deux dernières décennies lorsque les masses de données disponibles ont vu
+leur volume exploser. En effet, le nombre d’objets présents dans les bases de données a forte-
+ment augmenté mais également la taille de leur description. L’augmentation de la dimension
+des données a des conséquences non négligeables sur les traitements classiquement mis en
+oeuvre : outre l’augmentation naturelle des temps de traitements, les approches classiques
+s’avèrent parfois inadaptées en présence de bruit ou de redondance.
+La taille des données peut être mesurée selon deux dimensions, le nombre de variables et
+le nombre d’observations. Ces deux dimensions peuvent prendre des valeurs très élevées, ce
+qui peut poser un problème lors de l’exploration et l’analyse de ces données. Pour cela, il est
+Caractérisation automatique des groupes en classification non supervisée
+fondamental de mettre en place des outils de traitement de données permettant une meilleure
+compréhension des données. En effet, plus le nombre de dimensions d’une base de données
+est important, plus les données sont dispersées dans l’espace de représentation et plus la dif-
+férences entre les deux données les plus similaires et les deux données les moins similaires
+est réduit. Ainsi, dans un espace de grande dimensions, il est très difficile pour un algorithme
+de classification de détecter les variations de similarité qui définissent les regroupements de
+données. C’est ce qu’on appelle le "fléau de la dimension”. Pour contourner cette difficulté,
+on utilise souvent des techniques de réduction des dimensions afin de faciliter le processus
+de l’ECD1. La réduction des dimensions permet d’éliminer les informations non-pertinentes
+et redondantes selon le critère utilisé. Cette réduction permet donc de rendre l’ensemble des
+données plus représentatif du phénomène étudié. Il s’agit d’un problème complexe qui permet
+d’optimiser le volume d’informations à traiter et faciliter le processus de l’apprentissage. En
+effet, les principaux objectifs de la réduction des dimensions sont :
+– faciliter la visualisation et la compréhension des données,
+– réduire l’espace de stockage nécessaire,
+– réduire le temps d’apprentissage et d’utilisation,
+– identifier les facteurs pertinents.
+La réduction du nombre d’observations peut se faire par quantification à travers une classifi-
+cation non supervisée ou par sélection d’exemples. Dans le cadre de cette étude, nous procé-
+derons par une classification non supervisée permettant ainsi de calculer des prototypes (réfé-
+rents : moyennes locales) représentant l’ensemble des données.
+Les algorithmes d’apprentissage artificiel requièrent typiquement peu de traits (va-
+riables/attributs) très significatifs caractérisant le phénomène étudié. Dans la problématique
+de la classification non supervisée, il pourrait encore être bénéfique d’incorporer un module de
+réduction du nombre de variables dans le système global avec comme objectif d’enlever toute
+information inconséquente et redondante. Cela a un effet important sur la qualité de la clas-
+sification. En effet le nombre de caractéristiques utilisées est directement lié à l’erreur finale.
+L’importance de chaque caractéristique dépend de la taille de la base d’apprentissage : pour un
+échantillon de petite taille, l’élimination d’une caractéristique importante peut diminuer l’er-
+reur. Il faut aussi noter que des caractéristiques individuellement peu pertinentes peuvent être
+très informatives si on les utilise conjointement. Pour la réduction du nombre de variables nous
+pouvons procéder de plusieurs manières :
+– par sélection : qui consiste à choisir un sous ensemble des caractéristiques initiales dans
+l’espace de mesure,
+– par transformation : qui vise à construire de nouvelles caractéristiques dans un espace
+transformé - un espace de projection.
+Dans cette étude, nous nous intéressons à la réduction de dimension de l’espace de description
+dans le cadre de la classification non supervisée par sélection à travers la pondération locale
+des variables. Deux approches différentes, par la technique de pondération locale et proche par
+l’utilisation de la structure de la carte, seront présentées dans ce papier.
+Pour la réduction de dimension de l’espace de description en apprentissage non supervisé
+les contributions sont plutôt moins conséquentes (Roth et Lange; Liu et al., 2005; Guyon et al.,
+2006). Dans la littérature nous trouvons généralement des approches basées sur la pondération
+comme les travaux de Huang et al. (2005), Blansche et al. (2006), Guérif et Bennani (2007),
+1Extraction des Connaissance à partir des Données
+N. Grozavu et al.
+Frigui et Nasraoui (2004) et Grozavu et al. (2008) et des approches de sélection de caractéris-
+tiques comme les méthodes proposées par Basak et al. (1998), Bassiouny et al. (2004), Liu et al.
+(2005), Questier et al. (2005) et Li et al. (2006). Nous trouvons aussi des méthodes permettant
+la réduction simultanée des dimensions des données (exemples et variables). Ces méthodes
+sont souvent appelées des techniques de "bi-classification" ou "classification croisée" ou bien
+encore "Subspace clustering" (Parsons et al., 2004). Ces approches sont très séduisantes en
+pratique car elles permettent, grâce à une classification simultanée des observations et des va-
+riables, de caractériser les groupes identifiés.
+Les deux approches que nous proposons dans cet article peuvent être vue comme proches,
+mais pas identiques à ces dernières techniques de classification croisée. Nos approches sont as-
+sociées à deux algorithmes d’apprentissage non supervisé et simultané des observations et des
+variables. La première approche est une technique complètement nouvelle pour pondérer les
+variables. Cette technique agit plus en amont en pondérant les caracteristiques des observations
+au cours de l’apprentissage afin de déduire des pondérations locales. La deuxième approche
+n’est qu’une extension et une reformulation stochastique de l’approche, de pondération locale,
+proposée dans Grozavu et al. (2008). Dans ce cas la pondération des distances nous permet
+de déduire les pondérations locales associées à chaque groupe "clusters". Dans le cadre de
+notre étude, les deux formalismes de pondérations proposés sont associés au modèle des cartes
+auto-organisatrices. Les pondérations locales estimées sont utilisées pour la caractérisation des
+groupes de la partition obtenue avec la carte topologique. En effet, contrairement à la pondé-
+ration globale, qui estime un seul vecteur de pondérations pour tout l’ensemble des référents
+(c’est à dire toute la carte), la pondération locale associe un vecteur de pondérations à chaque
+référent de la carte topologique. Ces valeurs sont simultanément estimées au cours de l’ap-
+prentissage avec le partitionnement des observations. Par conséquent nous pouvons utiliser ces
+pertinences, à la fin de l’apprentissage, pour regrouper et caractériser les prototypes.
+Le reste de cet article est organisé comme suit. La Section 2 présente brièvement le modèle
+de base des cartes auto-organisatrices suivi du détail des deux approches proposées de pondé-
+ration locale adaptative : lwd-SOM2 (pondération de la distance) et lwo-SOM3 (pondération
+des observations). La technique pour caracteriser automatiquement les groupes en utilisant nos
+pondérations est présentée dans la section 5. Dans la section 6 nous présentons les résultats des
+expérimentations. Une conclusion et des perspectives sont données dans la section 7.
+2 Cartes auto-organisatrices traditionnelles
+Les cartes auto-organisatrices (SOM4) présentées par Kohonen (2001) ont été largement uti-
+lisées pour la classification et la visualisation des bases de données multidimensionnelles. On
+trouve une grande variété d’algorithmes des cartes topologiques dérivée du premier modèle
+original proposé par Kohonen Bishop et al. (1998); Cottrell et al. (2004); Lebbah et al. (2007).
+Ces modèles sont différents les uns des autres, mais partagent la même idée de présenter les
+données de grande dimension en une simple relation géométrique sur une topologie réduite. Ce
+modèle consiste en la recherche d’une classification non supervisée d’une base d’apprentissage
+A = {xi ∈ R
+n, i = 1..N} où l’individu xi = (xi1, xi2..., xij , ..., xin) est de dimension n.
+2local weight distance using Self Organizing Map
+3local weight observation using Self Organizing Map
+4Self-Organizing Map
+Caractérisation automatique des groupes en classification non supervisée
+Ce modèle classique se présente sous forme d’une carte possédant un ordre topologique de C
+cellules. Les cellules sont réparties sur les nœuds d’un maillage. La prise en compte dans la
+carte de taille C de la notion de proximité impose de définir une relation de voisinage topo-
+logique. Afin de modéliser la notion d’influence d’une cellule k sur une cellule l, qui dépend
+de leur proximité, on utilise une fonction noyau K (K ≥ 0 et lim
+|y|→∞
+K(y) = 0). L’influence
+mutuelle entre deux cellules k et l est donc définie par la fonction Kk,l(.). A chaque cellule k
+de la grille est associée un vecteur référent wk = (wk1, wk2..., wkj , ..., wkn) de dimension n.
+On note par la suite parW = {wj ,wj ∈ R
+n}
+|W |
+j=1 l’ensemble des référents associés à la carte.
+Les phases principales de l’algorithme d’apprentissage associé aux cartes auto-organisatrices
+sont définies dans la littérature et consistent à minimiser la fonction de coût suivante Kohonen
+(2001) :
+RSOM(χ,W ) =
+N∑
 i=1
-ci ∗ 1{X∈Ki}
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-Les ci sont des constantes et les Ki constituent une partition de l’ensemble des individus
-de l’échantillon. Il s’agit dans ce modèle d’estimer la constante ci pour chaque classe Ki, de
-déterminer de façon optimale le nombre n0 des classesKi de cette partition. Dans cette étude,
-X est le vecteur de variables explicatives. C’est notamment l’ensemble des caractéristiques
-connues ou prévues des vols. Une fois les Ki déterminés, le meilleur estimateur au sens des
-moindres carrés des ci est donné par la moyenne de la variable à expliquer dans la classe Ki.
-L’ouvrage collectif de Celeux et Nakache (1994) rappelle un ensemble de fondements théo-
-riques de la méthode CART.
-Parmi les critères utilisés pour sélectionner la meilleure division, Breiman et al. (1984)
-recommandent l’utilisation des critères de la minimisation de la « déviance » lorsque la va-
-riable d’intérêt est continue. C’est ce critère3 qui est utilisé dans cette étude pour la fonction
-de dévianceD(Xj , s) définie par l’équation suivante :
-D(Xj , s) = min
-c1,c2
- ∑
-(xi,yi)∈aG(Xj ,s)
-(yi − c1)2 +
-∑
-(xi,yi)∈aD(Xj ,s)
-(yi − c2)2
- ,
-où aG(Xj , s) et aD(Xj , s) sont respectivement les nœuds gauche et droite obtenus de la
-division du nœud parent a par la variable explicativeXj au seuil s. Les estimateurs de c1 et c2
-que nous notons ĉ1 et ĉ2 sont donnés par les relations suivantes :
-ĉ1 =
-1
-Card(aG(Xj , s))
-∑
-(xi,yi)∈aG(Xj ,s)
-yi,
-ĉ2 =
-1
-Card(aD(Xj , s))
-∑
-(xi,yi)∈aD(Xj ,s)
-yi.
-Ce sont les estimateurs empiriques de la moyenne de la variable dépendante Y à l’intérieur
-des nœuds descendants gauche et droit respectivement.
-La meilleure division notée d∗ = (X∗j , s
-∗) qui minimise la fonction déviance D(Xj , s) est
-donnée par :
-d∗ = arg min
-(Xj ,s)∈D
-D(Xj , s)
-où D est l’ensemble des divisions admissibles du nœud parent a. X∗j est la variable ex-
-plicative sur la quelle la division optimale est obtenue avec le seuil s∗. On obtient un résultat
-équivalent en cherchant la division maximisant l’indice de réduction « d’impureté » Ghattas
-(1999). Par ailleurs, un nœud est déclaré terminal s’il est pur ou si le nombre d’observations
-qu’il contient est inférieur à un nombre minimal fixé.
-3.2 Modélisation par CART
-En appliquant la procédure CART sur les données de trafic aérien, nous observons qu’il y
-a seulement 5 variables explicatives qui ont contribué activement au partitionnement de l’en-
-semble des observations. Ces variables actives sont celles qui apparaissent visuellement sur
-l’arbre de régression, voir la figure 1. Il s’agit de :
-3Il s’agit de l’inertie intra-classes.
-N. Fouemkeu et al.
-Nœud  Racine
-Type = A306,AT43,B461,B712,B742,BE99 
-Y= - 17.6, n=11114
-Indur  <  1.013          
-Y  = 4.42, n=24999
-Distprev1  >=  414   
-Y=- 63.9, n = 13744
-Vitessecour  >=  162.5 
-Y=201, n=571
-Indur  <  0.9618      
-Y= - 236, n=2589
-Type  =  AT43       
-Y= - 87.4, n=3883
-Y=-1760
-n=41
-Y= - 344
-n=1133
-Y= -152
-n=1456
-Y= - 441 
-n=204
-Y=- 67.8
-n=3679
-Y=4.35
-n=6660
-Y=244
-n=57
-Y=127
-n=1840
-Y=333
-n=949
-Y=51.8
-n=8466
-Nœuds intermédiaires
-Nœuds terminaux
-1ère ligne : Variable et seuil de division
-2ème ligne : Y = prévision de l’écart temporel
-1ère ligne : Y = prévision de l’écart temporel 
-n :   nombre d’individus dans le noeud
-Distprev1 < 351.7   
-Y= 87.9, n = 11255
-Nivpln  <  185           
-Y= - 260, n=2630
-Indur < 1.07 
-Y=197, n=2789
-Distprev1  <  147.46 
-Y=- 29.4, n = 10543
-Y=1290
-n=40
-Y=104
-n=474
-Distprev1 < 55.46 
-Y=675, n = 97
-Avance Retard
-FIG. 1 – Arbre de régression de la méthode CART pour le modèle de prévision des écarts
-temporels au passage des avions en des points de leurs trajectoires prévues
-– L’influence du vent prévu sur les trajectoires de vols (Indur).
-– La distance entre les avions et les points de leurs trajectoires prévues (Distprev1).
-– Le type d’avion utilisé (Type).
-– Le niveau de vol prévu dans le plan de vol pour la phase de croisière (Nivpln).
-– Enfin, la vitesse du vol à l’instant courant de prévision (Vitessecour).
-Ces variables mettent en évidence l’impact significatif de trois facteurs importants dans la
-progression des avions sur leurs trajectoires. Il s’agit des conditions météorologiques représen-
-tées par l’influence du vent, des paramètres courants des vols représentés par la distance de vol
-prévue et la vitesse courante, enfin, des caractéristiques des vols définies dans les plans de vols
-et représentées par le type d’avion et le niveau de vol de croisière. Nous proposons ci-dessous
-une analyse des effets de ces variables explicatives sur l’écart temporel.
-Rappelons qu’une valeur négative de l’écart temporel 4τ s’interprète comme un avion
-qui passe sur un point de sa trajectoire plus tôt par rapport à l’instant de passage prévu dans
-le plan de vol (côté gauche de l’arbre, figure 1). Inversement, une valeur positive de l’écart
-temporel s’interprète comme un retard au passage de l’avion au point de sa trajectoire prévue
-relativement à l’instant de passage prévu (côté droite de l’arbre, figure 1). Aussi, le vent est de
-face si l’indicateur Indur est supérieur à 1 et de dos sinon. Pour un vent globalement nul sur la
-trajectoire de vol, Indur est égale à 1.
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-3.3 Mise en évidence de l’effet du vent sur le respect du plan de vol
-Dans la hiérarchie des variables explicatives, l’influence du vent est une variable de premier
-niveau et montre que les conditions météorologiques jouent un rôle de premier plan dans le
-processus de prévision de l’incertitude sur le temps de passage des avions sur les points de leur
-trajectoire de vol prévue.
-La première division sur la variable influence du vent Indur de seuil 1.013 semble bien
-avoir divisé les données en deux ensembles suivant l’importance du vent auquel les vols ont
-été soumis. L’estimation de l’écart temporel pour les vols de la branche de droite est d’environ
-87.9 secondes. Celle-ci concerne les vols ayant été soumis à un vent de face dominant et les
-avions impliqués ont tendance à survoler les points de leur trajectoire après les instants prévus
-dans leurs plans de vols. Ce résultat est cohérent avec les principes de la dynamique des vols
-dans la mesure où le vent de face oppose à la progression d’un avion sur sa trajectoire une force
-de résistance qui réduit sa poussée, donc ralentit son mouvement. En revanche, l’estimation de
-l’écart temporel pour les vols de la branche gauche est d’environ −63.9, soit une avance de
-63.9 secondes. Ce sont des vols ayant été soumis à un vent de dos dominant et les avions
-impliqués ont tendance à survoler les points de leur trajectoire avant les instants prévus dans
-leurs plans de vols. Une fois de plus, ce résultat est conforme aux principes de la dynamique
-des vols dans la mesure où un vent de dos dominant tend à augmenter la poussée de l’avion,
-donc à accélérer son mouvement.
-Par ailleurs, la division sur la variable influence du vent de seuil 1.07 montre que lorsque
-le vent de face est très fort (Indur > 1.07), les aéronefs concernés survolent les points de leur
-trajectoire avec des retards encore plus élevés. Il s’agit des vols de la branche droite de ce
-nœud où la valeur moyenne de l’écart temporel se situe autour de 333 secondes. En revanche,
-la division sur la variable influence du vent de seuil 0.96 montre que lorsque le vent de dos
-est très fort (Indur < 0.96), les aéronefs concernés survolent les points de leur trajectoire avec
-des avances beaucoup plus importantes. Il s’agit des vols de la branche gauche de ce nœud
-où la valeur moyenne de l’écart temporel se situe autour de −344 secondes, soit une avance
-d’environ 344 secondes. Ce qui montre qu’un vent très fort qu’il soit de dos ou de face a pour
-effet d’amplifier le niveau d’incertitude dans la prévision du temps de passage des aéronefs en
-des points de leur trajectoire de vol et tend à réduire la capacité de gestion de trafic aérien dans
-son ensemble.
-3.4 Effets des autres variables sur le respect du plan de vol
-On observe de la figure 1 que la deuxième variable active la plus importante est la distance
-de vol prévue (Distprev1). Son interaction avec l’indicateur du vent montre au travers les divi-
-sions de seuils respectifs (Distprev1 ≥ 414) et (Distprev1 < 351.7) que l’influence du vent
-qu’il soit de dos ou de face n’est réellement significative sur la progression d’un avion que si
-ce dernier est soumis à cette influence de vent sur une distance importante. Par exemple, pour
-une distance supérieure à 414 mille nautiques dans les conditions de vent de dos dominant, les
-avions survolent les points de leur trajectoire avec des avances en moyenne de 260 secondes
-contre 17.6 secondes pour les autres. Pour une distance supérieure à 351.7 mille nautiques
-dans les conditions de vent de face dominant, les avions survolent les points de leur trajectoire
-avec des retards en moyenne 197 secondes contre 52 secondes pour les autres.
-N. Fouemkeu et al.
-Le type d’avion et le niveau de vol4 apparaissent comme des variables actives de troisième
-niveau. L’interprétation des effets liés à ces paramètres ne semble pas évidente. Par ailleurs, la
-vitesse de vol à l’instant courant qui est une variable active de quatrième niveau sur l’arbre a
-des effets conformes aux principes de la dynamique des vols. En effet, au regard de la division
-sur le nœud (V itessecour ≥ 162.5) où le retard moyen est de 201 secondes, on observe que
-ce retard se situe à 104 secondes pour les avions avec une vitesse à l’instant courant supérieure
-162.5 knots5. En revanche, ce retard est six fois plus important pour les avions dont la vitesse
-de vol à l’instant courante est inférieure à 162.5 knots.
-4 Forêts aléatoires
-Les forêts aléatoires développées par Breiman (2001) sont une collection d’arbres binaires
-de décisions (Ak)(k=1,...,K). Ces arbres Ak sont construits sur des échantillons bootstrap de
-l’échantillon d’apprentissage initial. Chaque échantillon bootstrap est obtenu par tirage aléa-
-toire avec remise dans l’échantillon de données de départ. Ces techniques d’apprentissage au-
-tomatique par agrégation de modèles sont très répandues et présentent quelques spécificités
-dont les plus importantes sont :
-– Dans la procédure de construction des arbres, à chaque nœud, un faible nombre de va-
-riables est tiré aléatoirement et la recherche de la division optimale est basée uniquement
-sur ce sous-ensemble de variables.
-– Les arbres construits sur les échantillons bootstrap ne sont pas optimisés, ils ne sont pas
-élagués, donc maximaux.
-– Pour chaque arbre, une partie de l’échantillon est mise de côté. Elle est appelée Out-of-
-bag sample notée OOB. Cette partie de l’échantillon d’apprentissage non utilisée pour la
-construction de l’arbre sert en effet à l’évaluation de l’importance des variables utilisées.
-– L’introduction du tirage aléatoire sur l’ensemble des variables explicatives permet d’évi-
-ter l’apparition des mêmes variables.
-Selon la règle de décision, il existe deux versions des forêts aléatoires : Le Random Input
-où la règle de décision porte sur une seule des variables explicatives tirées au hasard, et l’autre
-connu sous Random Features qui utilise une combinaison linéaire des variables sélectionnées
-à chaque nœud, avec des coefficients tirés aussi aléatoirement.
-Cette procédure présente un certain nombre d’avantages. Elle nécessite peu de paramètres
-à régler et utilisent les variables explicatives continues et discrètes pour des problèmes de clas-
-sification et de régression. Les arbres obtenus ne sont pas instables comme ceux fournis par
-la méthode CART. La procédure de choix aléatoire des variables explicatives à tester lors de
-la division en chaque nœud de l’arbre bootstrap permet de donner aux variables importantes
-cachées dans la méthode CART, des rôles plus actifs dans la construction des arbres indivi-
-duels issus des échantillons bootstrap. Par ailleurs, deux propriétés essentielles expliquent les
-performances des forêts aléatoires :
-– La bonne performance des arbres individuels qui ont un faible biais mais une forte va-
-riance, et la faible corrélation entre les arbres de la forêt. La corrélation entre arbres est
-définie comme celle de leurs prévisions sur les échantillons tests OOB.
-4Le niveau de vol est la hauteur en pieds divisée par 100 de l’avion au dessus de l’altitude pression 1013.25 Hpa.
-5Le knot est l’unité de vitesse en navigation. Un knot est la vitesse d’un mille nautique par heure.
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-– Le fait qu’un faible nombre de variables soit utilisé à chaque nœud des arbres construits,
-permet de réduire la complexité algorithmique.
-Les forêts aléatoires présentent aussi un certain nombre d’inconvénients : Le temps de cal-
-cul est important pour évaluer un nombre suffisant d’arbres jusqu’à ce que l’erreur de prévision
-sur l’échantillon OOB ou sur un autre échantillon de validation se stabilise. La procédure s’ar-
-rête si elle tend à augmenter. Il est nécessaire de stocker tous les modèles de la combinaison
-afin de pouvoir utiliser cet outil de prévision sur les nouvelles données. L’amélioration de la
-qualité de prévision se fait au détriment de l’interprétabilité, ainsi le modèle finalement obtenu
-devient une « boite noire ».
-Les forêts aléatoires dépendent de trois principaux paramètres :
-– Le nombre d’arbres générés à partir des échantillons bootstrap que nous notons ntree.
-– Le nombre de variables testées dans chaque nœud d’un arbre pour la recherche de la
-division optimale que nous notons mtry.
-– Enfin, le nombre minimal d’observations dans un nœud terminal.
-Breiman (2001) suggère qu’en classification, le nombre de variables testées pour chaque
-nœud d’un arbre est égal à
-√
-p, où p est le nombre initial de variables. Cette valeur propo-
-sée par Breiman a été confirmée par d’autres auteurs. Liaw et Wiener (2002), Diaz-Uriarte et
-de Andrés (2006) ont montré l’optimalité de cette valeur en terme de performance des forêts
-sur les échantillons OOB. Pour la régression, ce nombre est approximativement
-p
-3
-(Breiman,
-2002). Une forte diminution de ce paramètre réduit les chances que des variables importantes
-soient sélectionnées dans les arbres individuels, et peut ainsi dégrader les performances des
-forêts. Les forêts aléatoires fournissent également un moyen original de calcul d’un indice
-d’importance pour l’hiérarchisation des variables explicatives (Ben et Ghattas, 2008))
-5 Modélisation par les forêts aléatoires (FA)
-La version des forêts aléatoires utilisée ici est le Random Input où la règle de décision sur
-chaque nœud porte sur une seule des variables explicatives tirées de façon aléatoire.
-5.1 Choix des paramètres
-Nous avons fixé le nombre minimal d’observations par feuille à 406. Le couple de pa-
-ramètres (ntree,mtry) est déterminé par une procédure de type validation croisée. Rappelons
-que ntree est le nombre d’échantillons bootstrap pour chaque forêt à construire et mtry est le
-nombre de variables explicatives à tirer aléatoirement sur chaque nœud. Pour mtry, nous ex-
-plorons les valeurs entières comprises entre 2 et
-p
-2
-. En effet, cet intervalle contient la valeur
-optimale qui est approximativement égale à
-p
-3
-. Pour ntree, nous avons fixé une valeur maxi-
-male du domaine d’exploration à 200. Ainsi, en posant yi = ∆τi et ŷi = ∆̂τ i, le couple
-6Il n’existe pas de règle établie pour déterminer le nombre minimal d’observations par nœud.
-N. Fouemkeu et al.
-20 40 60 80 100 120 140 160 180 200
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-MSE : Moyenne des carrées des résidus de 
-prévisions par modèle correspondant
-ntree
-m
-tr
-y
-1.3
-1.4
-1.5
-1.6
-1.7
-1.8
-1.9
-x 10
-4
-FIG. 2 – Somme des carrés des erreurs de prévision sur les données d’apprentissage en fonc-
-tion du nombre d’échantillons bootstrap et du nombre de variables de randomisation sur les
-nœuds.
-optimal est celui qui minimise donc le critère suivant :
-E(ntree,mtry) =
-n∑
-i=1
+|W|∑
+j=1
+Kj,χ(xi)‖xi −wj‖
+2 (1)
+où χ(xi) = argminj
 (
-yi − ŷ(ntree,mtry)i
-)2
-autrement dit :
-(ntree∗,mtry∗) = arg min
-(ntree,mtry)
-E(ntree,mtry) (4)
-Les valeurs du critère E en fonction de ntree et mtry sont représentées dans la figure 2. Un
-examen de cette figure montre que les performances du modèle de chaque forêt dépend simulta-
-nément du nombre d’arbres et du nombre de variables de randomisation. Ainsi, si on privilégie
-le nombre de variables explicatives au nombre d’échantillonnages bootstrap, le premier couple
-permettant d’obtenir un bon ajustement des forêts aléatoires est (120, 9) où 120 est le nombre
-d’échantillonnages bootstrap et 9 est le nombre de variables explicatives de randomisation. En
-revanche, si l’on privilégie le nombre d’échantillonnages bootstrap au nombre de variables de
-randomisation, le premier couple permettant d’obtenir le meilleur modèle d’ajustement des fo-
-rêts aléatoires est approximativement (150, 7). C’est ce dernier cas que nous avons retenu pour
-notre étude. En effet, le nombre de variables de randomisation dans chaque nœud est proche
-de la valeur préconisée par Breiman (2001), c’est-à-dire proche de la valeur correspondante
-à la partie entière de la fraction
-22
-3
-. En effet, nous avons 22 variables explicatives. A partir
-de ce couple (150, 7), nous avons obtenu un modèle des forêts aléatoires avec un coefficient
-de détermination R2 = 84.52%. La figure 3 montre qu’au delà du nombre d’échantillons
-bootstrap ntree=150, le gain de performance en terme de réduction de l’erreur de prévision est
-négligeable.
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-FIG. 3 – Somme des carrés des erreurs de prévision en fonction du nombre d’échantillons
-bootstrap (FA=forêts aléatoires)
-5.2 Hiérarchie des variables explicatives
-Les forêts aléatoires sont un modèle construit par agrégation de plusieurs arbres de ré-
-gression, donc il n’y a pas d’interprétation directe. Néanmoins, des informations pertinentes
-peuvent être obtenues par le calcul et la représentation graphique d’indices proportionnels à
-l’importance de chaque variable dans le modèle et donc de sa participation à la régression.
-Cela est d’autant plus utile que les variables sont très nombreuses. Plusieurs critères sont ainsi
-proposés pour évaluer l’importance de la j e`me variable explicative.
-Concernant les modèles non paramétriques, il n’existe que très peu d’outils permettant
-d’établir une hiérarchie des variables. Notons cependant que les arbres de régression de la
-méthode CART et les forêts aléatoires (Breiman, 2001) offrent la possibilité d’établir une hié-
-rarchie des variables explicatives. Dans le cadre des modèles récents de type Séparateurs à
-Vastes Marges (SVM), Barnhill et al. (2002) et Rakotomamonjy (2003) ont proposé des scores
-pour chaque variable explicative utilisée. Ces scores permettent d’établir une hiérarchie des
-variables. En comparant différentes méthodes de sélection des variables sur données réelles
-et simulées, Ben et Ghattas (2008) montrent que les forêts aléatoires fournissent une hiérar-
-chie plus stable des variables que les autres méthodes. Nous synthétisons dans la figure 4, la
-hiérarchie des variables explicatives de la variable dépendante écart temporel obtenue par le
-modèle des forêts aléatoires. L’axe des abscisses représente les variables explicatives et l’axe
-des ordonnées représente l’importance des variables.
-Cette hiérarchie a été réalisée en optimisant le critère du Gain de Pureté du Nœud (GPN)
-défini comme suit :
-N. Fouemkeu et al.
-0,0
-10,0
-20,0
-30,0
-40,0
-50,0
-60,0
-70,0
-80,0
-90,0
-100,0
-Hiérarchie des variables explicatives du modèle (FA)
-Les variables explicatives
-Im
-p
-o
-rt
-a
-n
-c
-e
- d
-e
-s
- v
-a
-ri
-a
-b
-le
-s
-  
-e
-x
-p
-li
-c
-a
-ti
-v
-e
-s
-e
-n
- (
-%
+‖xi −wj‖
+2
 )
-FIG. 4 – Importance des variables explicatives du modèle des forêts aléatoires. Le modèle est
-construit à partir de 150 échantillons bootstrap de l’échantillon d’apprentissage initial avec 7
-tirages aléatoires des variables explicatives sur les nœuds.
-GPN(Xj) =
-∣∣∣∣∣
-ntree∑
-q=1
-[
-(yq − ŷq(Xj))2
-]
-−
-ntree∑
-q=1
-[(
-yq − ŷ′q(Xj)
-)2]∣∣∣∣∣ (5)
-où :
-– yq est l’estimation de la variable dépendante Y sur le qe`me échantillon bootstrap ;
-– ŷq(Xj) est la prévision de la variable Y par l’arbre du qe`me échantillon bootstrap avec
-les variables (X1, . . . , Xp) et sans permutation de Xj ;
-– ŷ
-′
-q(Xj) est la prévision de la variable Y par l’arbre du q
-e`me échantillon bootstrap avec
-les variables (X1, . . . , Xp) après permutation des valeurs de la variable Xj .
-L’importance des variables explicatives a été rapportée à l’échelle [0 ;100] où chaque valeur
-du GPN a été divisée par la valeur la plus élevée multipliée par 100. Rappelons que le critère
-optimisé lors de la construction de l’arbre de chaque échantillon bootstrap est la minimisation
-de la fonction de déviance présentée précédemment.
-Les cinq premières variables les mieux classées de la hiérarchie sont exactement celles
-ayant été actives lors de la construction de l’arbre de régression du modèle CART. Il s’agit
-notamment : la distance de vol prévue (Distprev1), l’indicateur d’influence du vent prévu sur
-la trajectoire de vol (Indur), le niveau de vol prévu pour la phase de croisière (Nivpln), la vitesse
-du vol au point courant (Vitessecour) et le type d’avion utilisé pour le vol (Type). Néanmoins,
-nous notons que relativement à la hiérarchie obtenue par le modèle CART, l’ordre d’importance
-de l’indicateur d’influence du vent et celui de la distance de vol prévue sont permutés dans
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-la nouvelle hiérarchie produite par les forêts aléatoires. La nature des sorties de ce dernier
-modèle ne nous permet pas d’interpréter d’avantage. Nous présentons dans la section suivante
-l’ensemble des résultats obtenus et comparons les pouvoirs prédictifs des deux modèles en
-fonction de l’horizon temporel de prévision.
-6 Résultats
-6.1 Horizon de prévision et modèles d’ajustement
-Pour que les modèles présentés dans cet article soient utilisés opérationnellement, ils doivent
-répondre aux conditions de prédictibilité souhaitées par les autorités de régulation et de ges-
-tion de trafic aérien. Ainsi, s’impose la nécessité d’étudier les performances de ces modèles
-dans la prévision de trafic en fonction de l’horizon de prévision à erreur bornée dans lequel les
-modèles sont appelés à être utilisés. Pour cela, avant la présentation des résultats, nous nous
-intéressons d’abord à la définition de ce type d’horizon de prévision et des conditions de sa
-prise en compte.
-Un horizon de prévision à erreur bornée est un intervalle de temps pendant lequel il est
-possible d’utiliser un modèle pour calculer les prévisions avec un niveau d’erreur borné. Il est
-compris entre l’instant courant (ici, ramené à 0) et une limite supérieure dépendante de l’in-
-certitude du modèle utilisé. Pour évaluer l’amplitude de l’incertitude des modèles en fonction
-de l’horizon de prévision, nous avons considéré une fenêtre de temps de longueur inférieure à
-60minutes (3600 secondes) que nous avons ensuite divisé en 12 petits intervalles de 5minutes
-(300 secondes) chacun. Le 13e`me intervalle contient les points des trajectoires de vols pour les-
-quels l’horizon de prévision est égal à 60 minutes ou plus. Sur les représentations graphiques
-(figure 5), 00 − 03 indique le petit intervalle de limites 0 et 300 secondes et 36et+ désigne
-3600 secondes ou plus. Sur chacun des intervalles, le boxplot mesure la dispersion des erreurs
-d’ajustement du modèle correspondant et permet ainsi d’évaluer l’amplitude de l’incertitude
-de prévisions au fur et à mesure que l’horizon de prévision augmente. Ainsi, une lecture de
-la figure 5 montre que l’incertitude de prévision sur les données d’apprentissage par le mo-
-dèle des forêts aléatoires est beaucoup plus faible que celle obtenue du modèle CART. Pour
-une quantification du différentiel d’ajustement entre ces deux modèles, nous avons utilisé le
-coefficient de Theil7 1958 défini par l’équation suivante :
-Theil =
-√∑n
-i=1(yi−ŷrefi )2
-n√∑n
-i=1(yi−ŷalti )2
+la fonction d’affectation.
+A la fin de l’apprentissage, la carte auto-organisatrice détermine une partition des données en
+|W|5 groupes associés à chaque référent/prototype/représentant wk ∈ R
+n de la carte.
+3 Apprentissage non supervisé et pondération des observa-
+tions et des variables
+Un des inconvénients des cartes auto-organisatrices (SOM) est qu’elles traitent avec égalité
+toutes les variables. Ceci n’est pas souhaitable dans de nombreuses applications de partitionne-
+ment où les observations sont décrites avec un grand nombre de variables. Les groupes fournis
+par SOM se caractérisent souvent par un sous-ensemble de variables plutôt que l’ensemble des
+variables définies. Par conséquent certaine variables peuvent occulter la découverte de la struc-
+ture spécifique d’un groupe - cluster. La pertinence de chaque variable change d’un groupe à un
+autre. La pondération des variables est une extension de la procédure de sélection des variables
+où les variables sont associées à un vecteur de poids qui peuvent être considérés comme des
+degrés de pertinence.
+La démarche proposée pour réaliser simultanément le regroupement et la caractérisa-
+tion des groupes est conçue de telle manière à estimer les meilleurs prototypes, et les en-
+semble optimaux de poids au cours de la phase d’apprentissage. Chaque prototype wj =
+(wj1, wj2, ..., wjn) est associé à un vecteur de poids pij = (pij1, pij2, ..., pijn). Nous notons par
+la suite par Π = {pij , pij ∈ <
+n}
+|pi|
+j=1 l’ensemble des vecteurs de poids. Dans ce qui suit, nous
+présentons deux versions de pondération locale des variables avec les cartes topologiques : une
+nouvelle approche pour la pondération des observations et une reformulation stochastique de
+la pondération des distances.
+5|W| indique le nombre d’éléments de l’ensembleW
+N. Grozavu et al.
+3.1 Pondération locale des observations : lwo-SOM
+Cette technique de pondération estime un vecteur de poids pour pondérer et filtrer les ob-
+servations en les adaptant dans le processus d’apprentissage. Dans l’architecture proposée, qui
+est similaire à l’architecture supervisée ?, nous associons à chaque référent wj un vecteur de
+pondérations pij . Ainsi nous proposons de minimiser la nouvelle fonction de coût suivante :
+Rlwo(χ,W,Π) =
+N∑
+i=1
+|w|∑
+j=1
+Kj,χ(xi)‖pijxi −wj‖
+2 (2)
+La minimization de Rlwo(χ,W,Π) se fait itérativement, avec la descente du gradient, en
+trois étapes jusqu’à stabilisation. Après l’étape d’initialisation de l’ensemble des prototypes
+W et l’ensemble des pondérations associés Π, à chaque étape d’apprentissage (t + 1) nous
+appliquons les étapes suivantes :
+– Minimiser Rlwo(χ, Wˆ, Πˆ) par rapport à χ en fixantW et Π. Chaque observation ponde-
+rée (pijxi) est affectée au referent wj , dont elle est la plus proche au sens de la distance
+euclidienne :
+χ(xi) = argmin
+j
+(
+‖pijxi −wj‖
+2
+)
+(3)
+– Minimiser Rlwo(χˆ,W, Πˆ) par rapport àW en fixant χ et Π. Les vecteurs référents sont
+mis-à-jour avec l’expression suivante :
+wj(t+ 1) = wj(t) + (t)Kj,χ(xi) (xi −wj(t)) (4)
+– Minimiser Rlwo(χˆ, Wˆ ,Π) par rapport à Π en fixant χ etW . L’expression de mis-à-jour
+pour le vecteur des pondérátions pij(t+ 1) est :
+pij(t+ 1) = pij(t) + (t)Kj,χ(xi) (pijxi −wj(t)) (5)
+Comme l’algorithme stochastique classique de Kohonen, SOM, on note par (t) le pas d’ap-
+prentissage au temps t. L’apprentissage est généralement réalisé en deux phases. Dans la pre-
+mière phase, un grand pas d’apprentissage initial (0) et un grand rayon de voisinage Tmax
+sont utilisés. Pendant la deuxième phase,  et T décroient au cours du temps.
+4 La pondération locale de la distance : lwd-SOM
+A partir de la version lwd-SOM analytique Grozavu et al. (2008), nous avons developé la
+version stochastique de la pondération de la distance. La fonction de coût est décrite par la
+formule suivante :
+Rlwd(χ,W,Π) =
+N∑
+i=1
+|w|∑
+j=1
+Kj,χ(xi)(pij)
+β‖xi −wj‖
+2 (6)
+où β est le coefficient de discrimination.
+Comme pour l’algorithme lwo-SOM, la minimisation de la fonction de coût se fait en trois
+étapes :
+Caractérisation automatique des groupes en classification non supervisée
+1. Minimiser Rlwd(χ, Wˆ, Πˆ) par rapport à χ en fixantW et Π. L’expression d’affectation
+est la suivante :
+χ(xi) = argmin
+j
+(
+(pij)
+β
+‖xi −wj‖
+2
+)
+(7)
+2. MinimiserRlwd(χˆ,W, Πˆ) par rapport àW en fixant χ etΠ. Les vecteurs des prototypes
+sont mis-à-jour en utilisant l’expression suivante :
+wj(t+ 1) = wj(t) + (t)Kj,χ(xi)pi
+β (xi −wj(t)) (8)
+3. Minimiser Rlwd(χˆ, Wˆ,Π) par rapport à Π en fixant χ etW . La mis-à-jour de ces vec-
+teurs des pondérations pij(t+ 1) se fait d’après l’expression :
+pij(t+ 1) = pij(t) + (t)Kj,χ(xi)βpi
+β−1
+j ‖xi −wj(t)‖
+2 (9)
+De la même manière que la version lwo-SOM, on fait décroître le pas et le rayon d’apprentis-
+sage pour constituer deux phases : une phase d’auto-organisation associée aux grandes valeurs
+des parametres et une phase de quantification associée aux petites valeurs.
+5 Caracterisation automatique des groupes
+Une procédure de sélection de variables comporte trois éléments essentiels : une mesure
+de pertinence, une procédure de recherche et un critère d’arrêt. Nous distinguons trois types de
+méthodologie :
+– les approches filtres dont la mesure de pertinence est indépendante de l’algorithme qui
+utilise ensuite les données ;
+– les approches symbioses qui évaluent la pertinence des sous-ensembles de variables à
+l’aide des performances du système que l’on construit ;
+– les approches intégrées pour lesquelles la mesure de pertinence est directement incluse
+dans la fonction de coût optimisée par le système. Les approches intégrées sont de deux
+types : (1) globale où la mesure de pertinence est calculée globalement sur les individus ;
+(2) locale pour la quelle chaque référent a son propre vecteur de mesures de pertinence ;
+Nos approches lwo/d-SOM font partie des catégories des approches integrées avec une mesure
+localement adaptative de pertinence. Plusieurs critères d’arrêt ont été introduit dans la littéra-
+ture, mais souvent l’inconvénient de ces critères est la fixation d’un seuil qui dépend de la
+base des données. Dans notre cas, pour détecter les variables pertinentes nous avons utilisé un
+test statistique proposé par Cattell en 1960 Cattell (1966) appelé "Scree Test". Ce test va nous
+permettre une sélection des variables pertinentes d’une manière automatique et sans définir un
+seuil d’arrêt a priori.
+5.1 Critère de sélection : "Scree Acceleration Test"
+L’utilisation initiale du test "Scree Test", Cattell (1966) était la détermination visuelle du
+nombre de valeurs propres à prendre en compte lors d’une analyse en composantes principales.
+L’idée de base est de représenter graphiquement les valeurs propres et de trouver à partir de
+quelle valeur le graphique semble présenter un changement brutal. Selon Cattell, nous devons
+N. Grozavu et al.
+trouver ce qui représente la ligne du changement brutal ”Scree”. Le nombre de composantes à
+garder correspond au nombre de valeurs propres précédant ce ’Scree’. Fréquement, ce ’Scree’
+apparait là où la pente du graphe change radicalement. Ainsi, il s’agit de trouver la décélération
+maximale dans ce graphique.
+Par analogie, l’utilisation de ce test avec nos modèles de pondérations, consiste à dé-
+tecter, par exemple, le changement brutal dans le graphique des pertinences pik =
+(pik1, pik2..., pikj , ..., pikn). Il faudrait donc détecter la plus forte décélération. La procédure
+de sélection est ainsi composée des étapes suivantes :
+1. Ordonner le vecteur des pondérations pik = (pik1, pik2..., pikj , ..., pikn) en suivant un
+ordre décroissant. Le nouveau vecteur ordonné est noté pik = (pi
+1
+.., pi
+2
+....., pi
+i
+.., ..., pi
 n
-.
-C’est le rapport du RMSE (Root Mean Squared Error) d’un modèle de référence sur celui des
-erreurs de prévision de la méthode alternative. Nous considérons la méthode CART comme
-modèle de référence tandis que les forêts aléatoires sont le modèle alternatif. L’indicateur de
-Theil ainsi calculé est approximativement égal à 2.18 supérieur à 1. Donc relativement à cet
-indicateur, le modèle des forêts aléatoires a une capacité d’ajustement sur les données d’ap-
-7Si le coefficient de Theil est égal à un, les prévisions du modèle de référence (ref) ne sont pas meilleures que celles
-données par le modèle alternatif (alt). Si le coefficient de Theil est supérieur à un, les prévisions du modèle alternatif
-sont bien meilleures que celles du modèle de référence.
-N. Fouemkeu et al.
-l
-l
-l
-l
-ll
-l
-l
-ll
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-lll
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-00−03 09−12 18−21 27−30 36et+
-−
-10
-00
-−
-50
-0
-0
-50
-0
-10
-00
-(a) CART
-Horizon temporel de prévision (Secondes)
-R
-és
-id
-us
- (e
-n s
-ec
-on
-de
-s)
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-ll
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-l
-00−03 09−12 18−21 27−30 36et+
-−
-10
-00
-−
-50
-0
-0
-50
-0
-10
-00
-(b) Forêt Aléatoire
-Horizon temporel de prévision (Secondes)
-FIG. 5 – Dispersion des résidus des modèles en fonction de l’horizon temporel de prévision
-prentissage au moins deux fois supérieure à celle du modèle CART.
-6.2 Pouvoir prédictif des modèles sur données tests
-La performance d’un modèle issu d’une méthode d’apprentissage s’évalue par sa capacité
-de prévision ou capacité de généralisation en situation nouvelle. Trois types de stratégies sont
-souvent utilisés pour la mesure de cette performance :
-– Un partage de données en un échantillon d’apprentissage et un échantillon test afin de
-distinguer l’estimation du modèle et les estimations de l’erreur de prévision.
-– Une pénalisation de l’erreur d’ajustement faisant intervenir la complexité du modèle.
-– Un usage intensif du calcul (computational statistics) par la mise en œuvre de simula-
-tions.
-En général, le choix de la meilleure stratégie dépend de plusieurs facteurs dont la taille de
-l’échantillon initial, la complexité du modèle envisagé, la variance de l’erreur, la complexité
-des algorithmes liée au volume de calcul admissible. Dans le cadre de cet article, nous avons
-l’avantage de disposer d’une base importante de données. Ainsi, la première stratégie semble
-la mieux adaptée et nous l’utiliserons ici avec un seul échantillon test. Rappelons que l’esti-
-mation de la qualité de prévision est un élément central de la mise en place de la stratégie de
-modélisation par apprentissage automatique. Le point important étant que le meilleur modèle
-au sens du pouvoir prédictif n’est pas nécessairement celui qui ajuste le mieux les données
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-d’apprentissage (Besse, 2009). En effet, une diminution importante de l’erreur sur les données
-d’ajustement peut masquer une situation de surapprentissage.
-Lors de la comparaison des modèles d’ajustement, nous avons calculé le coefficient de
-Theil à partir de la moyenne des carrés des erreurs de prévisions. L’estimateur moyen étant
-sensible à des valeurs extrêmes, une valeur très grande ou très petite même isolée a une in-
-fluence considérable dans la moyenne. En revanche, la médiane est connue pour être robuste
-aux valeurs extrêmes, elle est donc un indicateur plus pertinent et permet par ailleurs d’évaluer
-la situation de la majorité des observations dans l’échantillon. A cette étape d’évaluation des
-modèles sur les données de l’échantillon de test, nous comparons les modèles entre eux en
-utilisant l’indicateur médian noté RMEDSEP (Root Median Square Error of Prediction). Cet
-indicateur est égal à la racine carrée de la médiane des carrés des erreurs de prévisions sur les
-données test au lieu du RMSEP (Root Mean Square Error of Prediction). On définit de façon
-similaire l’indicateur médian calculé sur les données d’apprentissage, noté RMEDSE (Root
-Median Square Error). La figure 6 synthétise l’évolution de ces indicateurs calculés pour les
-modèles CART et des forêts aléatoires en fonction de l’horizon temporel de prévision. Les
-données de l’échantillon de test portent sur 7388 observations et concernent les vols observés
-aux instants courants t0 égaux à 7 et 16 heures.
-Horizon temporel de prévision (Secondes)
-0
-20
-40
-60
-80
-100
-120
-140
-160
-180
-200
-R
-M
-ED
-SE
- e
-t 
-R
-M
-ED
-SE
-P
-Variation de la racine carrée de la médiane des carrés des erreurs de prévision en fonction 
-de l'horizon de prévision
-CART_apprentissage
-Forêt A_apprentissage
-CART_test
-Forêt A_test
-FIG. 6 – Comparaison des performances des modèles en fonction de l’horizon temporel de
-prévision. RMEDSE évalue le modèle sur les données d’apprentissage tandis que RMEDSEP
-l’évalue sur un échantillon test
-A la lumière de cette figure, nous retenons les résultats suivants :
-– Le point commun à ces deux modèles : Lorsque l’horizon de prévision est proche de
-l’instant courant la qualité de prévision des instants de passage des avions en des points
-de leur trajectoire de vol est meilleure. En revanche, on observe une forte détérioration
-de la qualité de prévision au fur et à mesure que l’horizon de prévision augmente en
-N. Fouemkeu et al.
-s’éloignant de l’origine. Rappelons qu’un horizon est proche de l’origine ou de l’instant
-courant de prévision lorsqu’il est inférieur à 40 minutes (2400 secondes).
-– Les courbes ForêtA_apprentissage et ForêtA_test montrent qu’en situation réelle du tra-
-fic, le modèle des forêts aléatoires fournit des prévisions dont les erreurs ont une ampli-
-tude très élevée par rapport à celles obtenues par ce modèle sur les données d’apprentis-
-sage. On observe alors un surapprentissage du modèle des forêts aléatoires qui semble
-dépendre fortement de l’horizon de prévision.
-Horizon temporel de prévision (Secondes)
-0,50
-0,90
-1,30
-1,70
-2,10
-2,50
-2,90
-3,30
-3,70
-R
-at
-io
- =
- R
-M
-ED
-SE
-P/
-R
-M
-ED
-SE
-Evaluation du surapprentissage des modèles en fonction de l'horizon 
-de prévision
-Ratio_CART
-Ratio_ForêtA.
-FIG. 7 – Evaluation du surapprentissage des modèles. Le ratio Ratio_CART mesure le sur-
-apprentissage pour le modèle CART en fonction de l’horizon temporel de prévision et Ra-
-tio_ForêtA. mesure celui du modèle des forêts aléatoires
-Afin de quantifier l’ampleur du surapprentissage des modèles, nous avons introduit un indi-
-cateur du type coefficient de Theil, mais calculé à partir des médianes. Pour chaque modèle, cet
-indicateur est le ratio du RMEDSEP (Root Median Square Error of Prediction) sur RMEDSE
-(Root Median Square Error). Ainsi, une valeur élevée de ce ratio traduit l’importance du sur-
-apprentissage du modèle ajusté par rapport aux prévisions qu’il fournit en situation nouvelle.
-A la lumière de la figure 7, nous pouvons en tirer les enseignements suivants :
-– Le profile quasi stable autour de la valeur 1 de la courbe Ratio_CART montre qu’en si-
-tuation nouvelle, le modèle obtenu de la méthode CART fournit des prévisions avec des
-erreurs presque au même niveau que des erreurs d’ajustement sur données d’apprentis-
-sage. Ce profile semble ne pas varier en fonction de l’horizon du temps.
-– En revanche, à la lumière de la courbe Ratio_ForêtA., il apparaît qu’en situation réelle
-de trafic, l’utilisation du modèle des forêts aléatoires fournit des erreurs de prévisions
-très élevées relativement à celles obtenues directement de son modèle d’ajustement. La
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-figure 7 montre que lorsque l’horizon de prévision se situe autour de 60minutes, l’erreur
-de prévision sur données de l’échantillon de test par le modèle des forêts aléatoires peut
-atteindre 3 fois celle obtenue sur les données d’apprentissage.
-Pour une meilleure prévision de l’écart temporel, donc, des instants de passage des avions sur
-les points de leur trajectoire prévue, le modèle construit par les forêts aléatoires est le plus
-adapté.
+..) ;
+où l’exposant i de la pondération pii indique l’ordre.
+2. Calculer les premières différences dfi = pi
+i
+.. − pi
+i+1
+.. ;
+3. Calculer les deuxièmes différences (l’accélération) acci = dfi − dfi+1
+4. Chercher le changement brutal ’scree’ à l’aide de la fonction suivante :
+maxi (abs(acci) + abs(acci+1))
+Ce processus permet de sélectionner toutes les variables se trouvant avant le changement brutal.
+6 Validation des approches proposées
+Nous avons utilisé différents jeux de données disponibles sur UCI Asuncion et Newman (2007)
+de taille et de complexité variable pour évaluer nos approches de pondération locale adaptative
+et de sélection. En particulier dans la partie validation, nous allons donner plus de détails sur
+la base des vagues de Breiman. Les bases utilisées sont :
+– Vagues de Breiman bruitées : La base est composée de 5000 exemples divisés en 3
+classes. La base originale comportait 21 variables, mais 19 variables additionnelles dis-
+tribuées selon une loi normale ont été rajoutées sous forme de bruit. Chaque observation
+a été généré comme une combinaison de 2 sur 3 vagues.
+– Base de cancers : "Wisconsin Diagnostic Breast Cancer (WDBC) : Ce jeu de données
+contient 569 individus qui sont décrit par 32 variables. 357 individus sont atteint de
+cancer bénigne et les 212 autres ont des cancers malignes. Les variables décrivent les
+caractéristiques des noyaux de cellules présentes dans l’image numériques.
+– Jeu de données Isolet : Ces données ont été généré comme suit : 150 sujets prononcent
+chaque lettre de l’alphabet à deux reprises. Ainsi, nous avons 52 exemples de formation
+de chaque locuteur. Les données sont constituées de 1559 individus et 617 variables.
+Toutes les variables sont continues.
+– La base Madelon : Ces données posent un problème à 2 classes proposé à l’origine
+pendant la compétition sur la sélection de variables organisée lors de la conférence
+NIPS’2003, Guyon et al. (2006). Les exemples sont situés sur les sommets d’un hyper-
+cube en dimension 5, mais 15 variables redondantes et 480 dimensions bruitées ont été
+ajoutés. Le jeu de données original était séparé en trois parties (apprentissage, validation
+et test) mais nous n’avons utilisé que les 2600 observations de l’ensemble d’apprentis-
+sage et de validation pour lesquels les classes étaient connues.
+– La base "SpamBase" est un jeu de données composé de 4601 observations décrites par
+57 variables, chacune decrivant un mail et sa categorie : spam ou non-spam. Les attributs
+Caractérisation automatique des groupes en classification non supervisée
+descriptifs de ces mails sont les frequences d’apparition de certains mots ou caractères
+ainsi que des informations sur la quantité de caractères mis en capitale.
+Dans ces expérimentations, la comparaison des différents résultats est mesurée à l’aide de deux
+critères externes. On peut utiliser ces indices lorsque la segmentation souhaitée est connue, en
+particulier sur nos jeux de données. Il s’agit de la comparaison entre la segmentation proposée
+et une segmentation souhaitée. Ainsi nous avons utilisé, le taux de la pureté et l’indice de
+Rand, qui calcule le pourcentage du nombre de couples d’observations ayant la même classe
+et se retrouvant dans le même sous ensemble après segmentation de la carte Saporta (2006).
+Nous avons lancé l’apprentissage avec nos algorithmes lwo/d-SOM et le test de sélection
+de variables sur les cinq bases décrites ci-dessus. Nous calculons par la suite les valeurs des
+indices de qualité pour les deux cartes (lwo/d− SOM ).
+(a) (W de SOM) (b) (W de lwo-SOM) (c)W de lwd-SOM
+(d) Π de lwo-SOM (e) Π de lwd-SOM
+FIG. 1 – Carte topologique de taille 26×14 (364 neurones). Les graphiques a, b et c indiquent
+l’ensemble des référents W issus respectivement de SOM classique, lwo-SOM et lwd-SOM.
+Les graphiques d et e représentent les pondérations locales estimées respectivement par lwo-
+SOM et lwd-SOM.
+6.1 Déroulement de l’approche sur un exemple : Vagues de Breiman
+Nous utilisons ce jeu de données pour montrer l’intégralité du processus permettant la ca-
+ractérisation des groupes, à partir de l’apprentissage avec les deux approches (lwo/d-SOM)
+N. Grozavu et al.
+en passant par la détection et la sélection des variables pertinentes. L’apprentissage d’une
+carte de dimension 26 × 14 pour toutes les observations permet de fournir pour chaque cel-
+lule un vecteur référent wk = (wk1, wk2..., wkj , ..., wk40) et un vecteur de pondérations
+pik = (pik1, pik2..., pikj , ..., pik40) de dimension n = 40.
+La figure 1 (a, b, c) montre, avec une visualisation 3D, l’ensemble des référentsW issus de
+l’apprentissage des trois algorithmes : SOM classique, lwo-SOM et lwd-SOM. Les pondéra-
+tions locales Π sont preséntées dans la figure 1 (d, e) issues de l’apprentissage avec lwo-SOM
+et lwd-SOM respectivement. Les axesX et Y indiquent respectivement les variables et les in-
+dices des référents. L’amplitude indique la valeur estimée. Nous rappelons ici, que dans le cas
+de l’algorithme lwo-SOM, les référents calculés W représentent des observations pondérées
+(pix). En observant les trois graphiques (a, b, c) nous constatons que le bruit qui represente
+les variables de 19 à 40 est bien visible avec de faibles amplitudes. Cette analyse visuelle des
+résultats est plus claire avec la version nouvelle lwo-SOM que nous avons proposée. Les deux
+graphiques representant les référents W et les pondérations Π montrent que les variables du
+bruit ne sont pas pertinantes. Après l’analyse des deux types de pondérations (figure 1 (d, e)),
+nous constatons que les pondérations Π issues de lwo-SOM corespondent plus à la structure
+des données (pertinence des variables) que les pondérations de lwd-SOM. Ce phénomène a
+lieu car les pondérations des observations réprésentent un filtre pour les données et l’estima-
+tion des référents tient compte de ce filtrage. Afin de vérifier qu’il est possible de sélectionner
+les variables d’une manière automatique avec nos algorithmes lwo-SOM, nous avons appliqué
+la phase de sélection sur l’ensemble des référents W pour la version lwo/d − SOM après
+segmentation de la carte. Cette phase consiste à détecter les variations brutales pour chacun
+des vecteurs en entrée. Pour la phase de segmentation nous avons utilisé la classification hié-
+rarchique Vesanto et Alhoniemi (2000).
+En utilisant la version lwo-SOM la segmentation de la carte avec les référentsW , qui sont
+TAB. 1 – Les résultats de la séléction par groupe de la base vagues de Breiman (l’intervalle
+[i− j] indique les variables de i à j)
+Db # groupes réels. lwd-SOM : ΠW lwo-SOM :W Classification croisée
+wave- 3 cl1 : [6-15] cl1 : [3-8 ; 11-16] cl1 : [3-12]
+form cl2 : [4-10] cl2 : [8-11 ; 14-19] cl2 : [7-15]
+cl3 : [7-19] cl3 : [3-20] cl3 : [10-18]
+cl4 : [5-17]
+Pureté 0,5374 0,5416
+Rand 0,6068 0,6164
+déjà pondérés, permet d’obtenir du premier coup 3 groupes. Par contre avec la version lwd-
+SOM, la segmentation de la carte utilisant les référentW fournie 6 groupes "clusters", mais la
+segmentation à partir du produit ΠW permet d’oboutir à 3 groupes ce qui est significatif pour
+notre exemple (vagues de Breiman).
+La caractérisation des groupes avec l’algorithme "ScreeTest" est fourni dans la Table 1. Pour
+chaque technique nous montrons les variables sélectionnées et associées à chaque groupe.
+Nous observons que les deux techniques fournissent 3 groupes caractérisés par des variables
+Caractérisation automatique des groupes en classification non supervisée
+différentes, mais qui se recouvrent. Nous constatons que pour les groupes cl1, cl2 et cl3, les va-
+riables détectées avec la carte lwd-SOM sont inclues dans l’ensemble des variables détectées
+avec la carte lwo-SOM. Nous observons aussi qu’aucune variable du bruit n’est sélection-
+née avec la méthode lwd-SOM, au contraire de la technique lwo-SOM qui détecte une seule
+variable du bruit 20. Ceci ne réduit pas la qualité de la segmentation puisque le calcul de la pu-
+reté des deux partitions, confirme une meilleur segmentation avec la méthode lwo-SOM (Table
+1). Cette augmentation est faible, mais elle est significatif puisqu’acune connaissance n’est a
+priori utilisée pour cette tâche. En comparant ces résultats avec des approches de classification
+croisée, nous constatons qu’on selectionne les mêmes variables.
+6.2 Résultats sur d’autres bases de données
+En ce qui concerne les autres bases de données, nous allons ce contenter dans cette sec-
+tion d’indiquer les résultats obtenus après la phase de sélection des variables. Pour la base
+WDBC, l’application de nos approches lwo/d-SOM nous a permis d’obtenir les variables 4 et
+24 comme variables pertinentes de la base avec une forte importance pour le premier groupe
+et pour le 9ieme groupe (acune variable n’est selectionées pour le rest des groupes). En ce qui
+concerne la base Isolet nous avons constaté un accord de la sélection des variables non perti-
+nentes. Les algorithmes lwo/d-SOM associés au test de sélection fournissent les variables non
+pertinentes dont les indices appartiennent à l’intervalle 300 à 500. En comparant les indices de
+qualité de partionement (Indice de pureté), nous constatons une amélioration pour l’approche
+lwo-SOM par rapport à lwd-SOM.
+TAB. 2 – Détéction des variables pertinantes par groupes pour les db. : wdbc, madelon, isolet
+et spambase (l’intervalle [i− j] indique les variables de i à j ; cli : groupe i)
+Db. # gr. lwd-SOM lwo-SOM Classification
+réel sélection ΠW Pureté sélection surW Pureté croisée
+wdbc 2 cl1-cl9 : (4 ;24) 0,6274 cl1-cl9 : (4 ;24) 0,8682 cl1-cl5 (4 ;24)
+Made- 2 cl1 :1 0,5242 cl1 :1 0,5347 cl1 :[445-450]
+lon cl2 : (91, 281, cl2 : (242, cl2 :[450-460]
+403-424) 417-452]
+26 cl1-cl13 : 0,5242 cl1-cl13 : 0,5261 cl1-cl15 :
+Isolet [1-330, [5-302, 434-488] [1-300,
+450-617] [545-551,586-593] 450-620]
+Spam 2 cl1 :56 ; cl2 :57 0,6103 cl1 : 56 ; cl2 : 57 0,6413 cl1 :56 ;cl2 :57
+Après l’analyse des expérimentation nous pouvons déduire quelques caractéristiques par-
+ticulières et quelques comparaisons entre lwo-SOM et lwd-SOM :
+– Les deux approches itératives de pondérations lwo/d-SOM ne donne aucune importance
+aux variables non-pertinentes à l’opposé avec le SOM classique où nous avons des va-
+leurs plus élevées pour les variables non pertinentes.
+– Les deux méthodes stochastiques sont plus rapides en les comparant particulièrement à
+la version analytique “batch” de pondération déjà proposé de Anonyme.
+N. Grozavu et al.
+– Les deux algorithmes (lwo/d-SOM) et la Scree Test fournissent une caractérisation des
+groupes plus adapté grâce à l’utilisation des pondérations locales.
+– Les indices de qualité de la segmentation (Indice de Pureté) sont meilleurs pour les deux
+approches avec un avantage pou l’algorithme lwo-SOM.
+– Les pondérations Π après l’apprentissage de lwo-SOM apporte plus d’information que
+celles fournis par lwd-SOM du fait de l’adaptation des pondérations aux observations et
+pas aux distances. L’avantage de la méthode lwo-SOM est obtenu grâce à la pondération
+en amont des observations.
 7 Conclusion
-A travers cet article, les méthodes d’apprentissage automatique apparaissent comme un
-outil efficace de prévision des instants de passage des avions sur les points de leur trajectoire
-de vol prévue. Nous avons montré que si le modèle des forêts aléatoires fournit des meilleures
-prévisions relativement au modèle benchmark CART, son utilisation opérationnelle dans la
-prévision du trafic aérien nécessite en revanche, un certain niveau de circonspection. En ef-
-fet, les erreurs de prévisions en situation réelle peuvent très vite atteindre des proportions très
-importantes (trois fois le niveau des erreurs d’ajustement dans notre cas). Le pouvoir prédictif
-des forêts aléatoires est toutefois supérieur à celui du modèle CART. Le caractère croissant de
-l’écart entre les prévisions sur les données test et celles des données d’apprentissage est alors
-un signal d’alerte sur le recul nécessaire lors de l’utilisation de ce modèle dans le cadre de la
-prévision des phénomènes dynamiques.
-Dans cette étude, nous avons également mis en évidence les effets significatifs des interac-
-tions entre l’indicateur d’influence du vent et de la distance de vol sur les avions. Ainsi, le vent
-qu’il soit de « dos » ou de « face » n’a d’influence significative sur la progression d’un avion
-que si ce dernier est soumis dans ce vent sur une distance importante de sa trajectoire.
-En fonction du phénomène à prévoir et du niveau d’erreur fixé, une étape complémentaire
-est indispensable à cette étude. Cette phase vise à compléter les modèles développés en re-
-cherchant un horizon temporel optimal pour leur utilisabilité. Dans ce cadre, le modèle des
-forêts aléatoires développé ici sera comparé aux autres types de modèle non-paramètres tels
-que, les SVM (Séparateurs à Vates Marges) et le modèle MARS (Multivariate Adaptive Re-
-gression by Splines). Le surapprentissage apparent observé sur le modèle des forêts aléatoires
-sera à nouveau examiné mais cette fois en prenant en compte le nombre d’arbres dans la forêt.
-Pour l’ensemble de ces modèles, un intervalle de prédictibilité du trafic sera déterminé afin de
-garantir les prévisions de meilleure qualité.
+Dans ce papier, nous avons introduit deux approches pour caractériser les groupes "clusters"
+en utilisant les cartes auto-organisatrices. La première est une nouvelle technique de caractéri-
+sation en pondérant les observations (lwo-SOM). La deuxième est une reformulation stochas-
+tique de la pondération classique des distances (lwd-SOM). Nous avons utilisé un test statis-
+tique original "Scree Test" qui nous a permis de détecter automatiquement les variables les
+plus pertinentes. Nous avons montré à travers différents exemples l’intérêt de l’estimation des
+pertinences des variables pour la visualisation et la sélection des variables. Nous avons mon-
+tré aussi que les deux approches peuvent être considérées comme une pseudo-classification
+croisée ou simultanée des observations et des variables. Enfin, contrairement à la classification
+croisée, la méthode proposée dans cet article permet de caractériser les groupes d’une manière
+automatique. L’estimation du nombre correct de groupes est en relation avec la stabilité de
+la segmentation et la validité des groupes générés. En perspective, nous allons mesurer cette
+stabilité pour nos algorithmes par des techniques de sous-échantillonnage.
 Références
-Barnhill, S., I. Guyon, J. Weston, et V. Vapnik (2002). Gene selection for cancer classification
-using support vector machines. Machine Learning 46(3), 389–422.
-Ben, A. I. et B. Ghattas (April 2008). Sélection de variables pour la classification binaire en
-grande dimension : Comparaisons et application aux données de biopuces. Journal de la
-Société Française de Statistique 145,3.
-N. Fouemkeu et al.
-Besse, P. (Juillet 2009). Apprentissage Statistique et Data mining. Institut de Mathématique
-de Toulouse : Laboratoire de Statistique et Probabilités UMR CNRS C5583.
-Breiman, L. (1996a). Bagging predictors. Machine Learning 24, 2350–2383.
-Breiman, L. (1996b). Heuristic of instability and stabilization in model selection. Annals of
-Statistics 24(6), 2350–2383.
-Breiman, L. (2001). Random forests. Machine Learning 45(1), 5–32.
-Breiman, L. (2002). Manual on setting up, using, and understanding random forests v3.1.
-(http://oz.berkeley.edu/users/breiman/Using randomforests V3.1.pdf/).
-Breiman, L., J. H. Friedman, R. A. Olshen, et C. J. Stone (1984). Classification And Regression
-Trees. California: Wadsworth International: Chapman and Hall.
-Celeux, G. et J.-P. Nakache (1994). Analyse discriminante sur variables qualitatives. Poly-
-technica edition.
-Davis, R. et J. Anderson (1989). Exponential survival trees. J. Am. Statist. Assoc. 8, 947–961.
-Diaz-Uriarte, R. et S. A. de Andrés (2006). Gene selection and classification of microarray
-data using random forest. BMC Bioinformatics 7:3, 1–13.
-Eurocontrol (2009). Project bada eec technical/scientific report 2009/003. Technical report,
-Eurocontrol.
-Freund, Y. et R. Schapire (1997). A decision-theoric generalization of on-line learning and an
-application to boosting. Journal of Computer and System Sciences 55(1), 119–139.
-Gelfand, S., C. Ravishankar, et J. Edward (1991). An iterative growing and pruning algo-
-rithm for classification tree design. IEEE transactions on pattern analysis and machine
-intelligence 13, 163–174.
-Ghattas, B. (1999). Importance des variables dans les méthodes CART. GREQAM - Université
-de la Méditerranée.
-Leblanc, M. et J. Crowley (1992). Relative risk trees for censored survival data. biometrics.
-Biometrics 48, 411–425.
-Liaw, A. et M. Wiener (2002). Classification and regression by random forest. Rnews 2,
-18–22.
-Messenger, R. et M. Mandell (1972). A model search technique for predictive nominal scale
-multivariate analysis. J. Am. Statist. Assoc. 67, 768–772.
-Morgan, J. et J. Sonquist (1963). Problems in the analysis of survey data and a proposal. J.
-Am. Statist. Assoc 58, 415–434.
-Morgan, J. N. et R. C. Messenger (1973). Thaid: A sequential serach program for the analysis
-of nominal scale dependant variables. Ann Arbor : Institute of social research, university of
-Michighan.
-Olshen, R., S. Horning, L. Kwak, et J. Halpern (1990). Prognostic significance of actual dose
-intensity in diffuse large-cell lymphoma : results of a tree-structured survival analysis. J. of
-Clinical Oncology 8, 963–977.
-Quinlan, R. (1996). Bagging, boosting and c4.5. In Proceedings of the Thirteenth National
-Conference on Artificial Intelligence 13, 725–730.
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-Rakotomamonjy, A. (2003). Variable selection using svm-based criteria. Journal of Machine
-Learning Research 3, 1357–1370.
-Schapire, R. (2002). The boosting approach to machine learning : An overview. In MSRI
-Workshop on Nonlinear Estimation and Classification 55(1).
-Sonquist, J. et J. Morgan (1964). The detection of interaction effects. Ann Arbor : Institute
-for social research, University of Michigan.
-Theil, H. (1958). Economic Forecasts and Policy. Amsterdam: North Holland.
-Tuffery, S. (April 2006). Data mining et statistique décisionnelle, l’intelligence des données.
-Short Book Review, technip edition 26, Aof 978–2–7108–0888–6.
-Annexe : Les variables explicatives des modèles : TAB 1 et
-TAB 2
+Asuncion, A. et D. Newman (2007). UCI machine learning repository.
+Basak, J., R. K. De, et S. K. Pal (1998). Unsupervised feature selection using a neuro-fuzzy
+approach. Pattern Recogn. Lett. 19(11), 997–1006.
+Bassiouny, S., M. Nagi, et M. F. Hussein (2004). Feature subset selection in som based text
+categorization. In IC-AI, pp. 860–866.
+Bishop, C. M., M. Svensén, et C. K. I.Williams (1998). Gtm : The generative topographic
+mapping. Neural Comput 10(1), 215–234.
+Blansche, A., P. Gancarski, et J. Korczak (2006). Maclaw : A modular approach for clustering
+with local attribute weighting. Pattern Recognition Letters 27(11), 1299–1306.
+Cattell, R. (1966). The scree test for the number of factors. MBR 1, 245–276.
+Cheeseman, P., J. Kelly, M. Self, J. Stutz, W. Taylor, et D. Freeman (1988). Autoclass : A
+bayesian classification system. In Fifth International Workshop on Machine learning.
+Cottrell, M., S. Ibbou, et P. Letrémy (2004). Som-based algorithms for qualitative variables.
+Neural Netw. 17(8-9), 1149–1167.
+Caractérisation automatique des groupes en classification non supervisée
+Fisher, D. (1996). Iterative optimization and simplification of hierarchical clusterings. Journal
+of Artificial Intelligence Research. (JAIR) 4, 147–178.
+Frigui, H. et O. Nasraoui (2004). Unsupervised learning of prototypes and attribute weights.
+Pattern Recognition 37(3), 567–581.
+Grozavu, N., Y. Bennani, et M. Lebbah (2008). Pondération locale des variables en apprentis-
+sage numérique non-supervisé. Extraction et Gestion des Connaissances (EGC 08), 45–54.
+Guérif, S. et Y. Bennani (2007). Dimensionality reduction trough unsupervised features selec-
+tion. International Conference on Engineering Applications of Neural Networks.
+Guyon, I., S. Gunn, M. Nikravesh, et L. Zadeh (Eds.) (2006). FE, Found. and Appl. Springer.
+Huang, J. Z., M. K. Ng, H. Rong, et Z. Li (2005). Automated variable weighting in k-means
+type clustering. IEEE Transactions on Pattern Analysis and Machine Intelligence 27(5).
+Kohonen, T. (2001). Self-organizing Maps. Springer Berlin.
+Lebbah, M., N. Rogovschi, et Y. Bennani (2007). Besom : Bernoulli on self organizing map.
+In International Joint Conferences on Neural Networks. IJCNN 2007, Orlando, Florida.
+Li, Y., B.-L. Lu, et Z.-F. Wu (2006). A hybrid method of unsupervised feature selection based
+on ranking. In ICPR ’06.
+Liu, L., J. Kang, J. Yu, et Z. Wang (2005). A comparative study on unsupervised feature
+selection methods for text clustering. pp. 597–601.
+Parsons, L., E. Haque, et H. Liu (2004). Subspace clustering for high dimensional data : a
+review. SIGKDD Explor. Newsl. 6(1), 90–105.
+Questier, F., R. Put, D. Coomans, B. Walczak, et Y. V. Heyden (2005). The use of cart and
+multivariate regression trees for supervised and unsupervised feature selection. pp. 45–54.
+Roth, V. et T. Lange. Feature selection in clustering problems. In S. Thrun, L. Saul, et B. Schöl-
+kopf (Eds.), Advances in Neural Information Processing Systems 16.
+Saporta, G. (2006). Probabilités, analyse des données et statistiques. Editions Technip.
+Vesanto, J. et E. Alhoniemi (2000). Clustering of the self-organizing map. Neural Networks,
+IEEE Transactions on 11(3), 586–600.
 Summary
-The high air traffic demand growth (5% year) in the european airspace shows that air traffic
-control will face more and more aircrafts. Hence the uncertainty prediction on aircraft trajec-
-tories’s become of paramount importance. The goal of our study is twofold: (i) First, bsaed on
-ait traffic operational data we show that the automatic learning based methods as CART and
-random forests are suitable tools to predict accurately the crossing time on points of the aircraft
-trajectories. We quantify the predictive effectiveness of both models based CART method and
-the random forests. These models are assessed using test sample. (ii) Second we highlight
-that, in some case the model based on the random forets can lead to a strong overfitting of data.
-N. Fouemkeu et al.
-Noms des variables Description des variables
-Paramètres prévus dans les plans de vol
-Depart Aéroport de départ du vol (qualitative).
-Arriv Aéroport de destination du vol (qualitative).
-Droulage La durée moyenne du roulage dans l’aéroport de départ du
-vol (secondes).
-Aroulage La durée moyenne du roulage dans l’aéroport d’arrivée du
-vol (secondes).
-Dmouvaer Le nombre moyen de mouvements par heure, dans l’aéroport
-de départ du vol.
-Amouvaer Le nombre moyen de mouvements par heure, dans l’aéroport
-d’arrivée du vol.
-Type Le type d’aéronef utilisé par le vol (qualitative).
-Distpln La distance de vol prévue dans le plan de vol (NM).
-Nivpln Le niveau de vol de croisière prévu dans le plan de
-vol(FL ; flight level).
-Regul Nombre de régulations auxquelles le vol a été soumis avant
-son départ du bloc de stationnement.
-Exemdist Le vol est un long courrier ou un court courrier
-(qualitative).
-Retardbloc Le retard dont l’aéronef a fait l’objet avant son départ
-du bloc (secondes).
-Paramètres courants des vols
-Heurecour L’instant courant du vol (qualitatif).
-Retardcour Le retard du vol au point courant (secondes).
-Txmdcour Le taux de montée ou de descente de l’aéronef au point
-courant du vol à (l’instant courant pieds/minutes).
-Vitessecour La vitesse de l’aéronef au point courant du vol à l’instant
-courant (kts).
-Difalti La différence d’altitudes entre le point courant du vol
-à l’instant courant et le point de la trajectoire pévue en
-lequel on veut prévoir le temps de passage du vol
-(FL ; pieds divisé par 100).
-Distprev1 La distance en projection entre le point courant du vol et
-un point de sa trajectoire prévue en lequel on veut prévoir
-l’instant de passage de l’aéronef (NM).
-Decalcour L’écart de distance du point courant du vol par rapport à
-sa trajectoire prévue (NM).
-TAB. 1 – Les variables explicatives utilisées dans les modèles
-Prévision des trajectoires d’avions par CART et les forêts aléatoires
-Noms des variables Description des variables
-Variables de complexité et d’infrastructure du trafic.
-Secteur C’est la variable désignant le secteur de l’espace traversé
-par les trajectoires des vols prévues (qualitatif).
-Moycrois Le nombre moyen de routes connectées sur chaque balise de la
-trajectoire de vol prévue.
-Denscum1 Le flux de trafic sur la trajectoire prévue.
-Indecum1 La somme cumulée de toutes les interactions potentielles
-prévues sur la trajectoire du vol (Nombre de vols par NM).
-Rscorecum1 Le score des interactions sur la trajectoire de vol prévue.
-Paramètres météorologiques et atmosphériques
-Indur Influence du vent sur le vol (sans unité).
-Moytemp L’écart moyen entre la température prévue et la température
-de l’atmosphère standard sur la trajectoire prévue du vol
-(degré Celsuis).
-Moytpres L’écart moyen entre la pression prévue et la pression de
-l’atmosphère standard sur la trajectoire prévue du vol
-(hPa).
-Moydensa L’écart moyen entre la densité de l’air prévue et la densité
-de l’air de l’atmosphère standard sur la trajectoire prévue
-du vol (kg/m3).
-TAB. 2 – Les variables explicatives utilisées dans les modèles (suite)
+We introduce a new approach, which provide simultaneously Self-Organizing Map (SOM)
+and local weight vector for each cluster. The proposed approach is computationally simple,
+and learns a different feature vector weights for each cluster. Clustering and feature weighting
+offers two advantages: First, they guide the SOM process to cluster the data set into more
+meaningful clusters; Second, they can be used to characterize a cluster using a feature selec-
+tion method. Based on the Self-Organizing Map approach, we present two new simultaneously
+clustering and weighting algorithms, called lwo-SOM and lwd-SOM respectively. These two
+algorithms achieve the same goal, however, they minimize different objective functions. lwo-
+SOM estimates the feature vector weights by weighting observations, while lwd-SOM esti-
+mates the feature vector weights by weighting distance between observations and prototypes.
+We illustrate the performance of the proposed approach using different data sets.

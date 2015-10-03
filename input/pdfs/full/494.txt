@@ -1,392 +1,535 @@
-Import automatique et interactif de données dans les
-systèmes de visualisations
-Frédéric Gilbert∗, David Auber∗
-∗LaBRI, Université de Bordeaux, Talence, France
-Gravité Inria Bordeaux Sud-Ouest
-frederic.gilbert@labri.fr,
-david.auber@labri.fr
-Résumé. La première étape du processus de visualisation d’information consiste
-à transformer les données d’un format brut vers une structure de données utili-
-sable par les différents composants de visualisation. Dans les applications réelles,
-cette première étape représente une barrière empêchant l’accès des utilisateurs
-novices à une riche variété de techniques de visualisation. Par exemple, il peut
-être techniquement impossible pour un utilisateur lambda de transformer des
-données arborescentes en un modèle de graphe pouvant utiliser une représenta-
-tion à base de TreeMap. Une autre barrière est aussi la multitude de transfor-
-mations possible des données brutes. Il faut pouvoir explorer cet ensemble de
-combinaisons. Basé sur nos retours d’expériences avec des utilisateurs finaux,
-dans cet article, nous considérons que le format brut est sous forme tabulaire.
-Ce format est le plus couramment utilisé et est facilement accessible par nos
-utilisateurs. Nous proposons une méthode novatrice permettant de générer au-
-tomatiquement des graphes valués à partir de n’importe quelle table. En analy-
-sant le contenu de chaque dimension nous identifions les interconnexions entre
-celles-ci. Puis nous caractérisons les entités, les attributs et les relations possibles
-au sein des tables. Finalement, nous intégrons l’utilisateur dans le processus de
-transformation en lui proposant un ensemble de transformations valides.
-1 Introduction
-De nos jours, la collecte de données est de plus en plus aisée. Il existe un grand nombre
-d’outils et méthodes pour collecter et stocker facilement des données. Le plus souvent ces
-données sont stockées sous forme de base de données contenant des informations basiques
-comme des noms, des nombres, des dates, des heures... Elles sont stockées dans le but de garder
-des informations comme qui/quoi, quand, où, etc... Mais ces facilités de collecte et stockage ont
-pour conséquences de voir augmenter la quantité de grandes bases de données. Par exemple, les
-chercheurs sur le génome humain collectent des données dans le but de comprendre comment
-les gènes interagissent et les compagnies commerciales en collectent afin de mettre en évidence
-des comportements typiques ou atypiques de clients.
-Pour répondre à ce type de questions, il existe des systèmes de visualisation comme DE-
-Vise Livny et al. (1997), Polaris Stolte et al. (2008) ou Tableau Mackinlay et al. (2007). Ces
-Import automatique et interactif dans les systèmes de visualisations
-systèmes suivent le processus d’analyse exploratoire défini par une hypothèse, puis une expé-
-rimentation et finalement une découverte. Mais avant cela, il est nécessaire de transformer les
-données d’un format brut vers une structure de données utilisable par les différents composants
-de visualisation de ces systèmes. Or cette étape représente une barrière empêchant l’accès des
-utilisateurs non experts à une riche variété de techniques de visualisation. Par exemple, il peut
-être techniquement impossible pour un utilisateur non expert de transformer des données arbo-
-rescentes en un modèle de graphe pouvant utiliser une représentation à base de TreeMap John-
-son et Shneiderman (1991). Mais en plus de cela, chaque système de visualisation utilise un
-modèle de graphe qui lui est propre donc l’utilisation des spécificités de chaque système de-
-manderait de grandes capacités techniques aux utilisateurs non experts.
-Il faut aussi remarquer que si cette barrière était franchie par certains utilisateurs, une se-
-conde viendrait immédiatement se mettre en travers de leur appréhension du système. Cette
-deuxième barrière est matérialisée par la multitude de transformations possible des données
-brutes. En effet si des données renferment une structure arborescente, il n’est pas exclu que
-d’autres structures soient présentes. Ces structures sont bien souvent dissimulées dans les don-
-nées brutes. Il est alors primordial de fournir aux utilisateurs des méthodes pour transformer
-les données brutes en données utilisables par un système de visualisation. Il est aussi important
-que les données brutes soient analysées pour mettre en évidence toutes les structures qu’elles
-contiennent. Ainsi les utilisateurs novices pourront franchir les deux barrières qui se dressaient
-devant eux. Ils pourront alors aisément s’inscrire dans le processus d’analyse exploratoire.
-Grâce à l’analyse des données brutes qui aura été réalisée, ils seront même en mesure de déga-
-ger des hypothèses auxquelles ils n’avaient jamais pensé jusqu’alors. Il est donc indispensable
-de doter chaque système de visualisation d’un module capable d’analyser et de transformer les
-données brutes des utilisateurs en données utilisables par ce système.
-Mais avant de développer des méthodes d’analyses, il est nécessaire de définir un format
-de données brutes. Il faut que ce format soit suffisamment générique et simple pour que les
-utilisateurs novices soient capables de présenter leurs données brutes dans ce format. Plutôt que
-de définir un format, nous avons décidé d’étudier le format le plus utilisé par les utilisateurs
-non experts et basé sur nos retours d’expériences avec des utilisateurs finaux, nous sommes
-arrivés à la conclusion que le format brut le plus couramment utilisé est sous forme tabulaire.
-Ainsi, c’est sous cette forme que les données initiales seront présentées dans la méthode que
-nous exposons dans cet article.
-Donc en utilisant comme données d’entrée une table, nous proposons une méthode nova-
-trice permettant de générer automatiquement des graphes valués à partir de n’importe quelle
-table. En analysant le contenu de chaque dimension nous identifions les interconnexions entre
-celles-ci. Puis nous caractérisons les entités, les attributs et les relations possibles au sein des
-tables. Finalement, nous intégrons l’utilisateur dans le processus en lui proposant un ensemble
-de transformation valide. L’utilisateur a la possibilité de modifier ces transformations avant de
-générer les graphes correspondants.
-Cet article est structuré de la manière suivante : nous présentons tout d’abord des travaux
-traitant de l’import automatique de données dans les systèmes de visualisation. Puis nous dé-
-crivons notre méthode, et enfin nous concluons avec un cas d’étude.
-F. Gilbert et D. Auber
-2 Méthodes de générations de graphes
-Afin de répondre aux principales attentes des utilisateurs de système de visualisation comme
-on peut le lire dans Smith et al. (2009), Mackinlay et al. (2007), et Slingsby et al. (2009),
-nous souhaitons leur fournir des visualisations simplifiées de leurs données. Pour cela nous
-mettons en place des méthodes de génération automatique de graphes. Nous présentons ici les
-principales techniques de génération de graphes. Si on étudie la littérature du domaine, trois
-méthodes pour générer des graphes se démarquent des autres pour en devenir les références.
-La première que nous pouvons citer est Many Eyes Viegas et al. (2007). D’après l’équipe
-qui développe cette plateforme, il est important que plusieurs personnes puissent travailler sur
-les mêmes données et débattre sur les différentes visualisations générées à partir de celles-ci.
-Les auteurs expliquent qu’il est difficile de donner une bonne manière de visualiser un type de
-jeu de données. Il est possible que pour deux jeux de données, qui différent seulement d’une
-dimension, la manière de les visualiser soit radicalement différente. C’est pour cette raison que
-cette équipe a développé Many Eyes, un web service qui permet aux utilisateurs d’accéder à
-des jeux de données, de déposer leurs propres jeux de données et de créer des visualisations.
-Mais il ne s’agit là que de la première partie du processus, la seconde consistant à proposer à la
-discussion les visualisations générées dans le but de profiter de l’avis d’experts. Donc au lieu
-d’essayer de construire la "bonne" visualisation pour un jeu de données, Many Eyes préfère
-offrir l’opportunité d’avoir une visualisation élaborée par plusieurs experts.
-La seconde méthode est celle développée par Mackinlay dans Tableau Software Mackinlay
-et al. (2007). Avec celle-ci, on peut facilement charger des données, les manipuler et créer des
-visualisations en combinant des dimensions des données. La force de cet outil est qu’il choisit
-à la place de l’utilisateur comment visualiser efficacement le résultat de la combinaison de
-certaines dimensions. Les tests combinatoires que cet outil fait sur les dimensions le rendent
-très intéressant. Il est capable de simplifier les données et d’y trouver des structures que les
-utilisateurs ne seraient pas capables de trouver par eux-même dans de très grandes tables. Mais
-ces tests combinatoires ne sont pas décrits.
-La dernière méthode, développée par Smith dans nodeXl Software Smith et al. (2009),
-repose sur l’utilisation de feuilles de calcul. Les feuilles de calcul permettent, de par leur fonc-
-tion première, de calculer des valeurs et bien d’autres informations en utilisant des formules
-logiques ou mathématiques. Ces valeurs serviront d’attribut pour les entités ou les relations.
-Mais cet outil permet aussi de construire un graphe à partir d’une feuille de calcul. Le graphe
-doit être décrit par une liste d’arêtes. La feuille de calcul doit contenir au moins deux colonnes,
-et chaque ligne décrit les deux entités (une dans chaque colonne) en relation. Donc cet outil
-fournit une méthode automatique qui ne nécessite pas l’utilisation d’un langage de programma-
-tion et qui en plus permet aux utilisateurs novices de produire une analyse visuelle de données
-relationnelles. Dans cette méthode, en raison de la création manuelle de la liste des arêtes, il
-n’est pas possible d’assurer que les utilisateurs non experts soient capables de construire un
-graphe valide.
-Maintenant que nous avons présenté les trois grandes tendances de travail dans le domaine,
-nous présentons une précédente méthode que nous avons réalisée. Cette méthode Gilbert et Au-
-ber (2010) est inspirée du travail réalisé par Tableau Software. Comme les tests combinatoires
-qui y sont utilisés ne sont pas décrits, nous avons développé notre propre méthode combina-
-toire. Cette méthode vérifie l’existence des structures hiérarchiques entre les dimensions de
-la table et s’en sert pour la simplifier avant de générer les graphes que l’ont peut obtenir en
-Import automatique et interactif dans les systèmes de visualisations
-tenant compte de ces structures. Dans cette méthode, chaque ligne de la table décrit une entité
-et on cherche à savoir comment les attributs (valeurs contenues dans une ligne) hiérarchisent
-ces entités.
-3 Notre méthode
-Dans cette nouvelle méthode, nous considérons toujours que chaque cellule d’une table
-contient des données nominales. Ainsi, qu’elles contiennent un mot, un nombre ou une date,
-l’information sera traitée comme une chaîne de caractères sans distinction. Par contre, nous
-changeons d’approche en ce qui concerne la globalité des données contenues dans une table.
-Au lieu de considérer chaque ligne comme une entité décrite par des attributs, nous considérons
-ici que les entités sont des valeurs contenues dans les lignes. Par exemple, la table 1 contient
-des vols d’avions ayant une escale, donc plusieurs aéroports apparaissent dans chaque ligne
-de la table. Un utilisateur peut vouloir visualiser comment les aéroports sont inter-connectés.
-Ainsi le travail que nous réalisons ici se rapproche à la fois de celui réalisé dans Tableau
-Software de par l’analyse combinatoire que l’on va mener sur les dimensions de la table et
-également de celui réalisé dans nodeXl de par l’idée de chercher des listes d’arêtes. Toutefois,
-cette liste d’arêtes n’est pas clairement identifiée dans la table, et peut s’étendre sur plus de
-deux dimensions.
-Identifiant vol Départ Escale Terminus
-1 Orly Nantes Bordeaux
-2 Blagnac Orly Strasbourg
-3 Bordeaux Blagnac Roissy
-TAB. 1 – Exemple d’une table regroupant des données sur des vols d’avions
-Nous allons décrire maintenant le processus que nous avons mis en place pour cette mé-
-thode. Celui-ci se décompose de la façon suivante : tout d’abord nous recherchons des intersec-
-tions entre les dimensions de la table, puis proposons les intersections trouvées à l’utilisateur
-afin que celui-ci puisse éventuellement les modifier, et enfin une fois que l’utilisateur a va-
-lidé les intersections et ses choix, nous générons les graphes entité-relation que l’utilisateur
-souhaite visualiser.
-3.1 Recherche des intersections entre les dimensions
-Afin de comparer les contenus des différentes dimensions et pour éviter d’avoir à parcou-
-rir à chaque fois toutes les valeurs d’une dimension, nous travaillons à partir des alphabets
-des dimensions. Nous définissons par alphabet l’ensemble des valeurs d’une dimension. Cela
-a pour avantage de supprimer les valeurs qui apparaissent de multiples fois dans une même
-dimension.
-Par exemple, si les valeurs d’une dimensionDim sont : {A,B,D,A,E,G, F, F,B}. L’alpha-
-bet ΣDim associé à cette dimension sera : {A,B,D,E, F,G}.
-La seconde étape consiste à déterminer s’il existe des intersections entre les dimensions.
-On définit qu’il existe une intersection entre deux dimensions s’il existe au moins une valeur
-F. Gilbert et D. Auber
-présente dans chacune des dimensions. Par exemple, les dimensions suivantes ont l’ensemble
-{A,B} comme intersection : Dim1 = {A,B,B,C,E, F} et Dim2 = {A,B,D,G,G,H}.
-En utilisant le fait que nous avons déjà construit les alphabets de chaque dimension, pour sa-
-voir s’il existe une intersection entre deux dimensions Dim1, Dim2, il suffit de construire un
-troisième alphabet ΣDim1∪Dim2 à partir de ΣDim1 et ΣDim2 les alphabets de chaque dimen-
-sion. Si on obtient que |ΣDim1∪Dim2 | < |ΣDim1 |+ |ΣDim2 | (i.e. ΣDim1 ∩ΣDim2 6= ∅) alors
-cela signifie qu’il existe une intersection entre les dimensions Dim1, Dim2.
-Par exemple si on souhaite déterminer s’il existe une intersection entre la dimension "Dé-
-part" et la dimension "Terminus" de la table1, il nous faut d’abord générer les alphabets de
-ces dimensions. On obtient ainsi : ΣDepart = {Bordeaux,Blagnac,Orly} et ΣTerminus =
-{Bordeaux,Roissy, Strasbourg}. Puis nous devons générer un troisième alphabet à partir
-des deux précédents, ce qui donne :
-ΣDepart∪Terminus = {Bordeaux,Blagnac,Orly,Roissy, Strasbourg}.
-Et on peut vérifier qu’il existe bien une intersection entre ces deux dimensions puisque :
-|ΣDepart∪Terminus| = 5 < |ΣDepart|+ |ΣTerminus| = 3 + 3 = 6.
-En procédant par paire de dimensions, il n’est pas évident de détecter s’il existe des in-
-tersections entre plus de deux dimensions. Par exemple, considérons trois dimensions Dim1,
-Dim2, Dim3, il est possible qu’il y ait une intersection entre Dim1 et Dim2, une autre entre
-Dim2 et Dim3, mais qu’il n’y en ait pas entre Dim1 et Dim3. Alors afin de pouvoir stocker
-les informations sur les intersections, nous avons mis en place un graphe (graphe de concepts).
-Chaque dimension de la table est représentée dans le graphe par un sommet et à chaque fois
-que l’on trouve une intersection entre deux dimensions on ajoute une arête entre les deux
-sommets correspondant dans le graphe. Nous obtenons ainsi un graphe composé d’une ou plu-
-sieurs composantes connexes. Et nous sommes sûrs que toutes les dimensions appartenant à
-une même composante connexe possèdent des intersections et donc par extensions que toutes
-les valeurs contenues dans ces dimensions appartient à un même domaine.
-FIG. 1 – Graphe des intersections des dimensions de la table 1
-Import automatique et interactif dans les systèmes de visualisations
-Par exemple si nous considérons le cas de vols d’avions, chaque ligne de la table représente
-un vol caractérisé par les dimensions "Départ", "Terminus" et "Escale". Alors si nous trouvons
-des intersections entre ces dimensions, nous pouvons affirmer que ces dimensions contiennent
-des valeurs appartenant au même domaine, ici des aéroports. La figure 1 représente le graphe
-des intersections des dimensions de la table 1.
-3.2 Propositions des intersections et interactions de l’utilisateur
-Maintenant que les intersections entre les dimensions ont été mises en évidence, nous al-
-lons les soumettre à l’utilisateur pour qu’il puisse éventuellement les éditer. En effet, il est
-intéressant que l’utilisateur intervienne, car il se peut qu’en fonction de la répartition des va-
-leurs dans les différentes dimensions de la table, des intersections n’aient pas étés détectées.
-Par exemple si on considère la table 2, il n’y a une intersection qu’entre les dimensions
-"Départ" et "Escale". Pourtant si l’utilisateur souhaite visualiser les interconnexions entre les
-aéroports de la table, il faut également prendre en compte la dimension "Terminus" afin de
-définir le domaine "aéroport". Dans ce cas précis il est impossible de détecter l’inclusion de la
-dimension "Terminus" dans le domaine "aéroport".
-Identifiant vol Départ Escale Terminus
-1 Orly Nantes Toulon
-2 Blagnac Orly Strasbourg
-3 Bordeaux Blagnac Roissy
-TAB. 2 – Exemple de table regroupant des donnés sur des vols d’avions où il n’y a pas d’in-
-tersections de la dimension "Terminus" avec les autres dimensions de la table.
-Il semble donc intéressant et indispensable pour construit des graphes les plus précis pos-
-sibles, de tirer profit des connaissances de l’utilisateur. Ainsi, si deux dimensions ne possèdent
-pas d’intersection alors que manifestement elles désignent des entités de même type, il est
-important que l’utilisateur puisse spécifier cela. Dans notre exemple, les dimensions "Départ"
-et "Terminus" ne possèdent pas d’intersections, pourtant toutes deux renferment des valeurs
-d’aéroports. Il faut donc proposer à l’utilisateur d’ajouter cette information dans les ensembles
-d’intersections.
-Pour que l’utilisateur puisse visualiser et éditer les ensembles d’intersections, nous avons
-choisi de ne pas utiliser le graphe (graphe de concepts) que nous avons construit lors de l’étape
-de recherches des intersections, car un tel graphe de concepts est complexe. Cette complexité
-réside dans le fait que pour modifier un domaine (une composante connexe dans le graphe
-d’intersection/concepts) il faut que l’utilisateur manipule directement un graphe en ajoutant ou
-en retirant des arêtes. Nous avons alors pris en compte le fait que les données en entrée sont
-sous forme tabulaire, donc en conservant cette représentation le plus longtemps possible (tant
-que la tache est solvable) nous évitons ainsi une surcharge cognitive.
-C’est en ce basant sur cette notion de limitation de la surcharge cognitive que nous avons
-choisi de mettre en place une interface qui permet à l’utilisateur d’éditer les intersections précé-
-demment trouvées. Cette interface est une table dont chaque colonne représente une dimension
-de la table d’origine. Les lignes de cette table représentent les ensembles d’intersections. Afin
-F. Gilbert et D. Auber
-FIG. 2 – Table permettant de visualiser les ensembles d’intersections des dimensions qui ont
-été trouvé lors de l’analyse de la table2. On peut voir qu’il n’y a pas d’intersection incluant
-la dimension "Terminus". Toutefois l’utilisateur va pouvoir corriger cela en cochant la boite
-correspondante.
-qu’on puisse visualiser dans une ligne l’ensemble qu’elle représente, nous avons doté chaque
-cellule de la table d’une boite cochable et chaque boite correspondant à une dimension qui
-apparait dans l’ensemble est cochée (cf figure 2).
-Pour l’édition, l’utilisateur peut cocher ou décocher les boîtes qu’il souhaite. Ainsi il peut
-retirer des dimensions d’un ensemble d’intersections ou en rajouter. L’utilisateur peut aussi
-rajouter un nouvel ensemble d’intersections (domaine). Pour cela il lui suffit d’ajouter une
-ligne à la table et de cocher les dimensions qui vont définir un nouveau domaine (ensemble
-d’intersections).
-Une fois que l’utilisateur a apporté toutes les modifications qu’il souhaite aux intersections,
-nous construisons un nouveau graphe similaire au premier que nous avons construit. Celui-ci va
-nous permettre de stocker les nouveaux domaines pour la suite de l’application de la méthode.
-3.3 Génération des graphes entités-relation représentants les domaines
-En utilisant le graphe obtenu après que l’utilisateur a apporté des modifications, nous
-sommes en mesure de mettre en évidence des ensembles d’entités. Ces ensembles d’entités
-sont identifiables grâce aux composantes connexes du graphe. En effet chaque composante
-connexe représente un ensemble de dimensions possédant des intersections entres elles et s’il
-existe un tel ensemble, alors les valeurs contenues dans ces dimensions définissent un ensemble
-d’entités. Donc pour chaque composante connexe de ce graphe, nous sommes capable de créer
-un nouveau graphe ayant comme ensemble de sommets les valeurs contenues dans les dimen-
-sions de cette composante. Maintenant, pour obtenir des graphes de types entité-relation, nous
-devons ajouter des arêtes à ce graphe.
-Pour les ajouter, nous allons utiliser la structure globale de la table. Par définition si des
-valeurs appartiennent à une même ligne de la table, alors elles décrivent toutes l’entité que re-
-présente cette ligne. On peut donc dire qu’elles sont en relation entre elles car elles définissent
-la ligne de la table. Par exemple, avec les vols d’avions, ce sont bien les aéroports qui défi-
-nissent le vol mais réciproquement, chaque vol va définir une relation entre les aéroports qui
-le composent.
-Donc pour chaque ligne de la table nous allons ajouter une arête dans le graphe entre les
-valeurs des dimensions possédant des intersections. Par exemple avec la table 1 et le graphe des
-intersections de la figure 1, nous pouvons dire que le graphe que nous allons obtenir possédera
-Import automatique et interactif dans les systèmes de visualisations
-une arête entre les sommets "Orly" et "Nantes", une seconde entre "Orly" et "Bordeaux" ainsi
-qu’une troisième entre "Nantes" et "Bordeaux". En appliquant cela à chacune des lignes de
-la table 1, nous obtenons le graphe de la figure 3 dans lequel on retrouve les interconnexions
-entre les aéroports que l’utilisateur souhaitait visualiser.
-FIG. 3 – Graphe des aéroports obtenu en tenant compte des intersections des dimensions de
-la table1
-3.4 Complexité
-Notre méthode permet à l’utilisateur d’analyser le contenu de ses données et d’en extraire
-des graphes entités-relation. Mais l’espace de toutes les combinaisons possibles entre les di-
-mensions est quadratique. Il est donc important de considérer les complexités en temps que
-requiert notre méthode.
-Nous exprimons ici les complexités en considérant que la table en entrée est composée
-de m dimensions et n lignes. Ainsi la construction de l’alphabet d’une dimension est en
-O(n log n) en utilisant une structure ensembliste. Et par extension la construction de tous les
-alphabets est en O(m× n log n).
-Pour ce qui est de la construction d’un alphabet servant à vérifier l’existence d’une inter-
-section entre deux dimensions, on a besoin d’insérer au plus n valeurs d’un alphabet dans un
-autre. Donc, comme pour les alphabets associés aux dimensions de la table, cette construction
-est enO(n log n). Mais dans une table dem dimensions il y am× (m− 1) comparaison pos-
-sible deux à deux, on obtient donc une complexité globale en O(m(m− 1)× n log n) pour la
-construction des intersections des dimensions. Mais cette dernière complexité considère que
-F. Gilbert et D. Auber
-les alphabets initiaux de chaque dimension sont déjà construits, donc si on doit construire les
-premiers alphabets et les intersections, on obtient une complexité de O(m2 × n log n).
-La seconde complexité qu’il faut prendre en compte est celle de la construction d’un graphe
-correspondant à un ensemble d’intersections. Si cet ensemble s’étend sur l des m dimensions
-de la table, alors pour chaque ligne de la table on va devoir considérer chacune des l valeurs
-deux à deux. On obtient donc que le complexité de en O(n× l(l − 1)).
-Donc cette complexité est inférieure à celle de la construction des intersections. On peut
-donc dire que la complexité globale de notre méthode est de l’ordre deO(m2 × n log n). Dans
-la plupart des jeux de données, le nombre de dimensions est bien inférieur au nombre de ligne,
-donc nous pouvons dire que notre méthode est applicable en pratique malgrès sa complexité
-quadratique.
-4 Cas d’étude
-Le jeu de données que nous utilisons ici est une extraction des publications de notre équipe
-de recherche à partir de la plate-forme "archive ouverte pluridisciplinaire HAL" (Hyper Ar-
-ticle en Ligne). Nous avons extrait l’ensemble des publications réalisées par les membres de
-notre équipe depuis sa création en 2008. Les données de cette extraction ont été stockée dans
-une table. Cette table est composée de huit dimensions qui sont : "Identifiant", "Type de pu-
-blication", "Titre de la publication", "Auteur 1", "Auteur 2", "Auteur 3", "Annee" et "Titre
-ouvrage". Nous avons décidé de stocker les noms des auteurs sur trois dimensions pour sim-
-plifier la structure globale. Si jamais des publications ont moins de trois auteurs, alors nous
-codons dans les champs supplémentaires qu’il n’existe pas de valeurs pour ces champs. Ces
-champs ne seront alors pas considérés lors de l’analyse. Chaque ligne de la table décrit donc
-une publication.
-FIG. 4 – Extrait de la table des publications.
-Import automatique et interactif dans les systèmes de visualisations
-La méthode que nous présentons dans cet article est implémentée à l’aide de Tulip Auber
-(2003). Tulip est un logiciel libre qui fournit des outils et des composants graphiques pour la
-visualisations de grandes masses de données.
-Lors de la première étape de notre méthode, nous cherchons les intersections entre les
-dimensions de la table. Il est évident que notre méthode devrait pouvoir mettre en évidence des
-intersections entre les différentes dimensions regroupant les noms des auteurs des publications.
-Le résultat de la recherche des intersections est présenté dans la figure 5, et celui-ci confirme
-bien les intersections attendues entre les dimensions "Auteur".
-FIG. 5 – Table permettant de visualiser les ensembles d’intersections des dimensions qui ont
-été trouvé lors de l’analyse de la table regroupant les publications. On peut voir il y a qu’une
-seule intersection incluant les dimensions "Auteur 1", "Auteur 2" et "Auteur 3".
-La seconde étape de notre méthode est la génération des graphes correspondant aux inter-
-sections. Dans notre cas, étant donné qu’une seule intersection n’a été trouvée, un seul graphe
-sera généré. Le graphe que nous obtenons dans le cas des auteurs est celui de la figure 6. Nous
-l’avons dessiné à l’aide d’un algorithme de dessin de force déjà implémenté dans Tulip.
-Maintenant que nous avons importé et généré des graphes à partir de l’extraction de publi-
-cation, nous pouvons entrer dans un processus d’analyse exploratoire. Ainsi si on observe le
-graphe obtenu, on peut voir qu’il existe des sommets particuliers qui sont des connecteurs dans
-le graphe. Par exemple, on peut voir dans la figure 6 que "Delest Maylis" permet de connecter
-deux parties du graphe. On peut donc conclure qu’elle joue un rôle important pour la cohé-
-sion de cette équipe. On peut retrouver des rôles similaires pour "Zaidi Faraz" et "Lambert
-Antoine". Une autre hypothèse que ce graphe nous permet de faire est que "Auber David" et
-"Melancon Guy" ont des positions très centrales dans cette équipe.
-5 Conclusion
-Nous avons présenté dans cet article une méthode générant de manière automatique des
-graphes à partir d’un jeu de données sous forme tabulaire. Cette méthode facilite la transforma-
-tion des données afin de pouvoir les utiliser dans des systèmes de visualisation d’informations.
-Pour générer des graphes de type entité-relation nous tirons profit de l’expertise et des connais-
-sances de l’utilisateur. Couplée à nos précédents travaux, cette méthode permet d’obtenir des
-graphes valués sur lesquels il est possible de procéder à une analyse exploratoire. Nous avons
-montré que la complexité de notre méthode reste applicable à de grands jeux de données. Nous
-avons aussi démontré au travers d’un cas d’étude l’utilité de notre méthode. En effet, en partant
-de données sur des publications, nous avons pu générer un graphe des auteurs qui peut s’avérer
-révélateur quant au rôle de certains auteurs au sein de la communauté.
-F. Gilbert et D. Auber
-FIG. 6 – Graphe entité-relation obtenu à partir des auteurs de la table de la figure 4.
-Références
-Auber, D. (2003). Tulip : A huge graph visualisation framework. In P. Mutzel et M. Jünger
-(Eds.), Graph Drawing Softwares, Mathematics and Visualization, pp. 105–126. Springer-
-Verlag.
-Gilbert, F. et D. Auber (2010). From Databases to Graph Visualization. In Information Visua-
-lization 2010 14th International Conference Information Visualisation, pp. 128–133.
-Johnson, B. et B. Shneiderman (1991). Tree-maps : a space-filling approach to the visualization
-of hierarchical information structures. In VIS ’91 : Proceedings of the 2nd conference on
-Visualization ’91, Los Alamitos, CA, USA, pp. 284–291. IEEE Computer Society Press.
-Livny, M., R. Ramakrishnan, K. Beyer, G. Chen, D. Donjerkovic, S. Lawande, J. MyllymÃd’ki,
-et K. Wenger (1997). Devise : Integrated querying and visual exploration of large datasets.
-In In Proceedings of ACM SIGMOD, pp. 301–312.
-Import automatique et interactif dans les systèmes de visualisations
-Mackinlay, J. D., P. Hanrahan, et C. Stolte (2007). Show me : Automatic presentation for
-visual analysis. Volume 13, pp. 1137–1144.
-Slingsby, A., J. Dykes, et J. Wood (2009). Configuring hierarchical layouts to address research
-questions. IEEE Trans. Vis. Comput. Graph. 15(6), 977–984.
-Smith, M., B. Shneiderman, N. Milic-Frayling, E. Mendes Rodrigues, V. Barash, C. Dunne,
-T. Capone, A. Perer, et E. Gleave (2009). Analyzing (social media) networks with nodexl.
-In C&T ’09 : Proceedings of the fourth international conference on Communities and tech-
-nologies, New York, NY, USA, pp. 255–264. ACM.
-Stolte, C., D. Tang, et P. Hanrahan (2008). Polaris : a system for query, analysis, and visuali-
-zation of multidimensional databases. Commun. ACM 51(11), 75–84.
-Viegas, F. B., M. Wattenberg, F. van Ham, J. Kriss, et M. McKeon (2007). Manyeyes : a
-site for visualization at internet scale. IEEE Transactions on Visualization and Computer
-Graphics 13(6), 1121–1128.
-Villerd, J., S. Ranwez, M. Crampes, D. Carteret, et J. M. Penalva (2007). Using concept lattices
-for visual navigation assistance in large databases : Application to a pantent database. In
-CLA.
-Ware, C. (2000). Information Visualization : Perception for Design. Morgan Kaufmann Publi-
-shers.
-Summary
-The first step of any information visualization system is to enable end user to import their
-dataset into the system. However, non expert user are faced to the difficult task of choosing
-how their data should/could be transform to be used in these Infovis systems. In that paper
-we propose a novel method for automatic valuated graph generation from dataset in tabular
-format. Analysing each dimension of the table we highlight connections between them, we
-characterize entities, attributes and possible relations in tables. Finally, we include end users
-in the transformation process asking him to validate the set of transformations.
+Conception de systèmes d’information spatio-temporelle 
+adaptatifs avec ASTIS 
+ 
+ 
+Bogdan Moisuc,  Jérôme Gensel, Hervé Martin 
+ 
+Laboratoire LSR-IMAG 
+Equipe SIGMA 
+681, rue de la Passerelle, 
+BP. 72, 38402 Saint Martin d'Hères Cedex, France 
+{Bogdan.Moisuc, Jerome.Gensel, Herve.Martin}@imag.fr 
+ 
+Résumé. Les avancées technologiques récentes du Web et du sans fil, 
+conjuguées au succès des applications spatialisées grand public, sont à 
+l’origine d’un accès accru aux systèmes d'information spatio-temporelle 
+(SIST) par une grande diversité d’utilisateurs, munis des  dispositifs d’accès 
+et dans des contextes d’utilisation variés. Adapter ces  systèmes à l'utilisateur 
+devient donc une nécessité, un gage  d'utilisabilité et de pérennité. Cet article 
+présente une approche générique pour la conception et la génération de 
+systèmes d’information spatio-temporelle adaptés à l’utilisateur, appelé 
+ASTIS. ASTIS offre des modalités générales de mise en oeuvre de 
+l’adaptation à l’utilisateur, visant tant le contenu que la présentation des 
+applications. Elle permet aux concepteurs d’intégrer ces modalités 
+d’adaptation dans des applications traitant des données spatio-temporelles. 
+Afin de définir les besoins et types d’adaptation propres à leur application, il 
+suffit aux concepteurs de créer des modèles conceptuels, par spécialisation et 
+instanciation des modèles offerts par notre architecture. 
+1 Introduction 
+Dans le domaine des systèmes d’informations géographique et, plus généralement, des 
+systèmes d’informations spatialisées, certaines recherches (Timpf, 2001, Laurini et Servigne, 
+2007),  montrent depuis une dizaine d’années que ces applications doivent prendre en 
+considération une variété plus large d'influences et de limitations que celles utilisées dans la 
+cartographie conventionnelle (de nature matérielle, mais aussi de nature cognitive et 
+sémantique), liées aux utilisateurs, aux dispositifs d’accès, à l’environnement, et de s’adapter 
+afin d’être  utilisables par leur différents utilisateurs finaux. 
+Ces préoccupations se sont multipliées avec l’émergence de l’informatique mobile et 
+ubiquitaire. L’augmentation de l’autonomie des dispositifs mobiles, de leur taille mémoire et 
+de leur puissance de calcul a donné la possibilité à la communauté de chercheurs en 
+géomatique d’explorer de nouvelles applications des systèmes d’information géographique 
+- 63 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+(Anegg, 2002, Zipf, 2002). De nouvelles perspectives s’ouvrent pour les utilisateurs qui 
+peuvent accéder à des informations spatialisées n’importe quand, n’importe où, à travers des 
+dispositifs d’accès très variés en termes de puissance de calcul et capacité d’affichage (par 
+exemple les services localisés et les systèmes de navigation). Cet accès accru et universel aux 
+applications spatiales accentue les problèmes d’adaptation, liés tant aux limitations 
+intrinsèques des dispositifs mobiles, qu’aux problèmes cognitifs soulevés par l’interaction 
+entre l’utilisateur et ces types de dispositif dans un environnement mobile. 
+Initialement, les recherches se sont focalisées sur le contournement des limitations 
+techniques des dispositifs mobiles (ou DM), comme les PDA (Personal Digital Assistant) et 
+les smartphones (téléphones portables de dernière génération dotées d'écrans tactiles). Parmi 
+les objectifs visés nous pouvons citer l'optimisation de l'utilisation de la bande passante dans 
+des réseaux à bas débit (Follin et al., 2005), la généralisation du contenu pour réaliser 
+l’adaptation à la capacité de calcul et à la capacité mémoire des DM (Lee et al., 2003), la 
+généralisation dynamique pour adapter la présentation de cartes sur les DM à affichage réduit 
+(Sester et Brenner, 2004). 
+Dans des recherches plus récentes, l'attention s'est portée vers les aspects cognitifs de 
+l'adaptation à l'utilisateur (personnalisation) et à son contexte (sensibilité au contexte). Les 
+travaux sur la personnalisation visent à éviter les phénomènes de fatigue et désorientation 
+(Conklin, 1987). En transformant l'application de manière à prendre en compte le profil de 
+l'utilisateur, il devrait avoir le sentiment que le système a été conçu spécialement pour lui. 
+Parmi les caractéristiques des utilisateurs considérées pour l'adaptation, on trouve le plus 
+couramment les préférences et intérêts de l'utilisateur (Malaka et Zipf, 2000), sa nationalité 
+(Sarjakoski et al., 2002)  ou son âge (Nivala et Sarjakoski, 2004). 
+D'autres recherches mettent en évidence l'influence que peut avoir le contexte de 
+l'utilisateur sur l'adaptation (Zipf, 2005, Reichenbacher, 2001) en soulignant que les SIST 
+doivent être capables de présenter à l'utilisateur une information pertinente, au moment 
+opportun et au bon endroit, en fonction de son environnement. Plus précisément, la notion de 
+contexte de l'utilisateur définit l'ensemble d'entités qui peuvent avoir une influence 
+significative sur l'interaction entre l'utilisateur et l'application. Parmi les caractéristiques du 
+contexte le plus souvent prises en compte pour l'adaptation, on peut citer la localisation 
+(Anegg, 2002, Zipf, 2002), l'activité en cours de réalisation par l'utilisateur (Zipf, 2002, Petit 
+et al., 2006), la saison (Nivala et Sarjakoski, 2004) ou encore la direction de mouvement de 
+l'utilisateur (Roth, 2002). 
+Ces travaux présentent toutefois certains inconvénients. Ainsi, les applications existantes 
+utilisent des mécanismes d'adaptation assez simplistes, qui ne tiennent pas compte des 
+aspects plus complexes de la cartographie (Reichenbacher, 2001) comme, par exemple, les 
+représentations multiples. De même, la dimension temporelle n'est généralement pas prise en 
+compte, tant au niveau de la gestion de données qu'au niveau de l'adaptation (Schwinger et 
+al., 2005). Enfin, les approches existantes n'offrent pas de support pour la conception de 
+SIST adaptatifs. La mise en œuvre des mécanismes d'adaptation se confond avec la logique 
+interne de l'application, ce qui rend ces approches très difficilement réutilisables et 
+extensibles.  
+En constatant ce manques d’outils et approches génériques pour l’adaptation dans les 
+SIST, notre objectif est d'offrir aux concepteurs de SIST des outils de conception et des 
+logiciels afin de leur faciliter les démarches de conception et de développement de SIST 
+adaptables. Cet article présente un framework, appelé ASTIS, dédié à la conception et la 
+- 64 -RNTI-E-13
+B. Moisuc et al. 
+ 
+réalisation de systèmes d’information spatio-temporelle adaptatifs et interactifs. ASTIS 
+adopte une approche de conception et de mise en oeuvre d’applications basée sur des 
+modèles. Nous avons préalablement proposé une architecture modulaire appelée GenGHIS 
+(Moisuc et al., 2005), séparant contenu et présentation et permettant aux concepteurs de 
+SIST de générer des applications à partir de  modèles de données conçus par eux. GenGHIS 
+est composé de deux modules principaux : l’un assure la gestion du contenu, l’autre la 
+gestion de la présentation, en s’appuyant sur un système de représentation de connaissances 
+par objets spatio-temporel appelé AROM-ST (Moisuc et al., 2004). ASTIS étend GenGHIS 
+avec des mécanismes d’adaptation de contenu (un système de création de points de vue sur 
+les données) et d’adaptation de la présentation (un système de styles graphiques et 
+composants de présentation). Avec ASTIS, après avoir conçu le modèle de données et le 
+modèle de présentation de base pour l’application, les concepteurs peuvent spécifier 
+différentes adaptations de contenu et de présentation, en fonction des caractéristiques des 
+utilisateurs et du contexte. Au démarrage de l’application, un module d’adaptation est chargé 
+de gérer les utilisateurs, de choisir les adaptations nécessaires et de les mettre en œuvre 
+dynamiquement.  
+L’article est organisé de la manière suivante : la section 2 présente l’architecture générale 
+du framework ASTIS. Les sections 3 et 4 détaillent les mécanismes adaptatifs utilisés au sein 
+d’ASTIS pour réaliser l’adaptation aux points de vue et aux niveaux d’expertise des 
+utilisateurs. La section 5 conclut l’article en présentant les perspectives de développement. 
+2 L’architecture générale de la plate-forme 
+Notre approche pour la conception et le développement d’applications spatio-temporelles 
+adaptées est basée sur la génération de code à partir de modèles. L’idée est de permettre aux 
+concepteurs de créer des applications adaptatives en se basant sur une approche déclarative, 
+de conception de modèles orientés objet. L’architecture est formée de composants 
+paramétrables qui opèrent une suite de transformations et de conversions, depuis des formats 
+et sources externes de données (aux formats relationnels les plus répandus : mif/mid, excel, 
+mdb, etc.) jusqu’au format final, affichable à l’écran (documents SVG et XHTML avec une 
+structure particulière). Le framework contient également des composants visuels génériques, 
+capables d’afficher de manière interactive les documents structurés résultants du processus 
+de transformation. 
+L’architecture est composée de trois modules principaux : un module de données, un 
+module de présentation et un module d’adaptation. Le module de données est chargé du 
+stockage, de l’interrogation et de l’analyse des données en conformité avec les modèles 
+spécifiés par les concepteurs. Il permet aux concepteurs de décrire leurs modèles de données 
+et de les instancier. Le module de présentation permet aux concepteurs de créer des modèles 
+de présentation adaptés et de générer des présentations conformes à ces modèles. Il contient 
+aussi les composants visuels nécessaires pour afficher ces présentations. Le module 
+d’adaptation est chargé de la gestion du contexte, des utilisateurs, et de l’application 
+dynamique des mécanismes d’adaptation choisis en fonction de ces cibles. 
+Le fonctionnement de l’architecture est décrit de manière simplifiée dans la FIG. 1. La 
+partie gauche de la figure illustre la partie statique de l’architecture, c'est-à-dire les 
+composants impliqués dans les processus de conception. La partie droite contient la partie 
+- 65 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+dynamique de l’architecture, c’est-à-dire les composants chargés de la génération à la volée 
+et de l’affichage de contenus SVG adaptés. Les composants représentés par des rectangles à 
+angles droits sont des composants paramètrisables via des modèles. Les composants 
+représentés sous forme de rectangles à coins arrondis sont les composants chargés des 
+conversions de format.  
+ 
+ 
+FIG. 1 Schéma du fonctionnement d’ASTIS. 
+ 
+Pour créer une nouvelle application, les concepteurs doivent d’abord spécifier le schéma 
+de données de l’application. Ensuite, ils doivent spécifier différentes transformations de ce 
+schéma afin de l’adapter aux caractéristiques des utilisateurs et du contexte. De la même 
+manière, la troisième étape consiste à spécifier des adaptations de présentation, c’est-à-dire 
+différentes options de style et d’affichage applicables. La dernière étape de conception 
+permet de définir et faire la liaison entre les différentes caractéristiques du contexte de 
+l’utilisateur et les adaptations correspondantes. Cela revient à spécifier un modèle 
+d’adaptation comme celui de la FIG. 2. A présent, il n’existe pas un consensus sur une 
+terminologie de l’adaptation. Nous avons adopté la terminologie de (Reichenbacher, 2003). 
+Ainsi, la cible de l’adaptation (target) définit les caractéristiques significatives de l’utilisateur 
+ou de son contexte auxquelles l’application doit s’adapter (par exemple, le niveau d’expertise 
+de l’utilisateur ou sa localisation). Une composante à adapter (adaptee) représente une 
+caractéristique du contenu ou de la présentation qui peut être ajustée en adéquation avec le 
+contexte. Le mécanisme d’adaptation (adapter) est la fonctionnalité du système qui permet 
+d’ajuster les caractéristiques des composantes à adapter en fonction des caractéristiques 
+connues des cibles. 
+ 
+  
+- 66 -RNTI-E-13
+B. Moisuc et al. 
+ 
+FIG. 2 Modèle d’adaptation d’ASTIS. 
+ 
+Afin de finaliser la réalisation d’une nouvelle application les concepteurs doivent 
+procéder à l’acquisition de données, c’est-à-dire peupler avec des instances la base de 
+connaissances AROM-ST de l’application, en utilisant le composant de conversion de 
+formats externes vers AROM-ST. Notre approche de conception s’inscrit donc dans le cadre 
+de l’adaptativité (MacEachren, 1998), les concepteurs sont amenés à décrire des adaptations 
+en fonction des caractéristiques de l’utilisateur et de son contexte, qui seront appliquées 
+automatiquement, sans l’intervention des utilisateurs, au moment de l’exécution de 
+l’application. Il est important de noter que, du point de vue technique il est possible de mettre 
+en œuvre de l’adaptabilité, c’est à dire de permettre aux utilisateurs de décrire et appliquer 
+eux-mêmes ces adaptations, de manière dynamique, pendant l’exécution de l’application. 
+Nous considérons que, pour que notre approche soit utilisable, il est nécessaire de créer de 
+nouvelles interfaces et des manières simplifiées de contrôler les applications, parce qu’il est 
+raisonnable d’imaginer que les utilisateurs finaux sont moins avisés en ce qui concerne la 
+modélisation de données et de présentations spatio-temporelles. Une des perspectives de 
+notre travail vise la mise en œuvre d’interfaces et modalités de présentation simplifiées pour 
+rendre notre architecture plus utilisable aussi dans une approche basée adaptabilité. 
+Au moment de l’exécution, le gestionnaire d’adaptation choisit, en fonction des 
+caractéristiques concrètes du contexte, les modalités adéquates d’adaptation à appliquer, 
+décrites par le modèle d’adaptation. Ces modalités sont appliquées au moment de la 
+génération du code SVG de l’application, au niveau de la présentation (structure de la 
+présentation, styles et options d’affichage), et au niveau du contenu (le point de vue sur les 
+données). Les modalités d’application de ces adaptations sont détaillées dans les 2 sections 
+suivantes, et sont illustrées par des exemples d’adaptation visant deux caractéristiques de 
+l’utilisateur : ses intérêts et son niveau d’expertise.  
+3 Adaptation de contenu  
+L'adaptation de contenu est réalisée à travers le concept de point de vue sur les  données. 
+Notre plate-forme utilise pour la modélisation et pour le stockage des données un système de 
+représentation de connaissances par objets, étendu avec des types et opérateurs spatio-
+temporels (Moisuc et al., 2004). Opérationnalisation d’UML, AROM (Page et al., 2001) 
+modélise la réalité sous forme de classes et d’associations. Les classes peuvent avoir des 
+propriétés appelées attributs. Une association exprime une relation existante entre au moins 
+deux classes, appelées rôles. Les instances de classes et associations sont appelées objets et, 
+respectivement, tuples. AROM dispose d’un langage de modélisation algébrique (LMA) qui 
+permet de formuler des requêtes, d’exprimer des contraintes et de calculer des valeurs 
+d’attributs. Notre plate-forme repose sur les capacités de modélisation d’AROM et du LMA 
+pour la gestion de points de vue sur les données. 
+ 
+- 67 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+  
+FIG. 3 Structure de points de vue sur les données dans ASTIS. 
+ 
+En ASTIS, un point de vue sur les données est défini en dérivant, à partir du schéma de 
+données initial d’une application, des schémas virtuels, représentant l’information sous 
+différentes perspectives (voir la FIG. 3). Ainsi, un point de vue de données est un schéma de 
+données contenant les classes, associations, attributs et rôles virtuels (représentés 
+respectivement par les classes Classe virtuelle, Association virtuelle, Attribut virtuel  et Rôle 
+virtuel dans la FIG. 3), et un ensemble de règles de correspondance entre les entités du 
+schéma dérivé et les entités du schéma de base (représentées par les associations Classe de 
+base et Association de base dans la FIG. 3). Notre approche est similaire à celle d’Abiteboul 
+et Bonner (1991). Elle est ici étendue pour le modèle d’AROM qui adopte une représentation 
+explicite des associations et de leurs instances. 
+Le concepteur peut employer plusieurs mécanismes pour dériver des points de vue :  
+− Masquer des classes et des associations, des attributs et des rôles ;  
+− Masquer les objets et les tuples non pertinents, en employant des requêtes qui permettent 
+de ne retenir que ceux qui correspondent à certains critères de pertinence (l'attribut 
+Requête objets pour la classe Classe virtuelle et, respectivement, l'attribut Requête tuples 
+pour la classe Association virtuelle) ;  
+− Renommer des classes, des associations, des attributs et des rôles ;  
+− Fusionner en une seule classe des classes qui sont liées par des associations (l'attribut 
+Requête valeur de la classe Attribut virtuel permet de rechercher la valeur de l'attribut à 
+partir d’attributs des classes liées à la classe de base), ou, au contraire, d’éclater une 
+classe en plusieurs classes (en définissant plusieurs classes virtuelles à partir de la même 
+classe de base) ;  
+− Définir de nouvelles classes, en utilisant des requêtes pour regrouper des objets du 
+même type (en employant l'attribut Requête objets de la classe Classe virtuelle).  
+Nous présentons un exemple d’obtention de point de vue (ou PDV), dans le cas de 
+l’application dédiée au suivi des risques d’éboulement. L’idée est d’obtenir, à partir du 
+schéma présenté en FIG. 4, un schéma dérivé contenant les classes et associations qui 
+intéressent les touristes, en adéquation avec leur perspective sur les éboulements (voir la FIG. 
+5).  
+Une manière de définir ce point de vue est la suivante : 
+ 
+- 68 -RNTI-E-13
+B. Moisuc et al. 
+ 
+FIG. 4 Exemple de schéma de base dans une application dédiée aux risques d’éboulements. 
+ 
+viewpoint Touriste 
+ 
+viewpoints: BaseRisques 
+hide: Niche Depot, Niche Depot Composite, Niche 
+Formations, Pied Depot, Formation, Affecte, Enjeu, Hôpital, 
+Objectif Publique, Eboulement, Manifestation 
+ 
+class Objectif Touristique 
+ ... 
+ 
+class Zone à risque 
+ ...  
+ 
+association dessert 
+ ... 
+ 
+association menace 
+ ... 
+ 
+association se situe 
+ ... 
+ 
+- 69 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+  
+FIG. 5 Exemple de schéma dérivé pour le PDV « Touriste ». 
+ 
+Dans cet exemple, le concepteur a choisi donc d’exclure : 
+– les classes qui présentent des détails structurels sur la formation des éboulements 
+(Niche Depot, Niche Depot Composite, Niche Formations, Pied Depot) ;  
+– la classe qui permet de connaître les conditions favorisant des éboulements (classe 
+Manifestation), comme les pluies torrentielles, les changements brusques et 
+extrêmes de température, etc. ; 
+– les classes Enjeu, Objectif Publique, et Hôpital, sous l’hypothèse que les seuls 
+objectifs publics qui intéressent les touristes sont les objectifs touristiques ; 
+– l’association Affecte, qui ne peut plus exister, étant donné que les classes qu’elle 
+relie ont été exclues. 
+Le concept de risque est représenté par une seule classe, Zone à risque, en considérant 
+que l’information importante est dans le danger, et non pas dans sa source exacte. La classe 
+Objectif Touristique est introduite pour généraliser les classes Restaurant et Hôtel. Les 
+associations dessert, menace, se situe permettent de rendre compte des différentes relations 
+de voisinage existantes entre les objets. La classe POI a été ajoutée afin de permettre aux 
+touristes d’ajouter leurs propres annotations aux cartes, sous la forme de points d’intérêt. 
+Utilisons l’exemple de la  pour illustrer ce type de classe. Par exemple, supposons que la 
+classe Restaurant, présente dans le point de vue de base, ne contienne pas d’informations sur 
+les types de cuisine proposés : 
+class: Restaurant 
+super-class : Enjeu 
+variables: 
+ variable: Nom 
+  type: string 
+ variable: Position 
+  type: point 
+Afin de permettre l’ajout de cette information, le concepteur peut redéfinir la classe 
+Restaurant dans le PDV « touriste » ainsi : 
+- 70 -RNTI-E-13
+B. Moisuc et al. 
+ 
+class: Restaurant 
+super-class : Objectif Touristique 
+base-class : BaseRisques.Restaurant 
+variables: 
+ variable: Types Cuisine 
+  type: list-of-string 
+instances: set(r in BaseRisques.Restaurant: true) 
+Le concepteur définit la nouvelle classe comme classe à extension virtuelle, avec comme 
+instances un ensemble d’instances virtuelles équivalent à l’ensemble d’instances de la classe 
+de base. Il ajoute aussi l’attribut Types Cuisine qui permet aux touristes de maintenir la liste 
+des types de cuisine proposée par chaque restaurant. 
+Lorsque la valeur de l’attribut Types Cuisine est mise à jour, le nouvel attribut est présent 
+seulement au niveau du nouveau point de vue. Nous donnons ci-dessous un exemple 
+d’instance réelle, stockée dans le PDV originel, suivi d’un exemple d’instance dérivée. 
+instance: Restaurant154869753 
+is-a: Restaurant 
+Nom: “Le Lantier” 
+  Position: "-0.375769, 0.219575" 
+   
+instance: RestaurantRestaurant154869753 
+is-a: Restaurant 
+base-instance: BaseRisques.Restaurant154869753 
+Types Cuisine: [“Française”, “Italienne”] 
+4 Adaptation de la présentation 
+Les points de vue peuvent influencer non seulement les données à présenter aux 
+utilisateurs, mais également la manière dont les données sont présentées. La plate-forme 
+ASTIS permet de générer des interfaces de visualisation qui rendent compte des dimensions 
+diverses de l’information (dimensions spatiale, temporelle et attributaire). Celles-ci sont 
+affichées dans des fenêtres spatiales (cartes), temporelles (diagrammes temporels) ou 
+attributaires (tableaux), dont les contenus sont synchronisés. Les mécanismes de 
+synchronisation (ou linking, voir Buja et al., 1991) permettent de réaliser des requêtes 
+visuelles et de visualiser leurs résultats sur toutes les fenêtres simultanément.  
+ASTIS permet aux concepteurs de spécifier des adaptations de la présentation qui sont 
+appliquées dynamiquement à l’exécution de l’application, en fonction des caractéristiques 
+des cibles (l’utilisateur et son contexte). Un modèle de présentation, dont un schéma 
+simplifié est présenté en FIG. 6, permet de définir et de regrouper une série de 
+transformations à appliquer sous la forme d’une visualisation. Le modèle de présentation 
+d’ASTIS reprend la spécification SLD (Styled Layer Descriptor) de l’OGC (2002) et l’étend 
+sur plusieurs aspects. 
+- 71 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+  
+FIG. 6 Modèle de présentation simplifié d’ASTIS. 
+ 
+SLD est un standard de présentation qui permet de décrire des transformations de style 
+(classe Style en FIG. 6) à appliquer à des couches de données (classe Layer). Une couche de 
+données fait référence à une classe d’objets spatiaux (classe Class dans la FIG. 6, appelée 
+aussi ”feature type” dans la terminologie OGC). Un style est composé d’un ensemble de 
+règles, qui permettent de décrire le type exact de symbole graphique correspondant à chaque 
+objet spatial, en fonction de ses valeurs d’attributs (classe Filter). Par exemple, pour une 
+couche représentant les rivières dont le symbole graphique est un trait bleu, un ensemble de 
+règles permet de spécifier différentes épaisseurs du trait en fonction du débit de chaque 
+rivière. Une règle peut aussi spécifier l’intervalle d’échelles pour lequel l’ensemble d’objets 
+contenus est visible sur la carte. 
+Le modèle de présentation d’ASTIS étend le standard SLD sur deux aspects : la prise en 
+compte des présentations temporelles et attributaires, et non pas seulement spatiales, ainsi 
+que la prise en compte des éléments dynamiques de présentation, afin de permettre des 
+présentations interactives. ASTIS permet de définir des visualisations  complexes et 
+multidimensionnelles (classe Vizualisation) contenant plusieurs fenêtres (classe Frame) de 
+type spatial, temporel ou attributaire, chaque fenêtre affichant un certain nombre de couches 
+(de type spatial, temporel ou attributaire). De nouveaux types de symboles graphiques 
+temporels (1D, classe Temporal Symbol) et attributaires (0D, classe Plain Symbol) ont été 
+ajoutés aux types existants en SLD (2D, classe Spatial Symbol). Nous pouvons apercevoir un 
+exemple de visualisation multidimensionnelle en FIG. 6 à gauche, contenant une fenêtre 
+temporelle, une fenêtre attributaire et deux fenêtres spatiales, chacune des fenêtres étant 
+peuplée de symboles de type correspondant : symboles spatiaux (polygones colorées en 
+aplats, cercles proportionnels, signes conventionnels, texte ancré, etc.), symboles temporels 
+(histogrammes), symboles attributaires (texte simple). 
+Afin de permettre la génération de présentations dynamiques et interactives, le modèle de 
+présentation d’ASTIS étend la notion de couche décrite en SLD en ajoutant des informations 
+concernant les liens existants entre les différents types d’objet (classe Association Path). Par 
+exemple, dans une application de gestion d’avalanches (voir FIG. 7), en cliquant sur le 
+contour d’une commune sur la carte (la commune avec un remplissage rouge) il est possible 
+- 72 -RNTI-E-13
+B. Moisuc et al. 
+ 
+de visualiser (toujours sur la carte) quels sont les sites avalancheux susceptibles de l’affecter 
+(en violet), quelles sont les caractéristiques temporelles des événements avalancheux qui se 
+sont produits sur ces sites (sur le diagramme temporel, en bas) ainsi que leurs caractéristiques 
+attributaires (fenêtre attributaire, à gauche).  
+ 
+  
+FIG. 7 Exemple de synchronisme interactif dans une application de visualisation de risques 
+avalancheux. 
+ 
+ 
+FIG. 8 Exemple de visualisation pour le  point de vue « touriste ». 
+ 
+Nous reprenons l’exemple de l’application dédiée au suivie des risques d’éboulements 
+pour montrer comment peuvent être adaptées les présentations aux besoins de l’utilisateur 
+pour un certain point de vue. Considérons la conception des présentations selon  un point de 
+vue « touristique » (voir la FIG. 8) et selon un point de vue « cyndinicien » (voir la FIG. 9). La 
+- 73 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+visualisation pour le point de vue « cyndinicien » est conçue pour un groupe d’utilisateurs 
+habitués aux outils de type SIST, alors que la visualisation selon le point de vue « touriste » 
+s’adresse sans doute à des utilisateurs moins avisés. 
+Certaines différences de contenu entre les deux fragments de cartes sont visibles. Le point 
+de vue « touristique » contient, par exemple, des informations sur des objectifs touristiques 
+(musées, monuments, restaurants). Le point de vue « cyndinicien » contient plus 
+d’informations liées à l’occupation des sols et au réseau hydrographique.  
+Au niveau de la structure, les deux visualisations contiennent des fenêtres attributaires, 
+spatiales et temporelles. Pourtant, si pour le PDV « touriste » comporte plus de détails 
+attributaires sur les points d’intérêt touristique, les tableaux attributaires pour les 
+cyndiniciens apportent plus d’informations sur les risques mêmes. Au niveau de la fenêtre 
+temporelle, les graphiques temporels permettent aux cyndiniciens d’avoir une perspective 
+historique sur plusieurs décennies des phénomènes liés aux risques. La fenêtre temporelle de 
+la visualisation dédiée aux touristes leur permet tout simplement d’accéder aux prévisions 
+des dangers éventuels menaçant leurs points d’intérêt pour les prochains jours. 
+ 
+  
+FIG. 9 Exemple de visualisation pour le  point de vue « cyndinicien ». 
+ 
+La représentation du concept de risque est très simplifiée dans l’application dédiée aux 
+touristes. Une zone rouge permet de mettre en évidence les différents types de zones 
+d’éboulements qui sont à éviter par les touristes, permettant ainsi de les informer des risques 
+existants lors de la préparation de leurs balades en montagne. Les différentes composantes 
+d’une zone d’éboulements (pied de dépôt, niche de dépôt, niche composite, etc.) sont, au 
+contraire, présentées en détail par des signes conventionnels familiers aux cyndiniciens.  
+En ce qui concerne les niveaux d’expertise, la visualisation s’adressant aux touristes est 
+plus simple : la densité visuelle affichée (et, respectivement, la quantité totale d’information) 
+est plus faible. Son style de présentation s’appuie sur l’utilisation de symboles visuels. Au 
+contraire, la visualisation pour les cyndiniciens est plus dense et utilise des signes 
+- 74 -RNTI-E-13
+B. Moisuc et al. 
+ 
+conventionnels qui permettent d’afficher une quantité plus importante d’information, au 
+détriment de la lisibilité. 
+5 Conclusions et perspectives 
+Nous avons présenté dans cet article une plate-forme pour la conception et la génération 
+de SIST adaptables à l’utilisateur. Cette architecture implémente une approche conceptuelle 
+de l’adaptation à l’utilisateur qui permet aux concepteurs de SIST de générer des applications 
+adaptables en décrivant simplement des modèles conceptuels. Ces modèles doivent décrire la 
+transformation applicable à la composante à adapter (les éléments du système qui sont 
+transformés afin de répondre aux besoins de l’utilisateur) et la cible de l’adaptation (les 
+caractéristiques de l’utilisateur ou de son environnement que le système doit prendre en 
+compte pour l’adaptation). Afin d’aider les concepteurs dans la modélisation, la plate-forme 
+offre des modèles génériques pour chaque type de cible et de composante à adapter, qu’il 
+suffit aux concepteurs d’instancier. Cela permet aux mécanismes génériques d’adaptation 
+implémentés au sein de notre plate-forme de réaliser l’adéquation aux types d’utilisateurs au 
+niveau de l’application finale. Notre approche met en œuvre tant l’adaptation du contenu (les 
+données), que l’adaptation de la présentation (les interfaces de visualisation). 
+Plusieurs perspectives sont possibles, en vue d’améliorer notre proposition et de la rendre 
+plus utile pour la conception et la réalisation d’applications pour des SIST mobiles. La 
+première vise la réalisation d’un module d’acquisition du contexte. Ce module devrait utiliser 
+un modèle compréhensif de contexte et devrait permettre aux applications d’acquérir un 
+maximum de paramètres du contexte (localisation, temps, paramètres du dispositif d’accès, 
+historique de l’utilisateur, agenda, etc.) sans aucune intervention de la part de l’utilisateur ou 
+du concepteur. La deuxième perspective est de compléter la plateforme avec un module 
+d’adaptation dynamique, chargé de détecter les changements de contexte et de déclencher (en 
+utilisant un mécanisme de type ECA – Event Condition Action) les adaptations nécessaires, 
+c’est-à-dire régénérer  de manière adéquate les parties de l’application influencées par le 
+changement de contexte.  
+Références 
+Abiteboul S. and Bonner A., Objects and Views, Proc. ACM-SIGMOD’91, 1991. 
+Anegg H., Kunczier, H. Michlmayr, E. Pospischil G. and Umlauft M., LoL@: Designing a 
+Location Based UMTS Application, ÖVE-Verbandszeitschrift e&i, Springer, 2002. 
+Buja A., McDonald J. A., Michalak, J. et Stuetzle, W., Interactive data visualization using 
+focusing and linking, Proc. of the 2nd Conference on Visualization '91, 1991.  
+Conklin J., Hypertext: An introduction and survey. IEEE Computer 20 (9), pp. 17-41, 1987. 
+Follin J.-M., Bouju, A., Bertrand, F. and Stockus, A., An Increment Based Model for Multi-
+resolution Geodata Management in a Mobile System, Proc. W2GIS 2005, LNCS, 2005. 
+Lee C.-H., Chen L., Lee J.-D. and Bae H.-Y., Content Adaptation and Transmission Strategy 
+of Spatial Information for WWW and Mobile Applications, HSI’03, LNCS, 2003. 
+- 75 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+Laurini R. and Servigne S., Visual Access to City's websites: A Challenge for PDA’s GUI. 
+Journal of Visual Languages and Computing, 18 (3), p. 339-355, June 2007. 
+MacEachren A.M., VISUALIZATION - Cartography for the 21st century. 7th Annual 
+Conference of Polish Spatial Information Association. Warsaw, Poland, 1998. 
+Malaka R. and Zipf  A., DEEP, MAP Challenging IT Research in the Framework of a 
+Tourist Information System. In: D. Fesenmaier, Proceedings of ENTER 2000. Wien, 
+New York, Springer, 15-27, 2000. 
+Moisuc B., Davoine P. A., Gensel J. and Martin H., Design of Spatio-Temporal Information 
+Systems for Natural Risk Management with an Object-Based Knowledge Representation 
+Approach, Geomatica, Vol. 59, No. 4, 2005. 
+Moisuc B., Gensel J. et Martin H., Représentation de connaissances par objets pour les SIG à 
+représentations multiples, Proc. Cassini-SIGMA 2004. 
+Nivala A-M. and Sarjakoski L.T., Preventing Interruptions in Mobile Map Reading Process 
+by Personalisation. Proc. 3rd Workshop on "HCI in Mobile Guides", in adjunction to: 
+MobileHCI'04, 2004. 
+OGC, Styled Layer Descriptor Implementation Specification, version 1.0.0, 2002. 
+Page M., Gensel J., Capponi C., Bruley C., Genoud P., Ziebelin D., Bardou D. and Dupierris 
+V., A New Approach to Object-Based Knowledge Representation: the AROM System, 
+LNAI, 2001. 
+Petit M., Ray C. and Claramunt C., A contextual approach for the development of GIS: 
+Application to maritime navigation. Proceedings W2GIS'06, LNCS, 2006. 
+Reichenbacher T., Adaptive Concepts for a Mobile Cartography, Supplement Journal of 
+Geographical Sciences, December, 43-53, 2001. 
+Reichenbacher T., Adaptive Methods for Mobile Cartography. Proceedings of the 21st 
+International Cartographic Conference (ICC) 2003, Durban, 2003.  
+Roth J., Context-Aware Web Applications Using the PinPoint. Proceedings IADIS 
+International Conference WWW/Internet 2002, Lissabon (Portugal), IADIS Press, 3-10, 
+2002. 
+Sarjakoski T., Sarjakoski L. T., Lehto L., Sester M., Illert A., Nissen F., Rystedt R. and 
+Ruotsalainen R., Geospatial Info-mobility Services - A Challenge for National Mapping 
+Agencies. Proceedings Joint International Symposium on GeoSpatial Theory, Processing 
+and Applications, Ottawa, Canada, 2002. 
+Schwinger W., Grün Ch., Pröll B., Retschitzegger W. and Schauerhuber. A., Context-
+awareness in Mobile Tourism Guides - A Comprehensive Survey, Technical Report, July 
+2005. 
+Sester M. and Brenner C., Continuous Generalization for Fast and Smooth Visualization on 
+Small Displays, International Archives of Photogrammetry, Remote Sensing and Spatial 
+Information Sciences, XXXV (B4:IV): 1293-1298, 2004. 
+- 76 -RNTI-E-13
+B. Moisuc et al. 
+ 
+Timpf S., Geographic Task Models for geographic information processing. Meeting on 
+Fundamental Questions in Geographic Information Science, Duckham, M. and Worboys 
+M.F. (eds.), Palace Hotel, Manchester, UK, pp.217-229, 2001. 
+Zipf A., User-Adaptive Maps for Location-Based Services (LBS) for Tourism, Proc. ENTER 
+2002, Innsbruck, 2002. 
+Zipf A., Location aware mobility support for tourists. Trends & Controversies. In: IEEE 
+Intelligent Systems. Journal. Special Issue on "Intelligent Systems for Tourism". 
+November/December 2002. 57-59, 2002.  
+Zipf A., Using Styled Layer Descriptor (SLD) for the dynamic generation of user- and 
+context-adaptive mobile maps - a technical framework, In Proc. W2GIS’05, LNCS, 2005. 
+Summary. The joint development of the Web and of ubiquitous computing increases 
+constantly the potential diversity of the users, access devices and contexts of use of spatio-
+temporal information systems accessed via these means. Adapting these systems to their 
+users becomes a necessity and a guarantee of usability and longevity. This paper presents a 
+generic approach for the design and generation of adaptive spatio-temporal information 
+systems. The presented framework integrates generic user adaptation mechanisms, aimed at 
+adapting both the content and the presentation of the applications. It allows designers to 
+integrate these mechanisms into adaptable applications. In order to define the needs and the 
+adaptations of their applications, designers only have to create conceptual models, by 
+instantiating generic models supplied by our framework. 
+ 
+- 77 - RNTI-E-13
+Conception de systèmes d’information spatio-temporelle adaptatifs avec ASTIS 
+ 
+- 78 -RNTI-E-13

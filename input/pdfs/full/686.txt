@@ -1,257 +1,441 @@
-KGRAM: une machine abstraite de graphes de connaissance
-Olivier Corby∗, Catherine Faron-Zucker∗∗
-∗INRIA
-2004 route des lucioles - BP 93 - FR-06902 Sophia Antipolis cedex
-olivier.corby@sophia.inria.fr
-∗∗I3S, UNS, CNRS
-930 route des Colles - BP 145 - FR-06903 Sophia Antipolis cedex
-catherine.faron-zucker@unice.fr
-Résumé. Cet article présente la machine abstraite de graphes de connaissance
-KGRAM qui unifie les notions d’homomorphisme de graphe et de calcul de re-
-quêtes telles que celles du langage SPARQL sur des données RDF. KGRAM
-implémente un ensemble extensible d’expressions qui définissent une famille de
-langages abstraits d’interrogation de graphes, GRAAL. Nous décrivons la sé-
-mantique dynamique de GRAAL en Sémantique Naturelle et nous présentons la
-machine abstraite KGRAM conçue comme l’interprète de GRAAL, qui implé-
-mente les règles de sémantique naturelle du langage.
+Visualisation en Gestion des Connaissances
+Développement d’un nouveau modèle graphique
+Graph’Atanor
+Bruno Pinaud∗,∗∗, Pascale Kuntz∗∗, Fabrice Guillet∗∗, Vincent Philippé∗
+∗Knowesia SAS
+Atlanpôle, La Fleuriaye
+BP 40703, 44481 Carquefou Cedex
+{bruno.pinaud, vincent.philippe}@knowesia.fr
+http://www.knowesia.fr
+∗∗Laboratoire d’Informatique de Nantes Atlantique (LINA)
+site Ecole Polytechnique
+La Chantrerie - rue Christian Pauc
+BP 50609, 44306 Nantes Cedex 3
+{pascale.kuntz, bruno.pinaud, fabrice.guillet}@univ-nantes.fr
+http://www.sciences.univ-nantes.fr/lina/fr
+Résumé. Les systèmes de gestion des connaissances servent de support pour la
+création et la diffusion de mémoires d’entreprises qui permettent de capitaliser,
+conserver et enrichir les connaissances des experts. Dans ces systèmes, l’inter-
+action avec les experts est effectuée avec des outils adaptés dans lesquels une
+formalisation graphique des connaissances est utilisée. Cette formalisation est
+souvent basée au niveau théorique sur des modèles de graphes mais de façon
+pratique, les représentations visuelles sont souvent des arbres et des limitations
+apparaissent par rapport aux représentations basées sur des graphes. Dans cet
+article nous présentons le modèle utilisé par le serveur de connaissances Atanor
+qui utilise des arbres pour visualiser les connaissances, et nous développons une
+nouvelle approche qui permet de représenter les mêmes connaissances sous la
+forme de graphes en niveaux. Une analyse comparative des deux méthodes dans
+un contexte industriel de maintenance permet de mettre en valeur l’apport des
+graphes dans le processus de visualisation graphique des connaissances.
 1 Introduction
-Dans cet article nous présentons la machine abstraite de graphes de connaissance KGRAM
-(acronyme pour Knowledge Graph Abstract Machine) qui unifie les notions d’homomorphisme
-de graphe et de calcul de requêtes telles que celles du langage SPARQL sur des données
-RDF/S. KGRAM implémente un ensemble extensible d’expressions qui définissent une famille
-de langages abstraits d’interrogation de graphes de connaissance quelconques, que nous appe-
-lons GRAAL (acronyme pour GRAph Abstract query Languages). Ce travail d’abstraction que
-nous avons mené pour définir GRAAL a été alimenté par les résultats du projet GRIWES (Ba-
-get et al., 2008) auquel nous avons participé. Nous définissons ici GRAAL par sa sémantique
-dynamique en Sémantique Naturelle et nous définissons KGRAM comme l’implémentation
-des règles de sémantique naturelle de GRAAL.
-Quant à la machine KGRAM proprement dite, nous montrons le haut niveau d’abstraction
-de son implémentation qui ne manipule que des interfaces, aussi bien pour ses structures de
-données que pour ses opérations de graphes. Ainsi, différents gestionnaires de graphes et éva-
-luateurs de contraintes peuvent être connectés — en implémentant les APIs de KGRAM. Nous
-montrons l’interopérabilité de KGRAM en la connectant indifféremment aux gestionnaires de
-graphes des moteurs sémantiques Corese 1 (Corby et al., 2004) et Jena 2 et à l’évaluateur de
-contraintes de Corese.
-La partie 2 suivante présente le langage GRAAL et la partie 3 la machine KGRAM.
-1. http ://www-sop.inria.fr/edelweiss/software/corese/
-2. http ://jena.sourceforge.net/
-RNTI-E-19- 423 -
-KGRAM: une machine abstraite de graphes de connaissance
-2 La famille GRAAL de langages de requête
-Syntaxe abstraite. La syntaxe abstraite du cœur de GRAAL est donnée par la grammaire
-suivante :
-Exp ::= NODE | EDGE | FILTER
-| and(Exp, Exp) | union(Exp, Exp) | option(Exp)
-| graph(NODE, Exp) | query(Exp) | not(Exp) | exist(Exp)
-Les primitives que partagent tous les langages de la famille GRAAL sont les expressions NODE
-et EDGE permettant de rechercher un nœud ou une relation n-aire (hyperarc) dans un graphe.
-Une expressions FILTER permet d’exprimer des contraintes sur les nœuds recherchés dans le
-graphe interrogé. Remarquons que les expressions NODE, EDGE et FILTER sont primitives et
-nous verrons dans la partir 3 qu’elles correspondent à des interfaces dans la machine abstraite
-KGRAM qui interprète GRAAL.
-Les expressions AND et UNION permettent d’exprimer une conjonction ou une disjonction
-entre deux expressions.
-Une expression OPTION permet de considérer certaines expressions comme optionnelles.
-Une expression GRAPH permet de spécifier le graphe de connaissances sur lequel évaluer une
-expression (en l’absence d’une telle expression, c’est un graphe par défaut qui est considéré).
-Une expression QUERY permet d’exprimer des sous-requêtes dont le résultat détermine des
-liaisons de variables de la requête appelante.
-Une expression NOT exprime la négation par l’échec. Une expression EXIST permet de ne
-rechercher qu’une solution (la première trouvée).
-D’autres expressions encore sont disponibles dans GRAAL qui ne sont pas présentées ici faute
-de place. En outre, GRAAL est conçu pour être extensible.
-Sémantique naturelle. La Sémantique Naturelle a été initialement conçue par Kahn (1987)
-pour fournir une sémantique opérationnelle aux langages de programmation, les règles de sé-
-mantique naturelle constituant les spécifications des interprètes de ces langages. De manière
-analogue, en définissant une sémantique opérationnelle de GRAAL, nous spécifions la ma-
-chine abstraite KGRAM qui peut être vue comme un interprète de GRAAL, les expressions de
-celle-ci permettant d’interroger des bases de graphes de connaissance.
-En Sémantique Naturelle, la sémantique opérationnelle d’un langage est donnée sous la
-forme d’un ensemble de règles d’inférence, où les expressions du langage sont évaluées dans
-un environnement et l’application d’une règle d’inférence produit de nouveaux environne-
-ments. Ainsi, les règles d’inférence de la sémantique de GRAAL décrivent l’évolution de l’en-
-vironnement lors de l’évaluation des expressions du langage qui composent une requête. Plus
-précisément, une expression dans une requête est évaluée dans un environnement consistant en
-une liste de variables apparaissant dans la requête et liées à des nœuds du graphe interrogé, ces
-liaisons résultant de l’évaluation précédente d’autres expressions de la requête. L’évaluation
-d’une expression peut produire plusieurs environnements (dans le cas de plusieurs solutions)
-et les autres expressions de la requête évaluées ensuite le sont dans chacun d’eux. Lorsque
-toutes les expressions d’une requête ont été évaluées, chaque environnement qui en résulte
-correspond à une solution trouvée.
-Nous décrivons ici l’opérationalisation des expressions NODE, EDGE et FILTER de GRAAL
-au travers de règles de sémantique naturelle. Faute de place, les règles opérationalisant les
-RNTI-E-19 - 424 -
-O. Corby et C. Faron-Zucker
-autres primitives de GRAAL ne sont pas décrites dans cet article. les règles 1 et 2 suivantes
-montrent le calcul des listes d’environnements lors de l’évaluation d’une expression demandant
-la recherche d’un nœud ou d’une relation dans un graphe. L’évaluation d’une telle expression
-dans un environnement ENV requiert de rechercher la liste d’environnements LENV contenant
-les appariements possibles du nœud ou de la relation dans le graphe interrogé et de fusionner
-ENV et LENV. Ces deux opérations sont synthétisées dans les règles 1 et 2 par les bases de
-règles graph et merge qui décrivent la sémantique respectivement du gestionnaire de graphe et
-du gestionnaire d’environnement.
-graph(ENV  NODE → LENV ) ∧ merge(ENV,LENV → LENV ′)
-ENV  NODE → LENV ′ (1)
-graph(ENV  EDGE → LENV ) ∧ merge(ENV,LENV → LENV ′)
-ENV  EDGE → LENV ′ (2)
-Les règles 3 et 4 suivantes montrent qu’un filtre est évalué en utilisant les liaisons des
-variables de la requête dans l’environnement courant. Si le filtre est évalué à faux (règle 3),
-l’environnement devient vide (il n’y a pas de solution) ; sinon (règle 4), l’opérateur list trans-
-forme l’environnement en une liste d’un unique environnement.
-eval(ENV  FILTER : false)
-ENV  FILTER→ φ (3)
-eval(ENV  FILTER : true)
-ENV  FILTER→ list ENV (4)
-Des langages GRAAL remarquables. Selon le sous-ensemble des primitives de GRAAL
-que l’on considère, on adopte un langage de requêtes particulier ou un autre. Une limitation
-aux expressions NODE et NODE définit un langage correspondant à celui des Graphes Concep-
-tuels simples Chein et Mugnier (2008). L’opérationalisation des règles de sémantique naturelle
-associées à ces expressions correspond à la recherche d’homomorphismes de graphes étique-
-tés dont les relations peuvent être n-aires. Nous verrons dans la partie 3 que ce calcul des
-homomorphismes de graphes est la "colonne vertébrale" de l’algorithme de KGRAM.
-En ajoutant au langage des expressions FILTER, on considère le modèle des Graphes Concep-
-tuels avec contraintes tel que présenté par Baget et Mugnier (2002).
-En ajoutant au langage les expressions AND, UNION, OPTION et GRAPH, nous définissons
-le fragment cœur du langage SPARQL.
-3 La machine abstraite KGRAM
-Interfaces abstraites. La machine abstraite KGRAM accède au graphe interrogé au travers
-d’une interface abstraite (API) qui en masque la structure et l’implémentation. Autrement dit,
-KGRAM opère sur une abstraction de graphe, au travers de structures et de fonctions abs-
-traites. Le graphe interrogé est modélisé sous forme de sommets et d’arcs d’arité n quelconque
-au travers des interfaces Node et Edge. Le langage de requêtes de KGRAM permet ainsi d’in-
-terroger tout type de graphe de connaissances, par exemple aussi bien des graphes conceptuels
-(dont les relations sont n-aires) que des graphes RDF (dont les relations sont binaires).
-Non seulement les structures de données manipulées par KGRAM sont abstraites, mais
-aussi ses opérateurs :
-RNTI-E-19- 425 -
-KGRAM: une machine abstraite de graphes de connaissance
-– Le gestionnaire de graphes de KGRAM qui permet d’accéder au graphe interrogé est
-un objet implémentant l’interface Producer qui énumère des arcs (resp. sommets) cibles
-correspondant à un arc (resp. sommet) requête.
-– Le test de correspondance entre les sommets (resp. arcs) est effectué par un objet im-
-plémentant l’interface Matcher. Cet objet a la charge de la comparaison des étiquettes
-(labels et types) de sommets. Selon l’implémentation de l’interface Matcher, il prendra
-en compte dans cette comparaison les relations de subsomption entre types, il pourra
-autoriser des appariements approchés basés sur des mesures de similarité, etc.
-– Les contraintes (ou filtres) sont des objets abstraits qui implémentent l’interface Filter
-et qui sont évalués par un objet qui implémente l’interface Evaluator. KGRAM ignore
-la structure interne des filtres qu’il manipule, il se contente d’appeler la fonction eval de
-l’interface Evaluator sur des objets Filter, en passant en argument un Environment.
-Ces interfaces montrent bien le haut niveau d’abstraction auquel nous nous sommes tenus dans
-la conception de KGRAM. L’algorithme de KGRAM qui manipule ces interfaces est ainsi
-totalement abstrait, indépendant de toute implémentation et de toute structure de données.
-Algorithme. La fonction eval de KGRAM évalue une expression du langage GRAAL sto-
-ckée sous la forme d’une pile stack d’expressions élémentaires. Elle fait appel à un gestion-
-naire de graphes abstrait producer qui considère une expression exp de la pile stack et
-l’environnement courant memory des liaisons de variables du graphe requête avec des nœuds
-du graphe interrogé. La fonction candidate du gestionnaire de graphes utilise l’environ-
-nement pour trouver les éventuels nœuds dans l’expression exp déjà liés, de sorte qu’elle
-retourne les seules relations candidates compatibles avec ces liaisons présentes dans l’environ-
-nement. Les relations candidates qui respectent les liaisons dans l’environnement sont ajoutées
-dans une pile des relations, ainsi que les nœuds de la relation dans la pile des nœuds de l’en-
-vironnement. Cette pile de nœuds peut être utilisée comme environnement d’évaluation des
-filtres, comme nous le verrons plus loin. La recherche d’homomorphisme aboutit et l’homo-
-morphisme partiel en construction devient complet lorsque le sommet de la pile d’expressions
-de la requête est atteint : l’environnement courant représente alors une solution.
-KGRAM est conçu comme l’interprète du langage GRAAL. Son algorithme repose sur
-l’opérationalisation des règles 1 et 2 de sémantique naturelle associées aux expressions NODE
-et EDGE de GRAAL qui permettent de rechercher des homomorphismes de graphe :
-eval(stack, n){
-if (stack.size() == n){store(); return;}
-exp = stack(n);
-switch(exp){
-case EDGE:
-for (Edge r : producer.candidate(exp, memory)){
-if (match(exp, r)){ // test bindings, types, etc.
-memory.push(exp, r); eval(stack, n+1); memory.pop(exp, r);}}
-case NODE: ... // similar to case EDGE
-case FILTER:
-if (evaluator.eval(exp, memory)){eval(stack, n+1);}
-... }}
-Dans l’instruction de contrôle switch, les blocs avec les types NODE et EDGE comme valeur
-de la variable exp implémentent les paquets de règles graph et merge des règles 1 et 2 et
-RNTI-E-19 - 426 -
-O. Corby et C. Faron-Zucker
-donc augmentent l’environnement courant par des liaisons des nœuds de la requête avec des
-nœuds du graphe interrogé. KGRAM permet ainsi une recherche d’homomorphismes guidée
-par l’appariement de nœuds et/ou par l’appariement de relations.
-Le bloc avec le type FILTER comme valeur de la variable de contrôle exp opérationa-
-lise les règles 3 et 4 de sémantique naturelle relatives aux expressions FILTER de GRAAL, et
-ce faisant KGRAM implémente la recherche d’homomorphismes de graphe sous contraintes.
-L’algorithme de KGRAM utilise un évaluateur de filtres abstrait evaluator et reste indé-
-pendant de la nature des filtres traités — qui dépendent du langage de filtres implémenté par
-l’évaluateur appelé. La fonction d’évaluation de l’évaluateur de filtres prend en argument le
-filtre à évaluer et la pile de nœuds qui constitue l’environnement courant d’évaluation. Dans le
-cas où le filtre est évalué à vrai, la recherche d’homomorphismes continue avec comme envi-
-ronnement celui issu de l’évaluation du filtre. Dans le cas contraire, l’homomorphisme partiel
-que constituait l’environnement courant n’aboutit pas à une solution.
-Les règles de sémantique naturelle des expressions AND, UNION et OPTION de GRAAL
-sont opérationalisées dans KGRAM en intégrant à la "colonne vertébrale" de l’algorithme
-présentée ci-dessus trois nouveaux blocs dans l’instruction de contrôle switch. KGRAM
-implémente ainsi le cœur du langage SPARQL et nous avons développé un compilateur qui
-traduit des expressions SPARQL en expressions GRAAL. KGRAM opérationalise également
-les règles de sémantique naturelle des autres expressions GRAAL présentées dans la partie 2 :
-GRAPH, QUERY, NOT et EXIST. Cela n’est pas détaillé dans cet article, faute de place.
-Interopérabilité. Nous avons testé la portabilité de KGRAM en réalisant une implémenta-
-tion des interfaces Producer, Matcher et Evaluator de KGRAM par Corese et par Jena. Les
-interfaces de KGRAM ont été conçues pour minimiser le "code glue" à réaliser de sorte que
-ces maquettes de portage de KGRAM sur un moteur ou sur l’autre ont demandé relativement
-peu de développement. La connexion de Corese à KGRAM a été presque immédiate, ce qui
-s’explique par le fait que nous avons conçu KGRAM en abstrayant les principes de Corese.
-Connecté à Corese, KGRAM interprète l’ensemble des expressions de GRAAL. Avec Jena,
-le portage a nécessité 416 lignes de code et quatre classes : EdgeImpl, ProducerImpl,
-EvaluatorImpl et NodeImpl. Avec Jena, KGRAM interprète actuellement les expres-
-sions EDGE, FILTER, UNION, AND et OPTION. Le travail de maquettage se poursuit.
-Ces deux implémentations témoignent de la généricité de la conception de KGRAM et
-laissent supposer une connexion facile de KGRAM à d’autres implémentations de gestion-
-naires de graphes de connaissance.
-4 Conclusion
-Nous avons présenté dans cet article la machine abstraite de graphes de connaissances
-KGRAM et son langage de requête à base de graphes GRAAL. Nous avons établi des règles de
-sémantique naturelle pour chacune des expressions de GRAAL, ces règles d’inférence consti-
-tuant les spécifications de KGRAM qui les opérationalise et qui peut être vu comme un in-
-terprète du langage GRAAL. Nous avons mis en lumière le niveau d’abstraction de KGRAM,
-la simplicité de son algorithme reposant sur la manipulation d’interfaces aussi bien pour les
-opérateurs que pour les structures de données.
-RNTI-E-19- 427 -
-KGRAM: une machine abstraite de graphes de connaissance
-Dans la continuité des résultats présentés dans cet article, nous travaillons actuellement à
-l’intégration d’optimisations telles que celles proposées par (Corby et Faron-Zucker, 2007),
-comme le tri des relations dans la pile de l’environnement selon des heuristiques permettant
-ensuite des opérations de backjump dans la pile, ou encore la possibilité de demander plusieurs
-relations adjacentes au gestionnaire de graphes plutôt que de les demander une à une.
-Dans le prolongement de notre expérience réussie d’implémentation des interfaces de
-KGRAM par les moteurs Corese et Jena, nos perspectives de travail sont d’aborder le problème
-de la distribution du traitement du web de données en interconnectant différents gestionnaires
-de graphes responsables chacun d’une base d’annotations et implémentant chacun l’APIs de
-KGRAM. Nous envisageons KGRAM d’une part comme un élément de réponse au problème
-du passage à l’échelle dans le traitement du web de données et d’autre part comme la clé de
-voute d’applications de mashup combinant les résultats de différents gestionnaires de graphe.
+L’explosion des quantités de données stockées sur différents supports informatique conjoin-
+tement à l’avènement des Technologies de l’Information et de la Communication a introduit
+des bouleversements importants dans le management des entreprises. En plus des connais-
+sances explicites (courriers électroniques, procédures, notes de services, ...), il faut capitaliser
+l’ensemble des connaissances tacites, c’est à dire les connaissances qui ne sont pas formali-
+sables aisément avec des mots (bonnes pratiques, savoir-faire, ...)(Alavi et Leidner, 2001; Earl,
+2001). L’objectif est de rendre cette connaissance accessible aux utilisateurs concernés, de la
+- 311 - RNTI-E-6
+Visualisation graphique en GC - le modèle Graph’Atanor
+conserver et de l’analyser pour la faire évoluer et par ce biais faire ainsi évoluer l’entreprise.
+La capitalisation, l’exploitation et l’enrichissement des connaissances se fait de plus en plus
+souvent par l’intermédiaire d’un système de gestion des connaissances (SGC) informatisé que
+l’on peut qualifier de mémoire d’entreprise (Dieng-Kuntz et al., 2001). Le processus de créa-
+tion d’une mémoire d’entreprise est un passage d’une mémoire de travail à une mémoire or-
+ganisationnelle qui se définit comme un capital de connaissances accessible indépendamment
+des acteurs qui l’ont créée (Prax, 2003).
+La construction de cette mémoire dépend des sources de connaissances disponibles et va-
+lides qui peuvent être utilisées tels que de la documentation technique, les experts humains ou
+des courriers électroniques. Selon les sources et les objectifs définis conjointement avec les
+utilisateurs, différentes approches ont été proposées : GED, mémoire documentaire, mémoire
+à base de connaissances, mémoire à base de cas, ... Chaque approche est associée à des tech-
+niques spécifiques de recueil de données comme des entretiens, des observations de l’expert
+en situation de travail ou de la transmission via un éditeur. Pour de nombreuses formes d’in-
+teraction, des outils de visualisation adaptés s’avèrent des médiateurs efficaces, facilitateurs
+de dialogue (Aubertin et al., 2003; Colloque ESIEE, 2002). Ils permettent d’apporter aux in-
+tervenants humains un substrat artificiel qui transcrive un grand nombre d’informations et qui
+soit un support à leurs connaissances et à leurs intuitions pour qu’ils puissent non seulement
+plus facilement exprimer leurs savoirs tacites et implicites mais aussi découvrir des nouvelles
+connaissances (e.g. relations). D’une façon plus générale, la visualisation de connaissances
+est un domaine naissant en plein essor (Eppler et Burkhard, 2005) et l’analyse de cet aspect
+fondamental dans un processus de gestion des connaissances (GC) n’en est qu’à ses débuts
+(Burkhard, 2004).
+Dans cet article nous nous focalisons sur l’intégration de la visualisation dans la phase
+d’opérationnalisation d’une mémoire à base de connaissances. Le serveur de connaissances
+Atanor qui nous sert d’environnement de référence utilise une approche orientée vers le dé-
+ploiement de connaissances portant sur des systèmes complexes et provenant de sources mul-
+tiples (Guillet et al., 2002). On peut citer comme exemples réels d’applications l’aide à la
+maintenance de machines de tri de courrier, le maintien en fonctionnement de sous-marins ou
+de navires de surface, le dépannage automobile.
+Dès la conception d’Atanor, une formalisation graphique des connaissances basée sur une
+adaptation des arbres de décision et de défaillances a été proposée (Guillet et al., 2000). Cepen-
+dant, l’instanciation de ce modèle visuel dans différents contextes applicatifs a mis en évidence
+des redondances qui peuvent entraver l’interprétation synthétique du fonctionnement d’un pro-
+cessus et masquer des points critiques. Bien que pour des raisons implicites de simplicité, les
+modèles d’arbres soient souvent privilégiés en GC, nous discutons ici de l’intérêt de l’intro-
+duction d’un modèle graphique basé sur des graphes qui sont des outils privilégiés bien connus
+pour modéliser un système de relations entre des entités. Ils permettent de caractériser préci-
+sément des propriétés d’un tel système via un arsenal combinatoire sophistiqué (Berge, 1973)
+tout en facilitant l’accès au profane à des structures complexes via notamment des représen-
+tations visuelles adaptées et nous présentons une comparaison entre ces deux approches pour
+une application réelle. Dans cet article nous proposons une extension du modèle d’arbre à un
+modèle de graphe orienté en niveaux.
+Le reste de cet article est organisé de la façon suivante : le paragraphe 2 propose un état
+de l’art des différentes approches pour la visualisation des connaissances dans les systèmes de
+- 312 -RNTI-E-6
+B. Pinaud et al.
+GC. Un descriptif général du serveur de connaissances Atanor est rappelé dans le paragraphe 3.
+Le paragraphe 4 décrit la représentation par logigrammes sous forme arborescente et présente
+le nouveau modèle de graphes. Une illustration dans le cadre de la maintenance de machines
+de tri de courrier de la Poste est décrite dans le paragraphe 5.
+2 Visualisation graphique en Gestion des Connaissances
+Les représentations visuelles proposées dans les systèmes de gestion des connaissances
+sont pour la plupart basées, au moins implicitement, d’un point de vue formel sur des modèles
+d’arbres ou plus généralement de graphes. D’un point de vue théorique, ces méthodes ont pour
+la plupart été initialement développées dans la communauté de la visualisation d’information
+(Herman et al., 2000). D’un point de vue applicatif en GC, la paire indissociable {modèle,
+représentation visuelle} dépend à la fois des connaissances dont on dispose, du mode de rai-
+sonnement sur ces connaissances et des différents points de vue “utilisateurs” considérés dans
+le SGC. Nous nous restreignons ici aux références associés à des applications en GC.
+De façon générale, les modèles de visualisation sont souvent basés sur le modèle générique
+des réseaux sémantiques (Lehmann, 1992). Ils représentent avec les sommets d’un graphe des
+concepts et avec les arcs des relations sémantiques entre ces concepts. La majeure partie des
+techniques présentées ci-dessous pourrait être considérée, dans le cadre d’une représentation
+descriptive, comme des spécialisations des réseaux sémantiques.
+2.1 Représentation par arbres
+Les représentations sous forme d’arbres qui sont parmi les plus abouties, regroupent des
+techniques très différentes :
+– Les cartes cognitives (Buzan et Buzan, 1996) permettent une représentation visuelle des
+idées ; ce modèle permet de représenter autour d’un sommet central des idées ou des
+pensées en créant différentes arborescences autour de ce sommet. Différentes solutions
+logicielles reprennent cette approche notamment MindManager1, VisualMind2 ou les
+différentes solutions proposées par “The Brain”3. Dans le domaine du logiciel libre, on
+peut citer FreeMind4 qui est une solution complète et aboutie.
+– Les arbres de défaillances (Limnios, 2005) sont très utilisés dans le domaine de la sûreté
+de fonctionnement. Les représentations graphiques permettent de représenter l’ensemble
+des pannes possibles pouvant se produire pour un évènement donné. Un même système
+peut donc avoir plusieurs arbres de défaillances possibles. Cette technique est très em-
+ployée dans le monde industriel où la sécurité est primordiale (aéronautique, automobile,
+chimie, nucléaire, ...)
+– Les arbres de décision et plus généralement les graphes d’inductions ont été initiale-
+ment utilisés en apprentissage automatique (Zighed et Rakotomalala, 2000). Ils sont des
+modèles privilégiés d’exploration des données à la fois pour la description et le classe-
+ment. Les feuilles d’un arbre de décision représentent des classes d’individus et chaque
+1http ://www.mmdfrance.fr/
+2http ://www.visual-mind.com/
+3http ://www.thebrain.com
+4http ://freemind.sourceforge.net/wiki/index.php/Main_Page
+- 313 - RNTI-E-6
+Visualisation graphique en GC - le modèle Graph’Atanor
+sommet intermédiaire est associé à un test sur un attribut d’une des classes. Chaque arc
+correspond à une réponse possible d’un test.
+2.2 Représentation par graphes
+La plupart des représentations par graphes en GC se retrouvent associées à trois grandes
+classes de modèles dont les intersections peuvent être importantes : les graphes conceptuels,
+les ontologies et les réseaux bayésiens.
+– Les graphes conceptuels ont été à l’origine proposés comme une représentation gra-
+phique de la logique de premier ordre. Ils permettent de simplifier la mise en relation
+entre la logique et les langues naturelles (Sowa, 1992) pour obtenir une représentation
+des données qui soit lisible par tous et algorithimiquement puissante. En GC, ils peuvent
+servir pour mettre en évidence des relations entre les données (Aissaoui et al., 2003) et
+comme formalisme pour représenter des ontologies (Fürst, 2004).
+– L’ingénierie ontologique vise à la construction et l’exploitation d’ontologies, c’est à dire
+des représentations des connaissances d’un domaine indépendantes des usages opéra-
+tionnels qui peuvent en être fait. Dans une mémoire à base de connaissances, les onto-
+logies permettent d’expliciter la terminologie ou les concepts liés à un métier ou à un
+groupe donné d’individus au sein d’une organisation. Du fait de l’importance croissante
+en GC, différents logiciels proposent des représentations graphiques tels que Protégé5,
+Os-Skill6 (Roche et al., 2005) ou encore ITM de Mondeca7.
+– Les réseaux bayésiens, utilisés initialement en apprentissage automatique, peuvent s’in-
+terpréter comme des graphes d’états auxquels sont ajoutés des probabilités de transition
+sur les arcs. Des logiciels sont maintenant utilisés en GC : BayesiaLab et Best8.
+– Plus spécifiquement, des représentations graphiques ont été développées en association
+avec les méthodes classiques de GC tel que CommonKADS (Corby et Dieng, 1998).
+3 Descriptif général du serveur de connaissances Atanor
+Le serveur de connaissances Atanor dans lequel s’intègre notre travail est construit autour
+de quatre modèles associés à des représentations graphiques :
+1. un “modèle d’expertise” représentant les processus métiers qui permet de maintenir des
+connaissances procédurales exprimées sous formes de règles de raisonnement ;
+2. un “modèle organique” qui permet de décrire la structure du système à travers sa décom-
+position organique ;
+3. un “modèle des compétences” associées au système décrivant les compétences des ac-
+teurs sur le système (de l’équipe à l’entreprise) en les hiérarchisant du plus global au
+plus spécifique ;
+4. un organigramme des personnes associé à un modèle de compétences pouvant intervenir
+sur le système (Vergnaud et al., 2004).
+5http ://protege.stanford.edu/index.html
+6http ://www.ontologos-corp.com
+7http ://www.mondeca.com/
+8http ://www.bayesia.com/index_fr.php
+- 314 -RNTI-E-6
+B. Pinaud et al.
+processus spécifiques de l’entreprise.
+Les compétences associées aux
+La structure de l’information associée
+Le modèle ORGANIQUE
+Les différents métiers de l’entreprise
+Le modèle ORGANIGRAMME
+Les compétences associées au système
+Le modèle des COMPETENCESLe modèle EXPERTISE
+L’affectation d’une personne
+à une tache opérationnelle.aux éléments composants le système.
+La formalisation du raisonnement de l’expert
+La structuration du système étudié
+FIG. 1 – Les différents modèles d’Atanor avec leurs interactions.
+Ces modèles interagissent entre eux : les connaissances portent sur des composants d’un sys-
+tème dont la manipulation nécessite des compétences elles-mêmes portées par des individus
+de l’organisation en charge de ce système (voir la figure 1).
+L’architecture technique d’Atanor est basée sur un serveur de connaissances réalisé ma-
+joritairement en Prolog. Le choix de ce langage pour l’implémentation du serveur facilite la
+gestion interne des connaissances recueillies, mais surtout permet d’activer ces connaissances.
+Le serveur est composé d’un ensemble de modules proposant différentes vues sur les modèles
+dont le module Expert qui permet aux experts de capitaliser la connaissance en décrivant les
+modèles et leurs associations.
+4 Des logigrammes aux graphes en niveaux pour le module
+Expert
+Nous nous focalisons dans la suite sur les représentations du modèle d’expertise qui est
+associé au module Expert car il représente ici la mémoire organisationnelle. Il permet de re-
+présenter des connaissances procédurales actionnables liées à un savoir-faire se décomposant
+en une suite d’étapes. Par exemple, dans le cas d’un diagnostic pour l’aide à la maintenance
+d’un système industriel, la stratégie mise en œuvre par les experts consiste à tester successi-
+vement des hypothèses sur l’état des composants ou des fonctionnalités du système, et ceci en
+procédant généralement des hypothèses les plus simples aux plus complexes.
+4.1 Représentation visuelle par des logigrammes
+Le premier modèle proposé, appelé logigramme d’expertise, associe chaque étape du rai-
+sonnement de l’expert à un sommet d’un arbre. La représentation graphique des logigrammes
+a été présentée à l’origine comme une généralisation enrichie des arbres de décision et des
+arbres de défaillance (Figure 2). Deux types de sommets structurants sont mis en évidence :
+(1) Les sommets tests associés à une variable, typiques des arbres de décision, dont les fils ne
+sont pas ordonnés, mais dont chaque arc est associé à une valeur de la variable. La variable est
+généralement associée à l’état dans lequel se trouve un élément du système sous-jacent ; (2)
+les sommets modules, absents des arbres de décision et de défaillance, dont les fils sont ordon-
+nés de gauche à droite et généralement du plus simple au plus complexe, au sens de l’expert.
+Chacun de ces sommets permet de définir un “module de connaissances” permettant d’intégrer
+- 315 - RNTI-E-6
+Visualisation graphique en GC - le modèle Graph’Atanor
+21 3 4
+} ordonnésSommets fils
+Sommet testSommet module Sommet échec Sommet diagnostic
+FIG. 2 – Formalisation des connaissances par logigramme.
+des principes cognitifs caractéristiques des stratégies de décision expertes dont un principe de
+parcimonie/décidabilité (Barthélemy et Mullet, 1992) : les premiers sommets fils d’un module
+permettent d’arriver à une décision à moindre coût par des opérations simples (parcimonie) et
+les sommets fils suivant offrent la possibilité de réaliser des opérations de plus en plus com-
+plexes afin d’arriver à une prise de décision même si elle s’avère coûteuse (décidabilité).
+Il existe aussi deux types de sommets terminaux : les sommets associés à un diagnostic
+indiquant une résolution du problème ainsi que la réparation à effectuer et les sommets associés
+à un échec indiquant une non résolution du problème et provoquant la mise en œuvre d’un
+mécanisme de retour au dernier sommet module traité et la transition au sommet suivant au
+sens de l’ordre induit par ce sommet module.
+Une propriété importante de cette formalisation graphique réside dans la possibilité de
+transformer un logigramme en un ensemble de règles de production, en traduisant l’ensemble
+des chemins menant de la racine à chacune des feuilles. Ainsi le logigramme de la figure 2 se
+transforme en 4 règles :
+Règle 1 : si point dur volet = trop dur alors changer l’électro du volet ;
+Règle 2 : si point dur volet = trop libre alors changer la biellette ;
+Règle 3 : si point dur volet = normal et positionnement du volet = mauvais alors régler le
+positionnement du volet ;
+Règle 4 : si point dur volet = normal et positionnement du volet = correct et battement du
+volet dans les deux sens = pas de battement alors changer la carte contrôle 10 volet ;
+- 316 -RNTI-E-6
+B. Pinaud et al.
+Sommet module Sommet échec Sommet diagnosticSommet test
+FIG. 3 – Exemple de graphe en niveaux pour le modèle d’expertise.
+La représentation graphique des connaissances par logigramme a l’avantage d’être beaucoup
+plus intelligible et synthétique qu’un ensemble équivalent composé d’une liste de règles de
+production. Cependant, des sous-arbres correspondant à des sous-ensembles de règles de pro-
+duction utilisés dans différentes phases peuvent être dupliqués à l’issue de la phase d’expertise.
+Cette duplication lorsqu’elle est fréquente peut nuire à l’intelligibilité de la représentation vi-
+suelle.
+4.2 Le modèle Graph’Atanor et sa représentation visuelle
+Pour palier aux limites du logigramme d’expertise, nous avons développé un modèle de
+graphe en niveaux. Ce modèle a pour avantage de pouvoir exploiter directement le modèle
+Prolog qui associe directement un sommet avec l’ensemble de ses fils sans redondance. Dans
+le modèle de graphes, les sommets représentent comme dans les logigrammes les tests, les
+modules ou les diagnostics. La différence majeure est ici l’unicité ; un sommet ne peut pas
+être dupliqué. Ces sommets sont ordonnés dans des niveaux : en notant 1 le premier niveau, le
+niveau i contient les sommets dont la longueur du plus long chemin originaire du niveau 1 vaut
+i. Les arcs représentent pour les sommets tests les différentes valeurs possibles de la variable
+associée à ce sommet. Pour les sommets modules, comme dans les logigrammes, les arcs sont
+associés à un numéro d’ordre qui définit l’ordre de priorité de la transition (voir la figure 3).
+L’objectif général de la représentation visuelle d’un tel graphe est de fournir un tracé in-
+telligible sur un support standard. La qualité du dessin est décisive pour l’appropriation de la
+représentation par l’utilisateur (Purchase, 2000). Lorsqu’une convention de tracé est donnée
+(ici le tracé en niveaux), on retient en général deux concepts de base (Di-Battista et al., 1999) :
+1. les contraintes du support et de l’œil humain qui imposent notamment des écarts mini-
+mums à respecter entre les sommets et les arcs.
+- 317 - RNTI-E-6
+Visualisation graphique en GC - le modèle Graph’Atanor
+2. les critères “esthétiques” qui définissent les propriétés à satisfaire pour faciliter l’intel-
+ligibilité. Ces critères sont définis par des contraintes combinatoires : minimisation du
+nombre de croisement d’arêtes, minimisation de la somme des longueurs des arêtes,
+minimisation des coudes dans certains types de tracés, ... La plupart de ces critères ne
+peuvent cependant pas être satisfaits simultanément. Des travaux récents en psychologie
+cognitive ont montré que la réduction des croisements d’arêtes est le critère prépondérant
+pour la lisibilité et la mémorisation (Purchase, 1997).
+Dans le cas d’un tracé en niveaux, la minimisation du nombre de croisements d’arcs peut sem-
+bler plus simple que le problème plus général de minimiser le nombre de croisement d’arêtes
+sur un graphe quelconque puisque le choix de coordonnées géométriques pour les sommets
+est ici remplacé par le choix d’un ordre des sommets sur chaque niveau. Le problème reste
+néanmoins NP-complet (Garey et Johnson, 1983).
+Un grand nombre d’heuristiques pour ce problème suivent le principe du balayage succes-
+sif des différents niveaux : les sommets de chaque niveau sont réordonnés de façon à réduire
+le nombre de croisements d’arcs. Des stratégies très variées ont été proposées pour le réor-
+donnancement (e.g. Laguna et al. (1997) pour plus de détails). Les plus utilisées sont basées
+sur des méthodes de tris qui utilisent le nombre de croisements d’une façon proche des tris
+classiques et des heuristiques basées sur le principe selon lequel le nombre de croisements
+diminue si un sommet se trouve à peu près au milieu de ses voisins sur les niveaux adjacents
+(Sugiyama et al., 1981). Plus récemment différentes méthaheuristiques ont été développées
+pour ce problème : recherche tabou (Laguna et al., 1997), GRASP (Marti, 2001) et les algo-
+rithmes génétiques hybridés dont on a expérimentalement montré qu’ils sont très compétitifs
+et peuvent présenter des avantages certains dans le cadre d’un tracé interactif (Pinaud et al.,
+2004), cadre privilégié en GC. Ainsi, la représentation visuelle de Graph’Atanor a été effec-
+tuée par un algorithme génétique hybridé avec deux spécificités majeures (Kuntz et al., 2006) :
+deux opérateurs de croisements adaptés aux représentations en niveaux, et une recherche locale
+combinant différentes transformations locales.
+5 Analyse comparative des modèles graphiques
+Nous avons comparé les logigrammes et les graphes en niveaux dans le cadre applicatif de
+l’aide au diagnostic pour la maintenance de machines de tri automatique de courrier (La Poste).
+Après une période d’adaptation et de formation à l’éditeur de connaissances, les experts ont
+commencé à assurer la construction, la mise à jour et l’évolution des connaissances maintenues
+par l’outil. La phase de recueil des connaissances s’est étalée sur deux ans et s’est appuyée sur
+quatre experts géographiquement dispersés. Elle a permis de mettre en évidence une trentaine
+de pannes possibles, nécessitant la construction d’un logigramme par panne. Les experts ont
+ainsi fait apparaître plus de 400 sommets tests et environ 200 diagnostics différents ont été
+répertoriés.
+La figure 4-a propose un extrait d’un logigramme pour la résolution d’une panne précise.
+La figure 4-b est un extrait du graphe en niveaux pour la même panne. Pour obtenir un dessin
+le plus lisible possible, la contrainte qui impose un ordre des fils dans les sommets modules
+dans le modèle d’arbres est relaxée. Pour les sommets tests, les réponses aux tests permettant
+de choisir le chemin à suivre ne sont pas affichées.
+- 318 -RNTI-E-6
+B. Pinaud et al.
+(a) Extrait du logigramme "Bourrage séquence vidage" effectué avec Atanor. Les parties entourées du dessin repré-
+sentent des parties identiques du logigramme
+(b) Extrait de la représentation en graphe en niveaux. Les sous-graphes entourés permettent de situer les parties qui
+étaient dupliquées dans le logigramme précédent.
+FIG. 4 – Extrait d’un même processus métier pour le dépannage d’un type de machine de tri
+de courrier représenté soit (a) avec un logigramme soit (b) avec un graphe .
+- 319 - RNTI-E-6
+Visualisation graphique en GC - le modèle Graph’Atanor
+Plusieurs avantages apparaissent clairement sur la représentation avec un graphe. Le prin-
+cipal est ici que les parties dupliquées dans le logigramme ne le sont plus dans le graphe. Cette
+non-duplication permet une meilleure exploitation du tracé par l’expert ou le manager :
+– on voit clairement qu’un même diagnostic peut être effectué rapidement en un nombre
+minimum de tests ou plus lentement avec plus d’étapes,
+– un même diagnostic peut avoir des effets multiples (non représenté ici),
+– les sommets avec un degré important ont statistiquement plus de chances d’être utili-
+sés dans les diagnostics et donc une attention particulière préventive pourra être portée
+sur les parties du système concernées (maintenance préventive). Une conséquence im-
+médiate est de pouvoir améliorer la répartition des experts ou des techniciens pour être
+certain d’avoir toujours une personne compétente sur les pannes risquant de se produire
+souvent.
+De plus, le comptage des passages dans chaque sommet différent est plus simple dans le graphe
+que dans le logigramme. Cette statistique permet à l’expert ou au manager de recenser les
+composants du graphe peu utilisés (pannes peu fréquentes) de ceux qui le sont fréquemment
+(pannes fréquentes pouvant indiquer une faiblesse dans le système).
+6 Conclusion
+La visualisation graphique des données en GC est d’une importance majeure pour une
+bonne utilisation des SGC et leur appropriation par les utilisateurs. Nous avons montré dans le
+cadre d’un véritable exemple industriel que les représentations en arbres, qui sont parmis les
+plus abouties, sont limitées par rapport à un modèle de graphes. Ce modèle qui peut paraître
+à priori plus compliqué, permet d’améliorer les représentations visuelles pour s’assurer d’une
+meilleure exploitation des modèles de connaissances par les experts.
+Bien qu’étant de taille limitée et utilisant peu de données, les représentations de la figure
+4 sont déjà trop grandes pour tenir correctement sur un support standard (feuille de papier ou
+écran) tout en restant lisible. Par exemple, le graphe permettant de représenter l’ensemble des
+pannes de la machine de tri de courrier compte 553 sommets et 625 arcs. Ce graphe permet
+d’apporter des informations supplémentaires intéressantes pour les experts mais même après
+optimisation du tracé, il reste encore environ un millier de croisements d’arcs. Ce graphe ne
+peut donc pas être représenté entièrement sur un écran et d’autres méthodes complémentaires
+de visualisation adaptées pour ces grandes structures de données sont à envisager (Munzner,
+2000). De plus, lors de la saisie des graphes par les experts, il est intéressant d’optimiser le
+tracé après l’ajout de sommets et d’arcs pour conserver un graphe lisible et compréhensible.
+Dans ce cas le tracé devient intéractif et les algorithmes de visualisation doivent prendre en
+compte le tracé obtenu à l’instant t avant de produire celui de l’instant t + 1 pour respecter
+au mieux la carte mentale de l’utilisateur (Eades et al., 1991) et ainsi éviter à ce dernier de
+dépenser une énergie cognitive importante inutilement pour redécouvrir le tracé.
 Références
-Baget, J., O. Corby, R. Dieng-Kuntz, C. Faron-Zucker, F.Gandon, A. Giboin, A. Gutierrez,
-M. Leclère, M. Mugnier, et R. Thomopoulos (2008). GRIWES : Generic Model and Pre-
-liminary Specifications for a Graph-Based Knowledge Representation Toolkit. In Proc. of
-the 16th International Conference on Conceptual Structures, ICCS 2008, Toulouse, France,
-Volume 5113 of Lecture Notes in Computer Science, pp. 297–310. Springer.
-Baget, J. et M. Mugnier (2002). Extensions of Simple Conceptual Graphs : the Complexity of
-Rules and Constraints. J. Artif. Intell. Res. (JAIR) 16, 425–465.
-Chein, M. et M. Mugnier (2008). Graph-based Knowledge Representation : Computational
-Foundations of Conceptual Graphs. Springer London Ltd.
-Corby, O., R. Dieng-Kuntz, et C. Faron-Zucker (2004). Querying the Semantic Web with
-Corese Search Engine. In Proc. of the 16th Eureopean Conference on Artificial Intelligence,
-ECAI 2004, pp. 705–709. IOS Press.
-Corby, O. et C. Faron-Zucker (2007). Implementation of SPARQL Query Language Based
-on Graph Homomorphism. In Proc. of the 15th International Conference on Conceptual
-Structures, ICCS 2007, Sheffield, UK, Volume 4604 of Lecture Notes in Computer Science,
-pp. 472–475. Springer.
-Kahn, G. (1987). Natural Semantics. In Proc. of 4th Annual Symposium on Theoretical As-
-pects of Computer Science, Passau, Germany, STACS 87, Volume 247 of Lecture Notes in
-Computer Science, pp. 22–39. Springer.
+Aissaoui, G., D. Genest, et S. Loiseau (2003). Le modèle des cartes cognitives de graphes conceptuels :
+un modèle graphique d’aide à la prise de décision. In Actes 2° journées francophones Modèles Formels
+de l’Interaction (MFI), pp. 243–248. Cepaduès.
+- 320 -RNTI-E-6
+B. Pinaud et al.
+Alavi, M. et D. Leidner (2001). Review : Knowledge management and knowledge management systems :
+Conceptual foundations and research issues. Mis Quarterly 25(1), 107–136.
+Aubertin, G., I. Boughzala, et J. Ermine (2003). Cartographie de connaissances critiques. In Actes conf.
+Extraction et Gestion des Connaissances (EGC), pp. 495–502. Hermes.
+Barthélemy, J. et E. Mullet (1992). A model of selection by aspects. Acta Psychologica 79, 1–19.
+Berge, C. (1973). Graphes et hypergraphes. Dunod.
+Burkhard, R. (2004). Learning from architects : The difference between knowledge visualization and
+information visualization. In Proc. of the 8th Int. conf. on Information Visualisation (IV), pp. 519–
+524.
+Buzan, T. et B. Buzan (1996). The Mind Map Book. Plume Books.
+Colloque ESIEE (2002). Colloque cartographie de l’information : de la visualisation à la prise de décision
+dans la veille et le management de la connaissance. ESIEE, Noisy Le Grand (93).
+Corby, O. et R. Dieng (1998). Webcokace : a commonKADS expertise model web server. In Proc. of the
+11th Workshop on Knowledge acquisition, Modeling and Management (KAW).
+Di-Battista, G., P. Eades, R. Tamassia, et I. Tollis (1999). Graph drawing Algorithms for the visualization
+of graphs. Prentice-Hall.
+Dieng-Kuntz, R., O. Corby, F. GAndon, A. Giboin, J. Golebiowska, N. Matta, et M. Ribière (2001).
+Méthodes et outils pour la gestion des connaissances (2° ed.). Dunod.
+Eades, P., W. Lai, K. Misue, et K. Sugiyama (1991). Preserving the mental map of a diagram. In Proc.
+of Compugraphics, pp. 24–33.
+Earl, M. (2001). Knowledge management strategies : toward a taxonomy. J. of Management Information
+Systems 18(1), 215–233.
+Eppler, M. et R. Burkhard (2005). Knowledge visualization. In D. Schwartz (Ed.), Encyclopedia of
+Knowledge Management. Idea Group.
+Fürst, F. (2004). Contribution à l’ingénierie des ontologies : une méthode et un outil d’opérationalisation.
+Ph. D. thesis, Université de Nantes.
+Garey, M.-R. et S. Johnson (1983). Crossing number is NP-complete. SIAM J. of Algebraic and Discrete
+Methods 4(3), 312–316.
+Guillet, F., D. Follut, V. Philippé, et J. Philippé (2002). Athanor : Une approche pour la gestion des
+connaissances de maintenance sur les systèmes complexes. In 1° journée Systèmes d’Information
+pour l’Aide à la Décision en Ingénierie Système (JESIADIS), pp. 41–54.
+Guillet, F., D. Follut, P. Vandekerckhove, et J. Philippe (2000). Un serveur de connaissances dans un
+contexte de maintenance appliquée aux machines de tri postal. In Journées Internationales Ingénierie
+de systèmes et NTIC (NimesTIC’2000), pp. 2–11.
+Herman, I., G. Melançon, et M. Marshall (2000). Graph visualization and navigation in information
+visualization : a survey. IEEE Trans. on Visualization and Computer Graphics 6(11), 24–43.
+Kuntz, P., B. Pinaud, et R. Lehn (2006). Minimizing crossings in hierarchical digraphs with a hybridized
+genetic algorithm. In J. of heuristics. Springer Science+Business Media. A paraître.
+Laguna, M., R. Marti, et V. Valls (1997). Arc crossing minimization in hierarchical design with Tabu
+Search. Computers and Operations Res. 24(12), 1175–1186.
+Lehmann, F. (1992). Semantic network. In F. Lehmann (Ed.), Semantic Networks in Artificial Intelli-
+gence, Volume 24 of Int. Series in Modern Applied Mathematics and Computer Science, pp. 1–50.
+Pergamon Press.
+Limnios, N. (2005). Arbres de défaillances (2° Ed.). Hermes.
+- 321 - RNTI-E-6
+Visualisation graphique en GC - le modèle Graph’Atanor
+Marti, R. (2001). Arc crossing minimization in graphs with GRASP. IIE Trans. 33(10), 913–919.
+Munzner, T. (2000). Interactive Visualization of Large Graphs and Networks. Ph. D. thesis, Stanford
+University.
+Pinaud, B., P. Kuntz, et R. Lehn (2004). Dynamic graph drawing with a hybridized genetic algorithm. In
+I. Parmee (Ed.), Automatic Computing in Design and Manufacture VI (ACDM), pp. 365–375. Springer.
+Prax, J. (2003). Le Manuel du Knowledge Management. Dunod.
+Purchase, H. (1997). Which aesthetic has the greatest effect on human understanding ? In Proc. Symp.
+Graph Drawing’ 97, pp. 248–261. LNCS.
+Purchase, H. (2000). Effective information visualisation : a study of graph drawing aesthetics and algo-
+rithms. Interacting with computers 13(2), 477–506.
+Roche, C., C. Foveau, et S. Reguigui (2005). La démarche ontologique pour la gestion des compétences
+et des connaissances. In Actes conf. Extraction et Gestion des Connaissances (EGC), Volume 2, pp.
+359–364. Cépaduès éditions.
+Sowa, J. (1992). Conceptuals graphs summary. In P. Eklund, T. Nagle, J. Nagle, et L. Gerholz (Eds.),
+Conceptual Structures : Current Research and Practice, pp. 3–52. Ellis Horwood.
+Sugiyama, K., S. Tagawa, et M. Toda (1981). Methods for visual understanding of hierarchical systems.
+IEEE Trans. Sys. Man and Cybernetics 11(2), 109–125.
+Vergnaud, N., M. Harzallah, et H. Briand (2004). Modèle de gestion intégrée des compétences et connais-
+sances. In Actes conf. Extraction et Gestion des Connaissances (EGC), pp. 159–170. Cépaduès Edi-
+tions.
+Zighed, D. et R. Rakotomalala (2000). Graphes d’induction - Apprentissage et data mining. Hermès.
 Summary
-In this paper we present the KGRAM Knowledge Graph Abstract Machine that unifies
-graph homomorphism and SPARQL-like query processing on RDF datasets. KGRAM imple-
-ments an extensible set of expressions which define the GRAAL family of GRAph Abstract
-query Languages. We describe the dynamic semantics of GRAAL in Natural Semantics and e
-present KGRAM which is designed as the interpret of GRAAL and implements the rules of
-natural semantics of GRAAL.
-RNTI-E-19 - 428 -
+Knowledge management systems are used to support the creation, transfer and application of knowl-
+edge in companies; it is especially applied to experts’ knowledges. The interaction between the knowl-
+edge management systems and the experts is done by visualization tools requiring graphical formaliza-
+tion of knowledge and specifically developed for this task. The formalization is often theorically based
+on graph-models, yet the best associated visual representations use trees; these may be more limited than
+those with graphs. This paper gives an introduction to Atanor, a knowledge management system which
+represents knowledge with a tree-based model; then we develop a new approach based on layered di-
+graph for representing knowledge. Finally we carry out a comparison on an industrial example to show
+the advantages of the graph-based model over the classical tree-based model.
+- 322 -RNTI-E-6

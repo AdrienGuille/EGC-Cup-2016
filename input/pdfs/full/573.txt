@@ -1,791 +1,535 @@
-L’apprentissage statistique a` grande e´chelle
-Le´on Bottou1, Olivier Bousquet2
-1 NEC Labs America, Princeton, USA
-2 Google, Zurich, Suisse
-Re´sume´ Depuis une dizaine d’anne´es, la taille des donne´es croit plus vite que la
-puissance des processeurs. Lorsque les donne´es disponibles sont pratiquement infi-
-nies, c’est le temps de calcul qui limite les possibilite´s de l’apprentissage statistique.
-Ce document montre que ce changement d’e´chelle nous conduit vers un compromis
-qualitativement diffe´rent dont les conse´quences ne sont pas e´videntes. En particu-
-lier, bien que la descente de gradient stochastique soit un algorithme d’optimisation
-me´diocre, on montrera, en the´orie et en pratique, que sa performance est excellente
-pour l’apprentissage statistique a` grande e´chelle.
+Une étude des algorithmes de construction d’architecture des
+réseaux de neurones multicouches.
+Norbert Tsopzé1∗,∗∗ Engelbert Mephu Nguifo∗
+Gilbert Tindo∗∗
+∗CRIL-CNRS, IUT de Lens, SP 16 Rue de l’Université 62307 Lens Cedex
+{tsopze,mephu}@cril.univ-artois.fr
+∗∗Département d’Informatique - Université de Yaoundé I BP 812 Yaoundé
+tsopze.norbert@gmail.com, gtindo@uycdc.uninet.cm
+Résumé. Le problème de choix d’architecture d’un réseau de neurones multi-
+couches reste toujours très difficile à résoudre dans un processus de fouille de
+données. Ce papier recense quelques algorithmes de recherche d’architectures
+d’un réseau de neurones pour les tâches de classification. Il présente également
+une analyse théorique et expérimentale de ces algorithmes. Ce travail confirme
+les difficultés de choix des paramètres d’apprentissage (modèle, nombre de couches,
+nombre de neurones par couches, taux d’apprentissage, algorithme d’apprentis-
+sage,...) communs à tout processus de construction de réseaux de neurones et les
+difficultés de choix de paramètres propres à certains algorithmes.
 1 Introduction
-La the´orie de l’apprentissage statistique prend rarement en compte le couˆt des algo-
-rithmes d’apprentissage. Vapnik [1] ne s’y inte´resse pas. Valiant [2] exclue les algorithmes
-d’apprentissage dont le couˆt croit exponentiellement. Cependant, malgre´ de nombreux
-progre`s sur les aspects statistiques [3, 4], peu de re´sultats concerne la complexite´ des
-algorithmes d’apprentissage (e.g., [5].)
-Ce document de´veloppe une ide´e simple : une optimisation approximative est souvent
-suffisante pour les besoins de l’apprentissage. La premie`re partie reprend la de´composition
-de l’erreur de pre´vision propose´e dans [6] dans laquelle un terme supple´mentaire qui de´crit
-les conse´quences de l’optimisation approximative. Dans le cas de l’apprentissage a` petite
-e´chelle, cette de´composition de´crit le compromis habituel entre approximation et esti-
-mation. Dans le cas de l’apprentissage a` grande e´chelle, elle de´crit une situation plus
-complexe qui de´pend en particulier du couˆt de calcul associe´ a` l’algorithme d’apprentis-
-sage. La seconde partie explore les proprie´te´s asymptotiques de l’apprentissage a` grande
-e´chelle lorsque l’on utilise diverses me´thodes d’optimisation. Ces re´sultats montrent clai-
-rement que le meilleur algorithme d’optimisation n’est pas ne´cessairement le meilleur
-algorithme d’apprentissage. Finalement, cette analyse est confirme´e par quelques compa-
-raisons expe´rimentales.
-2 Optimisation approximative
-Comme [7, 1], conside´rons un espace de paires entre´es-sorties (x, y) ∈ X × Y e´quippe´
-d’une loi jointe de probabilite´ P (x, y). La loi conditionelle P (y|x) repre´sente la relation
-inconnue qui lie entre´es et sorties. Une fonction de perte `(yˆ, y) mesure l’e´cart entre la
-sortie pre´dite yˆ et la sortie observe´e y. Notre objectif est la fonction f ∗ qui minimise le
-risque moyen
-E(f) =
-∫
-`(f(x), y) dP (x, y) = E [`(f(x), y)],
-c© Revue MODULAD, 2010 -61- Nume´ro 42
-c’est a` dire,
-f ∗(x) = argmin
-yˆ
-E [`(yˆ, y)|x].
-Bien que la distribution P (x, y) soit inconnue, on nous donne un e´chantillon S compose´ de
-n exemples d’apprentissage (xi, yi), i = 1 . . . n tire´s inde´pendemment de cette loi inconnue.
-Nous pouvons alors de´finir le risque empirique
-En(f) =
-1
-n
-n∑
-i=1
-`(f(xi), yi) = En[`(f(x), y)].
-Notre principe d’apprentissage consiste ensuite a` choisir une famille F de fonctions de
-pre´vision, et a` rechercher celle qui minimise le risque empirique : fn = argminf∈F En(f).
-Lorsque la famille F est suffisamment restrictive cette approche est justifie´e par des
-re´sultats combinatoires bien connus [1]. Comme il n’est pas vraisemblable que la famille
-de fonction F contienne la fonction optimale f ∗, nous appelons f ∗F = argminf∈F E(f)
-la meilleure fonction au sein de la famille F . Afin de simplifier l’analyse, nous suppose-
-rons que f ∗, f ∗F et fn sont bien de´finies et uniques.
-Nous pouvons alors de´composer l’exce´dent d’erreur
-E [E(fn)− E(f∗)] = E [E(f∗F )− E(f∗)]︸ ︷︷ ︸ + E [E(fn)− E(f∗F )]︸ ︷︷ ︸
-= Eapp + Eest
-, (1)
-ou` les espe´rances s’entendent par rapport au tirage ale´atoire des exemples d’apprentis-
-sage. L’erreur d’approximation Eapp mesure comment la solution optimale f ∗ peut eˆtre
-approche´e par la famille de fonction F . L’erreur d’estimation Eest mesure ce que l’on perd
-en minimisant le risque empirique En(f) a` la place du risque moyen E(f). L’erreur d’esti-
-mation est de´termine´e par le nombre n d’exemples d’apprentissage et par la capacite´ de la
-famille de fonctions [1]. Choisir une famille plus grande3 re´duit l’erreur d’approximation
-mais augmente l’erreur d’estimation. Ce compromis a e´te´ e´tudie´ en de´tail [1, 3, 8, 9].
-2.1 Erreur d’optimization
-Il est souvent couˆteux de calculer fn en minimisant le risque empirique En(f). Comme
-le risque empirique En(f) est de´ja` une approximation du risque moyen E(f), il ne devrait
-pas eˆtre ne´cessaire d’accomplir cette minimisation avec une tre`s grande pre´cision. Il est
-souvent tentant de stopper un algorithme ite´ratif d’optimisation avant qu’il ne converge.
-Supposons qu’un algorithme approximatif d’optimisation calcule une solution ap-
-proche´e f˜n qui minimise la fonction de couˆt avec une tole´rance ρ > 0 pre´de´finie.
-En(f˜n) ≤ En(fn) + ρ
-On peut alors de´composer l’exce´dent d’erreur E = E[E(f˜n)− E(f ∗)] en trois termes :
-E = E [E(f∗F )− E(f∗)]︸ ︷︷ ︸ + E [E(fn)− E(f∗F )]︸ ︷︷ ︸ + E[E(f˜n)− E(fn)]︸ ︷︷ ︸
-= Eapp + Eest + Eopt
-. (2)
-3On conside`re souvent une se´rie de familles de fonctions de la forme FB = {f ∈ H, Ω(f) ≤ B}.
-Pour chaque valeur de l’hyperparame`tre B, la fonction fn est obtenue en minimisant le risque empirique
-re´gularise´ En(f)+ λΩ(f) avec une valeur approprie´e du coefficient de Lagrange λ. On peut alors ajuster
-le compromis estimation–approximation en choisissant λ au lieu de B.
-c© Revue MODULAD, 2010 -62- Nume´ro 42
-Nous appelons erreur d’optimisation le terme supple´mentaire Eopt qui mesure l’impact de
-l’optimization approximative sur l’erreur de pre´vision. L’ordre de grandeur de ce terme
-est bien suˆr comparable a` celui de la tole´rance ρ (see section 3.1.)
-2.2 Le compromis approximation–estimation–optimisation
-Cette de´composition de´crit un compromis plus complexe car il concerne trois variables
-et deux contraintes. Les contraintes sont le nombre maximal d’exemples et le temps calcul
-maximal disponibles pour l’apprentissage. Les variables sont la taille de la famille de
-fonction F , la tole´rance de l’optimisation ρ, et le nombre n d’exemples effectivement
-utilise´s pour l’apprentissage. Cela conduit au programme suivant :
-min
-F ,ρ,n
-E = Eapp + Eest + Eopt sous les contraintes
-{
-n ≤ nmax
-T (F , ρ, n) ≤ Tmax (3)
-Le nombre effectif d’exemples d’apprentissage est une variable parce qu’il peut eˆtre im-
-possible de mener a` bien l’optimisation sur tous les exemples dans le temps imparti. Cela
-se produit souvent en pratique. La table 1 re´sume comment les termes du programme (3)
-varient habituellement lorsque les variables F , n, ou ρ augmentent.
-Tab. 1 – Variations des termes de (3) lorsque F , n, ou ρ augmentent.
-F n ρ
-Eapp (approximation error) ↘
-Eest (estimation error) ↗ ↘
-Eopt (optimization error) · · · · · · ↗
-T (computation time) ↗ ↗ ↘
-La solution du programme (3) change conside´rablement selon que la contrainte ac-
-tive est celle concernant le nombre d’exemples n < nmax ou celle concernant le temps
-d’apprentissage T < Tmax.
-– Nous parlerons d’apprentissage a` petite e´chelle lorsque le programme (3) est
-contraint par le nombre maximal d’exemples nmax. Comme le temps de calcul n’est
-pas limite´, nous pouvons choisir ρ tres petit et re´duire l’erreur d’optimisation Eopt a`
-un niveau insignifiant. L’exce´dent d’erreur est alors de´termine´ par les erreurs d’ap-
-proximation et d’estimation. Il suffit alors de prendre n = nmax pour retrouver le
-compromis approximation–estimation habituel.
-– Nous parlerons d’apprentissage a` grande e´chelle lorsque le programme (3) est
-contraint par le temps de calcul maximal Tmax. Il est alors possible d’atteindre
-une meilleure erreur de pre´vision avec une optimisation approximative – c’est a` dire
-en choisissant ρ > 0 – car le temps de calcul ainsi e´conomise´ nous permet de trai-
-ter un plus grand nombre d’exemples d’apprentissage dans le temps imparti Tmax.
-Cela de´pend bien suˆr de la forme exacte de la fonction T (F , ρ, n) pour l’algorithme
-d’optimisation retenu.
-c© Revue MODULAD, 2010 -63- Nume´ro 42
-3 Analyse asymptotique
-Dans la section pre´ce´dente, nous avons e´tendu le compromis statistique habituel afin de
-tenir compte de l’erreur d’optimisation. Nous avons de´fini pre´cise´ment la diffe´rence entre
-apprentissage a` petite et grande e´chelle. Ce dernier cas est substantiellement diffe´rent
-parce qu’il faut tenir compte du couˆt de calcul de l’algorithme utilise´. Afin de clarifier les
-compromis de l’apprentissage a` grande e´chelle, nous allons faire plusieurs simplifications.
-Il est possible de donner des analyses plus pre´cises dans des cas particuliers [10].
-– Nous travaillons avec des bornes supe´rieures des erreurs d’approximation et d’es-
-timation (2). Ces bornes donnent en fait une bonne ide´e des vitesses de conver-
-gence [11, 12, 13, 14], a` un facteur constant pre`s.
-– Nous e´tudions seulement les proprie´te´s asymptotiques de la de´composition (2). Pour
-re´soudre le programme (3) il nous suffira alors de faire en sorte que les trois erreurs
-de´croissent avec des vitesses asymptotiques comparables.
-– Nous conside´rons une famille de fonction F fixe´e et nous ignorons donc l’erreur
-d’approximation Eapp. Cette partie du compromis recouvre des re´alite´s pratiques
-aussi diverses que choisir les mode`les ou choisir les variables explicatives. Discuter
-ces pratiques de´passe les objectifs de ce document.
-– Finalement, toujours pour simplifier l’analyse, nous supposons que la famille de
-fonctions F est parame´tre´e line´airement par un vecteur w ∈ Rd. Nous supposons
-e´galement que x, y et w sont borne´s. Il existe alors une constante B telle que
-0 ≤ `(fw(x), y) ≤ B et `(·, y) sont des fonctions Lipschitziennes.
-Apre`s avoir montre´ comment la convergence uniforme des bornes traditionelles permet
-de prendre l’erreur d’optimisation en compte, nous comparerons les proprie´te´s asympto-
-tiques de quelques algorithmes d’apprentissage.
-3.1 Convergence des erreurs d’estimation et d’optimisation
-L’erreur d’optimization Eopt depend directement de la tole´rance d’optimisation ρ. Ce-
-pendant, cette tole´rance borne la quantite´ empirique En(f˜n) − En(fn) alors que l’erreur
-d’optimisation concerne sa contre-partie espe´re´e E(f˜n)−E(fn). Cette section discute l’im-
-pact de l’erreur d’optimisation Eopt et de la tole´rance d’optimisation ρ sur les bornes qui
-s’appuient sur les concepts de convergence uniforme invente´s par Vapnik et Chervonen-
-kis [1]. Dans la suite, nous utiliserons la lettre c pour de´signer toute constante positive. En
-particulier, deux occurences successives de la lettre c peuvent repre´senter des constantes
-de valeur diffe´rentes.
-3.1.1 Le cas ge´ne´ral
-Comme la dimension de Vapnik-Chervonenkis [1] d’une famille de fonction parame´tre´e
-line´airement par w ∈ Rd est d+ 1, nous pouvons directement e´crire
-E
-[
-sup
-f∈F
-|E(f)− En(f)|
-]
-≤ c
-√
-d
-n
-,
-c© Revue MODULAD, 2010 -64- Nume´ro 42
-ou` l’espe´rance s’entend vis-a`-vis du tirage ale´atoire de l’ensemble d’apprentissage.4 Ce
-re´sultat donne imme´diatement une borne sur l’erreur d’estimation :
-Eest = E
-[ (
-E(fn)− En(fn)
-)
-+
-(
-En(fn)− En(f∗F )
-)
-+
-(
-En(f∗F )− E(f∗F )
-) ]
-≤ 2 E
-[
-sup
-f∈F
-|E(f)− En(f)|
-]
-≤ c
-√
-d
-n
-.
-On peut aussi obtenir une borne sur les erreurs combine´es d’estimation et d’optimisation :
-Eest + Eopt = E
-[
-E(f˜n)− En(f˜n)
-]
-+ E
-[
-En(f˜n)− En(fn)
-]
-+ E [En(fn)− En(f∗F )] + E [En(f∗F )− E(f∗F )]
-≤ c
-√
-d
-n
-+ ρ+ 0 + c
-√
-d
-n
-= c
-(
-ρ+
-√
-d
-n
-)
-.
-Malheureusement, il est bien connu que cette vitesse de convergence est trop pessimiste
-pour un grand nombre de cas. Des bornes plus raffine´es sont donc ne´cessaires.
-3.1.2 Le cas re´alisable
-Quand la fonction de perte `(yˆ, y) est positive, pour tout τ > 0, les bornes relatives
-de convergence uniforme [1] affirment avec probabilite´ 1− e−τ que
-sup
-f∈F
-E(f)− En(f)√
-E(f)
-≤ c
-√
-d
-n
-log
-n
-d
-+
-τ
-n
-.
-Ce re´sultat est tre`s utile car il de´crit une convergence acce´le´re´e O(log n/n) dans le cas
-re´alisable, c’est a` dire lorsque `(fn(xi), yi) = 0 pour tous les exemples d’apprentissage.
-Nous avons alors En(fn) = 0, En(f˜n) ≤ ρ et pouvons e´crire
-E(f˜n)− ρ ≤ c
-√
-E(f˜n)
-√
-d
-n
-log
-n
-d
-+
-τ
-n
-.
-En interpre´tant ce re´sultat comme une ine´galite polynomiale du second degre´,
-E(f˜n) ≤ c
-(
-ρ+
-d
-n
-log
-n
-d
-+
-τ
-n
-)
-.
-En inte´grant cette ine´galite avec les technique ordinaires (voir [15] par exemple), on ob-
-tient une vitesse de convergence acce´le´re´e pour les erreurs combine´es d’estimation et
-d’optimisation :
-Eest + Eopt = E
-[
-E(f˜n)− E(f∗F )
-]
-≤ E
-[
-E(f˜n)
-]
-= c
-(
-ρ+
-d
-n
-log
-n
-d
-)
-.
-4Bien que les bornes originales de Vapnik et Chervonenkis aient la forme c
-√
-d
-n log
-n
-d , on peut e´liminer
-le terme logarithmique avec la technique de “chaining” (e.g., [12].)
-c© Revue MODULAD, 2010 -65- Nume´ro 42
-3.1.3 Convergence acce´le´re´e
-De nombreux auteurs (e.g., [12, 4, 14]) proposent des bornes avec convergence acce´le´re´e
-dans des conditions plus ge´ne´rales. On peut en effet montrer que
-Eapp + Eest ≤ c
-(
-Eapp +
-(
-d
-n
-log
-n
-d
-)α )
-for
-1
+Un réseau de neurones est un ensemble de neurones interconnectés qui communiquent
+entre eux et avec l’extérieur. Un réseau de neurones se présente comme un graphe où les
+noeuds sont les différentes unités de réseau et les arcs représentent les connexions entre ces
+unités. Le nombre de couches, le nombre de neurones par couche et les interconnexions entre
+les différentes unités du réseau définissent l’architecture (encore appelée topologie) de celui-ci.
+Un neurone peut être appelé unité ou cellule. Comme tout système d’apprentissage supervisé,
+les systèmes d’apprentissage supervisé à base des réseaux de neurones fonctionnent en deux
+phases : la phase d’apprentissage qui consiste à construire à partir des observations (exemples
+présentés sous forme (x, y) où y représente l’observation de la fonction f en x) un système
+capable d’approximer la fonction f dont l’expression analytique n’est pas facile à trouver ; la
+phase de classement qui utilise le modèle construit en phase d’apprentissage pour produire
+des décisions (prédire un nouvel exemple qui ne faisait pas partie des observations de la base
+d’apprentissage). Définir la structure du réseau pour de tel système n’est pas une tâche évidente
+(J.Han et Hamber, 2001; A.Cornuéjols et Miclet, 2002). En effet, il n’existe aucune méthode
+permettant de définir et de justifier la structure d’un réseau de neurones (J.Han et Hamber,
+2001).
+1Le Service de Coopération et d’Action Culturelle (SCAC) de l’ambassade de France à Yaoundé (Cameroun) a
+financé le séjour du premier auteur au CRIL pendant la réalisation de ce travail. Ce travail est partiellement financé
+par le ministère français des affaires étrangères.
+Etude des algorithmes de construction d’architecture des réseaux de neurones.
+La définition de l’architecture du réseau de neurones multicouches pour la résolution d’un
+problème donné reste un problème ouvert. Outre les méthodes génétiques (D.Curran et O’Rior-
+dan, 2002), ce problème est souvent résolu en utilisant deux approches : la première consiste à
+ajouter successivement des neurones et des connexions à une petite architecture, la deuxième
+quant à elle consiste à supprimer des neurones et des connexions d’une architecture initiale
+maximale. Ces deux approches ont souvent comme inconvénient le temps d’apprentissage
+élevé et imprévisible.
+Les domaines d’application des réseaux de neurones sont multiples (Dreyfus et al., 2002) :
+la biologie moléculaire (analyse des séquences d’ADN (Shavlik et Towell., 1994)), prédiction,
+classification, traitement d’images, le génie logiciel (estimation des coûts de logiciel (S.Mbarki
+et al., 2004)), etc. Aucune explication ne justifie à notre connaissance la définition des architec-
+tures utilisées. Pour les problèmes de classification en particulier, plusieurs méthodes ont été
+développées et sont proposées dans la littérature (J.Yang et al., 1999; Yang et al., 1996; Parekh
+et al., 1997b). On peut classer ces méthodes en deux catégories : celles qui construisent l’archi-
+tecture en utilisant un ensemble de connaissances de domaine (exemple de KBANN (Shavlik et
+Towell., 1994)) et les autres qui définissent cette architecture sans aucune connaissance (J.Yang
+et al., 1999; Parekh et al., 1997b; Yang et al., 1996; Parekh et al., 1995). Les algorithmes de
+construction des réseaux de neurones artificiels que nous avons rencontrés dans la littérature
+produisent des réseaux ayant les caractéristiques suivantes (Parekh et al., 1995, 1997a, 2000) :
+architecture minimale, habile à trouver le compromis entre les mesures de performances telles
+que le temps d’apprentissage, habilité à généraliser, . . .etc. Ces méthodes constructives de ré-
+seau de neurones diffèrent par les facteurs suivants (Parekh et al., 1997a, 2000) : restriction des
+entrées (type de données en entrée), circonstances d’ajout d’une nouvelle unité, initialisation
+des poids de connexion de cette unité et son apprentissage.
+Dans ce travail, notre intérêt porte sur les méthodes de recherche d’architecture des ré-
+seaux de neurones multicouches feed-forward (les informations circulent des entrées vers les
+sorties, sans retour) pour la résolution des problèmes de classification. Les principaux para-
+mètres de mesure de performance traités sont : la taille du réseau (nombre de neurones, nombre
+de couches...), la complexité en temps et la capacité de généralisation. Certaines méthodes de
+recherche d’architecture de réseaux de neurones ont été évaluées sur des données de taille re-
+lativement petite et la qualité des résultats varie d’un ensemble de données à l’autre (Parekh
+et al., 1997a). D’autre part, une comparaison théorique des ces algorithmes n’a pas à notre
+connaissance été faite. Notre étude portera essentiellement sur la comparaison de ces algo-
+rithmes d’après les mesures de performances citées ci-dessus et des résultats expérimentaux
+sur les données tirées de la base UCI (Newmann et al., 1998). Les opérations supplémentaires
+de prétraitement de données telles que projection, binarisation, la normalisation et autres ne
+seront pas abordées dans cette étude.
+Le reste du papier est organisé comme suit : la section suivante présente les réseaux de
+neurones multicouches, et quelques notions (définitions et apprentissage) liées aux réseaux
+de neurones multicouches ; la troisième section recense les algorithmes de construction d’ar-
+chitecture neuronale. Les analyses expérimentales et théoriques feront l’objet de la quatrième
+section.
+N.Tsopzé et al.
+2 Les réseaux de neuronesmulticouches et algorithmes d’ap-
+prentissage
+2.1 Généralités
+Ce sont des réseaux de neurones dont les architectures vérifient les propriétés suivantes :
+1. les cellules (neurones ou unités) sont réparties de façon exclusive sur les différentes
+couches.
+2. la première couche ou couche d’entrée est composée des cellules d’entrée qui cor-
+respondent aux n variables d’entrée ; elle a généralement un nombre d’unités égal au
+nombre d’attributs des exemples.
+3. la couche cachée est composée des unités qui effectuent des calculs intermédiaires entre
+les entrées et les sorties. Elle peut être composée de plusieurs autres couches.
+4. la dernière couche est celle de décision ; elle peut avoir aussi un nombre d’unités égal au
+nombre de classes.
+Les poids de connexion des réseaux multicouches sont généralement modifiés par rétropropa-
+gation (Rumelhart et al., 1986a,b). Cet algorithme produit des bons résultats lorsque l’archi-
+tecture est appropriée, il est également utilisé lorsque l’architecture du réseau reste statique
+(D.Curran et O’Riordan, 2002). Des outils tels que WEKA (Witten et Frank, 2005) et SNNS
+(Stuttgart Neural Network Simulator)2 offrent aux utilisateurs la possibilité de définir la struc-
+ture de leur réseau, ces outils apprennent ces réseaux par retropropagation. La difficulté ma-
+jeure est de trouver cette architecture (A.Cornuéjols et Miclet, 2002).
+2.2 Algorithme d’apprentissage des poids de connexion
+L’apprentissage dans les systèmes neuronaux peut se faire par unité ou par couche. Le prin-
+cipal algorithme d’apprentissage des unités neuronales est le perceptron ; lorsque les données
+ne sont pas linéairement séparables, il est remplacé par l’une de ses variantes : pocket with
+racket, barycentric,...etc. L’apprentissage d’une couche peut être généralisé à toutes ses uni-
+tés ou se faire suivant le principe du Winner Take All (WTA). Afin de montrer l’influence de
+l’algorithme d’apprentissage sur la complexité du système, nous présentons (voir tableau 1)
+sans entrer dans les détails les complexités en temps de ces algorithmes. Les détails sur ces
+algorithmes d’apprentissage sont présentés dans (Parekh et al., 1999, 2000), (Gallant, 1990)
+et (Frean, 1992a). Théoriquement, ces algorithmes utilisent de manière similaire l’espace mé-
+moire. Le tableau 1 présente les complexités en temps de ces algorithmes d’apprentissage dans
+lequel les variables désignent : n le nombre d’objets, M le nombre de classes, m le nombre
+d’attributs et Nit le nombre d’itérations dans l’algorithme d’apprentissage.
+3 Algorithmes de construction des RNA
+Cette section présente un résumé des algorithmes MTiling (Yang et al., 1996), MTower
+(Gallant, 1990; Parekh et al., 1995, 1997a), MUpstart (Parekh et al., 1997b), Distal (J.Yang
+2simulateur des réseaux de neurones disponibles à l’adresse Internet http ://www-ra.informatik.uni-
+tuebingen.de/SNNS/
+Etude des algorithmes de construction d’architecture des réseaux de neurones.
+Algorithmes Complexité en temps
+Perceptron n×m×M
+Pocket with racket modification n×m×M ×Nit
+Thermal Perceptron n×m×M ×Nit
+Barycentric Correction n×m×M ×Nit
+TAB. 1 – Complexité en temps des algorithmes d’apprentissage
+et al., 1999). La convergence de ces algorithmes est démontrée dans (Parekh et al., 1995) et
+dans (Parekh et al., 1997a).
+3.1 L’algorithme Mtiling (Yang et al., 1996)
+Mtiling est une adaptation de l’algorithme Tiling (Mezard et Nadal., 1989) à la classifi-
+cation multiclasses. Cette méthode construit un réseau de neurones multicouches dans lequel
+les unités d’un niveau (couche) reçoivent des unités du niveau inférieur (immédiat). En cas de
+mauvais classement du réseau courant, la procédure détermine le neurone ayant fait le maxi-
+mum d’erreurs, augmente un certain nombre de neurones (auxillaires) à la couche de sortie
+courante, elle augmente également une nouvelle couche deM neurones au réseau et connecte
+les entrées de cette couche aux sorties des unités de la couche de sortie ; cette couche (ajoutée)
+devient la nouvelle couche de sortie. Les neurones ajoutés sont appris individuellement par les
+algorithmes pocket ou une variante. Le nombre maximal de couches cachéesH est spécifié par
+l’utilisateur. La couche de sortie fonctionne suivant le principe de WTA afin d’assurer qu’une
+seule classe soit active pour un exemple donné.
+3.2 L’algorithme Mtower (Parekh et al., 1997a)
+Cette méthode construit le réseau sous forme de tour comme la méthode originale Tower
+(Gallant, 1990). L’architecture finale du réseau est telle que : les neurones au sommet (sortie)
+sont connectés à tous les neurones d’entrée et un neurone de la couche k reçoit de l’informa-
+tion de tous les neurones de la couche k− 1 (immédiatement connectés à la couche k). La tour
+est construite en ajoutant successivement les couches de M unités au réseau. Ces unités sont
+apprises par l’une des variantes du perceptron. La couche ajoutée est complètement connectée
+à la couche de sortie et à la couche d’entrée ; cette couche devient ainsi la nouvelle couche de
+sortie. La modification du réseau est répétée jusqu’à l’obtention de la précision (de classement)
+fournie par l’utilisateur, l’algorithme peut aussi d’arrêter le nombre maximal de couche est at-
+teint. La couche de sortie fonctionne aussi suivant le principe du WTA. La méthode Mpyramid
+(Parekh et al., 1997a) est semblable à Mtower à la seule différence que la couche ajoutée reçoit
+l’information de toutes les couches précédentes.
+3.3 L’algorithme MUpstart(Parekh et al., 1997b)
+Mupstart est une version de l’algorithme Upstart (Frean, 1992b) pour la classification mul-
+ticlasses. Comme Upstart, cet algorithme est basé sur une correction d’erreur produite par le
+N.Tsopzé et al.
+réseau courant. Ce réseau a une couche d’entrée de N + 1 unités et une couche de sortie de
+M unités. Le fils gauche, X est augmenté au nœud en cas de " wrongly on " et le fils droit Y
+en cas de " wrongly off ". On parle de "Wrongly on" (resp. "Wrongly off") lorsque la sortie
+obtenue est "1" (resp. "0") alors que l’on désirait obtenir plutôt "0" (resp. "1"). Le neurone
+ajouté pour corriger l’erreur produite à cette étape est appris par l’algorithme du perceptron ou
+une de ses variantes. Ces neurones ajoutés sont appris avec pour sorties attendues (Tx et Ty)
+définies dans le tableau 2 ; dans ce tableau, y (resp. o) représente la sortie désirée (resp. sortie
+obtenue), Tx (resp. Ty) est la sortie attendue pour l’apprentissage des unités x (resp. y) pour
+la correction de la différence entre y et o.
+y o Tx Ty
+0 0 0 0
+0 1 1 0
+1 0 0 1
+1 1 0 0
+TAB. 2 – Tableau présentant les sorties attendues des unités ajoutées
+3.4 L’algorithme Distal (J.Yang et al., 1999)
+C’est un algorithme qui est basé sur le calcul de distance entre exemple (ou entre attribut).
+La distance peut être euclidienne, ou autre. Cette procédure calcule, trie d’abord les distances
+entre exemples (ou attributs) et les stocke dans une matrice D. La procédure Distal construit à
+partir de la matrice des distances la couche cachée du réseau. Cette couche cachée est construite
+de la manière suivante : un neurone est ajouté pour apprendre k exemples tel que k soit l’indice
+de la classe ayant la plus grande plage d’exemples consécutifs dans D appartenant à la même
+classe. Les neurones de la couche cachée dans Distal sont à seuil sphérique (neurone actif si
+θlow ≤WX ≤ θhigh et inactif sinon, oùWX est le résultat en sortie) et les poids de connexion
+entre l’unité ajoutée et les unités d’entrée sont initialisés par les attributs de l’exemple i à partir
+duquel k a été trouvé. A l’étape suivante, tous les poids du réseau entre la couche cachée et
+celle de sortie sont multipliés par deux. Les unités de la couche fonctionnent suivant le principe
+de WTA.
+4 Complexités - Evaluations théoriques
+Les algorithmes de recherche d’architectures de réseau de neurones peuvent être classés
+suivant l’approche de construction du réseau en deux grands groupes :
+1. l’approche descendante, le réseau final est obtenu par élimination des neurones et de
+connexions. L’architecture initiale comporte un nombre suffisant de neurones et de connexions
+capables de bien classer tous les exemples.
+2. L’approche ascendante, le réseau est obtenu par ajout de neurones et de connexions.
+Les ajouts se font lorsque le réseau considéré produit des erreurs. L’architecture initiale
+Etude des algorithmes de construction d’architecture des réseaux de neurones.
+comporte un nombre assez réduit de neurones, généralement deux couches (la couche
+d’entrée et la couche de sortie).
+Tous les algorithmes présentés précédemment construisent le réseau par l’approche ascen-
+dante. Seul Mtiling(Yang et al., 1996) permet de combiner les deux approches en recherchant
+par l’approche ascendante une architecture maximale (architecture ayant le maximum H) de
+couches et ensuite élaguant cette architecture.
+Asymptotiquement, les algorithmes que nous avons présentés ont un comportement sem-
+blable. La complexité de ces algorithmes est calculée et présentée (tableau 3) au pire des cas :
+pour Distal par exemple, en général le nombre d’exemples est toujours supérieur au nombre
+d’attributs, c’est ce qui justifie que le temps maximal est obtenu lorsque la distance entre
+exemples est considérée. Le tableau 3 présente les complexités en temps et en espace mémoire
+des algorithmes tandis que le tableau 4 présente d’autres aspects non négligeables de ces algo-
+rithmes ; la projection consiste à ajouter un attribut supplémentaire ayant pour valeur la somme
+des carrés des autres attributs de l’exemple (
+∑
+i x
 2
-≤ α ≤ 1 . (4)
-si la variance de la fonction de perte satisfait
-∀f ∈ F E
-[(
-`(f(X), Y )− `(f ∗F(X), Y )
-)2] ≤ c ( E(f)− E(f ∗F) )2− 1α . (5)
-La vitesse asymptotique de convergence de (4) est alors donne´e par l’exposant α qui
-apparaˆıt dans la majoration de la variance (5). Il y a deux fac¸ons importantes d’e´tablir
-une telle majoration :
-– La premie`re fac¸on exploite la convexite´ stricte de certaines fonctions de perte [14,
-the´ore`me 12]. Par exemple, Lee et al. [16] e´tablissent une vitesse O(log n/n) quand
-on utilise une fonction de perte quadratique `(yˆ, y) = (yˆ − y)2.
-– La deuxie`me fac¸on consite a` faire des hypothe`ses sur la distribution des donne´es.
-Par exemple, dans le cas de proble`mes de reconnaissance de formes, la “condition
-de Tsybakov” de´crit comment les distribution conditionnelles P (y|x) se croisent
-au voisinage de la frontie`re de de´cision optimale [13, 14]. Le cas re´alisable discute´
-section 3.1.2 en est un cas particulier.
-Les techniques illustre´es sections 3.1.1 et 3.1.2 permettent d’englober l’erreur d’opti-
-misation dans ces bornes acce´le´re´es malgre´ leur complexite´ accrue. On obtient alors une
-borne combine´e de la forme
-E = Eapp + Eest + Eopt = E
-[
-E(f˜n)− E(f∗)
-]
-≤ c
-(
-Eapp +
-(
-d
-n
-log
-n
-d
-)α
-+ ρ
-)
-. (6)
-Par exemple, Massart [15, the´ore`me 4.2] donne un re´sultat ge´ne´ral avec α = 1. En
-combinant ce re´sultat avec des bornes connues sur la capacite´ des classes de fonctions
-line´airement parame´tre´es (e.g., [12]), on obtient
-E = Eapp + Eest + Eopt = E
-[
-E(f˜n)− E(f∗)
-]
-≤ c
-(
-Eapp + d
-n
-log
-n
-d
-+ ρ
-)
-. (7)
-Le lecteur inte´re´sse´ trouvera e´galement des bornes comparables dans [17, 4].
-3.2 Algorithmes d’optimisation par descente de gradient
-Nous sommes maintenant en mesure de comparer les proprie´te´s asymptotiques pour
-l’apprentissage de trois versions de l’optimisation par descente de gradient. Rappelons
-que la famille de fonction F est parame´trise´e line´airement par w ∈ Rd. Soient w∗F et
-wn les parame`tres correspondant aux fonctions f
-∗
-F et fn de´finies section 2. Nous faisons
-l’hypothe`se que la fonction w 7→ `(fw(x), y) est convexe et deux fois diffe´rentiable avec
-des de´rive´es secondes continues. Grace a` cette convexite´, le fonction de couˆt empirique
-C(w) = En(fw) posse`de un minimum unique.
-c© Revue MODULAD, 2010 -66- Nume´ro 42
-Deux matrices jouent un roˆle important dans cette analyse : la matrice Hessienne H
-et la matrice G de covariance des gradients a` l’optimum empirique.
-H =
-∂2C
-∂w2
-(wn) = En
-[
-∂2`(fwn(x), y)
-∂w2
-]
-, (8)
-G = En
-[(
-∂`(fwn(x), y)
-∂w
-)(
-∂`(fwn(x), y)
-∂w
-)′ ]
-. (9)
-Afin de re´sumer l’information contenue dans ces deux matrices, nous supposons qu’il
-existe des constantes λmax ≥ λmin > 0 et ν > 0 telles que l’on puisse choisir, pour tout
-η > 0, un nombre d’exemples suffisament grand pour faire en sorte que l’assertion suivante
-soit vraie avec une probabilite´ plus grande que 1− η :
-tr(GH−1) ≤ ν et Spectre(H) ⊂ [λmin , λmax ] (10)
-Le rapport de conditionnement κ = λmax/λmin est un bon indicateur de la difficulte´
-du proble`me d’optimisation [18]. L’hypothe`se λmin > 0 permet d’e´viter des complica-
-tions dans le cas de l’algorithme de gradient stochastique. Cette condition n’implique une
-convexite´ stricte que dans un voisinage de l’optimum. Si la fonction de couˆt e´tait partout
-convexe, l’argument de [14, the´ore`me 12] donnerait une convergence acce´le´re´e avec α ≈ 1
-pour (4) et (6). Ce n’est pas le cas, par exemple, lorsque la fonction de perte ` est obtenue
-en lissant localement une fonction `(z, y) = max{0, 1− yz}. La fonction de couˆt est alors
-line´aire par morceaux avec des coins et des areˆtes lisse´s. Bien que cette fonction ne soit
-pas partout strictement convexe, son optimum est vraisemblablement atteint sur un coin
-lisse´ avec une matrice Hessienne non singulie`re.
-Les trois algorithmes que nous e´tudions dans cette section utilisent de l’information
-sur le gradient de la fonction de couˆt C(w) pour mettre a` jour ite´rativement leur estime´e
-courante w(t) du vecteur de parame`tres optimaux.
-– La Descente de Gradient (GD) consiste a` ite´rer
-w(t+ 1) = w(t)− η∂C
-∂w
-(w(t)) = w(t)− η 1
-n
-n∑
-i=1
-∂
-∂w
-`
-(
-fw(t)(xi), yi
-)
-ou` le gain η > 0 est suffisament faible. L’algorithm GD posse`de une vitesse de conver-
-gence “line´aire” [18]. Lorsque η = 1/λmax, cet algorithme atteint une pre´cision ρ
-apre`s O(κ log(1/ρ)) ite´rations. Le nombre exact d’ite´rations depend bien suˆr du
-choix des parame`tres initiaux w(0).
-– La Descent de Gradient de Second Ordre (2GD) consiste a` ite´rer
-w(t+ 1) = w(t)−H−1∂C
-∂w
-(w(t)) = w(t)− 1
-n
-H−1
-n∑
-i=1
-∂
-∂w
-`
-(
-fw(t)(xi), yi
-)
-ou` la matrice H−1 est l’inverse de la matrice Hessienne (8). C’est un cas plus favo-
-rable que l’algorithme de Newton parce nous n’e´valuons pas la matrice Hessienne
-locale a` chaque ite´ration, mais nous supposons simplement que la matrice Hes-
-sienne optimale nous est donne´e par avance. L’algorithme 2GD posse`de une vitesse
-c© Revue MODULAD, 2010 -67- Nume´ro 42
-de convergence “superline´aire” et meˆme “quadratique” [18] : une seule ite´ration suf-
-fit lorsque le couˆt est quadratique. Dans le cas ge´ne´ral, cet algorithme atteint une
-pre´cision ρ apre`s au plus O(log log(1/ρ)) ite´rations.
-– La Descente Stochastique de Gradient (SGD) consiste, pour chaque ite´ration,
-a` tirer un example d’apprentissage (xt, yt) au hasard, et a` mettre a` jour w(t) sur la
-base du gradient de la fonction de perte pour cet exemple seulement.
-w(t+ 1) = w(t)− η
-t
-∂
-∂w
-`
-(
-fw(t)(xt), yt
-)
-.
-Les w(t) forment donc un processus stochastique induit par le tirage ale´atoire
-d’un nouvel exemple a` chaque ite´ration. Murata [19, section 2.2] en a calcule´ la
-moyenne ES[w(t)] et la variance VarS[w(t)]. En appliquant ce re´sultat a` la distribu-
-tion discre`te engendre´e par l’ensemble d’apprentissage, en prenant η = 1/λmin, et
-en de´finissant δw(t) = w(t)− wn, on obtient δw(t)2 = O(1/t).
-Nous pouvons alors e´crire
-ES [C(w(t))− inf C ] = ES
-[
-tr
-(
-H δw(t) δw(t)′
-)]
-+ o
-(
-1
-t
-)
-= tr
-(
-H ES [δw(t)]ES [δw(t)]′ +H VarS [w(t)]
-)
-+ o
-(
-1
-t
-)
-≤ tr(GH)t + o
-(
-1
-t
-) ≤ νκ2t + o(1t ) .
-(11)
-L’algorithme SGD atteint donc une pre´cision moyenne ρ apre`s au plus νκ2/ρ+o(1/ρ)
-ite´rations. Sa convergence est en fait limite´e par le bruit stochastique induit par le
-choix ale´atoire d’un exemple unique a` chaque ite´ration. Ni la valeur initiale w(0) du
-parame`tre, ni le nombre total d’exemples d’apprentissage n’apparaissent dans cette
-borne. Lorsque l’ensemble d’apprentissage est grand, il est possible d’atteindre la
-pre´cision ρ vise´e sans meˆme avoir visite´ tous les exemples d’apprentissage. C’est en
-fait une forme de borne sur la ge´ne´ralisation.
-Les trois premie`res colonnes de la table 2 donnent, pour chaque algorithme, le temps
-requis pour une ite´ration, le nombre d’ite´rations requises pour atteindre une pre´cision
-d’optimisation pre´de´finie ρ, et leur produit, c’est a` dire le temps requis pour atteindre
-cette pre´cision. Ces re´sultats asymptotiques sont valides avec une probabilite´ 1 parce que
-la probabilite´ de leur ne´gation est infe´rieure a` η pour tout η > 0.
-La dernie`re colonne majore le temps ne´cessaire pour ramener l’exce´dent d’erreur de
-pre´vision en dessous de la valeur c (Eapp + ε) ou` c est la constante qui apparaˆıt dans la
-borne (6). On calcule cela en observant que choisir ρ ∼ ( dn log nd )α dans (6) donne une
-vitesse asymptotique de convergence optimale pour ε avec un temps de calcul minimal.
-On utilise ensuite les e´quivalences asymptotiques ρ ∼ ε et n ∼ d
-ε1/α
-log 1ε .
-Re´ciproquement, on peut conside´rer la valeur de  pour laquelle cette dernie`re colonne
-est e´gale a` Tmax. Cette valeur est alors le meilleur exce´dent d’erreur de pre´vision que
-chaque algorithme peut atteindre dans la limite de temps de calcul Tmax . C’est donc la
-solution du programme (3) pour un proble`me d’apprentissage a` grande e´chelle satisfaisant
-nos hypothe`ses simplificatrices.
-Ces re´sultats asymptotiques montrent clairement que la performance de pre´vision des
-syste`mes d’apprentissage a` grande e´chelle de´pend a` la fois des proprie´te´s statistiques du
-mode`le et des proprie´te´s calculatoires de l’algorithme d’optimisation retenu. Cette double
-de´pendence conduit a` des re´sultats surprenants.
-c© Revue MODULAD, 2010 -68- Nume´ro 42
-Tab. 2 – Comportement asymptotique (avec probabilite´ 1) des trois algorithmes
-de descente de gradient. Il est inte´ressant de comparer les deux dernie`res colonnes
-(temps requis pour optimiser avec une tole´rance ρ, et temps requis pour atteindre
-un exce´dent d’erreur infe´rieur a` ). Le´gende : n nombre d’exemples ; d dimension du
-vecteur de parame`tres ; κ, ν voir equation (10).
-Algo. Couˆt d’une Ite´rations pour Temps pour Temps pour atteindre
-ite´ration atteindre ρ atteindre ρ E ≤ c (Eapp + ε)
-GD O(nd) O
-(
-κ log 1ρ
-)
-O
-(
-ndκ log 1ρ
-)
-O
-(
-d2 κ
-ε1/α
-log2 1ε
-)
-2GD O(d2 + nd) O(log log 1ρ) O((d2 + nd) log log 1ρ) O( d2ε1/α log 1ε log log 1ε)
-SGD O(d) νκ2ρ + o
-(
-1
-ρ
-)
-O
-(
-dνκ2
-ρ
-)
-O
-(
-d ν κ2
-ε
-)
-– Le re´sultat pour SGD ne de´pend pas du coefficient α de la vitesse asymptotique
-d’estimation statistique. Lorsque ce coefficient est me´diocre, il est moins ne´cessaire
-d’optimiser avec pre´cision, ce qui laisse le temps de traiter plus d’exemples.
-– Utiliser un algorithme d’optimisation superline´aire n’ame´liore pas sensiblement la
-vitesse de convergence asymptotique de l’exce´dent d’erreur de pre´vision ε. Bien
-que l’algorithme superline´aire 2GD ame´liore le terme logarithmique, la vitesse d’ap-
-prentissage est domine´e par le terme polynomial en (1/ε). Utiliser un algorithme
-d’optimisation sophistique´ est souvent moins efficace que travailler les constantes
-d, κ et ν avec des me´thodes simples de pre´conditionnement ou avec une meilleure
-imple´mentation [20].
-– L’algorithme SGD offre a` la fois la pire vitesse d’optimisation et la meilleure vitesse
-d’apprentissage. Cela avait e´te´ pre´dit the´oriquement et observe´ expe´rimentalement
-dans le cas d’un algorithme de gradient stochastique de second ordre [21].
-Au contraire, dans le cas de l’apprentissage a` petite e´chelle, on peut re´duire l’erreur
-d’optimisation Eopt a` des niveaux insignifiants. La performance en pre´vision est alors
-de´termine´e uniquement par les proprie´te´s statistiques du mode`le.
-4 Expe´riences
-Cette section vise a` confirmer les re´sultats pre´ce´dents avec quelques expe´riences simples
-sur une taˆche bien connue de cate´gorisation de documents. Cette taˆche consiste a` identifier
-les documents appartenant a` la cate´gorie CCAT dans le corpus RCV1-v2 [22] a` l’aide
-d’un se´parateur a` vaste marge (SVM). Les programmes utilise´s et quelques re´sultats
-supple´mentaires sont disponibles sur le site web http://leon.bottou.org/projects/sgd.
-Afin d’augmenter le nombre d’exemples d’apprentissage, nous avons renverse´ les roˆles
-des ensembles d’apprentissage et de test spe´cifie´s par [22]. Nous avons ainsi 781265
-exemples d’apprentissage et 23149 exemples re´serve´s pour tester la performance en
-pre´diction. Chaque document est repre´sente´ par 47152 variables explicatives que nous
-avons recalcule´es afin que leur normalisation ne de´pende que de nos exemples d’appren-
-c© Revue MODULAD, 2010 -69- Nume´ro 42
-50
+i ). Les particularités de ces algorithmes sont
+Algorithmes Complexité en temps Complexité en espace
+Distal N3 N2
+Mupstart H ×Nit×m×N max(H × (m+ 1),H ×M2)
+Mtiling (M +m)H × n×m×Nit max((M +m)m, (M +m)2H)
+Mtower H ×M × n×m×Nit max((m+ 1)×M,H ×M2)
+Mpyramid H ×M × n×m×Nit max((n+ 1)×M2, H ×M)
+P.-Cascade H ×Nit× n×m×N max(H × (m+ 1),H ×M2)
+TAB. 3 – Complexité en temps et en espace mémoire
+Algorithmes Nombre de Nombre de neurones opération
+couches cachées dans la couche cachée suplémentaire
+Distal 1 N Distance
+Mupstart 1 ou H H ×M Projection
+Mtiling H H ×M Projection
+Mtower H H ×M Projection
+Mpyramid H H ×M Projection
+Perceptron-Cascade H H ×M Projection
+TAB. 4 – Recapitulatif de certains aspects.
+les suivantes :
+La particularité de l’algorithmeMtiling, la correction d’erreur se fait par ajout d’une couche
+de M neurones ("maitres"), cette couche devient la nouvelle couche de sortie ; ajout de k
+neurones à la couche cachée immédiatement connectée à la couche de sortie. Les connexions
+sont complètes entre couches adjacentes.
+Mtower ajoute tout simplement une nouvelle couche deM neurones. Cette couche devient
+également la nouvelle couche de sortie et est complètement connectée à la couche d’entrée.
+N.Tsopzé et al.
+Distal est plus spécifique que les autres méthodes ; elle construit un réseau ayant une seule
+couche cachée, chaque neurone de la couche cachée permet de séparer un sous ensemble
+d’exemples. le réseau obtenu garantit le bon classement des exemples sans être appris.
+La méthode MUpstart quant à elle ajoute à chaque correction un seul neurone ; ce neu-
+rone est appris individuellement et connectée au neurone ayant produit le plus grand nombre
+d’erreurs.
+5 Expérimentations
+Ces algorithmes ont été testés sur les données de la base UCI (Newmann et al., 1998), les at-
+tributs de ces ensembles sont tous numériques et sans valeur manquante. Les expérimentations
+précédentes sont présentées dans (Parekh et al., 1997a; J.Yang et al., 1999) Nos expériences
+ont porté sur les algorithmes Distal, Mupstart, Mtiling, Perceptron-Cascade, Mpyramid, Mto-
+wer. Ces expériences étaient validées par validation croisée d’ordre 10 (10-Cross-Validation).
+Dans nos expériences, la distance choisie (sans aucune justification) entre exemples pour Dis-
+tal est la distance euclidienne. Les unités ajoutées au cours de la construction du réseau avec
+les autres ont été appris par "Perceptron with racket modification". Les résultats obtenus après
+le classement que nous avons obtenus ne sont pas aussi meilleurs que ceux présentés dans
+(Newmann et al., 1998).
+Données Nombre d’exemples Nombre d’attributs Nombre de classes
+Spambase 4601 57 2
+pendigits 7494 17 10
+Opdigits 3823 64 10
+TAB. 5 – Description des données utilisées pour les expérimentations
+Au cours de ces expériences, l’attention s’est surtout portée pour chaque algorithme sur
+les aspects suivants : le temps nécessaire pour la construction du réseau, le nombre total de
+neurones du réseau construit et la capacité de généralisation.
+Nos expérimentations sont classées en deux groupes :
+Distal est la seule méthode qui construit son réseau sans faire d’apprentissage ; pour cette rai-
+son, nous l’avons évalué séparément des autres. Cette méthode présente des très bons résultats
+expérimentaux en présence des données de petite taille. Mais lorsque les données atteignent
+une certaine taille, Distal ne produit plus de résultat. Cela est due à un besoin excessif de l’es-
+pace mémoire. La figure 5 montre l’évaluation de Distal en fonction de la taille de données.
+Les autres algorithmes construisent un réseau de neurones en modifiant simultanément la
+structure de celui-ci et les poids de connexion. Leurs évaluations expérimentales sont très coû-
+teuses en temps. L’apprentissage des unités ajoutées lors de la construction du réseau s’est fait
+avec l’algorithme "Perceptron with racket modification" avec 500 itérations, un maximum de
+350 (choix arbitraire) neurones par couches et une précision d’apprentissage et de test sou-
+haitée à 100%. Le temps affiché ici est en secondes, mais représente le temps obtenu pour le
+meilleur système en validation croisée.
+Etude des algorithmes de construction d’architecture des réseaux de neurones.
+Espace mémoire utilisé pendant l'éxécution
+0
+200
+400
+600
+800
+1000
+1200
+1400
+1600
+100 200 300 400 500 600
+Nombre de patterns
+T
+a
+il
+le
+ m
+é
+m
+o
+ir
+e
+ 
+pendigits
+Optdigits
+spambase
+Temps d'éxécution en fonction de la taille des 
+données
+0
+20
+40
+60
+80
 100
-0.1 0.01 0.001 0.0001 1e−05 1e−07 1e−08 1e−09
-Training time (secs)
-1e−06
-Optimization accuracy (trainingCost−optimalTrainingCost) 
-  TRON
-SGD
-0.25 Testing loss
-0.20
-0.1
-0.15
-0.2
-0.25
-0.3
-0.35
-0.4
-0.001 0.01 0.1 10 100 1000
-Testing loss
-1
-n=30000
-n=100000
-n=300000
-n=781265n=10000
-Training time (secs)
-SGD
-CONJUGATE GRADIENTS
-Fig. 1 – Temps d’apprentissage et
-couˆt de pre´vision en fonction de la
-pre´cision ρ de l’optimisation pour SGD
-et TRON [23].
-Fig. 2 – Couˆt de pre´vision en fonction
-du temps d’apprentissage pour SGD et
-pour l’algorithme CG applique´ a` une
-fraction des exemples.
-Tab. 3 – Re´sultats obtenus avec une SVM line´aire sur le corpus RCV1.
-Model Algo. Temps Couˆt Erreur de
-d’apprentissage pre´vision
-Couˆt SVM, λ = 10−4
-Voir [24, 25].
-SVMLight 23,642 secs 0.2275 6.02%
-SVMPerf 66 secs 0.2278 6.03%
-SGD 1.4 secs 0.2275 6.02%
-Couˆt logistique, λ = 10−5
-Voir [23].
-TRON (-e .01) 30 secs 0.18907 5.68%
-TRON (-e .001) 44 secs 0.18890 5.70%
-SGD 2.3 secs 0.18893 5.66%
-tissage. Nous utilisons une fonction de discrimination line´aire avec la fonction de perte
-“charnie`re” traditionnellement utilise´e pour les SVMs.
-min
-w
-C(w, b) =
-λ
-2
-+
-1
+120
+140
+100 200 300 400 500 600
+nombre de patterns
+te
+m
+p
+s
+ d
+'é
+x
+é
+c
+u
+ti
+o
 n
-n∑
-i=1
-`(yt(wxt + b)) avec `(z) = max{0, 1− z} .
-Les deux premie`re lignes de la table 3 reproduisent des re´sultats ante´rieurs [24] obtenus
-sur les meˆmes donne´es avec la meˆme valeur de l’hyperparame`tre λ. La troisie`me ligne
-donne les re´sultats obtenus avec un algorithme SGD dont chaque ite´ration consiste a`
-tirer un example d’apprentissage ale´atoire (xt, yt) ∈ R47152 × {±1} et a` mettre a` jour le
-parame`tre w de la fonction discriminante :
-wt+1 = wt − ηt
-(
-λw +
-∂`(yt(wxt + b))
-∂w
-)
-avec ηt =
-1
-λ(t+ t0)
-.
-Le biais b est mis a` jour de fac¸on identique. Le gain ηt retenu est une approximation du
-gain optimal (voir section 3.2 ) dans laquelle nous remplac¸ons la plus petite valeur propre
-de la matrice Hessienne par son minorant λ. Le de´calage t0 est choisi de fac¸on a` faire
-en sorte que le gain initial soit comparable avec la taille attendue du parame`tre optimal.
-c© Revue MODULAD, 2010 -70- Nume´ro 42
-Les re´sultats montrent sans aucun doute que l’algorithme SGD surclasse les algorithmes
-classiques d’optimisation des SVM. Des re´sultats comparables [25] ont e´te´ obtenus avec
-un algorithme SGD corrige´ par une ope´ration de projection. Notre re´sultat montre que
-cette ope´ration n’est pas ne´cessaire.
-La table 3 donne e´galement les re´sultats que l’on obtient avec la fonction de perte lo-
-gistique `(z) = log(1 + e−z). Comme cette fonction de perte est infiniment de´rivable, nous
-pouvons comparer l’algorithme SGD avec un algorithme d’optimisation superline´aire.
-Nous avons utilise´ l’algorithme TRON [23] avec deux crite`res d’arreˆt diffe´rents. Ces
-re´sultats apparaissent e´galement dans la figure 1. L’algorithme TRON prend moins d’une
-minute pour calculer l’optimum avec 10 chiffres significatifs. Bien que l’algorithme SGD
-soit incapable d’une telle performance d’optimisation, il est initialement plus rapide que
-TRON. La partie supe´rieure de la figure 1 montre que l’erreur en pre´vision cesse de dimi-
-nuer bien avant que TRON ne commence a` surclasser SGD.
-La figure 2 montre comment l’erreur en pre´vision e´volue en fonction du temps d’ap-
-prentissage. Nous avons cette fois compare´ l’algorithme SGD avec un algorithme de gra-
-dients conjugue´s (CG) applique´ a` divers sous-ensembles des exemples d’apprentissage.5
-Supposons, par exemple, que nous ne disposons que d’une seconde de temps de calcul.
-Lancer l’algorithme CG sur seulement 30000 exemples est alors bien plus efficace que le
-lancer sur tout l’ensemble d’apprentissage. En revanche il est difficile de savoir a` l’avance
-quel est le meilleur nombre d’exemples a` conside´rer, et l’algorithme SGD applique´ a` tous
-les exemples reste ge´ne´ralement plus rapide.
-5 Conclusion
-En prenant a` la fois en compte les contraintes sur le temps de calcul et sur le nombre
-maximal d’exemples, nous avons mis en e´vidence des diffe´rences qualitatives entre les
-performances des syste`mes d’apprentissage a` petite e´chelle et a` grande e´chelle. La per-
-formance en pre´vision d’un syste`me d’apprentissage a` grande e´chelle de´pend a` la fois des
-proprie´te´s statistiques du mode`le et des proprie´te´s calculatoires de l’algorithme d’opti-
-misation retenu. Des re´sultats the´oriques asymptotiques et des re´sultats expe´rimentaux
-montrent alors qu’un algorithme d’optimisation me´diocre, l’algorithme SGD, se re´ve´le un
-excellent algorithme d’apprentissage a` grande e´chelle.
-Cette analyse peut donner lieu a` de nombreux raffinements. Shalev-Shwartz et Sre-
-bro [10] l’ont e´tendu aux risques re´gularise´s. On peut e´galement attendre quelques effets
-inte´ressants relatifs au choix de fonctions de perte surroge´es [8, 14].
-Re´fe´rences
-[1] Vladimir N. Vapnik. Estimation of Dependences Based on Empirical Data. Springer
-Series in Statistics. Springer-Verlag, Berlin, 1982.
-5Cette expe´rience, sugge´re´e par Olivier Chapelle, utilise une variante de l’algorithme superline´aire CG
-optimise´e pour offrir une bonne vitesse initiale de convergence.
-c© Revue MODULAD, 2010 -71- Nume´ro 42
-[2] Leslie G. Valiant. A theory of learnable. Proc. of the 1984 STOC, pages 436–445,
-1984.
-[3] Ste´phane Boucheron, Olivier Bousquet, and Ga´bor Lugosi. Theory of classification :
-a survey of recent advances. ESAIM : Probability and Statistics, 9 :323–375, 2005.
-[4] Peter L. Bartlett and Shahar Mendelson. Empirical minimization. Probability Theory
-and Related Fields, 135(3) :311–334, 2006.
-[5] J. Stephen Judd. On the complexity of loading shallow neural networks. Journal of
-Complexity, 4(3) :177–192, 1988.
-[6] Le´on Bottou and Olivier Bousquet. The tradeoffs of large scale learning. In Advances
-in Neural Information Processing Systems (NIPS 2007), volume 20. MIT Press, 2008.
-[7] Richard O. Duda and Peter E. Hart. Pattern Classification And Scene Analysis.
-Wiley and Son, 1973.
-[8] Tong Zhang. Statistical behavior and consistency of classification methods based on
-convex risk minimization. The Annals of Statistics, 32 :56–85, 2004.
-[9] Clint Scovel and Ingo Steinwart. Fast rates for support vector machines. In Peter
-Auer and Ron Meir, editors, Proceedings of the 18th Conference on Learning Theory
-(COLT 2005), volume 3559 of Lecture Notes in Computer Science, pages 279–294,
-Bertinoro, Italy, June 2005. Springer-Verlag.
-[10] Shai Shalev-Shwartz and Nathan Srebro. SVM optimization : inverse dependence on
-training set size. In Proceedings of the 25th International Machine Learning Confe-
-rence (ICML 2008), pages 928–935. ACM, 2008.
-[11] Vladimir N. Vapnik, Esther Levin, and Yann LeCun. Measuring the VC-dimension
-of a learning machine. Neural Computation, 6(5) :851–876, 1994.
-[12] Olivier Bousquet. Concentration Inequalities and Empirical Processes Theory Applied
-to the Analysis of Learning Algorithms. PhD thesis, Ecole Polytechnique, 2002.
-[13] Alexandre B. Tsybakov. Optimal aggregation of classifiers in statistical learning.
-Annals of Statististics, 32(1), 2004.
-[14] Peter L. Bartlett, Michael I. Jordan, and Jon D. McAuliffe. Convexity, classification
-and risk bounds. Journal of the American Statistical Association, 101(473) :138–156,
-March 2006.
-[15] Pascal Massart. Some applications of concentration inequalities to statistics. Annales
-de la Faculte´ des Sciences de Toulouse, series 6, 9(2) :245–303, 2000.
-[16] Wee S. Lee, Peter L. Bartlett, and Robert C. Williamson. The importance of
-convexity in learning with squared loss. IEEE Transactions on Information Theory,
-44(5) :1974–1980, 1998.
-[17] Shahar Mendelson. A few notes on statistical learning theory. In Shahar Mendelson
-and Alexander J. Smola, editors, Advanced Lectures in Machine Learning, volume
-2600 of Lecture Notes in Computer Science, pages 1–40. Springer-Verlag, Berlin,
-2003.
-[18] John E. Dennis, Jr. and Robert B. Schnabel. Numerical Methods For Unconstrained
-Optimization and Nonlinear Equations. Prentice-Hall, Inc., Englewood Cliffs, New
-Jersey, 1983.
-c© Revue MODULAD, 2010 -72- Nume´ro 42
-[19] Noboru Murata. A statistical study of on-line learning. In David Saad, editor, Online
-Learning and Neural Networks. Cambridge University Press, Cambridge, UK, 1998.
-[20] Yann Le Cun, Le´on Bottou, Genevieve B. Orr, and Klaus-Robert Mu¨ller. Efficient
-backprop. In Neural Networks, Tricks of the Trade, Lecture Notes in Computer
-Science LNCS 1524. Springer Verlag, 1998.
-[21] Le´on Bottou and Yann Le Cun. Large scale online learning. In Sebastian Thrun,
-Lawrence K. Saul, and Bernhard Scho¨lkopf, editors, Advances in Neural Information
-Processing Systems 16. MIT Press, Cambridge, MA, 2004.
-[22] David D. Lewis, Yiming Yang, Tony G. Rose, and Fan Li. RCV1 : A new benchmark
-collection for text categorization research. Journal of Machine Learning Research,
-5 :361–397, 2004.
-[23] Chih-Jen Lin, Ruby C. Weng, and S. Sathiya Keerthi. Trust region Newton methods
-for large-scale logistic regression. In Zoubin Ghahramani, editor, Proceedings of the
-24th International Machine Learning Conference, pages 561–568, Corvallis, OR, June
-2007. ACM.
-[24] Thorsten Joachims. Training linear SVMs in linear time. In Proceedings of the
-12th ACM SIGKDD International Conference, Philadelphia, PA, August 2006. ACM
-Press.
-[25] Shai Shalev-Shwartz, Yoram Singer, and Nathan Srebro. Pegasos : Primal estima-
-ted subgradient solver for SVM. In Zoubin Ghahramani, editor, Proceedings of the
-24th International Machine Learning Conference, pages 807–814, Corvallis, OR, June
-2007. ACM.
-c© Revue MODULAD, 2010 -73- Nume´ro 42
+ (
+/1
+0
+0
+ )
+ 
+e
+n
+ s
+é
+c
+o
+n
+d
+e
+s
+pendigits
+ spambase
+Optdigits
+Nombre de neurones de la couche cachée en 
+fonction de la taille des données
+0
+100
+200
+300
+400
+500
+600
+100 200 300 400 500 600
+Taille des données
+N
+o
+m
+b
+re
+ d
+e 
+n
+eu
+ro
+n
+es
+pendigits
+Spambase
+Optdigits
+FIG. 1 – Evaluation expérimentale de l’algorithme Distal
+Les tableaux 6 et 7 présentent les résultats expérimentaux de ces algorithmes sur la base
+"spambase" avec respectivement comme nombre maximum de couches cachées 2 et 24. Ces
+tableaux montrent l’influence du nombre de couches sur le taux de généralisation. En effet
+malgré un temps plus élevé, nous obtenons une bonne capacité de généralisation lorsque le
+nombre de couches est élevé.
+Les tableaux 8 et 10 présentent les résultats obtenus de l’expérimentation sur les données
+présentées plus haut. Le nombre maximal de couches cachées choisies au cours de ces ex-
+périences est 2 (ce choix est arbitraire et nous a permis d’avoir les résultats avec un temps
+relativement raisonnable). Le symbole "-" signifie que soit l’expérience a échoué (générale-
+ment un débordement de la pile), soit le nombre maximal de couches a été atteint avec une
+précision inférieure à celle souhaitée. Notons que les données "pendigits" et "optdigits" ont
+pour particularité par rapport à "spambase" le fait que les exemples appartiennent à 10. Le
+comportement des algorithmes sur les données ci-dessus n’est pas très appréciable, mais ne
+saurait être généralisé à toute la classification multiclasses. Les tableaux 9 et 11 montrent une
+amélioration de la capacité de généralisation lorsque le nombre maximum de couches passe de
+2 à 24 ; ce qui explique l’influence du nombre de couches sur la capacité de généralisation.
+6 Discussion - Conclusion
+Ces méthodes de construction des réseaux de neurones sont presque semblables ; ces al-
+gorithmes initialisent le réseau à une structure minimale et modifient ce réseau par ajout des
+N.Tsopzé et al.
+Algorithmes Nombre de neurones Temps Capacité de
+dans la couche cachée généralisation
+Cascade 1 8,42 48,45
+MPyramid 2 48,8 0
+MTiling 1 24,79 21,78
+MTower 1 507,79 22,02
+MUpstart 1 8,5 45,12
+TAB. 6 – Expérimentations des algorithmes sur la base de données "Spambase" avec un
+nombre maximal de couches égal à 2
+Algorithmes Nombre de neurones Temps Capacité de
+dans la couche cachée généralisation
+Cascade 1 18,89 64.07
+MPyramid 24 294.69 30.34
+MTiling 24 345.80 63.55
+MTower 24 143.34 55.78
+MUpstart 1 87,5 87.49
+TAB. 7 – Expérimentations des algorithmes sur la base de données "Spambase" avec un
+nombre maximal de couches égal à 24
+unités au fur et à mesure que les erreurs surviennent. La question qui se pose est de savoir
+comment diriger le choix d’un concepteur face au problème d’architecture du réseau de neu-
+rones. Le choix de l’architecture de réseau de neurones devra être orienté vers la satisfaction
+de l’utilisateur final du système c’est-à-dire que ce choix devrait aboutir à la production d’un
+réseau de neurones ayant une bonne capacité de généralisation.
+D’après notre étude, nous pouvons séparer ces algorithmes en deux catégories : Les al-
+gorithmes qui construisent les réseaux ayant une seule couche cachée ; dans cette catégorie,
+peut être classé Distal. Cet algorithme a aussi pour avantage la faible intervention de l’utili-
+sateur ; mais il y a un besoin énorme en espace mémoire. Les autres algorithmes construisent
+des réseaux pouvant avoir H couches cachées ; l’utilisateur doit fournir à l’algorithme en plus
+du nombre maximal (H) de couches cachées, la précision souhaitée, l’algorithme d’apprentis-
+sage. A partir des tables 6 et 7, on remarque une variation de taux généralisation en fonction
+du nombre maximal de couches. On peut également noter le mauvais comportement de ces al-
+gorithmes sur les données "pendigits" et "optdigits" mais nous ne pouvons pas généraliser sur
+toutes les grandes bases de données. Pour généraliser, nous devons tenir compte de l’influence
+de la taille du réseau, de la répartition des données...
+Quelque soit la méthode de construction des réseaux de neurones, le choix des para-
+mètres (modèle du réseau, nombre de couches, nombre de neurones par couches, définition
+des connexions, taux d’apprentissage,...) reste toujours très problématique : pour la méthode
+Etude des algorithmes de construction d’architecture des réseaux de neurones.
+Algorithmes Nombre de neurones Temps Capacité de
+dans la couche cachée généralisation
+Cascade 10 64,37 10
+MPyramid 10 63,70 20
+MTiling 10 64,23 0
+MTower 10 64,26 10
+MUpstart - - -
+TAB. 8 – Expérimentations des algorithmes sur la base de données "Pendigits" avec un
+nombre maximal de 2 couches cachées
+Algorithmes Nombre de neurones Temps Capacité de
+dans la couche cachée généralisation
+Cascade - - -
+MPyramid 240 4648,9 35,6
+MTiling 240 2775,4 18,7
+MTower 240 3064,26 22,8
+MUpstart - - -
+TAB. 9 – Expérimentations des algorithmes sur la base de données "Pendigits" avec un maxi-
+mum de 24 couches
+distal, il faut trouver l’influence du choix de calcul de distance entre exemples ou entre at-
+tributs ; nos expériences confirment son comportement appréciable sur les données de petite
+taille, et un mauvais comportement sur des grands volumes de données ; cette défaillance est
+due à son besoin énorme en espace mémoire. Pour les méthodes Mupstart, Mtiling, Mtower,
+Pyramid, Perceptron-Cascade, trouver l’influence de l’algorithme d’apprentissage des unités
+ajoutées et le choix du nombre maximal de couches cachées reste problématique. Nous étu-
+dions actuellement l’application de ces méthodes sur de grandes bases de données. Il est aussi
+envisageable de trouver un moyen de traiter des données résidentes sur le disque dur avec ces
+algorithmes.
+Références
+A.Cornuéjols et L. Miclet (2002). Apprentissage Artificiel : Concepts et algorithmes. Eyrolles.
+D.Curran et C. O’Riordan (2002). Applying evolutionary computation to designing neural
+networks: A study of the state of the art. department of Information Technology, NUI
+Galway.
+Dreyfus, G., M. Samuelides, J.M.Martinez, M. Gordon, F.Badran, S.Thiria, et L.Hérault
+(2002). Réseaux de Neurones : Méthodologie et applications. Eyrolles.
+N.Tsopzé et al.
+Algorithmes Nombre de neurones Temps Capacité de
+dans la couche cachée généralisation
+Cascade 10 68,21 0
+MPyramid 10 69,43 0
+MTiling 10 909,22 0
+MTower 10 68,90 0
+MUpstart 10 68,55 0
+TAB. 10 – Expérimentations des algorithmes sur la base de données "Optdigits" avec un
+maximum de 2 couches
+Algorithmes Nombre de neurones Temps Capacité de
+dans la couche cachée généralisation
+Cascade - - -
+MPyramid 240 4648,9 18,5
+MTiling 240 3909,22 10,3
+MTower 240 3268,90 12,4
+MUpstart - - -
+TAB. 11 – Expérimentations des algorithmes sur la base de données "Optdigits" avec un
+maximum de 24 couches
+Frean (1992a). A thermal perceptron learning rule. Neural computation 4, 946–957.
+Frean (1992b). The upstart algorithm: A method for constructing and training feed forward
+neural networks. Neural computation 4, 198–209.
+Gallant, S. (1990). Perceptron - based learning algorithms. IEEE Transactions On Neural
+networks 1, 179–191.
+J.Han et M. Hamber (2001). Datamining: Concepts and Techniques. Morgan Kauffman
+Publishers.
+J.Yang, R. Parekh, et V. Honavar (1999). Distal: An inter-pattern distance-based constructive
+learning algorithm. Intell. Data Anal 3, 55–73.
+Mezard, M. et J. Nadal. (1989). Learning feed forward network: the tiling algorithm. J. Phys
+A: Math Gen. 22, 2191–2203.
+Newmann, D., S. Hettich, C. Blake, et C. Merz (1998). (uci)repository of machine
+learning databases. Dept. Inform. Comput. Sci., Univ. California, Irvine, CA,
+http://www.ics.uci.edu/AI/ML/MLDBRepository.html.
+Parekh, Y. R.G., et H. V.G (1997b). Mupstart-a constructive neural network learning algorithm
+for multi-category patterns classification. In Proceedings of the IEEE/INNS International
+Conference on Neural Networks INNSŠ97, 81–106.
+Parekh, R., J.Yang, et V. Honavar (1995). Constructive neural networks learning algorithms for
+Etude des algorithmes de construction d’architecture des réseaux de neurones.
+multi-category classification. Tech report isu cs tr 95-15, Department of Computer Science
+Lowa State University. Describes the package natbib.
+Parekh, R., J.Yang, et V. Honavar (1997a). Constructive neural network learning algorithm
+for multi-category real U˝ valued pattern classification. Tech report tr 96-14, Department of
+Computer Science Lowa State University. Describes the package natbib.
+Parekh, R., J. Yang, et V. Honavar (1999). Comparison of performance of variants of single-
+layer perceptron algorithms on non-separable datasets. Neural, Parallel, and Scientific
+Computations. 3.
+Parekh, R., J. Yang, et V. Honavar (2000). Constructive neural-network learning algorithms for
+pattern classification. IEEE TRANSACTIONS ON NEURAL NETWORKS 11(2), 436–451.
+Rumelhart, D. E., G. E. Hinton, et R. J. Williams (1986a). Learning internal representations
+by error propagation. In Parallel Distributed Processing, Cambridge, MA: MIT Press. 1,
+318–362.
+Rumelhart, D. E., G. E. Hinton, et R. J. Williams (1986b). Learning representations by back-
+propagating errors. Nature 323, 533–536.
+Shavlik, J. W. et G. G. Towell. (1994). Kbann: Knowledge based articial neural networks.
+Artificial Intelligence 70 (1,2), 119–165.
+S.Mbarki, A.Idri, et A. Abram (2004). Application du réseau de neurones rbfn à l’estimati-
+mayion des coûts de logiciel. Conférence africain sur la recherche en Informatique CA-
+RI’04, 405–413.
+Witten, I. H. et E. Frank (2005). Data Mining: Practical machine learning tools and tech-
+niques, 2nd Edition. Morgan Kaufmann, San Francisco.
+Yang, J. Parekh, et H. V. R. (1996). Mtiling-a constructive neural network learning algorithm
+for multi-category pattern classification. Proceedings of the World Congress on Neural
+Networks, 182–187.
+Summary
+The choice of neural network architecture remains a tremendous task for each neural net-
+work user. This paper describes different algorithms to build feed-forward multilayer neural
+networks architecture. These algorithms differ on many features. This paper presents a the-
+oretical study of these algorithms, as well as an experimental study using 10 cross-validation
+on datasets taken from UCI repository. These experiments point out difficulties to choose
+networks parameters such as learning algorithm, learning accuracy, number of layers.

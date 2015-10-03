@@ -1,832 +1,656 @@
-Classification supervisée pour
-de grands nombres de classes à prédire :
-une approche par co-partitionnement
-des variables explicatives et à expliquer
-Marc Boullé ∗
-∗ Orange Labs, 2 avenue Pierre Marzin, 22300 Lannion
-marc.boulle@orange-ftgroup.com,
-http://perso.rd.francetelecom.fr/boulle/
-Résumé. Dans la phase de préparation des données du data mining, les mé-
-thodes de discrétisation et de groupement de valeurs supervisé possèdent de
-nombreuses applications : interprétation, estimation de densité conditionnelle,
-sélection de type filtre des variables, recodage des variables en amont des clas-
-sifieurs. Ces méthodes supposent habituellement un faible nombre de valeur à
-expliquer (classes), typiquement moins d’une dizaine, et trouvent leur limite
-quand leur nombre augmente. Dans cet article, nous introduisons une exten-
-sion des méthodes de discrétisation et groupement de valeurs, consistant à par-
-titionner d’une part la variable explicative, d’autre part la variable à expliquer.
-Le meilleur co-partitionnement est recherché au moyen d’une approche Baye-
-sienne de la sélection de modèle. Nous présentons ensuite comment utiliser cette
-méthode de prétraitement en préparation pour le classifieur Bayesien naïf. Des
-expérimentations intensives démontrent l’apport de la méthode dans le cas de
-centaines de classes.
+La fouille de graphes dans les bases de données
+réactionnelles au service de la synthèse en chimie organique
+Frédéric Pennerath∗,∗∗, Amedeo Napoli∗∗
+∗Supélec,
+Campus de Metz, 2 rue Edouard Belin 57070 Metz
+frederic.pennnerath@supelec.fr
+∗∗Equipe Orpailleur, Loria
+Campus Scientifique, BP 239, 54506 Vandoeuvre-lès-Nancy Cedex
+amedeo.napoli@loria.fr
+Résumé. La synthèse en chimie organique consiste à concevoir de nouvelles
+molécules à partir de réactifs et de réactions. Les experts de la synthèse s’ap-
+puient sur de très grandes bases de données de réactions qu’ils consultent à tra-
+vers des procédures d’interrogation standard. Un processus de découverte de
+nouvelles réactions leur permettrait de mettre au point de nouveaux procédés de
+synthèse. Cet article présente une modélisation des réactions par des graphes et
+introduit une méthode de fouille de ces graphes de réaction qui permet de faire
+émerger des motifs génériques utiles à la prédiction de nouvelles réactions. En-
+fin l’article fait le point sur l’état actuel de ce travail de recherche en présentant
+le modèle général dans lequel s’intégrera un nouvel algorithme de fouille de
+réactions chimiques.
 1 Introduction
-L’objectif de la classification supervisée est de prédire la valeur d’une variable catégo-
-rielle à expliquer connaissant l’ensemble des valeurs des variables explicatives, numériques
-ou catégorielles. La plupart des problèmes de classification considérés usuellement se limitent
-à la prédiction d’une valeur booléenne, ou d’une variable comportant un nombre très faible
-de valeurs, typiquement moins d’une dizaine. On rencontre néanmoins des problèmes où ce
-nombre de valeurs à expliquer est plus important, comme par exemple la reconnaissance de
-chiffres manuscrits, la reconnaissance de caractères ou la classification de textes. Les appli-
-cations émergentes de ciblage publicitaire sur internet sont amenées à considérer le cas du
-choix d’un bandeau publicitaire parmi plusieurs centaines pour maximiser le taux de clic lors
-de la navigation des internautes. Les méthodes existantes supposent au moins implicitement
-un faible nombre de classes, et sont potentiellement moins performantes dans le cas de grands
-nombres de classes, avec peu d’individus par classe Il s’agit ici d’envisager le problème de
-classification dans son cadre le plus général sans faire l’hypothèse d’un nombre restreint de
-RNTI-E-19- 537 -
-Classification supervisée pour de grands nombres de classes à prédire
-classes. On s’intéresse ici à la préparation des données univariée consistant à discrétiser les
-variable numériques et grouper les valeurs des variables catégorielles Ces méthodes ont été
-largement traitées dans le bibliographie, en prétraitement pour les arbres de décision (Breiman
-et al., 1984; Quinlan, 1993; Zighed et Rakotomalala, 2000) ou pour le classifieur Bayesien
-naïf (Dougherty et al., 1995; Liu et al., 2002; Yang et Webb, 2002). L’objectif de cet article est
-d’étendre la préparation des données au cas de nombreuses classes.
-Les méthodes de prétraitement par discrétisation consistent à partitionner la variable expli-
-cative, en intervalles dans le cas numériques et en groupes de valeurs dans le cas catégoriel,
-de façon à obtenir une estimation de la probabilité conditionnelle des classes à prédire. Quand
-le nombre de classes est faible, ces méthodes fournissent une estimation robuste, mais quand
-ce nombre augmente, ces méthodes sont soit sujettes au sur-apprentissage, soit contraintes de
-sous-partitionner la variable explicative. Une solution est alors de considérer le partitionnement
-joint de la variable explicative et de la variable à expliquer. La méthode heuristique présentée
-dans (Ritschard et al., 2001) s’intéresse au problème du groupement des lignes et colonnes d’un
-tableau de contingence et maximise un critère d’association, tel le coefficient V de Cramer, T
-de Tschuprow ou φ de Pearson. L’algorithme proposé est en O(N5) où N est le nombre d’in-
-dividus, ce qui le limite au cas de variables ayant de faibles nombres de valeurs. Dans (Nadif et
-Govaert, 2005), le problème est posé sous la forme d’un modèle de mélange par bloc, et opti-
-misé au moyen de l’algorithme EM (expectation-maximisation). Cette approche est adaptée à
-l’analyse exploratoire dans le cadre d’un coclustering individus x variables, mais en raison de
-son temps de calcul, elle n’est pas adaptée à la préparation des données avec potentiellement
-de nombreuses variables explicatives à traiter. Parmi les méthodes apparentées, on peut égale-
-ment citer les approches de type ECOC (Error-correcting output codes) (Dietterich et Bakiri,
-1995) qui permettent d’appliquer un classifieur binaire dans le cas multi-classes, en réduisant
-le problème multi-classes à une série de problèmes binaires, basées sur des bi-partitions des
-classes. L’objectif de notre approche est non pas de permettre l’utilisation de classifieurs bi-
-naires dans le cas multi-classes, mais d’améliorer la précision et la robustesse des estimateurs
-de densité conditionnelle univariés, en recherchant pour chaque variable explicative la partition
-des classes la plus adaptée, potentiellement différente par variable explicative.
-Dans cet article, nous étendons l’approche MODL utilisée dans le cas de la discrétisa-
-tion supervisée (Boullé, 2006) et du groupement de valeurs supervisé (Boullé, 2005). Cette
-approche pose le problème du prétraitement univarié comme un problème de sélection de mo-
-dèles, un modèle étant défini par une partition des valeurs explicatives en intervalles ou groupes
-de valeurs et une distribution multinomiale des classes dans chaque partie. Le modèle de pré-
-traitement est ici étendu en partitionnant conjointement les classes, et en se limitant à une
-distribution multinomiale des groupes de classes dans chaque partie explicative. Il s’agit alors
-de trouver un compromis entre les modèles fortement discriminants, basés sur des groupes de
-classes de faible cardinalité, et les modèles plus robustes mais moins discriminants, exploitant
-des groupes de classes de forte cardinalité. Ce compromis est trouvé en recherchant le meilleur
-modèle selon une approche Bayesienne.
-L’article est organisé de la façon suivante. La partie 2 rappelle l’approche MODL utilisée
-pour les méthodes de prétraitement supervisé univarié. La partie 3 introduit l’extension de cette
-approche au cas des variables à expliquer comportant de grands nombres de classes. La partie 4
-présente l’impact des ces prétraitements étendus pour le classifieur Bayesien naïf. La partie 5
-évalue les performances de la méthode. Enfin, la partie 6 conclut cet article.
-RNTI-E-19 - 538 -
-M. Boullé
-2 Prétraitements supervisés MODL
-Cette section rappelle les principes de l’approche MODL1 dans le cas de la discrétisation
-supervisée (Boullé, 2006) et du groupement de valeurs supervisé (Boullé, 2005).
-2.1 Discrétisation supervisée
-La discrétisation supervisée traite des variables explicatives numériques. Elle consiste à
-partitionner la variable explicative en intervalles, en conservant le maximum d’information
-relative aux classes. Un compromis doit être trouvé entre la finesse de l’information prédic-
-tive, qui permet une discrimination efficace des classes, et la fiabilité statistique, qui permet
-une généralisation du modèle de discrétisation. Dans l’approche MODL, la discrétisation su-
-pervisée est formulée en un problème de sélection de modèles. Une approche Bayésienne est
-appliquée pour choisir le meilleur modèle de discrétisation, qui est recherché en maximisant
-la probabilité p(Model|Data) du modèle sachant les données. En utilisant la règle de Bayes,
-et puisque la quantité p(Data) est constante pour un même jeu de données en apprentissage,
-il s’agit alors de maximiser p(Model)p(Data|Model), c’est-à-dire un terme d’a priori sur les
-modèles et un terme de vraisemblance des données connaissant le modèle.
-Dans un premier temps, une famille de modèles de discrétisation est explicitement définie.
-Les paramètres d’une discrétisation particulière sont le nombre d’intervalles, les bornes des
-intervalles et les effectifs des classes par intervalle. Dans un second temps, une distribution a
-priori est proposée pour cette famille de modèles. Cette distribution a priori exploite la hiérar-
-chie des paramètres : le nombre d’intervalles est d’abord choisi, puis les bornes des intervalles
-et enfin les effectifs par classe. Le choix est uniforme à chaque étage de cette hiérarchie. De
-plus, les distributions des classes par intervalle sont supposées indépendantes entre elles.
-Soient N le nombre d’individus, J le nombre de classes, I le nombre d’intervalles, Ni..
-le nombre d’individus dans l’intervalle i et Nij le nombre d’individus de la classe j dans
-l’intervalle i. Dans le contexte de la classification supervisée, les nombre d’individus N et
-de classes J sont supposés connus. Un modèle de discrétisation supervisée est entièrement
-caractérisé par les paramètres {I, {Ni.}1≤i≤I , {Nij}1≤i≤I,1≤i≤J}.
-En utilisant la définition de la famille de modèles de discrétisation et de sa distribution a
-priori, la formule de Bayes permet de calculer explicitement les probabilités a posteriori des
-modèles connaissant les données. En prenant le log négatif de ces probabilités, cela conduit au
-critère d’évaluation fourni dans la formule (1).
-logN + log
-(
-N + I − 1
-I − 1
-)
-+
-I∑
-i=1
-log
-(
-Ni. + J + 1
-J − 1
-)
-+
-I∑
-i=1
-Ni.!
-Ni1!Ni2!...NiJ !
-(1)
-Les trois premiers termes représentent la probabilité a priori du modèle : choix du nombre
-d’intervalles, des bornes des intervalles, et de la distribution des classes dans chaque intervalle.
-Le dernier terme représente la vraisemblance, c’est-à-dire la probabilité d’observer les classes
-connaissant le modèle de discrétisation.
-Une discrétisation quasi-optimale est recherchée en optimisant le critère d’évaluation, au
-moyen de l’heuristique gloutonne ascendante décrite dans (Boullé, 2006). A l’issue de cet
-1Outil disponible en shareware sur http ://perso.rd.francetelecom.fr/boulle/
-RNTI-E-19- 539 -
-Classification supervisée pour de grands nombres de classes à prédire
-algorithme d’optimisation, des post-optimisations sont effectuées au voisinage de la meilleure
-solution, en évaluant des combinaisons de coupures et de fusions d’intervalles. L’algorithme
-exploite la décomposabilité du critère sur les intervalles pour permettre après optimisation de
-se ramener à une complexité algorithmique en O(JN logN).
-2.2 Groupement de valeurs supervisé
-Le cas des variables explicatives catégorielles est traité au moyen d’une approche simi-
-laire, en évaluant les modèles de groupement de valeurs. Dans le cas numérique, il s’agit de
-partitionner les valeurs explicatives, avec une contrainte d’adjacence entre valeurs (partition-
-nement en intervalles). Dans le cas catégoriel, il s’agit toujours de partitionner les valeurs
-explicatives, cette fois sans aucune contrainte (partitionnement en groupes de valeurs). Soient
-N le nombre d’individus, V le nombre de valeurs explicatives, J le nombre de classes, I le
-nombre de groupes de valeurs, Ni. le nombre d’individus dans le groupe de valeur i et Nij le
-nombre d’individus de la classe j dans le groupe i. L’application de l’approche Bayesienne de
-la sélection de modèle conduit ici à un critère d’évaluation d’un groupement de valeurs, fourni
-dans la formule (2). Cette formule possède une structure similaire à celle de la formule (1), en
-remplaçant dans les deux premiers termes la probabilité a priori d’une partition en intervalles
-par celle d’une partition en groupes de valeurs.
-log V + logB (V, I) +
-I∑
-i=1
-log
-(
-Ni. + J − 1
-J − 1
-)
-+
-I∑
-i=1
-log
-Ni.!
-Ni1!Ni2! . . . NiJ !
-. (2)
-B(V, I) est le nombre de répartitions des V valeurs explicatives en I groupes (éventuellement
-vides). Pour I = V , B(V, I) correspond au nombre de Bell. Dans le cas général, B(V, I) peut
-s’écrire comme une somme de nombre de Stirling de deuxième espèce (nombre de partitions
-de V valeur en i groupes non vides) : B(V, I) =
-∑I
-i=1 S(V, i). Le critère d’évaluation des
-groupements de valeurs est optimisé au moyen d’une heuristique gloutonne ascendante décrite
-dans (Boullé, 2005). Des étapes de pré-optimisation et post-optimisation sont utilisées, de fa-
-çon à garantir une complexité algorithmique en O(JN logN) sans sacrifier aux performances
-de la méthode.
-3 Généralisation aux grands nombres de classes à prédire
-En présence d’un grand nombre de classes, il n’est pas raisonnable de modéliser directe-
-ment la distribution de ces classes, en raison des effectifs par classe potentiellement très faibles.
-On propose de partitionner les classes en groupes de classes, ce qui permet de se ramener à
-un problème de classification supervisée standard portant sur un faible nombre de groupes
-de classes, puis de décrire la classe effective de chaque individu localement à son groupe de
-classes.
-Soit Y une variable catégorielle à expliquer comportant W classes. Il s’agit d’étendre les
-modèles de prétraitement supervisé en incorporant un groupement desW classes en J groupes.
-Le cas standard peut être considéré comme un cas particulier, pour lequel J = W . Ici,W est
-supposé connu à l’avance alors que le nombre J de groupes est un paramètre à estimer.
-Notations
-RNTI-E-19 - 540 -
-M. Boullé
-– N : nombre d’individus de l’échantillon
-– Y : variable catégorielle à expliquer
-– W : nombre de classes de la variable à expliquer (connu)
-– J : nombre de groupes de classes de la variable à expliquer (inconnu)
-– j(w) : index du groupe auquel est rattaché la valeur à expliquer w
-– N.j : nombre d’individus du groupe à expliquer j
-– mj : nombre de classes du groupe j
-– nw : nombre d’individus pour la classe w
-Pour un nombre de groupes J fixé, il s’agit de décrire une partition des W classes en J
-groupes, ce qui revient à spécifier {j(w)}1≤w≤W . De façon similaire au cas du groupement
-des valeurs d’une variable explicative décrit en section 2.2, la spécification du groupement des
-classes aboutit à l’ajout des nouveaux termes d’a priori suivants :
-logW + logB(W,J). (3)
-Notons qu’une fois cette partition spécifiée, les nombres mj de valeurs par groupe s’en
-déduisent et ne font donc pas partie du paramétrage de modélisation.
-On se ramène ensuite au cas classique du prétraitement univarié supervisé présenté en
-section 2. Les modèles de partitionnement de la variable explicative sont exploités pour dé-
-finir dans chaque partie explicative la distribution des individus sur les J groupes de classes.
-L’effectif par groupe N.j est déduit par sommation des effectifs par groupe de classes sur
-l’ensemble des I parties explicatives, selon N.j =
-∑I
-i=1Nij .
-Chaque individu étant associé à un groupe de classes, il s’agit désormais de préciser à
-quelle classe spécifique il est associé. Pour ce faire, on décrit localement à chaque groupe j la
-distribution des individus du groupe sur les classes du groupe, au moyen d’un modèle multi-
-nomial de distribution des Nj individus du groupe sur sesmj classes. Comme précédemment,
-on utilise un a priori uniforme pour le paramétrage de ce modèle multinomial, ce qui conduit
-pour chaque groupe à l’ajout du nouveau terme d’a priori suivant :
-log
-(
-N.j +mj − 1
-mj − 1
-)
-(4)
-La vraisemblance de la distribution des individus sur les groupes est gérée par le modèle
-de prétraitement standard. Il faut ici ajouter un terme de vraisemblance localement à chaque
-groupe pour la distribution des individus du groupe sur les classes du groupe, au moyen d’un
-terme du multinôme :
-logN.j !−
-∑
-{w;j(w)=j}
-lognw! (5)
-En sommant sur l’ensemble des groupes à expliquer, on obtient
-logW + logB(W,J) +
-J∑
-j=1
-log
-(
-N.j +mj − 1
-mj − 1
-)
-(6)
-pour les termes d’a priori, et
-J∑
-j=1
-logN.j !−
-V∑
-v=1
-lognv! (7)
-RNTI-E-19- 541 -
-Classification supervisée pour de grands nombres de classes à prédire
-pour les termes de vraisemblance.
-Il s’agit maintenant de rajouter ces nouveaux termes d’a priori et de vraisemblance aux
-critères de prétraitement présentés en section 2. Dans le cas de la discrétisation supervisée par
-exemple, la formule (1) est étendue en :
-logN + log
-(
-N + I − 1
-I − 1
-)
-+
-∑I
-i=1 log
-(
-Ni.+J+1
-J−1
-)
-+
-I∑
-i=1
-Ni.!
-Ni12!Ni2!...NiJ !
-(8)
-+ logW + logB(W,J)+
-∑J
-j=1 log
-(
-N.j+mj−1
-mj−1
-)
-+
-J∑
-j=1
-logN.j !−
-V∑
-v=1
-lognv!
-Le problème du partitionnement joint des variables explicatives et à expliquer s’apparente à
-celui de la discrétisation supervisée de deux variables explicatives, ce qui permet de réutiliser
-les mêmes algorithmes (bien que les critères soient sensiblement différent, ils possèdent la
-même structure). Dans cet article, nous avons utilisé les heuristiques décrites dans (Boullé,
-2009), qui présentent l’avantage de la tenue de charge avec une complexité algorithmique en
-O(N
-√
-N logN), indépendante du nombre de valeurs par variable.
-4 Impact sur le classifieur Bayesien naïf
-Cette partie rappelle les principes du classifieur Bayesien naïf, puis détaille la prise en
-compte des prétraitements introduits en section 3 pour le calcul des scores de prédiction.
-4.1 Le classifieur Bayesien Naïf
-Soient X = (X1, X2, . . . , XK) un ensemble de K variables explicatives numériques ou
-catégorielles et Y une variable catégorielle à expliquer, comportantW classes λ1, λ2, . . . λW .
-Soit x = (x1, x2, . . . , xK) les valeurs explicatives d’un nouvel individu à classer.
-Le classifieur Bayesien associe à chaque individu la classe maximisant la probabilité condi-
-tionnelle a posteriori
-P (Y = λw|X = x) = P (Y = λw)P (X = x|Y = λw)
-P (X = x)
-.
-Le classifieur Bayesien est optimal, mais il n’est pas calculable en pratique, puisqu’il suppose
-que l’on connaisse parfaitement la distribution jointe de probabilité conditionnelle. Le modèle
-Bayesien naïf (Langley et al., 1992) relâche fortement la contrainte sur l’estimation multiva-
-riée de probabilité conditionnelle, en faisant l’hypothèse naïve d’indépendance des variables
-explicatives conditionnellement à la variable à expliquer. Parfois qualifié d’idiot de Bayes dans
-la littérature, le classifieur Bayesien naïf est souvent performant en pratique sur de nombreux
-jeux de données réels (Hand et Yu, 2001). Il est simple à mettre en œuvre, rapide à apprendre
-et à déployer, et peu sujet au sur-apprentissage, puisque l’espace des modèles est réduit à un
-singleton. En appliquant cette hypothèse naïve d’indépendance conditionelle des variables ex-
-plicatives, on aboutit à :
-P (Y = λw|X = x) = P (Y = λw)
-∏K
-k=1 P (Xk = xk|Y = λw)
-P (X = x)
-. (9)
-RNTI-E-19 - 542 -
-M. Boullé
-L’équation (9) est suffisante pour obtenir la classe la plus probable connaissant les va-
-riables descriptives. Dans les problèmes où un score de prédiction est nécessaire, la probabilité
-conditionnelle de la classe peut être obtenue par sommation au dénominateur sur les classes :
-P (Y = λw|X = x) = P (Y = λw)
-∏K
-k=1 P (Xk = xk|Y = λw)∑W
-v=1 P (Y = λv)
-∏K
-k=1 P (Xk = xk|Y = λv)
-. (10)
-4.2 Prise en compte des prétraitements univariés
-A l’issue des prétraitements, chaque variableXk est partitionnée en Ik parties explicatives
-(intervalles ou groupes de valeurs) pour l’estimation conditionnelle de Y , elle même partition-
-nées en Jk groupes de classes. Soient Nkik. l’effectif en apprentissage de la partie ik de Xk,
-Nk.jk celui de la partie jk de Y et N
-k
-ikjk
-celui de la cellule (ik, jk).
-En exploitant le prétraitement par partitionnement joint deXk et Y , soient P kik(xk) la partie
-à laquelle la valeur explicative xk appartient et Gkjk(λw) le groupe associé à la classe λw. Le
-modèle de prétraitement permet d’estimer les probabilités conditionnelles de façon constante
-par morceau, ce qui conduit à :
-P (Xk = xk|Y = λw) = P
-(
-xk ∈ P kik(xk)|λw ∈ Gkjk(λw)
-)
-,
-P (Xk = xk|Y = λw) =
-Nkikjk
-Nk.jk
-. (11)
-Les probabilités a priori des classes peuvent elles être estimées par leur probabilité em-
-pirique P (Y = λw) = nw/N sur la base de l’effectif nw de la classe λw et de la taille N
-de l’échantillon d’apprentissage. En exploitant ces estimations empiriques de probabilité, la
-formule (10) se calcule de la façon suivante :
-P (Y = λw|X = x) =
-nw
-∏K
-k=1
-Nkikjk
-Nk.jk∑W
-v=1 nv
-∏K
-k=1
-Nkikjk
-Nk.jk
-. (12)
-Afin d’éviter les probabilités nulles, les probabilités conditionnelles sont estimées en utili-
-sant un m-estimate (support+mp) = (coverage+m) avecm =W/N et p = 1/W .
-5 Expérimentation
-Dans cette section, nous évaluons l’impact de notre méthode de prétraitement sur la prépa-
-ration des données et la modélisation par le classifieur Bayesien naïf.
-5.1 Exemple illustratif
-A titre illustratif, nous utilisons le jeu de données Letter de l’UCI (Asuncion et Newman,
-2007), qui consiste a prédire une lettre capitale (parmi 26) à partir d’une matrice de pixels en
-noir et blanc. Les 16 variables numériques descriptives sont des mesures concernant la taille
-RNTI-E-19- 543 -
-Classification supervisée pour de grands nombres de classes à prédire
-de la boîte contenant la lettre et des moments statistiques résumant la position des pixels noirs
-dans la boîte. A titre d’exemple, la largeur de la boîte (with) est une de ces mesures. La figure
-1 présente sous forme d’histogramme bivarié les résultats de prétraitement de partitionnement
-joint de la variable explicative width, en 10 intervalles de largeur, et de la variable à expliquer,
-en 8 groupes de lettres. La hauteur des histogrammes représente la probabilité conditionnelle
-d’observer une lettre appartenant un groupe de lettres, sachant que sa largeur est dans un in-
-tervalle de valeurs. Par exemple, pour les très petites largeurs (width <= 0.5), on a une
-probabilité conditionnelle de 100% d’observer la lettre I . A l’inverse, pour les très grandes
-largeurs de lettre (width > 10.5), on peut observer dans 60% des cas soitM soitW , et dans
-40% des cas une lettre parmi X , N , K ou H . Les autres situations correspondent à des cas
-intermédiaires. Globalement, le prétraitement permet d’obtenir une estimation constante par
-morceau des probabilités conditionnelles, et cette estimation est la meilleure connaissant les
-données selon l’approche Bayesienne de sélection de modèles utilisée.
-]-i
-nf
-;0
-.5
-]
-]0
-.5
-;1
-.5
-]
-]1
-.5
-;2
-.5
-]
-]2
-.5
-;3
-.5
-]
-]3
-.5
-;4
-.5
-]
-]4
-.5
-;6
-.5
-]
-]6
-.5
-;7
-.5
-]
-]7
-.5
-;9
-.5
-]
-]9
-.5
-;1
-0.
-5]
-]1
-0.
-5;
-+i
-nf
-[
-{I}
-{L, J}
-{F, E}
-{A, Y, V}
-{T, Q, G, O, C, Z}
-{U, D, P, B, R, S}
-{X, N, K, H}
-{M, W}
-0
-0.1
-0.2
-0.3
-0.4
-0.5
-0.6
-0.7
-0.8
-0.9
-1
-P(letter | width)
-width
-letter
-FIG. 1 – Estimation des probabilités conditionnelles de la lettre à expliquer (letter) connais-
-sant sa largeur (width) pour la base Letter.
-5.2 Expérimentation sur les bases de l’UCI
-Afin d’étudier l’impact de la méthode de prétraitement avec groupement de classes sur le
-taux de bonne prédiction en test du classifieur Bayesien naïf (NB), nous avons étudié trois
-types de prétraitement :
-RNTI-E-19 - 544 -
-M. Boullé
-– NB(G) : partitionnement supervisé des variables explicatives et à expliquer (section 3),
-– NB : partitionnement supervisé des variables explicatives uniquement (section 2),
-– nb : version standard, avec discrétisation non supervisée en 10 intervalles d’effectif égal
-dans le cas numérique et sans regroupement de valeurs dans le cas catégoriel.
-Il est à noter que alors que chaque prétraitement univarié permet d’obtenir des estimations
-de probabilité conditionnelles par groupe de classes (cf. section 5.1), le prédicteur Bayesien
-naïf combine ces estimations correspondant à des partitions de classes potentiellement diffé-
-rentes pour obtenir des estimations de probabilité conditionnelle par classe (cf. formule 12).
-Les expérimentations sont menées en utilisant 18 jeux de données de l’UCI (Asuncion et
-Newman, 2007) décrits en table 1, représentant une grande diversité de domaines, de nombres
-d’individus (N ), de variables explicatives numériques ou catégorielles (K) et comportant au
-moins trois classes (W ) avec des distributions de classes parfois déséquilibrées (Maj. rappelle
-la fréquence de la classe majoritaire). Le taux de bonne prédiction en test est évalué au moyen
-d’une validation croisée stratifiée à 10 niveaux.
-Dataset N K W Maj. NB(G) NB nb
-Abalone 4177 8 28 0.165 0.262 ± 0.022 0.243 ± 0.028 0.225 ± 0.020
-Flag 194 29 8 0.309 0.646 ± 0.083 0.636 ± 0.070 0.640 ± 0.088
-Glass 214 10 6 0.355 0.953 ± 0.046 0.949 ± 0.048 0.921 ± 0.042
-Iris 150 4 3 0.333 0.913 ± 0.085 0.920 ± 0.088 0.947 ± 0.040
-Led 1000 7 10 0.114 0.747 ± 0.038 0.743 ± 0.032 0.743 ± 0.032
-Led17 10000 24 10 0.107 0.738 ± 0.011 0.732 ± 0.010 0.736 ± 0.013
-Letter 20000 16 26 0.041 0.747 ± 0.013 0.747 ± 0.013 0.712 ± 0.012
-PenDigits 10992 16 10 0.104 0.885 ± 0.012 0.884 ± 0.010 0.871 ± 0.010
-Phoneme 2254 256 5 0.260 0.876 ± 0.023 0.872 ± 0.025 0.875 ± 0.023
-Satimage 6435 36 6 0.238 0.822 ± 0.009 0.823 ± 0.010 0.812 ± 0.012
-Segmentation 2310 19 7 0.143 0.921 ± 0.013 0.923 ± 0.012 0.899 ± 0.011
-Shuttle 58000 9 7 0.786 0.998 ± 0.000 0.999 ± 0.000 0.992 ± 0.001
-Soybean 376 35 19 0.138 0.918 ± 0.056 0.926 ± 0.068 0.928 ± 0.060
-Thyroid 7200 21 3 0.926 0.994 ± 0.002 0.994 ± 0.001 0.956 ± 0.007
-Vehicle 846 18 4 0.258 0.595 ± 0.036 0.618 ± 0.031 0.611 ± 0.035
-Waveform 5000 21 3 0.339 0.811 ± 0.022 0.810 ± 0.019 0.808 ± 0.024
-Wine 178 13 3 0.399 0.983 ± 0.026 0.983 ± 0.026 0.977 ± 0.028
-Yeast 1484 9 10 0.312 0.575 ± 0.050 0.575 ± 0.046 0.344 ± 0.032
-Moyenne 0.799 0.799 0.778
-V/=/D 2/14/2 8/10/0
-TAB. 1 – Taux de bonne prédiction en test sur les bases de l’UCI
-Les moyennes et écart types des résultats par jeu de données sont présentés en table 1,
-ainsi que la moyenne sur l’ensemble des jeu de données (Moyenne) et le nombre de victoires
-et défaites significatives (V/=/D) évaluées au seuil de 95% au moyen d’un test de Student.
-Les résultats confirment l’apport important des méthodes de prétraitement supervisé, avec 8
-victoires significative de la méthode NB(G) par rapport à la méthode standard nb. En revanche,
-les résultats des méthodes NB(G) et NB sont équivalents. Pour les bases de l’UCI comportant
-de l’ordre d’une dizaine de classes, la méthode de prétraitement avec groupement des classes
-est donc intéressante pour l’interprétation (cf. section 5.1), mais son impact en taux de bonne
-classification est négligeable.
-RNTI-E-19- 545 -
-Classification supervisée pour de grands nombres de classes à prédire
-5.3 Expérimentation avec de nombreuses classes
-Afin d’étudier l’impact de notre méthode dans le cas de grands nombres de classes, nous
-avons utilisé la base Mushroom de l’UCI pour construire une série de 10 bases artificielles. La
-base Mushroom comporte 8416 individus et 23 variables catégorielles, dont les nombres de
-valeurs sont rappelés sur la figure 2.
-0
+Le problème auquel s’intéresse cet article est la découverte de nouvelles familles de ré-
+actions chimiques à partir de bases de données de réactions. Cet article montre en quoi ce
+problème peut se reformuler en un problème particulier de fouille de graphes. La découverte
+de nouvelles réactions présente un grand intérêt pour la synthèse en chimie organique, disci-
+pline dont le but est la conception de molécules complexes à partir de composants chimiques
+usuels et de réactions. En effet, plus un expert de la synthèse a de réactions à sa disposition,
+plus il peut créer de nouveaux produits à partir d’un ensemble donné de molécules et plus il
+peut optimiser le plan de synthèse d’une molécule cible donnée. Par ailleurs, la découverte de
+dizaines de millions de réactions a vite rendu leur recensement nécessaire à travers la constitu-
+tion de très grandes bases de données de réactions. Ces bases de données réactionnelles sont
+plus particulièrement exploitées par les experts de la rétrosynthèse. Cette méthode consiste à
+inférer le plan de synthèse d’une molécule cible en recherchant les réactions qui permettent
+d’aboutir à la cible, puis à réitérer récursivement le processus en prenant pour cibles les réac-
+tifs des réactions ainsi trouvées et ce jusqu’à l’obtention de réactifs de départ jugés ordinaires.
+La rétrosynthèse peut donc tirer un excellent parti de tout modèle prédictif capable de propo-
+- 517 - RNTI-E-6
+La fouille de graphes dans les bases de données réactionnelles
+ser des réactions qui n’ont jamais été testées mais qui ont de forte chance d’être réalisables
+expérimentalement.
+Pour établir un tel modèle prédictif qui soit suffisamment fiable, certaines méthodes d’ap-
+prentissage automatique ont été appliquées aux bases de données réactionnelles, notamment
+des méthodes de voisinage symbolique (Régin, 1995). Mais leurs résultats restent limités tant
+leurs calculs de généralisation (appliqués de surcroît à des graphes) s’avèrent longs , et tant
+leurs procédures d’induction se révèlent sensibles aux inexactitudes engendrées par la pau-
+vreté des graphes moléculaires en tant que modèle de représentation des réactions. A ce titre
+l’emploi par Berasaluce et al. (2004) d’une méthode de recherche de motifs fréquents (Agra-
+wal et Srikant, 1994) s’est révélé judicieux dans la mesure où de telles méthodes sont à la
+fois adaptées à de grands volumes de données et robustes aux incohérences partielles des don-
+nées puisque basées sur des probabilités. La principale faiblesse d’une telle approche est de
+travailler sur des données booléennes et donc de ne pouvoir réellement prendre en compte la
+topologie des atomes dans une molécule, pourtant essentielle à la compréhension des réactions.
+Les travaux présentés dans cet article se situent dans le prolongement de ceux de Berasa-
+luce et al. (2004). La différence majeure réside dans la prise en compte de la topologie des
+molécules par le recours à des techniques de fouille de graphes, c’est-à-dire de généralisation
+des méthodes de fouille de données booléennes à des graphes. L’apport principal de cet article
+est de montrer comment la recherche de nouveaux schémas de réactions à partir de bases de
+réactions peut se reformuler en un problème particulier de fouille de graphes. Pour se faire, les
+notions de chimie organique utiles à la compréhension du problème sont introduites (section
+2). Les réactions décrites dans les bases de données réactionnelles sont ensuite modélisées sous
+la forme de graphes de réaction, à partir desquels des schémas de réactions particuliers appelés
+graphes de réaction partiels sont dérivés (section 3). Après un bref état de l’art des algorithmes
+de fouille de graphes, le problème d’apprentissage des mécanismes réactionnels est reformulé
+comme un problème particulier de fouille de graphes de réaction partiels (section 4).
+2 Les graphes moléculaires et les schémas de réactions
+Une molécule est un assemblage géométrique d’atomes solidaires liés par des liaisons de
+covalence. La forme développée ou graphe moléculaire est une représentation de la topolo-
+gie des liaisons d’une molécule sous forme d’un graphe étiqueté g(V,E, λ) où les sommets
+V (g) = V et les arêtes E(g) = E représentent respectivement les atomes et les liaisons de
+covalence de la molécule et où la fonction d’étiquetage λ : V → L associe (au minimum) à
+un sommet l’élément chimique, tel le carbone (C) ou l’hydrogène (H), de l’atome représenté
+par ce sommet. Un graphe moléculaire est un graphe particulier en ce sens que les sommets
+CH
+3
+CH
+3
+CH OH
+CH
+3
+CH
+3
+CH OH
+CH
+3
+CH
+3
+CH
+CH
+3
+CH
+3
+CH
+O
+H
 2
+O
 4
+3
+5
 6
+7
+2
+1
 8
-10
-12
-14
-Br
-uis
-e (
-V1
-)
-Ca
-pC
-olo
-r (V
-2)
-Ca
-pS
-ha
-pe
- (V
-3)
-Ca
-pS
-urf
-ac
-e (
-V4
-)
-Cla
-ss
- (V
-5)
-Gi
-llA
-tta
-ch
-me
-nt 
-(V
-6)
-Gi
-llC
-olo
-r (
-V7
-)
-Gi
-llS
-ize
- (V
-8)
-Gi
-llS
-pa
-cin
-g (
-V9
-)
-Ha
-bit
-at 
-(V
-10
-)
-Od
-or 
-(V
-11
-)
-Po
-pu
-lat
-ion
- (V
-12
-)
-Rin
-gN
-um
-be
-r (V
-13
-)
-Rin
-gT
-yp
-e (
-V1
-4)
-Sp
-ore
-Pr
-int
-Co
-lor
- (V
-15
-)
-Sta
-lkC
-olo
-rA
-bo
-ve
-Ri
-ng
- (V
-16
-)
-Sta
-lkC
-olo
-rB
-elo
-wR
-ing
- (V
-17
-)
-Sta
-lkR
-oo
-t (V
-18
-)
-Sta
-lkS
-ha
-pe
- (V
-19
-)
-Sta
-lkS
-urf
-ac
-eA
-bo
-ve
-Rin
-g (
-V2
-0)
-Sta
-lkS
-urf
-ac
-eB
-elo
-wR
-ing
- (V
-21
-)
-Ve
-ilC
-olo
-r (V
-22
-)
-Ve
-ilT
-yp
-e (
-V2
-3)
-N
-om
-br
-e 
-de
- v
-al
-eu
-rs
-FIG. 2 – Nombre de valeurs par variable de la base mushroom.
-Pour la première base, la variable de classe est la première variable (V1=Bruise), les 22
-autres variables étant explicatives. Pour la seconde base, la variable de classe est le produit
-cartésien des deux premières variables (V1 x V2 = Bruise x CapColor), les 21 autres variables
-étant explicatives. Les bases suivantes sont construites de façon similaire, jusqu’à la dixième
-ayant pour variable de classe le produit cartésien des dix première variables, les 13 dernières
-étant explicatives. La table 2 présente les caractéristiques de ces dix base artificielles, avec des
-nombres de classes allant de 2 à 782 pour des classes majoritaires de 59.0% à 0.6%.
-Target variable Clas. Maj. NB(M) NB
-V1 2 0.599 0.972 ± 0.004 0.972 ± 0.004
-V1xV2 17 0.174 0.420 ± 0.006 0.418 ± 0.007
-V1vV2xV3 56 0.084 0.182 ± 0.003 0.146 ± 0.004
-V1xV2...xV4 125 0.043 0.105 ± 0.002 0.060 ± 0.008
-V1xV2...xV5 159 0.024 0.104 ± 0.002 0.049 ± 0.005
-V1xV2...xV6 172 0.024 0.104 ± 0.001 0.045 ± 0.004
-V1xV2...xV7 495 0.017 0.035 ± 0.001 0.008 ± 0.002
-V1xV2...xV8 526 0.017 0.034 ± 0.000 0.004 ± 0.002
-V1xV2...xV9 554 0.017 0.035 ± 0.000 0.005 ± 0.002
-V1xV2...xV10 782 0.006 0.015 ± 0.001 0.000 ± 0.001
-TAB. 2 – Taux de bonne prédiction en test sur 10 bases articicielles.
-On compare les taux de prédiction en test de NB(G) et NB comme en section 5.2 au moyen
-d’une validation croisée stratifiée à 10 niveaux. Cette fois les différences de performance sont
-importantes et significatives (8 victoire significatives sur 10), d’autant plus que le nombre
-de classes augmente. La figure 3, présente ces différences, en apprentissage et en test. Les
-deux méthodes obtiennent des résultats similaires en apprentissage, mais ces performances se
-RNTI-E-19 - 546 -
-M. Boullé
-dégradent significativement pour NB dès que l’on atteint une cinquantaine de classes, alors que
-le sur-apprentissage reste faible pour NB(G) même avec plus de 500 classes.
-0.000
-0.001
-0.010
-0.100
-1.000
-1 10 100 1000
-Nombre de valeurs à expliquer
-Ta
-ux
- d
-e 
-bo
-nn
-e 
-pr
-éd
-ic
-tio
-n
-NB train
-NB test
-NB(M) train
-NB(M) test
-FIG. 3 – Taux de bonne prédiction en apprentissage et test des méthodes NB(G) et NB, en
-fonction du nombre de valeurs à prédire.
-6 Conclusion
-La méthode de prétraitement univarié supervisé présentée dans cet article se base sur un
-modèle de partitionnement joint, de la variable explicative en intervalles ou groupes de valeurs
-et de la variable à expliquer en groupe de classes. Ce partitionnement joint permet d’esti-
-mer de façon robuste la distribution de probabilité conditionnelle, sans être limité aux faibles
-nombres de classes. Le meilleur modèle de partitionnement joint est recherché au moyen d’une
-approche Bayesienne de la sélection de modèles. Des évaluations intensives sur les bases de
-l’UCI comportant de l’ordre d’une dizaine de classes, portant sur l’apport de la méthode en
-prétraitement du classifieur Bayesien naïf, montrent que la méthode obtient des performances
-équivalentes, mais non supérieures à celles de l’état de l’art. En revanche, quand le nombre de
-classes devient important, typiquement plusieurs centaines, les expérimentation démontrent un
-apport significatif de la méthode, avec une meilleure robustesse et des taux de bonne prédiction
-accrus. Ces résultats permettent d’étendre le champ d’application des méthodes de classifica-
-tion aux problèmes comportant de nombreuses classes. Des travaux futurs sont envisagés pour
-appliquer ce type d’approche au cas du ciblage publicitaire sur internet, pour lequel la classe
-à prédire, le bandeau publicitaire le plus susceptible d’entraîner un clic de l’internaute, peut
-comporter plusieurs centaines de valeurs.
+3
+56
+7
+2
+1
+8
+4
+FIG. 1 – Equation de la réaction de déshydratation du propan-2-ol avec appariement partiel
+des atomes (numéros encerclés)
+- 518 -RNTI-E-6
+F. Pennerath, A. Napoli
+représentant un même élément chimique ont des degrés (i.e. le nombre d’arêtes incidentes à un
+sommet) tous égaux à la valence de cet élément (4 pour C, 1 pour H). Une réaction chimique
+est quant à elle un processus physique qui, en chimie organique, brise certaines liaisons de
+covalence pour en créer de nouvelles, transformant ainsi un ensemble de molécules appelées
+réactifs en un ensemble de nouvelles molécules appelées produits. Elle se représente par une
+équation chimique, comme illustrée sur la figure 1, mettant en rapport les formes développées
+des réactifs et des produits.
+Les schémas de molécules (resp. les schémas de réactions) sont des graphes moléculaires
+(resp. des équations chimiques) dont certains sommets représentent des variables, remplaçant
+par une opération dite de contraction, un radical, c’est-à-dire un groupe d’atomes connec-
+tés. De telles variables peuvent être typées auxquels cas leurs ensembles de définition se re-
+streignent à des radicaux d’un type particulier. Certains types de schémas qualifiés dans cet
+article de partiels peuvent de plus, autoriser à ce que certains sommets ne soient pas saturés,
+c’est-à-dire que leur degré puisse être strictement inférieur à la valence de leur élément chi-
+mique. Un graphe moléculaire satisfait un schéma partiel s’il contient un sous-graphe qui par
+une série de contractions (compatibles avec les types des variables du schéma) est isomorphe
+au schéma. Ainsi le schéma de réactions représenté sur la figure 2 est satisfait par la réac-
+CH OH CH OH CH CH
+O
+H
+2
+O
+R R RR
+C CCC1 2
+1 2
+FIG. 2 – Un schéma de la déshydratation d’un alcool secondaire
+tion de la figure 1, le groupe méthyl CH3 étant une valeur acceptable pour une variable R de
+type alkyle, représentant toute chaîne linéaire d’atomes de carbone saturée en hydrogène. Ce
+schéma est partiel puisque les atomes de carbone (de valence 4) numérotés 1 et 2 ne sont pas
+incidents à 4 liaisons et sont donc non saturés. Un schéma de molécules (resp. de réactions)
+permet de représenter une molécule (resp. une réaction) générique instanciée par une famille
+de molécules (resp. une famille de réactions) de la même manière qu’un concept d’un langage
+de représentation des connaissances est satisfait par ses instances.
+3 Une modélisation des réactions chimiques adaptée à l’ap-
+prentissage
+3.1 Les graphes de réaction
+Les bases de données réactionnelles décrivent chaque réaction au minimum par son équa-
+tion chimique ainsi que par les conditions réactionnelles nécessaires à son déclenchement. En
+général les atomes des produits sont appariés avec ceux des réactifs pour traduire le principe
+de conservation des atomes au cours d’une réaction chimique. L’appariement de la réaction de
+la figure 1 est ainsi représenté par des numéros encerclés identifiant chaque atome. Sous cette
+forme la description des réactions est difficilement exploitable puisque les descriptions asso-
+ciées à la cause, c’est-à-dire aux réactifs, et ceux associées à la transformation, c’est-à-dire aux
+- 519 - RNTI-E-6
+La fouille de graphes dans les bases de données réactionnelles
+produits, pourtant indissociables, ne peuvent être mis en corrélation que par une information
+totalement étrangère (les appariements) à leur mode de description (les graphes moléculaires).
+L’introduction d’un graphe de réaction, illustré sur la figure 3 (a), permet de rattacher cause
+et effet de la réaction en un seul objet. Ce graphe de réaction résulte de la superposition des
+atomes appariés entre les graphes moléculaires des réactifs et des produits. Formellement ce
+graphe se construit à partir des graphes moléculaires des réactifs auxquels on ajoute les arêtes
+élémentaires nouvellement crées par la réaction (une liaison multiple étant dissociée en un
+nombre de liaisons élémentaires égal à sa multiplicité). De plus chaque arête est marquée d’une
+étiquette précisant s’il s’agit d’une arête inchangée, brisée ou créée. La figure 3 (a) représente
+le graphe de réaction associé à l’équation chimique de la figure 1. Les arêtes stables, brisées et
+créées y sont représentées respectivement en trait continu, en pointillés et en en trait épais.
+CH
+3
+CH
+3
+H C
+CH
+3
+CH
+3
+H
+HC
+O
+O
+H
+H
+C
+O
+O
+(b)(a)
+FIG. 3 – Graphe de réaction (a) et graphe de cœur (b) de l’équation de la figure 1
+A partir d’un graphe de réaction R et des ensembles de ses arêtes inchangées, brisées et
+créées respectivement notésE0(R),E−(R) etE+(R) , peuvent être définis trois sous-graphes
+présentant un intérêt particulier.
+– Le graphe du cœur C(R) = R · (E−(R) ∪E+(R)) est le sous-graphe de R réduit 1 par
+l’ensemble de ses arêtes brisées ou créées. Ce graphe représente le cœur de la réaction,
+c’est-à-dire l’ensemble des atomes dont les liaisons de covalence sont modifiées lors de
+la réaction. Le graphe de cœur du graphe de réaction de la figure 3 (a) est représenté sur
+la figure 3 (b).
+– Le graphe des réactifs R(R) = R · (E−(R) ∪ E0(R)) est le sous-graphe de R réduit
+par l’ensemble de ses arêtes brisées ou inchangées. Ce graphe représente l’union des
+graphes moléculaires des réactifs. Le graphe des réactifs associé au graphe de réaction
+de la figure 3 est identique à la partie gauche de l’équation chimique de la figure 1.
+– Le graphe des produits P(R) = R ·(E0(R)∪E+(R)) est le sous-graphe deR réduit par
+l’ensemble de ses arêtes inchangées ou créées. Ce graphe représente l’union des graphes
+moléculaires des produits. Le graphe des produits associé au graphe de réaction de la
+figure 3 est identique à la partie droite de l’équation chimique de la figure 1.
+On démontre que le graphe de cœur est un ensemble connexe de cycles de longueurs paires
+disjoints par leurs arêtes. Chaque cycle est une suite alternée de liaisons brisées et de liaisons
+créées. La preuve repose sur une démonstration similaire à celle, demeurée célèbre, qu’Euler
+apporta au problème des ponts de Konigsberg (Pour plus de détails, on se référera à un manuel
+de théorie des graphes comme par exemple Gondran et Minoux (1995)). Vu que dans un graphe
+de cœur un cycle de longueur 0 n’a pas de sens et qu’un cycle de longueur 2 peut être vu comme
+1La réduction notée G · E d’un graphe G par un ensemble E d’arêtes est le plus petit sous-graphe de G tel que
+E(G · E) = E.
+- 520 -RNTI-E-6
+F. Pennerath, A. Napoli
+une liaison stable, on peut conclure que les graphes de cœur de réaction sont des systèmes de
+cycles alternés de longueurs paires supérieures ou égales à 4.
+D’un point de vue purement informationnel, le graphe de réaction est rigoureusement équi-
+valent à une équation chimique appariée puisqu’il est possible de passer indifféremment d’un
+formalisme de représentation à l’autre. Mais les avantages du graphe de réaction sont mul-
+tiples : outre certains avantages en terme de complexité algorithmique qui sont ici hors sujet,
+le graphe de réaction permet de représenter naturellement le lien entre la cause et l’effet d’une
+réaction et ce en un seul objet, via un graphe connexe. Cette association est indispensable pour
+généraliser les réactions et approcher l’expression des mécanismes réactionnels sous-jacents
+qui rattache nécessairement les effets à leurs causes. Enfin le graphe de cœur peut servir à
+réaliser une partition et donc une indexation efficace des réactions d’une base de données ré-
+actionnelles.
+A ce titre, on introduit ici la notion de réaction nulle qui désigne une absence de toute ré-
+action lors de la mise en présence d’un ensemble donné de réactifs dans des conditions expéri-
+mentales données. Le graphe de cœur d’une réaction nulle est évidemment le graphe vide (sans
+sommets). Les graphes de réaction des réactions nulles sont les seuls à ne pas être connexes
+et dans ce cas uniquement se confondent avec les graphes des réactifs (ou indifféremment les
+graphes des produits). Les réactions nulles servent d’exemples négatifs supplémentaires utiles
+pour interdire certaines généralisations irréalistes de réactions. Malheureusement les bases de
+données réactionnelles ne contiennent pas la description de réactions nulles, ce qui est pour
+le moins normal vu l’intérêt tout aussi nul qu’elles présentent en synthèse organique. On peut
+cependant construire des réactions nulles en émettant l’hypothèse que la plupart des réactions
+d’une base de données réactionnelles forment des produits stables. Le graphe des produits
+de cette réaction peut alors servir de graphe de réaction pour une nouvelle réaction nulle.
+C’est pourquoi on suppose désormais qu’une base de données réactionnelle est un ensemble
+de graphes de réaction indexés par leur graphe de cœur éventuellement nul.
+3.2 Les graphes de réaction partiels
+L’introduction des graphes de réaction permet de définir un type particulier de schémas de
+réactions (au sens de celui défini dans la section 2) tenant compte de l’appariement des atomes
+des réactifs et des produits. Ces schémas appelés graphes de réaction partiels, tiendront lieu
+de motifs dans nos algorithmes de fouille de graphes.
+Un graphe de réaction partiel est défini comme un schéma de molécule contenant un et un
+seul graphe de cœur et dont les variables sont toutes mono-atomiques, c’est-à-dire qu’elles ne
+peuvent représenter qu’un seul atome. Les types des variables mono-atomiques se confondent
+alors avec un ensemble (L,v) d’étiquettes généralisées ordonné selon un ordre de subsomp-
+tion v : les étiquettes les plus spécifiques sont les éléments chimiques et l’étiquette la plus gé-
+nérale, notée >, remplace tout atome quel qu’il soit. Les étiquettes intermédiaires dans l’ordre
+induit par v permettent de regrouper les éléments dont les propriétés chimiques sont simi-
+laires, comme par exemple la famille des halogènes dont font notamment partie le chlore et le
+brome. La figure 4 (a) présente un graphe de réaction partiel qui est satisfait par la réaction de
+la figure 1.
+Ces schémas de réactions sont introduits ici car ils revêtent d’excellentes propriétés vis à
+vis des algorithmes de fouille de graphes. Ainsi chaque sommet ne peut être apparié qu’à un
+seul atome ce qui facilite la gestion des appariements entre les graphes partiels et les graphes
+- 521 - RNTI-E-6
+La fouille de graphes dans les bases de données réactionnelles
+C
+H
+C
+O
+O
+H
+(b)(a)
+C
+H
+C
+O
+O
+H
+C C
+FIG. 4 – Un graphe de réaction partiel (a) et son réacton (b)
+de réaction de la base de données (et ce contrairement aux radicaux en général, comme les
+groupes alkyle R). Mais surtout il est facile d’énumérer tous les graphes de réaction partiels
+possibles. Si on suppose dans un premier temps que l’on sache générer l’ensemble des graphes
+de cœur possibles, alors l’ensemble des spécialisations d’un graphe partiel de réaction qui per-
+mettent d’aboutir aux graphes partiels directement plus spécifiques est rapidement identifiable
+à l’aide de structures de données appropriées et optimisées qui ne sont pas détaillées ici. En
+effet seulement trois types de spécialisations sont envisageables :
+– L’adjonction d’une nouvelle arête stable entre deux sommets non saturés.
+– L’adjonction d’une nouvelle arête stable entre un sommet non saturé et un nouveau som-
+met étiqueté par >.
+– La spécialisation d’une étiquette généralisée en une étiquette immédiatement plus spé-
+cifique.
+Il est donc possible par une suite de spécialisations de générer tout graphe de réaction partiel
+à partir de son graphe du cœur. Par ailleurs et compte tenu de la connaissance des mécanismes
+réactionnels dont les chimistes disposent, la grande majorité des réactions sont le résultat d’une
+succession de réactions élémentaires dont le graphe de cœur se réduit à un seul cycle. Notre
+étude peut donc se restreindre à l’étude des réactions élémentaires dont les graphes partiels
+peuvent être générés à partir de l’ensemble des cycles alternés de longueur paire supérieure ou
+égale à 4 et dont tous les sommets sont étiquettés par >. Ce dernier ensemble est lui même
+trivial à générer. La figure 5 représente la suite (incomplète) de spécialisations passant du
+C
+H
+C
+O
+O
+H
+H
+C
+O
+O
+
+
+
+
+H
+C
+O
+O
+H
+(b)(a)
+C C
+FIG. 5 – Une suite incomplète de spécialisations passant du graphe de cœur (a) au graphe de
+réaction partiel (b)
+graphe de cœur (a) au graphe de réaction partiel (b) de la figure 4. Les atomes encerclés de
+pointillés correspondent aux sommets non saturés capables d’accepter une nouvelle arête.
+- 522 -RNTI-E-6
+F. Pennerath, A. Napoli
+4 La recherche de réactions génériques fiables vue comme
+un problème de fouille de graphes
+4.1 L’apprentissage des mécanismes réactionnels
+Au cœur de chaque réaction élémentaire se trouve un mécanisme réactionnel, c’est-à-dire
+un processus temporel et déterministe de transformation qui brise certaines liaisons de cova-
+lence pour en créer d’autres. Les graphes de réaction partiels peuvent servir de modèles de
+représentation des mécanismes réactionnels. Ce modèle n’est pas exact et induit des erreurs
+de prédiction lorsqu’il est confronté à une base d’exemples de réactions. Ces erreurs se ma-
+nifestent par des exemples qui satisfont la cause de la réaction générique sans en satisfaire
+l’effet. L’effet d’un mécanisme réactionnel est modélisé par le graphe de cœur du graphe par-
+tiel, traduisant la redistribution des liaisons de covalence, alors que la cause du mécanisme est
+modélisée par un graphe que l’on décide d’appeler réacton. Le réacton d’un schéma désigne
+l’ensemble des schémas des réactifs, c’est-à-dire le graphe des réactifs déduit du graphe de
+réaction partiel. Sur la figure 4 est illustré le réacton (b) associé au graphe partiel (a).
+(b)
+H
+CH
+3
+O
+H
+O
+C
+HH
+CH
+2
+CH
+3CH
+3
+CH
+3
+C
+CH
+3
+CH
+3
+H
+C
+O
+O
+H
+(a)
+CH
+3CH3
+FIG. 6 – Un exemple positif (a) et un exemple négatif (b) à 110 °C du graphe de réaction
+partiel de la figure 4
+Plus formellement étant donné un ensemble R des réactions (y compris des réactions
+nulles) dans des conditions réactionnelles fixées, on note gr(r) (resp. gre(r)) le graphe de ré-
+action (resp. le graphe des réactifs) d’une réaction r. Etant donné un graphe partiel de réaction
+s, la réaction r satisfait s si s est un sous-graphe de gr(r), c’est-à-dire si la cause (l’environ-
+nement topologique du cœur) et l’effet (la redistribution des liaisons de covalence) décrits par
+s se retrouve dans r. A l’inverse une réaction r infirmera s si le réacton gre(s) de s est un
+sous-graphe du graphe des réactifs gre(r) sans que r satisfasse s, c’est-à-dire si la cause se
+trouve dans r alors que l’effet ne s’y trouve pas. Un exemple de réaction qui satisfait (resp.
+qui infirme) un schéma s est dit positif (resp. négatif ) pour s. La figure 6 exhibe un exemple
+positif (a) et un exemple négatif (b) pour le graphe de réaction partiel de la figure 4. Il est
+important de noter que ces exemples ne sont valables que dans des conditions réactionnelles
+bien précises (ici une température supérieure à 110 °C). Si la température devient inférieure à
+ce seuil de 110 °C, l’expérience montre que la réaction de la figure 1 devient une réaction nulle
+et passe donc du statut d’exemple positif à celui d’exemple négatif.
+Etant donné un ensemble {ri}1≤i≤n d’exemples de graphes de réaction éventuellement
+nulles, il est alors possible de définir la fréquence positive f+(s) (resp. la fréquence négative
+f−(s)) d’un graphe partiel s comme le nombre d’exemples positifs (resp. négatifs) pour s.
+Plus la fréquence négative d’un schéma est faible, plus le schéma est fiable, plus la fréquence
+positive d’un schéma est grande, plus le schéma est général.
+- 523 - RNTI-E-6
+La fouille de graphes dans les bases de données réactionnelles
+4.2 La fouille de graphes
+Lamajorité des méthodes de fouille de données et d’apprentissage s’applique à des données
+où chaque objet est décrit par la liste des attributs booléens qu’il vérifie. La recherche des
+motifs fréquents et d’extraction des règles d’association (Agrawal et Srikant, 1994) est une de
+ces méthodes les plus employées. Etant donné une base d’objets décrits par la liste de leurs
+attributs, choisis dans un ensemble A, l’extraction de motifs fréquents consiste à énumérer
+dans un premier temps les conjonctions d’attributs, ou motifs, qualifiés de fréquents, c’est-à-
+dire dont le nombre d’occurrences (définies par les objets contenant simultanément tous les
+attributs du motif) dans la base de données, encore appelé fréquence ou support, est supérieur
+à un seuil fixé arbitrairement. L’extraction des règles d’association consiste dans un deuxième
+temps à déduire les règles d’association non triviales entre motifs fréquents dont la probabilité
+conditionnelle, ou confiance, est supérieure à un second seuil.
+Certains travaux initiés notamment par Inokuchi et al. (2000) et Kuramochi et Karypis
+(2001) ont depuis permis de transposer le paradigme des motifs fréquents au cas où les don-
+nées sont des graphes. L’ensemble (2A,⊆) des motifs booléens ordonné par l’inclusion est
+alors remplacé par l’ensemble (G,≤G) des graphes étiquetés ordonné par la relation ≤G d’in-
+clusion d’un sous-graphe isomorphe2. Ce problème d’isomorphisme, inexistant dans le cas des
+données booléennes, complique sensiblement les algorithmes et substitue à certaines primitives
+algorithmiques de complexité linéaire d’autres de complexité exponentielle. Les algorithmes
+de fouille de graphes les plus performants comme gSpan (Yan et Han, 2002) ou Gaston (Nijs-
+sen et Kok, 2004) sont de types verticaux, c’est-à-dire qu’ils parcourent l’espace de recherche
+(i.e l’ordre partiel des motifs) en profondeur, en effectuant un retour arrière lorsqu’un motif
+n’est pas fréquent. Outre sa simplicité, cette recherche en profondeur permet une économie de
+mémoire suffisante pour stocker les appariements entre le motif courant et les graphes de la
+base, restreignant ainsi les possibilités d’appariements des motifs plus spécifiques. Les algo-
+rithmes de fouille de graphes ont ouvert la voie à la fouille de molécules résumée dans Fischer
+et Meinl (2004) et ont notamment permis d’isoler au sein d’un corpus de molécules des sous-
+structures fréquentes, responsables d’une activité chimique particulière. Mais ces méthodes
+n’ont jamais été utilisées pour fouiller des bases de réactions chimiques.
+4.3 La fouille de graphes de réaction partiels
+Les modèles retenus pour la représentation des mécanismes réactionnels sont les graphes
+de réaction partiels. Etant donné une base de données réactionnelles, chaque graphe partiel
+gr peut être associé à une fréquence positive f+(gr) et une fréquence négative f−(gr). Ces
+deux fréquences sont des fonctions décroissantes par rapport à l’ordre partiel (Gr,≤G) des
+graphes de réaction partiels (i.e. g1 ≤G g2 ⇒ f+/−(g1) ≥ f+/−(g2)). Un graphe partiel est
+d’autant plus pertinent que sa fréquence positive est élevée et que sa fréquence négative est
+faible, comme l’illustre la figure 7 élaborée dans le prolongement des exemples précédents.
+Dans cet exemple, la base de réactions est censée contenir N1, N2 et N3 réactions mettant
+respectivement en jeu des alcools primaires, secondaires et tertiaires (i.e des molécules dont
+l’atome de carbone C portant le groupe alcool OH est relié respectivement à un, deux et trois
+autres atomes de carbone). Les réactions mettant en jeu des alcools primaires sont nulles alors
+2Deux graphes sont isomorphes s’il existe une bijection entre les ensembles de leurs sommets et une bijection entre
+les ensembles de leurs arêtes qui toutes deux préservent les relations d’incidence arête-sommet ainsi que les étiquettes.
+- 524 -RNTI-E-6
+F. Pennerath, A. Napoli
+que les alcools secondaires et tertiaires réagissent selon le coeur de la figure 4 (b). En outre la
+base de réaction est supposée représenter de manière homogène les différents types d’alcool.
+N1, N2 et N3 sont donc supposés tous égaux à N , de manière à pouvoir calculer simplement
+les fréquences des graphes de réaction partiels de la figure 7 (a), regroupées dans le tableau (b).
+Il apparaît ainsi que le graphe (c) est plus pertinent que le graphe (a) du fait d’une fréquence
+négative plus grande pour une même fréquence positive et que le graphe (e) du fait d’une
+fréquence positive plus faible pour une même fréquence négative.
+H
+H
+C
+O
+O
+H
+C
+C
+C
+H
+C
+O
+O
+H
+C
+C
+H
+C
+O
+O
+H
+C
+H
+C
+O
+O
+H
+C
+H
+C
+O
+O
+H
+C
+C
+H
+C
+O
+O
+H
+C
+H
+H
+H
+(a)
+(b) (c)
+(d) (e) (f)
+(a) Graphes de réaction partiels
+Graphe Fréquence Fréquence Fiabi- Diffé-
+partiel positive négative lité rence
+(a) N2 +N3 = 2 ·N N1 = N 2/3 N
+(b) N2 = N N1 = N 1/2 0
+(c) N2 +N3 = 2 ·N 0 1 2 ·N
+(d) 0 N1 = N 0 −N
+(e) N2 = N 0 1 N
+(f) N3 = N 0 1 N
+(b) Fréquences associées
+FIG. 7 – Graphes de réaction partiels ordonnés et leurs fréquences
+Différentes familles de graphes partiels peuvent être étudiées, chacune accordant une im-
+portance différente aux fréquences positives et négatives. En raison de sa simplicité, on s’inté-
+resse ici à la famille G(s+) des graphes partiels dont la fréquence négative est minimale tout
+en ayant une fréquence positive supérieure ou égale à un seuil s+ fixé arbitrairement. Ainsi
+l’exemple de la figure 7 permet d’établir que G(2 ·N) = {c} et G(N) = {c, e, f} en supposant
+par ailleurs que tous les graphes non représentés contenant les graphes (c), (e) et (f) ont une
+fréquence positive qui leur est strictement inférieure (et donc, pour être totalement exact, que
+les graphes partiels représentés regroupent l’ensemble des graphes de leur fermé).
+Pour calculer facilement une approximation Ĝ(s+) de cet ensemble, on choisit dans le
+cas tangent où un graphe g1 est inclus dans un autre graphe g2 et que ces deux graphes
+ont les mêmes fréquences négatives, de ne conserver dans Ĝ(s+) que le graphe le plus spé-
+cifique g2. Ce choix certes arbitraire, parfois même contraire au choix du graphe le plus
+pertinent, permet lorsqu’il est combiné au caractère décroissant de la fréquence négative,
+d’approximer l’ensemble G(s+) par la frontière positive de s+ c’est-à-dire par l’ensemble
+des graphes partiels fréquents (positivement par rapport à s+) maximaux, soit l’ensemble
+Ĝ(s+) = {g / f+(g) ≥ s+ et ∀g′g′ ≥G g ⇒ f+(g′) < s+}. Dans le cas de l’exemple, Ĝ(2 ·N)
+égale bien G(2 · N) mais Ĝ(N) = {e, f} omet l’élément c pourtant le plus pertinent. Les
+inexactitudes introduites par cette approximation sont toutefois compensées par la possibilité
+de traiter le problème comme celui d’une recherche de graphes fréquents maximaux et de le
+résoudre en tant que tel grâce à certains algorithmes adaptés comme Spin de Huan et al. (2004).
+Deux modifications doivent malgré tout être apportées à un algorithme vertical de fouille de
+graphes pour qu’il soit adapté à notre formulation du problème :
+- 525 - RNTI-E-6
+La fouille de graphes dans les bases de données réactionnelles
+– D’une part la génération des motifs par les algorithmes de fouille doit être modifiée afin
+de construire les motifs, c’est-à-dire les graphes de réaction partiels, à partir d’un graphe
+de cœur, c’est-à-dire un cycle alterné de liaisons brisées et créées. Ceci est nécessaire
+afin de garantir la présence unique et entière d’un graphe de cœur dans chaque motif.
+Cette modification est facile à intégrer au sein des algorithmes de type verticaux dont les
+motifs croissent à partir d’un motif initial, en général égal au motif vide mais qui peut
+être initialisé à une autre valeur.
+– D’autre part la phase de détermination des fréquences par le balayage de la base de
+graphes doit être modifiée pour être capable de calculer deux fréquences. En particulier
+la fréquence négative doit se calculer en testant dans les graphes de la base l’inclusion
+non du motif mais celle d’un motif secondaire (le réacton) dérivé du motif initial.
+Il est donc possible d’adapter certains algorithmes existants de fouille de graphes pour qu’ils
+extraient l’ensemble des graphes de réaction partiels maximaux fréquents (positivement). Cet
+ensemble de résultats peut ensuite être soumis à un expert en chimie afin qu’il analyse l’exac-
+titude et l’originalité des schémas de réactions découverts.
+4.4 Discussion
+Le choix arbitraire de l’ensemble de graphes partiels maximaux fréquents comme ensemble
+d’étude mérite une analyse critique. On propose ici une formalisation abstraite du problème gé-
+néral de l’apprentissage de mécanismes réactionnels afin de mieux situer la pertinence de la
+méthode proposée au paragraphe 4.3. Le constat initial pour une telle formalisation est qu’un
+graphe de réaction partiel représente d’autant mieux un mécanisme réactionnel que sa fré-
+quence positive est grande et que sa fréquence négative est faible. Ces deux fréquences étant
+toutes deux des fonctions décroissantes par rapport à ≤G , la recherche des graphes partiels les
+plus représentatifs n’a de sens que si on se donne un critère d’optimalité capable de pondérer
+l’importance accordée à la fréquence positive relativement à la fréquence négative. Ce critère
+peut se définir formellement à partir d’un ensemble totalement ordonné (E,≤) et d’une fonc-
+tion c : R2 → E qui associe aux couples des fréquences (f+(g), f−(g)) d’un graphe partiel
+g un élément de E. La seule contrainte imposée est que c soit une fonction croissante (resp.
+décroissante) de f+ (resp. de f−). Entre deux graphes comparables par ≤G , le graphe dont le
+critère c est le plus petit peut ainsi être éliminé. Les graphes partiels résistant à cette élimina-
+tion, c’est à dire les maxima locaux de c, sont sans nul doute les plus pertinents au sens de c.
+Cet ensemble peut alors être mis sous la forme d’une liste L triée selon les valeurs décrois-
+santes de leur image par c, c’est-à-dire par ordre d’intérêt décroissant. Seuls les motifs dont
+le critère c est supérieur à un seuil arbitraire c0 sont conservés dans L. La liste L constitue
+l’ensemble des graphes de réaction partiels les plus pertinents relativement à c et à la base de
+données réactionnelles considérée.
+Le choix de c est arbitraire et ouvre de nombreuses possibilités pour qualifier différem-
+ment l’ensemble L des résultats. L’ensemble G(s+) présenté au paragraphe 4.3 peut ainsi être
+formalisé par l’ensemble L associé à un ensemble E = R+ × R− muni de l’ordre lexico-
+graphique et par le critère c : (f+, f−) 7→ (min(f+, s+),−f−). Le caractère alambiqué de
+l’expression de c paramétré de surcroît par un seuil arbitraire s+ tend à prouver le manque de
+pertinence du choix de G(s+). Cet ensemble a été présenté dans cet article uniquement parce
+que certains algorithmes existants de fouille de graphes fréquents permettent de l’estimer di-
+rectement. Nous envisageons plutôt de travailler avec d’autres critères c, comme celui que nous
+- 526 -RNTI-E-6
+F. Pennerath, A. Napoli
+appelons fiabilité, défini par c(f+, f−) = f
++
+f++f− compris entre 0 et 1. Dans la mesure où la
+base de réactions couvre de manière homogène l’ensemble des phénomènes physiques qu’elle
+est censée décrire, la fiabilité constitue une approximation de la confiance (c’est-à-dire de la
+probabilité conditionnelle) associée au schéma de la réaction, interprété dans ce cas comme
+une règle de transformation reliant une hypothèse à une conclusion. En ce sens la fiabilité est
+un critère plus pertinent qui par ailleurs croit bien avec f+ et décroît avec f−. Nous exigeons
+de plus que la fréquence f+ reste supérieure à un seuil s+ de manière à ne retenir que les sché-
+mas suffisamment généraux (en particulier en écartant comme schémas les graphes de réaction
+de la base dont la fiabilité est évidemment égale à son maximum 1 mais dont la fréquence po-
+sitive valant aussi 1 est trop faible) et surtout de manière à limiter l’espace de recherche infini
+à un sous domaine fini (contrainte qui s’avère indispensable pour éviter toute récursion infinie
+de la part des algorithmes de fouille verticaux). Un autre critère envisageable est la différence
+c(f+, f−) = f+ − f−. Le tableau (b) de la figure 7 évalue pour chaque graphe les deux cri-
+tères de fiabilité et de différence. Les maxima locaux de fiabilité sont (c), (e) et (f). Il est à noter
+que la fiabilité ne peut prendre en compte la généralité d’un schéma et favoriser ainsi le graphe
+partiel (c) vis à vis des deux autres. Pour pallier ce défaut, il faudrait rajouter la fréquence
+positive comme critère secondaire à la manière du double critère du paragraphe 4.3. Le critère
+de différence permet de tenir compte très simplement de la généralité : il donne bien le graphe
+(c) comme unique maximum. A terme d’autres critères inspirés de la théorie de l’information
+permettront d’optimiser le compromis fiabilité - généralité.
+La méthode d’optimisation de tels critères c, que nous pensons intéressante, est incompa-
+tible avec les algorithmes de fouille de graphes actuels. La recherche de maxima locaux de
+fonctions c non monotones dans (Gr,≤G) vont à l’encontre du principe de ces algorithmes
+qui parcourent l’ensemble des motifs selon un ordre prédéterminé en évitant toutes comparai-
+sons avec les motifs voisins. Nous envisageons donc un nouveau type d’algorithme adapté à la
+formalisation du critère c qui ne peut être détaillé ici par manque de place.
+5 Conclusions
+Le problème de la recherche de réactions génériques fiables peut grâce à une modélisation
+adéquate se reformuler en un problème de fouille de graphes. Ce problème s’apparente à celui
+de la recherche de motifs qui sont à la fois fréquents dans une base et non fréquents dans une
+autre, avec cette originalité qu’un motif s’exprime différemment dans chacune des deux bases.
+Toutefois des particularités induites tant par la connaissance des mécanismes réactionnels que
+par notre propre modélisation du problème nous poussent à entrevoir une méthode générale
+de fouille de graphes pour laquelle les algorithmes existants sont inadaptés. Un nouvel algo-
+rithme inspiré de cette modélisation est en cours de développement et devrait à terme valider
+les idées introduites dans cet article. De nombreuses expériences sur des bases de données
+réactionnelles seront alors possibles et permettront notamment d’étudier l’influence du critère
+d’optimisation c. La méthode introduite n’étant pas spécifique à la chimie, il sera également
+possible de l’appliquer à d’autres types de données modélisables sous forme de graphes. Cette
+perspective motivante ne doit cependant pas faire oublier que les performances de calcul et
+plus encore la pertinence des résultats aux yeux des chimistes restent deux inconnues majeures
+du problème que seule l’expérimentation pourra lever.
+- 527 - RNTI-E-6
+La fouille de graphes dans les bases de données réactionnelles
 Références
-Asuncion, A. et D. Newman (2007). UCI machine learning repository.
-RNTI-E-19- 547 -
-Classification supervisée pour de grands nombres de classes à prédire
-Boullé, M. (2005). A Bayes optimal approach for partitioning the values of categorical attri-
-butes. Journal of Machine Learning Research 6, 1431–1452.
-Boullé, M. (2006). MODL : a Bayes optimal discretization method for continuous attributes.
-Machine Learning 65(1), 131–165.
-Boullé, M. (2009). Optimum simultaneous discretization with data grid models in supervi-
-sed classification : a bayesian model selection approach. Advances in Data Analysis and
-Classification 3(1), 39–61.
-Breiman, L., J. Friedman, R. Olshen, et C. Stone (1984). Classification and Regression Trees.
-California : Wadsworth International.
-Dietterich, T. et G. Bakiri (1995). Solving multiclass learning problems via error-correcting
-output codes. Journal of Artificial Intelligence Research 2, 263–286.
-Dougherty, J., R. Kohavi, et M. Sahami (1995). Supervised and unsupervised discretization
-of continuous features. In Proceedings of the 12th International Conference on Machine
-Learning, pp. 194–202. Morgan Kaufmann, San Francisco, CA.
-Hand, D. et K. Yu (2001). Idiot bayes ? not so stupid after all ? International Statistical
-Review 69(3), 385–399.
-Langley, P., W. Iba, et K. Thompson (1992). An analysis of Bayesian classifiers. In 10th
-National Conference on Artificial Intelligence, pp. 223–228. AAAI Press.
-Liu, H., F. Hussain, C. Tan, et M. Dash (2002). Discretization : An enabling technique. Data
-Mining and Knowledge Discovery 4(6), 393–423.
-Nadif, M. et G. Govaert (2005). Block clustering of contingency table and mixture model. In
-Advances in Intelligent Data Analysis VI, Volume 3646 of LNCS, pp. 249–259. Springer.
-Quinlan, J. (1993). C4.5 : Programs for Machine Learning. Morgan Kaufmann.
-Ritschard, G., D. A. Zighed, et N. Nicoloyannis (2001). Maximisation de l’association par
-regroupement de lignes ou de colonnes d’un tableau croisé. Mathématiques et Sciences
-Humaines 154-155, 81–98.
-Yang, Y. et G. Webb (2002). A comparative study of discretization methods for naive-Bayes
-classifiers. In Proceedings of the Pacific Rim Knowledge Acquisition Workshop, pp. 159–
-173.
-Zighed, D. et R. Rakotomalala (2000). Graphes d’induction. France : Hermes.
+Agrawal, R. et R. Srikant (1994). Fast algorithms for mining association rules in large data-
+bases. In Proceedings of the 20th Conference on Very Large Data Bases (VLDB-94), pp.
+478–499.
+Berasaluce, S., C. Laurenço, A. Napoli, et G. Niel (2004). An experiment on knowledge
+discovery in chemical databases. In J.-F. Boulicaut, F. Esposito, F. Giannotti, et D. Pedreschi
+(Eds.), PKDD, Volume 3202 of Lecture Notes in Computer Science, pp. 39–51. Springer.
+Fischer, I. et T. Meinl (2004). Graph based molecular data mining - an overview. In M. P.
+Wil Thissen, Peter Wieringa et M. Ludema (Eds.), IEEE Conference on Systems, Man and
+Cybernetics.
+Gondran, M. et M. Minoux (1995). Graphes et algorithmes. Eyrolles.
+Huan, J., W. Wang, J. Prins, et J. Yang (2004). Spin : mining maximal frequent subgraphs
+from graph databases. In W. Kim, R. Kohavi, J. Gehrke, et W. DuMouchel (Eds.), KDD, pp.
+581–586. ACM.
+Inokuchi, A., T. Washio, et H. Motoda (2000). An apriori-based algorithm for mining frequent
+substructures from graph data. In PKDD ’00 : Proceedings of the 4th European Conference
+on Principles of Data Mining and Knowledge Discovery, London, UK, pp. 13–23. Springer-
+Verlag.
+Kuramochi, M. et G. Karypis (2001). Frequent subgraph discovery. In ICDM ’01 : Proceedings
+of the 2001 IEEE International Conference on Data Mining, pp. 313–320.
+Nijssen, S. et J. N. Kok (2004). A quickstart in frequent structure mining can make a diffe-
+rence. In KDD ’04 : Proceedings of the tenth ACM SIGKDD international conference on
+Knowledge discovery and data mining, New York, NY, USA, pp. 647–652. ACM Press.
+Régin, J.-C. (1995). Développement d’outils algorithmiques pour l’intelligence artificielle.
+Application à la chimie organique. Thèse de l’Université des Sciences et Techniques du
+Languedoc, Montpellier.
+Yan, X. et J. Han (2002). gspan : Graph-based substructure pattern mining. In ICDM ’02 :
+Proceedings of the 2002 IEEE International Conference on Data Mining, Washington, DC,
+USA, pp. 721. IEEE Computer Society.
 Summary
-In the data preparation phase of data mining, supervised discretization and value grouping
-methods have numerous applications: interpretation, conditional density estimation, filter se-
-lection of input variables, variable recoding for classification methods. These methods usually
-assume a small number of output values, typically less than ten, and reach their limit when
-their number increases. In this paper, we extend discretization and value grouping methods,
-based on the partitioning of both the input and output variables. The best joint partitioning is
-searched by maximizing a Bayesian model selection criterion. We show how to exploit this
-preprocessing method as a preparation for the naïve Bayes classifier. Extensive experiments
-demonstrate the benefits of the approach in the case of hundred of output values.
-RNTI-E-19 - 548 -
+Synthesis in organic chemistry consists in designing new molecules from reactants and
+reactions. Synthesis experts use very large databases of chemical reactions through standard
+querying procedures. A discovery process of new reactions would be very useful to set up new
+synthesis processes. This paper presents a model of chemical reactions based on graphs and
+introduces a method for mining those reaction graphs, that makes generic patterns emerge and
+can be used for discovering new reactions. Finally this article sums up the progress of this
+research work by presenting a general model in which a new reaction mining algorithm will
+fit.
+- 528 -RNTI-E-6

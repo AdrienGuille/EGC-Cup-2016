@@ -1,633 +1,517 @@
-Une approche fondée sur la corrélation entre prédicats pour
-le traitement des réponses pléthoriques
-Patrick Bosc∗, Allel Hadjali∗, Olivier Pivert∗, Grégory Smits∗∗
-∗Irisa ENSSAT - Univ. Rennes 1, Lannion France
-{bosc,hadjali,pivert}@enssat.fr
-∗∗Irisa IUT Lannion - Univ. Rennes 1, Lannion, France
-gregory.smits@univ-rennes1.fr
-Résumé. L’interrogation de bases de données, dont les dimensions ne cessent
-de croître, se heurte fréquemment au problème de la gestion des réponses plé-
-thoriques. Une des approches envisageables pour réduire l’ensemble des résul-
-tats retournés et le rendre exploitable est de contraindre la requête initiale par
-l’ajout de nouvelles conditions. L’approche présentée dans cet article s’appuie
-sur l’identification de liens de corrélation entre prédicats associés aux attributs
-de la relation concernée. La requête initiale peut ainsi être intensifiée automati-
-quement ou par validation de l’utilisateur à travers l’ajout de prédicats proches
-sémantiquement de ceux spécifiés.
+Extraction de Regles d’Association Quantitatives
+Application a des Donnees Medicales
+Cyril Nortet Ansaf Salleb
+Teddy Turmeaux Christel Vrain
+LIFO Rue Leonard de Vinci BP 6759 45067 Orleans Cedex 02
+fCyril.Nortet, Teddy.Turmeaux, Christel.Vraing@lifo.univ-orleans.fr
+IRISA/INRIA, Projet Dream, Campus de Beaulieu, Rennes
+Ansaf.Salleb@irisa.fr
+Resume. L’extraction de regles d’association est devenue aujourd’hui
+une ta^che populaire en fouille de donnees. Cependant, l’algorithme Apriori
+et ses variantes restent dedies aux bases de donnees renfermant des infor-
+mations categoriques.
+Nous proposons dans cet article QuantMiner, qui est un outil que nous
+avons developpe dans le but d’extraire des regles d’association gerant va-
+riables categoriques et numeriques. L’outil que nous proposons repose sur
+un algorithme genetique permettant de decouvrir de facon dynamique les
+intervalles des variables numeriques apparaissant dans les regles.
+Nous presentons egalement une application reelle de notre outil sur des
+donnees medicales relatives a la maladie de l’atherosclerose et donnons
+des resultats de notre experience pour la description et la caracterisation
+de cette maladie.
+Mots cle : Fouille de Donnees, Regle d’Association, Attribut Numerique,
+Discretisation, Attribut Categorique, Algorithme Genetique.
 1 Introduction
-Depuis le début des années 90, il a été reconnu que l’enrichissement des systèmes d’accès
-à l’information par des approches coopératives était devenu un besoin pragmatique et indé-
-niable. Gaasterland (1992) souligne que le principal enjeu des approches coopératives d’accès
-à l’information est de fournir des résultats corrects, fiables et utiles en réponse aux requêtes
-utilisateurs au lieu de résultats littéraux. Les réponses coopératives ont également pour objec-
-tif de fournir des résultats répondant aux besoins et attentes des utilisateurs et ne nécessitant
-aucun effort et traitement supplémentaires pour être examinés et exploités.
-En ce sens, deux problèmes distincts sont fréquemment soulevés. Le premier concerne la
-gestion des requêtes retournant un ensemble de résultats vide. Lorsque aucun enregistrement
-ne répond pleinement à la requête soumise par l’utilisateur, l’enjeu des approches coopéra-
-tives est alors de fournir des réponses alternatives. Le second problème concerne le cas des
-requêtes fournissant des résultats pléthoriques. Ces requêtes retournent un nombre de réponses
-trop important pour être exploitées efficacement et facilement par l’utilisateur. Cette situation
-problématique est d’autant plus actuelle que la présence et l’accès à des bases de données de
-plus en plus volumineuses se démocratisent et se généralisent, notamment via Internet. Parmi
-l’ensemble volumineux des résultats retournés, l’utilisateur n’est généralement intéressé que
-par un sous-ensemble de ces résultats qu’il juge plus pertinent. Pour extraire ce sous-ensemble,
-l’utilisateur doit parcourir la totalité des résultats retournés, ce qui constitue une tâche fasti-
-dieuse et malaisée. Cet article vise à résoudre ce dernier problème en proposant une méthode
-RNTI-E-19- 273 -
-Traitement des réponses pléthoriques par corrélation entre prédicats
-permettant d’extraire un tel sous-ensemble des résultats initiaux qui soit pertinent pour l’utili-
-sateur et de taille raisonnable.
-Notons que ce problème de réponses pléthoriques a déjà été largement abordé par la com-
-munauté des bases de données selon deux axes. Le premier axe, guidé par les données, consiste
-à considérer l’ensemble initial des résultats retournés comme point de départ et à lui appliquer
-des procédures de classement pour ensuite retourner les k meilleurs. Cette approche se heurte
-fréquemment à la difficulté de différencier deux à deux des résultats qui répondent tous plei-
-nement à la requête initiale. Une autre approche de cet axe consiste à résumer l’ensemble des
-résultats pour en fournir une vue synthétique (voir par exemple Ughetto et al. (2008)).
-Le second axe, guidé par la requête, agit sur la requête utilisateur pour la rendre plus restric-
-tive ou fournir des informations ad hoc permettant de réduire l’ensemble des résultats retournés
-ou en privilégier certains. Au sein de cet axe, nous pouvons distinguer différentes approches.
-La première consiste en une intensification des prédicats spécifiés pour contraindre la requête
-initiale (par exemple, le prédicatA ∈ [a1, a2] devientA ∈ [a1+δ, a2−δ]). Pour certains types
-de requêtes cette intensification n’est pas souhaitable dans la mesure où elle peut conduire
-à une modification importante de la sémantique de la requête initiale. De plus, les requêtes
-atomiques comportant une contrainte sur une valeur unique ne peuvent être intensifiées.
-En s’appuyant à la fois sur une extension du langage d’interrogation des bases de données
-et sur une modélisation des préférences, une seconde approche consiste à solliciter l’utilisateur
-pour qu’il spécifie, en complément des contraintes de sélection, des préférences sur d’autres
-attributs. Ces connaissances peuvent ainsi être exploitées pour privilégier parmi un ensemble
-de résultats ceux respectant le mieux les préférences spécifiées.
-Une troisième approche consiste à compléter la requête initiale par des contraintes sup-
-plémentaires afin de la rendre plus restrictive. C’est dans cette dernière approche que s’ins-
-crivent les travaux présentés dans cet article. Le principe de l’approche proposée est basé sur
-l’identification de liens de corrélation entre prédicats applicables sur les attributs de la relation
-concernée, afin de contraindre la requête initiale par l’ajout de nouveaux prédicats. Ces prédi-
-cats sont choisis car ils partagent un lien sémantique avec ceux spécifiés par l’utilisateur. Cette
-démarche vise à réduire la cardinalité de l’ensemble des résultats retournés à l’utilisateur tout
-en respectant le sens des souhaits véhiculés dans la requête.
-Le processus d’intensification présenté dans ce document peut être déployé de manière
-automatique ou semi-automatique en demandant à l’utilisateur de choisir le prédicat à intégrer
-à sa requête initiale parmi ceux identifiés comme les plus corrélés.
-Après une présentation des principaux travaux existants dans la section 2, la section 3
-décrit les fondements de notre approche et plus particulièrement l’identification des relations
-de corrélation entre prédicats. La section 4 montre comment ces relations de corrélation sont
-exploitées pour contraindre des requêtes atomiques ainsi que des requêtes conjonctives. Un
-exemple complet et concret illustre cette approche dans la section 5.
-2 Travaux existants
-Réduire ou organiser un ensemble trop volumineux de résultats pour faciliter son analyse
-par un utilisateur est une problématique récurrente qui dépasse le cadre de l’interrogation des
-bases de données. Dans le contexte de la recherche d’information, les documents retournés
-sont associés à un score représentant des mesures de similarité, de pertinence et de popularité
-RNTI-E-19 - 274 -
-Bosc et al.
-en accord avec les mots clés spécifiés dans une requête utilisateur. Différentes stratégies ont
-été envisagées pour classer les documents retournés, allant des modèles vectoriels introduits
-par Salton et al. (1975) aux modèles de langues statistiques (cf. Croft et Lafferty (2003)), en
-passant par les systèmes de recherche d’information probabilistes dont un exemple est donné
-dans Jones et al. (2000). Ces stratégies restent cependant focalisées sur les attributs textuels et
-sont difficilement transposables aux attributs numériques et catégoriels.
-Différents travaux dans le domaine de l’interrogation de bases de données relationnelles ont
-été proposés pour fournir des méthodes de classement des résultats retournés. Rui et al. (1997)
-et Wu et al. (2000) exploitent notamment les retours ou exemples donnés par l’utilisateur pour
-identifier et classer les objets multimédia les plus pertinents par rapport à une requête initiale.
-Les approches probabilistes en recherche d’information ont également été plus directement
-reprises par Chaudhuri et al. (2004) pour proposer un modèle de classement prenant en compte
-les dépendances et corrélations entre attributs spécifiés et non spécifiés dans la requête afin
-d’associer un score à chaque tuple retourné. Outre le fait que cette dernière approche ne traite
-que les requêtes comportant des contraintes de type attribut = valeur, ces différents travaux
-nécessitent de disposer d’un historique de requêtes ou de retours d’utilisateurs pour construire
-leurs modèles. Ces connaissances ne sont pas toujours disponibles, surtout pour les nouvelles
-bases de données. Dans un contexte plus restrictif de bases de données commerciales, Su et al.
-(2006) proposent de classer les produits retournés par une requête utilisateur en fonction de
-leur intérêt commercial (présence obligatoire d’un attribut prix).
-Les travaux de Kießling (2002) et Chomicki (2002) visent également à fournir des mé-
-thodes permettant de classer un ensemble potentiellement trop volumineux de résultats. Ces
-méthodes s’appuient sur des préférences spécifiées par l’utilisateur au sein de la requête et
-donc une extension des langages d’interrogation de bases de données relationnelles. Cette ap-
-proche exige cependant de l’utilisateur qu’il considère des préférences sur des attributs ne
-concernant pas directement l’objet de sa requête initiale.
-Dans le contexte de l’interrogation flexible de bases de données, Bodenhofer et Küng
-(2003) enrichissent le langage VQS à l’aide d’opérateurs et proposent un classement des tuples
-retournés par une requête initiale. Dans ce même contexte de requêtes flexibles, Bosc et al.
-(2008) proposent d’utiliser un opérateur d’érosion sur un des prédicats flous de la requête ini-
-tiale pour contraindre cette dernière et ainsi réduire l’ensemble des résultats retournés. Pour
-certains prédicats, cette dernière approche entraîne cependant une modification importante et
-pas forcément souhaitée par l’utilisateur de la portée et du sens de la requête initiale.
-L’étude proposée par Ozawa et Yamada (1994) pour le traitement des requêtes à réponses
-pléthoriques est celle qui se rapproche le plus de nos travaux. Dans Ozawa et Yamada (1994),
-les données de la base concernée sont classées dans différents ensembles flous caractérisés
-par une étiquette linguistique associée à une fonction d’appartenance. Ces ensembles flous
-constituent une macro-expression des données exprimant leur distribution au sein de la base.
-En s’appuyant sur ces connaissances établies a priori, un degré de dispersion des résultats
-retournés par la requête initiale est calculé pour chaque attribut. L’approche définie par Ozawa
-et Yamada (1994) propose ensuite à l’utilisateur d’enrichir sa requête initiale à l’aide d’une
-nouvelle contrainte portant sur l’attribut sur lequel les résultats de la requête initiale sont le plus
-dispersés. La limite de cette approche réside dans le fait que l’attribut identifié comme celui
-proposant une dispersion maximale peut correspondre à une caractéristique non importante
-pour l’utilisateur et surtout n’ayant aucun lien avec les contraintes spécifiées dans la requête
-RNTI-E-19- 275 -
-Traitement des réponses pléthoriques par corrélation entre prédicats
-initiale.
-Pour illustrer cette limite, prenons l’exemple d’une base décrivant un ensemble important
-de véhicules d’occasion et comportant notamment une relation R_Véhicules composée des
-attributs {désignation, prix, km, année, puissance, type, indiceSecurité,
-indiceConfort, vitesseMax}.
-Soit la requête Q : SELECT * FROM R_Véhicules WHERE km < 30000 AND type = ’break’ ;
-L’approche envisagée par Ozawa et Yamada (1994) pourrait proposer à l’utilisateur de
-rajouter une contrainte sur le prix ou la puissance en observant par exemple que les voitures de
-moins de 30000 km et de type break sont dispersées sur ces attributs.
-L’approche présentée dans cet article adopte une démarche différente, en partant notam-
-ment de l’hypothèse que les propriétés les plus importantes pour l’utilisateur sont spécifiées
-dans sa requête et que cette requête doit être complétée par des contraintes respectant le sens
-de la requête initiale. Notre approche propose d’intégrer de nouveaux prédicats à la requête
-initiale, mais ces prédicats ne sont pas choisis par rapport à la dispersion des données qu’ils
-caractérisent, mais principalement pour leur lien sémantique avec un des prédicats spécifiés.
-Pour cet exemple, notre approche proposera en priorité à l’utilisateur les voitures récentes
-et disposant d’indices de sécurité et de confort élevés, qui apparaissent comme des propriétés
-corrélées sémantiquement à celles spécifiées dans la requête Q.
-3 Corrélation entre prédicats
-3.1 Présentation du problème
-Soit une relation R contenant n tuples {t1, t2, ..., tn} définis sur un ensemble Z dem attri-
-buts numériques ou catégoriels {Z1, Z2, ..., Zm}. SoitQ une requête surR de la forme : SELECT
-* FROM R WHERE Z1 = z1 AND Z2 > z2 AND . . . AND Zk IN (zk1, zk2, ..., zks);, ou plus généralement une
-requête composée d’une conjonction de prédicats d’égalité, inégalité, d’intervalle, d’apparte-
-nance, etc. Chaque Zi correspond à un attribut de R et les zi à des valeurs de son domaine de
-définition.
-L’ensemble de tuples ΣQ = {t1, t2, ..., tp} désigne les résultats de la requête Q sur la base
-concernée. Le problème de la gestion des résultats pléthoriques apparaît lorsque la cardinalité
-de l’ensemble des résultats (i.e. |ΣQ|) est trop grand 1 pour être facilement exploité par l’uti-
-lisateur. Ainsi, pour réduire l’ensemble ΣQ des résultats retournés, nous proposons d’intégrer
-de nouveaux prédicats à la requête initialeQ pour former une requêteQ′ plus sélective et ainsi
-retourner à l’utilisateur un ensemble ΣQ′ , tq. ΣQ′ ⊂ ΣQ. Comme suggéré par Chaudhuri et al.
-(2004), il peut paraître plus judicieux de privilégier les tuples de ΣQ qui possèdent des pro-
-priétés non spécifiées liées sémantiquement aux propriétés spécifiées dans la requête Q. Nous
-proposons d’identifier ces liens sémantiques en nous appuyant sur la notion de corrélation entre
-des prédicats prédéfinis et la requête de l’utilisateur.
-3.2 Connaissances disponibles a priori
-Nous supposons disponibles a priori des connaissances renseignant sur la distribution des
-données de la base. Ces connaissances sur la distribution des données sont matérialisées par des
-1. Cette limite est évidemment dépendante du contexte applicatif dans lequel le problème est considéré.
-RNTI-E-19 - 276 -
-Bosc et al.
-partitions du domaine de définition de chacun des attributs de la relation concernée. Un attribut
-Zi est donc associé à une partition Pi = {Pi1, Pi2, ..., Pisi}. Ces partitions sont construites lors
-de la définition du schéma de la base par un expert.
-Pour les attributs numériques, ces partitions définissent des plages de données qui corres-
-pondent à des prédicats d’intervalle et pouvant décrire un regroupement de tuples possédant
-une propriété commune sur l’attribut concerné. Par exemple, sur l’attribut année de la relation
-R_Vehicules, la plage de valeur [0, 3] peut constituer un intervalle décrivant les voitures
-très récentes. En ce qui concerne les attributs catégoriels, les différentes valeurs constituent
-individuellement ou par regroupement des éléments de la partition.
-Pour rendre ces partitions plus exploitables et surtout décrire la propriété exprimée par
-chaque regroupement de valeurs, un ensemble de labels linguistiques est associé à chaque
-partition (Fig. 1 ). Ainsi, la partition Pi portant sur l’attribut Zi est associée à l’ensemble de
-labels Li = {Li1, Li2, ..., Lisi}. Ces labels décrivent d’une manière linguistique et naturelle
-les propriétés possédées par les éléments des partitions (par. ex : Lannée = {"très récente",
-"récente", "d’âge moyen","ancienne", "très ancienne"}).
-Pour chaque élément Pij de la partition Pi d’un attribut Zi , nous dénotons par bmin(Pij)
-et bmax(Pij) les bornes inférieure et supérieure de l’intervalle de valeurs qui le caractérise,
-et par card(Pij) le nombre de tuples de la base qui ont une valeur appartenant à l’intervalle
-concerné. Cette dernière information soulève évidemment le problème de l’adéquation et de la
-mise-à-jour de cette donnée en fonction de l’évolution de la base de données. Sans toutefois dé-
-velopper cet aspect récurrent dans les approches basées sur une représentation des distributions
-de données, une solution consisterait à actualiser ces connaissances de manière incrémentale
-après une ou plusieurs modifications opérées sur la base.
-Xi
-card(P ij)
-P i1 P i2 P is
-Li1 Li2 Lis
-...
-...
-p
-p p p
-FIG. 1 – Partition et étiquetage d’un attribut
-Ainsi, chaque élément Pij de la partition Pi d’un attribut Zi constitue un prédicat d’inter-
-valle décrit par une étiquette Lij et que nous nommons prédicat prédéfini (noté P
-p
-ij)
-par opposition aux prédicats spécifiés (notés P si ) qui désignent les prédicats présents
-dans la requête initiale. L’intensification d’une requête repose sur l’intégration de un ou plu-
-sieurs prédicats prédéfinis comme contraintes de la forme zi BETWEEN bmin(Pij) AND bmax(Pij) si
-Zi est un attribut quantitatif et zi IN elem(Pij) 2 si Zi est un attribut catégoriel.
-Ozawa et Yamada (1994) exploitent des connaissances similaires aux partitions présen-
-tées précédemment, qui constituent ce qu’ils nomment une macro-expression de la base de
-données. Cette macro-expression de la base est construite automatiquement en exploitant les
-résultats d’un processus de classification automatique floue (Fuzzy C-Means) décrit dans Bez-
-2. elem(Pij) désigne la ou les catégories désignées par Pij .
-RNTI-E-19- 277 -
-Traitement des réponses pléthoriques par corrélation entre prédicats
-dek (1984). Les classes floues qui correspondent aux éléments de nos partitions avec des li-
-mites graduelles sont ensuite associées à des étiquettes linguistiques définies manuellement et
-a priori, ceci également afin d’améliorer la compréhension des classes construites.
-Les partitions du domaine de définition des attributs pourraient également être obtenues
-en utilisant les méthodes de construction d’histogrammes (Ioannidis (2003)). Cependant, telle
-que nous l’utilisons, la partition du domaine de définition d’un attribut n’a pas pour objectif
-principal de capturer une distribution figée des données de la base sur cet attribut, mais bien
-d’associer un sens ou plutôt une propriété à un intervalle de valeurs par l’intermédiaire d’une
-étiquette linguistique. C’est pourquoi, nous considérons que ces partitions sont établies lors de
-la création de la base par un expert et reflètent des regroupements de valeurs cohérents et de
-« bon sens », apportant une connaissance supplémentaire d’ordre sémantique sur les attributs.
-3.3 Corrélation entre prédicats et requête
-L’idée sous-jacente de notre approche est de considérer qu’un prédicat prédéfini est corrélé
-à une requête utilisateur s’il caractérise un ensemble d’éléments similaire à celui retourné par
-la requête. Par exemple, nous considérons qu’un prédicat désignant les voitures récentes (vé-
-tusté inférieure à 3 ans) est corrélé à une requête visant à sélectionner les véhicules de faible
-kilométrage, dans la mesure où les véhicules récents ont souvent un kilométrage faible. Pour
-évaluer cette corrélation, nous comparons l’ensemble des résultats retournés par la requête et
-les tuples décrits par le prédicat prédéfini. Pour quantifier ce lien de corrélation, nous utili-
-sons une mesure définie sur l’intervalle unité [0, 1] exprimant l’égalité graduelle entre deux
-ensembles. Ainsi, plus le degré d’égalité entre ces deux ensembles de tuples est élevé, plus la
-requête et le prédicat prédéfini sont corrélés.
-Soit une requête Q et ΣQ l’ensemble des tuples retournés. Soit P
-p
-ij le j
-eme prédicat prédé-
-fini sur l’attribut Zi, attribut non spécifié dans Q, et B l’ensemble des tuples caractérisés par
-ce prédicat. Le degré de corrélation entre P pij et Q, noté cor(P
-p
-ij , Q), repose donc sur le calcul
-du degré d’égalité entre ΣQ et B :
-cor(P pij , Q) =
-card(ΣQ ∩B)
-card(ΣQ ∪B)
-Ce degré de corrélation qui correspond à l’indice de Jaccard vérifie les propriétés de ré-
-flexivité (cor(P pij , P
-p
-ij) = 1) et de symétrie (cor(Q,P
-p
-ij) = cor(P
-p
-ij , Q)).
-Capacité de réduction d’un prédicat
-Le choix du prédicat prédéfini pour l’intensification de la requête initiale ne peut reposer
-uniquement sur la maximisation du degré de corrélation avec les prédicats spécifiés. En ef-
-fet, cette stratégie pourrait conduire à sélectionner un prédicat prédéfini entièrement ou très
-fortement corrélé à un prédicat spécifié (degré de corrélation égal ou proche 1) et l’ajout de
-cette propriété ne réduirait pas suffisamment l’ensemble initial des résultats retournés. Pour
-pallier ce problème, nous appliquons sur le degré de corrélation une fonction d’appartenance
-triangulaire sur l’intervalle [0, 1] permettant de favoriser les prédicats offrant un compromis
-entre corrélation et capacité de réduction. Cette fonction, notée μcorMod : [0, 1] → [0, 1], est
-définie par un seul point γ caractérisant le degré de corrélation de référence comme l’illustre la
-RNTI-E-19 - 278 -
-Bosc et al.
-figure 2. Le résultat de l’application de cette fonction sur un degré de corrélation cor(P pij , Q)
-est appelé degré de corrélation modifié noté corMod(P pij , Q).
-1
-0 1
-cor(P  ,Q)pij
-
-corMod
- (             )cor(P  ,Q)pij
-FIG. 2 – Fonction de calcul du degré de corrélation modifié
-Le point γ permet d’influer sur le comportement du processus d’intensification. En favori-
-sant les degrés de corrélation élevés, les prédicats prédéfinis les plus corrélés seront privilégiés
-au détriment de leur capacité de réduction. Les degrés les plus faibles permettront une réduc-
-tion plus rapide de l’ensemble initial des résultats mais entraîneront l’ajout des prédicats les
-moins corrélés (Algo. 1).
-Actuellement, le point γ décrivant cette fonction est un paramètre technique possédant
-une valeur par défaut (γ = 0.6). Nous envisageons cependant de développer une méthode
-permettant d’ajuster automatiquement la valeur de ce paramètre en fonction des spécificités
-de la requête. L’idée sous-jacente est d’exploiter la clause TOP N de la requête, si celle-ci est
-spécifiée, ou bien de demander à l’utilisateur le nombre N de résultats attendu. À partir de ces
-informations et d’une estimation du nombre de résultats obtenus suite à l’intégration de chacun
-des prédicats pré-définis les plus corrélés à la requête initiale, il sera possible d’identifier la
-valeur γ garantissant le meilleur compromis entre corrélation et capacité de réduction.
-4 Intensification des requêtes
-4.1 Tables de corrélation entre prédicats
-Il serait inefficace de calculer à chaque fois que l’on est confronté à une requête à réponses
-pléthoriques les degrés de corrélation entre la requête et tous les prédicats prédéfinis sur tous
-les attributs de la relation. Nous proposons donc d’établir et de maintenir une table de corréla-
-tion dans laquelle sont stockées ces connaissances. Cette table contient autant de lignes et de
-colonnes qu’il y a de prédicats prédéfinis et renseigne pour chaque couple de prédicats prédé-
-finis (P pij , P
-p
-kl), k = i le degré de corrélation cor(P pij , Q) entre le prédicat P pij et une requête
-Q = P pkl. À partir de ces informations, nous pouvons stocker pour chaque prédicat prédéfini
-P pij , la liste des autres prédicats prédéfinis classés par ordre décroissant de leur degré de corré-
-lation vis-à-vis d’une requête Q = P pkl. Nous estimons qu’il n’est pas nécessaire de conserver
-la liste ordonnée de tous les prédicats les plus corrélés à chaque prédicat prédéfini dans la me-
-sure où l’intégration de plus de 3 ou 4 prédicats supplémentaires conduirait à une modification
-trop importante de la visée de la requête. Nous ne conservons et n’exploitons ainsi que les cinq
-prédicats les plus corrélés.
-RNTI-E-19- 279 -
-Traitement des réponses pléthoriques par corrélation entre prédicats
-Afin d’exploiter les connaissances stockées dans cette table, il est nécessaire d’identifier
-pour chaque prédicat spécifié son prédicat prédéfini le plus proche dans le domaine de défini-
-tion de l’attribut concerné. Pour les attributs numériques, nous utilisons une mesure de distance
-entre deux prédicats P si et P
-p
-ij inspirée de la distance de Hausdorff notée dist(P
-s
-i , P
-p
-ij) :
-dist(P si , P
-p
-ij) = max(|bmin(P si )− bmin(P pij)|, |bmax(P si )− bmax(P pij)|).
-Dans le cas où les prédicats P si et P
-p
-ij portent sur des attributs catégoriels, cette mesure est
-remplacée par le nombre de catégories désignées par P si ou P
-p
-ij moins celles en commun
-entre P si et P
-p
-ij (i.e. |elem(P si ) ∪ elem(P pij)| − |elem(P si ) ∩ elem(P pij)|). Le prédicat le
-plus proche P ′si d’un prédicat P
-s
-i défini sur l’attribut Zi, attribut associé à la partition Pi =
-{P pi1, P pi2, ..., P pih}, est celui qui minimise cette distance :
-P ′si = P
-p
-ij tel que dist(P
-p
-ij , P
-s
-i ) = infj=1,hdist(P
-p
-ij , P
-s
-i )
-4.2 Processus d’intensification
-4.2.1 Requêtes atomiques
-L’intensification d’une requête atomique Q = P si peut être automatisée en appliquant
-l’algorithme 1.
-Algorithme 1 Intensification d’une requête Q = P si
-Entrée : Q = P si //requête initiale
-γ //degré de corrélation de référence
-ΣQ = resultats(Q)
-/*Recherche du prédicat prédéfini P ′si le plus proche de P
-s
-i */
-P ′si = P
-p
-ij tel que dist(P
-p
-ij , P
-s
-i ) = infj=1,hdist(P
-p
-ij , P
-s
-i )
-/*Récupération des cinq prédicats prédéfinis les plus corrélés à P ′si */
-C = correles(5, P ′si )
-/*Récupération des cinq prédicats possédant les plus forts degrés de corrélation modifiés avec P ′si */
-I = modificationDegres(γ,C)
-k = 1
-tantque est_plethorique(ΣQ) faire
-/*intégration du keme prédicat prédéfini maximisant le degré de corrélation modifié avec Q
-ou du prédicat choisi par l’utilisateur si l’intensification n’est pas automatique*/
-Q = Q ∧ I[k]
-ΣQ = execute(Q)
-k = k + 1
-fin tantque
-Sortie : ΣQ
-En exploitant la table de corrélation, l’intensification d’une requête atomique devient un
-processus efficace reposant sur l’application directe de l’algorithme 1. L’identification du pré-
-dicat prédéfini P ′si le plus proche du prédicat spécifié P
-s
-i dans la requêteQ nécessite cependant
-une comparaison avec l’ensemble des prédicats prédéfinis sur l’attribut Zi. La récupération des
-RNTI-E-19 - 280 -
-Bosc et al.
-prédicats prédéfinis les plus corrélés au prédicat prédéfini le plus proche du prédicat spécifié
-est directe étant donné que ces informations sont accessibles dans la table de corrélation. De
-même, le degré de corrélation modifié est calculé uniquement sur les cinq prédicats prédéfinis
-les plus corrélés. L’exécution de la requête intensifiée est évidemment effectuée sur l’ensemble
-des résultats de la requête initiale et non sur la totalité de la base si tous les attributs nécessaires
-font partie de la projection initiale.
-4.2.2 Requêtes conjonctives
-Dans le cas d’une requête conjonctive Q = P s1 ∧ P s2 ∧ ... ∧ P sr conduisant à des résultats
-pléthoriques, la méthode de sélection des prédicats prédéfinis à intégrer diffère quelque peu.
-Pour chaque prédicat spécifié P si , i = 1..r, nous conservons toujours les 5 prédicats pré-
-définis maximisant le degré de corrélation vis-à-vis de chaque requête Q′ = P ′si , i = 1..r, où
-nous rappelons que P ′si est le prédicat prédéfini le plus proche de P
-s
-i . Après calcul du degré
-de corrélation modifié, nous reclassons ces prédicats par ordre décroissant de leur degré de
-corrélation modifié moyen.
-Soit P pij un des prédicats prédéfinis conservés. Le degré de corrélation modifié de ce pré-
-dicat par rapport à la requête conjonctive Q et à la fonction de modification du degré de corré-
-lation μcorMod est recalculé de la façon suivante :
-corMod(P pij , Q) =
-1
-r
-.
-r∑
-k=1
-μcorMod(cor(P
-p
-ij , P
-′s
-k ))
-En tenant compte de ce nouveau classement partiel, l’algorithme 1 est ensuite appliqué
-pour l’intensification des requêtes conjonctives.
-5 Exemple
-Pour illustrer cette approche, reprenons l’exemple de la relation de test R_Vehicules
-introduit en section 2 et la requête :
-Q = SELECT * FROM R_Vehicules WHERE km BETWEEN 10000 AND 30000 AND type = ‘break’ ;
-Pour illustrer notre approche, nous considérons l’ensemble des résultats ΣQ pléthorique
-avec notamment |ΣQ| = 108.
-La figure 3 illustre des partitions possibles des attributs année et type concernés par la
-requête Q. On remarque que les prédicats prédéfinis les plus proches des prédicats spécifiés
-P s1 = km BETWEEN 10000 AND 30000et P s2 = type = ‘break’ sont respectivement Ppkm1 (Lkm1 = ‘très faible’) et
-Pptype5 ((Ltype5 = familial’)), d’où P ′s1 = Ppkm1 et P ′s2 = P
-p
-type5 .
-La table 5 propose des extraits de la table de corrélation et de réduction disponible, per-
-mettant notamment d’appréhender la distribution des tuples appartenant à ΣQ.
-Pour cet exemple, nous considérons que |P ′s1 | = 234 et |P ′s2 | = 172. De même, la car-
-dinalité de chaque partition est spécifiée après chaque label linguistique entre parenthèses.
-Pour chaque couple de prédicats prédéfinis (P ′sk , P
-p
-ij), nous donnons leur degré de corrélation
-cor(P ′sk , Q = P
-p
-ij) et pour information nous avons ajouté entre parenthèses le cardinal de
-l’intersection des ensembles de tuples retournés par ces deux prédicats P ′sk ∧ P pij .
-RNTI-E-19- 281 -
-Traitement des réponses pléthoriques par corrélation entre prédicats
-Xkm
-card(P kmj)
-P km1
-Lkm1
-0 40
-k
-80
-k
-12
-0k
-16
-0k
-20
-0k
-24
-0k
-'très faible' 'faible' 'élevé' 'très élevé'
-P km2 P km3 P km4 P km5
-Lkm2 Lkm3 Lkm4 Lkm5
-'moyen'
-km BETWEEN
-10000 AND 30000
-Xtype
-card(P typej)
-P type1
-Ltype1
-u
-til
-ita
-ire
-s
-po
-rt
-c
-o
-u
-pé
-br
-ea
-k
-4x
-4
-m
-o
-n
-o
-s
-pa
-ce
-'utilitaire' 'sport' 'coupé' 'familial'
-c
-a
-m
-pi
-ng
-c
-a
-r
-P type2P type3P type4 P type5 P type6
-Ltype2 Ltype3 Ltype4 Ltype5 Ltype6
-'4x4' 'camping
-car'
-type = 'break'
-p p p p p p
-p p p p p
-p p
-FIG. 3 – Partitions des attributs km et type
-Attribut puissance
-Lpuissancei ‘faible’(275) moyenne’(502) ‘élevée’(435)
-P ′s1 0,067 (32) 0,059 (41) 0,055 (35)
-P ′s2 0,067 (28) 0,039 (25) 0,1 (55)
-Attribut prix
-Lprixi ‘bas’(161) ‘moyen’(342) ‘élevé’(417) ‘très élevé’(262)
-P ′s1 0,008 (3) 0,016 (9) 0,085 (51) 0,102 (46)
-P ′s2 0,034 (11) 0,078 (37) 0,069 (38) 0,053 (22)
-Attribut année
-Lanneei ‘très récent’(90) ‘récent’(302) ‘moyen’(339) ‘ancien’(310) ‘très ancien’(171)
-P ′s1 0,286 (72) 0,045 (23) 0,016 (9) 0,006 (3) 0,02 (1)
-P ′s2 0,087 (21) 0,049 (22) 0,045 (22) 0,057 (26) 0,052 (17)
-Attribut indiceConfort
-LindiceConforti ‘faible’(349) ‘moyen’(435) ‘élevé’(368) ‘très élevé’(60)
-P ′s1 0,021 (12) 0,032 (21) 0,058 (33) 0,167 (42)
-P ′s2 0,012 (6) 0,032 (19) 0,084 (42) 0,215 (41)
-Attribut indiceSecurite
-LindiceSecuritei ‘bas’(107) ‘moyen’(442) ‘élevé’(399) ‘très élevé’(264)
-P ′s1 0,018 (6) 0,034 (22) 0,082 (48) 0,117 (52)
-P ′s2 0,004 (1) 0,022 (13) 0,071 (38) 0,147 (56)
-Attribut vitesseMax
-LvitesseMaxi ‘faible’(276) ‘moyen’(542) élevée’(394)
-P ′s1 0,065 (31) 0,057 (42) 0,059 (35)
-P ′s2 0,067 (28) 0,08 (53) 0,05 (27)
-TAB. 1 – Extraits de la table de connaissances pour P ′s1 , P
-′s
+L’extraction de regles d’association est devenue aujourd’hui une ta^che populaire
+en fouille de donnees. Elle a pour but de degager des relations intelligibles entre des
+attributs dans une base de donnees. Une regle d’association (Agrawal et al. 1993) est
+une implication C1 ) C2, ou C1 et C2 expriment des conditions sur les attributs de
+la base de donnees. La qualite d’une regle est classiquement evaluee par un couple de
+mesures support et conance, denis comme suit :
+ Support(C), ou C exprime des conditions sur les attributs, est le nombre de n-
+uplets (lignes de la table) qui satisfont C.
+ Support(C1 ) C2) = Support(C1 ^ C2)
+ Conance(C1 ) C2) = Support(C1^C2)Support(C1)
+Etant donnes deux seuils, MINSUPP et MINCONF, une regle est dite solide, si son
+support et sa conance depassent MINSUPP et MINCONF respectivement.
+Quoique tres utilises, l’algorithme Apriori et ses variantes restent dedies aux bases
+de donnees renfermant des informations categoriques (dites aussi symboliques ou encore
+RNTI-E-3495
+Regles d’Association Quantitatives - Application Medicale
+qualitatives). Or, dans la pratique, les bases de donnees reelles traitent non seulement
+de variables categoriques mais aussi numeriques.
+Nous proposons dans cet article QuantMiner, outil developpe en collaboration
+avec le BRGM, Bureau de Recherches Geologiques et Minieres (service REM/VADO)
+dans le but d’extraire des regles d’association quantitatives, exprimant des correlations
+entre des variables qui peuvent e^tre categoriques et/ou numeriques. L’outil que nous
+proposons repose sur un algorithme genetique permettant de decouvrir de facon dyna-
+mique les intervalles des variables numeriques qui optimisent le support et la conance
+d’une regle d’association. L’idee de base est la suivante : QuantMiner engendre un
+ensemble de schemas de regles et cherche pour chaque regle les meilleurs intervalles
+pour les attributs numeriques la composant. La discretisation obtenue varie donc pour
+chaque schema et depend des attributs categoriques et numeriques qui le composent.
+Divers travaux ont deja porte sur l’apprentissage de regles d’association quantita-
+tives. Plusieurs methodes ont ete proposees, reposant sur une discretisation a priori des
+attributs quantitatifs (voir par exemple (Lent et al. 1997, Srikant et Agrawal 1996)),
+ou sur une discretisation pendant le processus d’apprentissage. La discretisation peut
+alors e^tre eectuee soit pendant la phase de generation des regles (Fukuda et al. 1996a,
+Rastogi et Shim 1999), mais dans ce cas le format des regles est souvent tres limite,
+soit pendant la phase de generation des itemsets frequents (Mata et al. 2002).
+A notre connaissance, seul ce dernier travail repose sur l’utilisation d’un algorithme
+genetique. La problematique est cependant dierente dans la mesure ou l’algorithme
+genetique est dans leur cas, utilise pour recherche des itemsets frequents optimisant un
+critere de qualite fonde principalement sur le support. QuantMiner cherche a trouver
+des intervalles numeriques optimisant la qualite (support et conance) d’une regle.
+QuantMiner est un outil interactif et convivial. Il a ete utilise sur deux applica-
+tions, l’une concerne la recherche de regles d’association dans un Systeme d’Information
+Geographique developpe par le BRGM, la seconde concerne des donnees medicales re-
+latives a la maladie de l’atherosclerose. Nous presentons des resultats obtenus sur cette
+seconde application.
+Le papier est organise comme suit. Dans la section suivante, nous faisons un etat de
+l’art des divers travaux portant sur l’apprentissage de regles d’association quantitatives.
+Dans la section 3, nous decrivons l’outil QuantMiner que nous avons developpe. La
+section 4 est dediee a l’application de QuantMiner sur des donnees medicales. La sec-
+tion 5 discute des ameliorations possibles de notre approche ainsi que des perspectives
+que nous envisageons dans cette thematique.
+2 Regles d’Association Quantitatives
+Cette section, inspiree de (Salleb 2003) et de (Nortet), est d’une part une synthese
+des principaux travaux d’extraction de regles d’association quantitatives et d’autre part
+apporte un point de vue critique des approches proposees dans la litterature.
+L’algorithme Apriori (Agrawal et Srikant 1994) et ses variantes (voir par exemple
+(Brin et al. 1997, Bayardo 1998, Zaki 2000, Salleb et al. 2002)) ont ete concus pour des
+bases de donnees booleennes, c’est a dire dont les items sont categoriques et prennent
+leurs valeurs dans un ensemble discret, de cardinal ni. Mais dans la plupart des cas, les
+RNTI - 1
+RNTI-E-3 496
+Cyril Nortet et al.
+donnees sont decrites dans un formalisme attribut-valeur et stockees dans une relation
+(table). Un attribut peut e^tre de type :
+1. categorique, par exemple couleur est un attribut qui prend ses valeurs dans l’en-
+semble fbleu, rouge, vertg; dans ce cas, par exemple, (couleur=bleu) est considere
+comme un item,
+2. numerique discret, i.e. ayant peu de valeurs numeriques dierentes les unes des
+autres; par exemple, l’attribut nb voitures a pour valeurs possibles f0, 1, 2, 3g,
+on peut former l’item (nb voitures=2),
+3. numerique continu deni sur une large plage de valeurs, comme par exemple a^ge
+dont le domaine est [0,120], un item possible serait, par exemple, a^ge 2 [20,40].
+Pour les deux premiers types d’attributs, pour passer de la relation aux items, il
+sut d’enumerer les modalites de l’attribut et de former pour chaque valeur possible
+l’egalite (attribut=valeur). En revanche, ceci n’est pas envisageable pour les attributs
+numeriques continus dans le cadre de l’extraction de regles d’association. En eet, c’est
+rarement sur une valeur particuliere, peu frequente (souvent n’apparaissant qu’une
+seule fois), que l’on generera des regles d’association de qualite, les valeurs numeriques
+etant souvent toutes dierentes d’un n-uplet a un autre. C’est pluto^t dans un intervalle
+de valeurs que des regles interessantes de support susant peuvent e^tre decouvertes.
+Une regle d’association quantitative est une regle dont l’antecedent et le consequent
+sont des conjonctions d’items de la forme (Ai = vi) pour les attributs categoriques ou
+numeriques discrets, ou de la forme Ai 2 [li; ui] pour les attributs numeriques (vi, li et
+ui sont des valeurs du domaine de l’attribut Ai). En voici un exemple :
+a^ge 2 [27; 38] et (marie=oui) =) (nb voitures=2)
+Il va sans dire que le choix de la technique de decoupage des attributs numeriques
+en intervalles a des consequences tres importantes sur la qualite des regles generees.
+Nous pouvons classer les approches proposees dans la litterature pour l’extraction
+de regles quantitatives en trois grandes categories :
+Approche fondee sur une discretisation prealable Un attribut continu est sou-
+vent discretise avant l’etape d’extraction de regles. La discretisation consiste a decouper
+son domaine en un nombre ni d’intervalles. L’attribut, rendu ainsi categorique, peut
+donc e^tre utilise dans l’extraction de regles d’association au me^me titre que les attri-
+buts non continus. Parmi les methodes les plus standard de discretisation, citons :
+- la discretisation en k intervalles de largeur uniforme (equi-width), ou chaque intervalle
+prend la me^me proportion du domaine,
+- la discretisation en k intervalles de frequences egales (equi-depth), ou a chaque inter-
+valle correspond un me^me nombre de n-uplets de la relation,
+- la discretisation non reguliere qui s’appuiera sur des connaissances du domaine.
+La diculte de ces methodes de decoupage reside dans le choix du parametre k pour
+les deux premieres et de la disponibilite de connaissances a priori pour la troisieme.
+Le choix d’une pre-discretisation dans le contexte d’extraction des regles d’association
+a ete souleve et discute dans (Srikant et Agrawal 1996). En eet, en se basant sur de
+trop petits intervalles, on risque d’omettre des regles pour insusance de support, alors
+que si les intervalles sont trop grands, c’est par defaut de conance que nous sommes
+RNTI - 1
+RNTI-E-3497
+Regles d’Association Quantitatives - Application Medicale
+susceptibles de les manquer. Le choix de la discretisation influe de maniere opposee sur
+les deux parametres vitaux du probleme d’extraction de regles.
+La pre-discretisation est souvent utilisee conjointement avec des techniques de fusion
+d’intervalles et de regroupement pour ameliorer le partitionnement (Lent et al. 1997,
+Miller et Yang 1997, Srikant et Agrawal 1996, Wang et al. 1998, Zhang et al. 1997).
+Neanmoins, cette approche n’est pas satisfaisante car elle est sensible au bruit et les
+attributs sont discretises independamment les uns des autres. De plus, rien ne prouve
+que la discretisation preliminaire reflete bien la distribution des donnees et ne nous fait
+pas manquer des regles a fort potentiel.
+Approche guidee par des schemas de regles Ici, les attributs numeriques ne
+sont pas, a proprement parler, discretises. Une nouveaute dans les travaux de Fukuda
+et al. presentes dans (Fukuda et al. 1996a, Fukuda et al. 1996b), est que le mot cle n’est
+plus discretisation mais pluto^t optimisation. Ces auteurs ont developpe des methodes
+ou l’utilisateur specie la forme de l’antecedent et du consequent de la regle. Les regles
+d’association sont dans ce cas restreintes a des regles ou les attributs du membre
+gauche et droit de la regle sont instancies sauf un ou deux attributs numeriques dans
+la partie gauche de la regle. Il faut ensuite trouver les intervalles pour ces attributs
+numeriques non instancies qui maximisent le support ou la conance ou toute autre
+mesure d’intere^t. Dans ces travaux, une nouvelle mesure tres interessante nommee Gain
+est introduite. Elle met en relation le support et la conance et mesure une sorte de
+compromis entre les deux.
+Gain(A) B) = Supp(AB)−MinConf  Supp(A)
+Les supports sont donnes en nombre d’occurrences et non en fraction. Cette mesure fut
+par la suite reprise dans (Rastogi et Shim 1999), ou deux algorithmes fondes sur l’op-
+timisation du gain sont proposes et permettent d’introduire la disjonction de plusieurs
+intervalles dans les regles gerant, la aussi, au plus deux attributs numeriques.
+Une autre vision du probleme fondee sur la distribution des attributs continus a ete
+proposee dans (Aumann et Lindell 1999, Webb 2001). Ici, les distributions statistiques
+(moyenne, variance, ecart-type, minimum etc.) des attributs numeriques sont auto-
+risees dans la partie droite d’une regle. Plus precisement, deux sortes de regles sont
+traitees dans ce travail : dans le membre gauche de la regle un ensemble d’attributs
+categoriques et a droite la distribution de plusieurs attributs numeriques, ou encore
+un seul attribut numerique a gauche et la distribution d’un seul attribut numerique a
+droite. Par exemple :
+Region=Sud =) Salaire : moyenne = 1200 euros / mois
+Comme le precisent les auteurs de ces travaux, quoique interessante, la forme des regles
+reste neanmoins restreinte.
+Approche reposant sur un algorithme genetique L’optimisation est egalement
+la voie choisie dans les travaux de (Mata et al. 2002). Seulement, ici il n’est pas question
+d’optimiser directement des regles mais simplement de trouver les itemsets frequents,
+pour ensuite generer les regles selon la methode traditionnelle. L’algorithme genetique
+propose dans leurs travaux est classique. Un individu est code par une liste de couples
+(attribut numerique; disjonction d’intervalles). Comme tout algorithme evolutionnaire,
+RNTI - 1
+RNTI-E-3 498
+Cyril Nortet et al.
+la qualite des individus (qui sont donc des itemsets) est evaluee par une mesure permet-
+tant d’optimiser le support des itemsets, tout en veillant a ne pas retenir les domaines
+entiers des attributs numeriques et a favoriser les itemsets les plus speciques.
+Il est clair, d’apres la forme de la representation d’un individu, que l’algorithme extrait
+d’un seul coup plusieurs frequents numeriques. Par contre, il ne prend en compte aucun
+attribut categorique, ce qui limite l’applicabilite d’une telle approche. Rajoutons a cela
+que seul le support est optimise, ce qui est insusant.
+Cette etude bibliographique, exposant les principaux travaux dans ce domaine, nous
+a permis de ressentir la diculte du probleme des regles quantitatives mais surtout
+de realiser que pour approcher ce probleme dicile, il faut faire necessairement des
+compromis, comme nous le verrons dans la section suivante dediee a notre approche.
+3 QuantMiner
+A la lumiere de l’etude bibliographique exposee dans la section precedente, nous
+avons d’abord ecarte l’idee d’utiliser une pre-discretisation des variables numeriques.
+En fait, elle rigidie tout le reste du processus d’extraction; c’est en denitive une
+mauvaise facon d’apprehender le probleme. En revanche, nous avons retenu l’idee de
+travailler directement sur l’optimisation de regles quantitatives par algorithme
+genetique. Notre choix de l’optimisation, comme quelques travaux cites plus haut, se
+justie par le fait qu’on travaille sur des variables numeriques, continues qui donnent
+au probleme une complexite telle qu’on ne peut songer a un algorithme exact.
+Il convient ici de montrer clairement ce qui demarque notre approche des tra-
+vaux de Mata et al. D’une part, nous prenons en compte les attributs numeriques et
+categoriques, et d’autre part, optimiser seulement le support des itemsets nous semble
+insusant. C’est pourquoi, nous proposons de travailler directement sur les regles en
+utilisant le support et la conance.
+Ainsi, nous considerons des schemas de regles. Un schema de regle est une regle
+presentant dans chacun de ses membres gauche et droit des items categoriques aux va-
+leurs xees et des items numeriques dont les intervalles correspondant ne sont pas encore
+instancies. Puis par optimisation nous cherchons les bornes les plus adaptees pour cha-
+cun de ses intervalles, en prenant en compte la mesure du Gain (Fukuda et al. 1996a).
+L’algorithme genetique que nous proposons suit une organisation tout a fait tradition-
+nelle (donnee ci-dessous), dont voici les mecanismes adaptes au probleme :
+ Representation d’un individu : Un individu est represente par un ensemble de
+couples (attributi; [li; ui]), ou attributi est le ieme attribut numerique en partant
+de la gauche du schema de regle a optimiser. Lors de la generation de la po-
+pulation initiale, on fabrique des individus dont les intervalles sont de supports
+decroissants, pour garantir une bonne diversite et exprimer des regles aussi bien
+generales que speciques.
+ Fonction de croisement : Pour ajouter un peu de variete a ces regles ini-
+tiales, nous procedons par cette operation a l’echange aleatoire entre parents.
+Pour chaque attribut numerique, l’intervalle correspondant chez l’enfant sera,
+RNTI - 1
+RNTI-E-3499
+Regles d’Association Quantitatives - Application Medicale
+avec une certaine probabilite, ou bien celui du pere, ou bien celui de la mere, ou
+alors un melange des deux (Figure 1).
+ Fonction de mutation : La mutation a pour ro^le d’aner les regles. Il s’agit de
+deplacer chaque borne, par augmentation ou reduction (Figure 1). Le deplacement
+se fait dans le domaine trie de l’attribut numerique et ne doit pas permettre
+d’englober ou d’ecarter plus de 10% de n-uplets couverts par l’intervalle.
+Croisement
+Domaine de l’Attributi
+li
+li
+li
+l0i
+l0i
+l0i
+ui
+ui
+ui
+u0i
+u0i
+u0i
+Mutation
+li
+li
+ui
+uil
+00
+i
+u00i
+Fig. 1 { Operateurs genetiques utilises dans QuantMiner
+ Fonction de qualite
+La qualite repose avant tout sur la valeur du gain. Si celui-ci est positif, on va
+tenter d’en aner les intervalles en favorisant ceux d’amplitudes faibles. Pour
+accentuer la penalite sur un intervalle d’amplitude large, on eleve au carre sa
+proportion (rapport de son amplitude sur l’amplitude du domaine). Une penalite
+supplementaire est attribuee aux regles qui ne depassent pas le seuil de support :
+on diminue la qualite du nombre de n-uplets (valeur qui est en somme dans la
+me^me unite que le gain), pour bien s’assurer qu’un tel individu sera vite ecarte
+de la population.
+Qualite(A=>B)=
+{ QualiteTemporaire = Gain(A=>B);
+Si QualiteTemporaire >= 0
+Alors Pour tout intervalle I
+Faire QualiteTemporaire * = (1-Proportion(I))**2;
+Si Support(A=>B) < MinSupp
+Alors QualiteTemporaire - = NbEnregistrements;
+Renvoyer QualiteTemporaire; }
+RNTI - 1
+RNTI-E-3 500
+Cyril Nortet et al.
+Algorithme QuantMiner
+Entree: une relation (table), POP SIZE, GEN NB, MINSUPP, MINCONF
+Sortie: Regles d’association quantitatives
+1. Choisir un ensemble d’attributs de la relation
+2. Choisir un ensemble de schemas de regles sur ces attributs
+3. Calculer les itemsets frequents sur les attributs categoriques
+apparaissant dans les schemas1
+4. Pour chaque schema de regle
+5. Generer une population aleatoire de taille POP SIZE
+6. Iterer les etapes suivantes GEN NB fois
+7. Former une nouvelle generation de population
+par croisements et mutations
+8. Garder les regles de bonne qualite
+Implementation QuantMiner a ete developpe en Java par Cyril Nortet au BRGM.
+Le logiciel prend en charge des chiers de donnees au format DBF et prend la forme
+d’un assistant (wizard), limite a 5 etapes :
+1) Selection des attributs et denition de leur type
+2) Repartition ne des items (Ai = vi ou Ai 2 [li; ui], les valeurs li; ui non instanciees,
+vi instanciee ou non) aux places ou on souhaite les voir appara^tre dans les regles.
+3) Choix de la technique d’optimisation et reglage des parametres de celle-ci.
+4) Execution de l’algorithme d’optimisation.
+5) Achage des resultats, avec tri selectif des regles produites.
+Dans QuantMiner, le processus de fouille de donnees est interactif; l’utilisateur
+qui est dans ce cas tout pres des regles, precisant celles qui l’interessent. Le processus est
+aussi iteratif dans la mesure ou l’utilisateur peut sauvegarder son contexte d’extraction
+(schemas, methode et parametres) et recommencer le processus ulterieurement.
+En plus du support minimum et de la conance minimum, les parametres de l’algo-
+rithme genetique sont la taille de la population, le nombre de generations, les taux de
+mutations et de croisements. Nous avons xe ces valeurs par defaut a 250 individus, 150
+generations, 40% de mutations et 50% de croisements. Ce choix experimental permet
+d’obtenir des intervalles optimises relativement stables d’une execution a une autre de
+l’application. De nombreuses optimisations dans l’evaluation des regles ont ete integrees
+dans le cur du logiciel. Nous ne pouvons donner tous les details d’implementation
+faute de place, mais a titre indicatif, avec les parametres par defaut, le logiciel parvient
+a traiter en moyenne un schema de regle par seconde sur une base de 2 500 n-uplets.
+Exemple Nous avons eectue a titre experimental des tests sur un jeu de donnees
+classique : les Iris de Fisher (Fisher 1936, Murphy et Aha 1995). Il est compose de 150
+iris repartis en trois familles de proportions identiques : Setosa, Versicolor et Virginica.
+Chaque fleur est decrite par un attribut categorique ESPECE indiquant la famille de
+1Cette etape, semblable a Apriori, permet d’instancier les attributs categoriques dans les schemas.
+RNTI - 1
+RNTI-E-3501
+Regles d’Association Quantitatives - Application Medicale
+la fleur, ainsi que par 4 attributs numeriques mesurant la longueur et largeur de son
+sepale, longueur et largeur de son petale. Considerons le schema suivant :
+ESPECE = valeur ) Larg. Pet.2 [l1; u1] Larg. Sep.2 [l2; u2]
+Long. Pet.2 [l3; u3] Long. Sep.2 [l4; u4] supp%-conf%
+QuantMiner a genere les regles suivantes (voir aussi Figure 2). Elles sont coherentes
+avec les statistiques descriptives de chacune des especes donnees en Table 1.
+ESPECE = Setosa ) Larg. Pet.2[1; 6] Larg. Sep.2[31; 39]
+Long. Pet.2[10; 19] Long. Sep.2[46; 54] 23%-70%
+ESPECE = Versicolor ) Larg. Pet.2[10; 15] Larg. Sep.2[22; 30]
+Long. Pet.2[35; 47] Long. Sep.2[55; 66] 21%-64%
+ESPECE = Virginica ) Larg. Pet.2[18; 25] Larg. Sep.2[27; 33]
+Long. Pet.2[48; 60] Long. Sep.2[58; 72] 20%-60%
+Fig. 2 { Exemple de regle telle que produite par QuantMiner
+Espece Mesure Min Max Moyenne Ecart-type
+Setosa Larg. Pet. 1 6 2.46 1.05
+Larg. Sep. 23 44 34.28 3.79
+Long. Pet 10 19 14.62 1.74
+Long. Sep 43 58 50.6 3.52
+Versicolor Larg. Pet. 10 18 13.26 1.98
+Larg. Sep. 20 34 27.7 3.14
+Long. Pet 30 51 42.6 4.70
+Long. Sep 49 70 59.39 5.16
+Virginica Larg. Pet. 14 25 20.26 2.75
+Larg. Sep. 22 38 29.74 3.22
+Long. Pet 45 69 55.52 5.52
+Long. Sep 49 79 65.88 6.36
+Tab. 1 { Description statistique des trois especes d’iris
+RNTI - 1
+RNTI-E-3 502
+Cyril Nortet et al.
+4 Application a des donnees medicales
+L’atherosclerose est une maladie repandue et grave des arteres dont les parois se
+durcissent provoquant une ge^ne considerable a la circulation du sang.
+Le projet STULONG2 porte sur une etude medicale eectuee pendant 20 ans sur les
+facteurs de risque de cette maladie. Elle concerne une population de patients com-
+posee de 1 419 hommes adultes qui ont ete classes en trois groupes : le groupe des
+patients normaux N, le groupe des patients a risque R et enn le groupe P des pa-
+tients presentant la pathologie. Nous nous sommes interesses a l’extraction de regles
+descriptives et caracteristiques de cette maladie dans le cadre de ce projet.
+An de decrire les patients selon leur groupes et selon qu’ils soient decedes ou non,
+nous nous sommes concentres sur des regles de la forme3 :
+Ensemble de patients =) descriptions
+Par exemple :
+DEATH? = valeur =) descriptions
+GROUP = valeur =) descriptions
+Nous avons ainsi cherche a decrire des patients par rapport a leur consommation
+d’alcool, de tabac, a leur poids, a leur situation sociale, leurs activites physiques ainsi
+qu’aux examens cliniques, biochimiques et physiques eectues lors de leur entree dans
+l’etude. La Table 2 donne un echantillon de regles generees par QuantMiner.
+Regle (A) B) Supp(A) B) Conf(A) B) Conf(:A) B)
+GROUP = N =) ALCO CONS 2 [1.0; 1.2] ^
+BMI 2 [19.73; 27.77] ^ TOBA CONSO 2
+[0.0; 0.5]
+13% 69% 19%
+GROUP = R =) ALCO CONS 2
+[1.0; 1.29] ^ BMI 2 [22.28; 30.72] ^
+TOBA CONSO 2 [0.5; 1.25] ^ TOBA DURA 2
+[15.0; 20.0]
+39% 64% 38%
+GROUP = P =) ALCO CONS 2
+[1.0; 1.53] ^ BMI 2 [21.98; 33.14] ^
+TOBA CONSO 2 [0.5; 1.25]
+5% 64% 60%
+DEATH? = yes =) ALCO CONS 2
+[1.0; 1.28] ^ TOBA CONSO 2
+[0.5; 1.25] ^ TOBA DURA 2 [15.0; 20.0]
+18% 68% 53%
+DEATH? = no =) ALCO CONS 2
+[1.0; 1.23] ^ TOBA CONSO 2 [0.0; 0.85]
+49% 67% 55%
+Tab. 2 { Exemples de regles decouvertes par QuantMiner
 2
-RNTI-E-19 - 282 -
-Bosc et al.
-Sur cet exemple, nous utilisons une fonction de modification du degré de corrélation définie
-par γ = 0, 6. Ainsi, on constate que les cinq prédicats maximisant le degré de corrélation mo-
-difié avec les prédicats P ′s1 et P
-′s
-2 sont respectivement : {année ‘très récent’/0,477;
-indiceConfort ‘très élevé’/0,278; indiceSécurité ‘très élevé’/0,195; p
-rix ‘très élevé’/0,17; prix ‘élevé’/0,142} et {indiceConfort ‘très élevé’
-/0,358; indiceSécurité ‘très élevé’/0,245; puissance ‘élevée’/0,167; an
-née ‘très récent’/0,145; indiceConfort ‘élevé’/0,14} . Ces prédicats prédéfi-
-nis apparaissent bien comme porteurs de propriétés sémantiquement proches de celles spéci-
-fiées dans la requête initiale.
-Nous fusionnons ensuite ces classements pour établir un classement final des prédicats
-selon leur degré de corrélation modifié moyen. On obtient alors : {indiceConfort ‘très
-élevé’/0,318; année ‘très récent’/0,311; indiceSécurité ‘très élevé’/
-0,22; prix ‘très élevé’/0,085; puissance ‘élevée’/0,083; prix ‘élevé’/0
-,071 ; indiceConfort ‘élevé’/0,07}.
-Ce classement final est soit exploité pour intensifier automatiquement la requête initiale
-par application de l’algorithme 1, soit suggéré à l’utilisateur pour qu’il choisisse le (ou les)
-prédicat(s) prédéfini(s) à intégrer à sa requête initiale. Si dans notre exemple, l’utilisateur
-choisit le prédicat (année ‘très récent’) pour intensifier sa requête initiale Q, la re-
-quête Q’ = SELECT * FROM R_Vehicule WHERE km BETWEEN 10000 AND 30000 AND type = ’break’ AND année BETWEEN
-bmin(Ppannee4) AND bmax(P
-p
-annee4) ;
-3 sera construite et exécutée pour générer un ensemble de résul-
-tats ΣQ′ , tq. ΣQ′ ⊂ ΣQ. ΣQ′ est retourné à l’utilisateur ainsi, le cas échéant, que le classement
-calculé précédemment des prédicats prédéfinis les plus corrélés à Q afin de procéder si néces-
-saire à une nouvelle intensification.
-6 Conclusion et perspectives
-L’approche proposée pour le traitement des requêtes à réponses pléthoriques est basée sur
-le principe d’intensification de requêtes au moyen de prédicats prédéfinis. Le choix et l’ordre
-des prédicats à intégrer sont déterminés en utilisant une mesure de corrélation entre les pré-
-dicats prédéfinis associés aux attributs de la relation concernée. Un des avantages majeurs de
-l’approche est qu’elle ne conduit pas à une dégradation importante de la requête initiale. Ceci
-est clairement illustré dans l’exemple considéré. La complexité de l’approche est maintenue
-acceptable grâce à la table de connaissances qui renseigne sur les corrélations entre les prédi-
-cats prédéfinis. Ces connaissances sont établies a priori puis maintenues à jour.
-Après une validation du fondement de cette approche, nous envisageons de mettre en place
-une évaluation qualitative de l’intérêt de ce processus d’intensification par retour d’utilisateurs
-dans un contexte applicatif donné (interrogation de la base de données cinématographique
-IMDB http://www.imdb.com). En plus de présenter à l’utilisateur les prédicats les plus
-corrélés à sa requête initiale, nous envisageons également d’exploiter les connaissances dispo-
-nibles à travers les partitions des domaines de valeurs des attributs pour approximer le nombre
-de tuples qui lui seront retournés suite à l’intégration de chacun de ces prédicats.
-3. Rappel : P pannee4 correspond au quatrième élément de la partition définie sur l’attribut année.
-RNTI-E-19- 283 -
-Traitement des réponses pléthoriques par corrélation entre prédicats
-Références
-Bezdek, J. (1984). Fcm : The fuzzy c-means clustering algorithm. Computers and Geosciences.
-Bodenhofer, U. et J. Küng (2003). Fuzzy orderings in flexible query answering systems. Soft
-Computing 8, 512–522.
-Bosc, P., A. Hadjali, et O. Pivert (2008). Empty versus overabundant answers to flexible rela-
-tional queries. Fuzzy sets and systems 159((12)), 1450–1467.
-Chaudhuri, S., V. H. G. Das, et G. Weikum (2004). Probabilistic ranking of databases query.
-In Proc. of Int. Conf on Very Large Databases, pp. 888–899.
-Chomicki, J. (2002). Querying with intrinsic preferences. EDBT , 34–52.
-Croft, W. et J. Lafferty (2003). Language Modeling for Information Retrieval. Kluwer.
-Gaasterland, T. (1992). Relaxation as a platform for cooperative answering. Journal of Intel-
-ligent Information Systems 1(3-4), 296–321.
-Ioannidis, Y. (2003). The history of histograms (abridged). In Proc. of the 29th Int. Conf. on
-Very Large DataBases.
-Jones, K. S., S. Walker, et S. Robertson (2000). A probabilistic model of information retrieval :
-development and comparative experiments. Inf. Process Management (Part 1), 809–840.
-Kießling, W. (2002). Foundations of preferences in database systems. In Proc. of the 28th Int.
-Conf. on Very Large DataBases, pp. 311–322.
-Ozawa, J. et K. Yamada (1994). Cooperative answering with macro expression of a database.
-In Proc. of the IPMU conf., pp. 17–22.
-Rui, Y., T. Huang, et S. Merhotra (1997). Content-based image retrieval with relevance feed-
-back in mars. In Proc. IEEE Int. Conf. on Image Processing, pp. 815–818.
-Salton, G., A. Wong, et C. Yang (1975). A vector space model for automatic indexing. Com-
-munications of ACM : Information Retrieval and Language Processing 8(11).
-Su, W., J. Wang, Q. Huang, et F. Lochovsky (2006). Query result ranking over e-commerce
-databases. In Proc. of the CIKM.
-Ughetto, L., W. Voglozin, et N. Mouaddib (2008). Database querying with personalized voca-
-bulary using data summaries. Fuzzy Sets and Systems 159, 2030–2046.
-Wu, L., C. Faloutsos, K. Sycara, et T. Payne (2000). Falcon : Feedback adaptive loop for
-content-based retrieval. In Proc. of the 26th Int. Conf. on Very Large DataBases, pp. 297–
-306.
+<The study (STULONG) was realized at the 2nd Department of Medicine, 1st Faculty of Medicine
+of Charles University and Charles University Hospital, U nemocnice 2, Prague 2 (head. Prof. M.
+Aschermann, MD, SDr, FESC), under the supervision of Prof. F. Boudik, MD, ScD, with collaboration
+of M. Tomeckova, MD, PhD and Ass. Prof. J. Bultas, MD, PhD. The data were transferred to the
+electronic form by the European Centre of Medical Informatics, Statistics and Epidemiology of Charles
+University and Academy of Sciences (head. Prof. RNDr. J. Zvarova, DrSc). The data resource is on
+the web pages http://euromise.vse.cz/STULONG. At present time the data analysis is supported by
+the grant of the Ministry of Education CR Nr LN 00B 107. >
+3N’avoir qu’une condition dans le membre gauche n’est pas une limitation de QuantMiner.
+RNTI - 1
+RNTI-E-3503
+Regles d’Association Quantitatives - Application Medicale
+Nos experimentations ont montre que l’exces de poids, la consommation excessive
+de tabac pendant une longue duree, des taux de cholesterol, de triglycerides et des
+pressions arterielles systoliques et diastoliques eleves, ainsi que la presence de plis
+graisseux sous certains muscles sont des facteurs de risques importants. Les resultats,
+publies dans (Salleb et al. 2004), ont ete juges interessants lors du Discovery Challenge
+organise autour de ces donnees et dans lequel des medecins participent et scrutent les
+connaissances apprises par les diverses contributions.
+5 Discussion et Conclusion
+QuantMiner ne se contente pas de donner la conance d’une regle de la forme
+A ) B, mais il donne aussi la conance de :A ) B, B ) A, :B ) A (Figure 2).
+Cependant, lors de l’application aux donnees medicales, il nous a semble que ces criteres
+devaient e^tre anes dans le cas de la caracterisation de plusieurs classes. Dans le cas
+ou A represente des caracteristiques des patients a risques, :A regroupe les patients
+bien portants et malades; il serait plus interessant de separer ces deux classes.
+Par ailleurs, dans QuantMiner, nous cherchons le meilleur intervalle pour chaque
+attribut, mais que se passe-t-il s’il n’y a pas vraiment de meilleur, mais un bon intervalle
+et d’autres interessants ? Notre algorithme limite a un intervalle ne va pas considerer les
+autres alors qu’ils auraient pu reveler des informations interessantes. On peut penser
+qu’il sut d’introduire la disjonction d’intervalles dans la representation des individus
+pour resoudre le probleme, mais cela le rend plus complexe. Ce probleme est illustre
+dans la Figure 3 et sera l’objet de nos travaux futurs dans cette thematique.
+Fig. 3 { Soient 2 concentrations de points < Z1 > et < Z2 > a mettre en evidence. Il est bien
+evident que l’on ne generera jamais d’itemset les representant exactement avec la notation
+disjonctive car < (A, A1[A2) \ (B, B1[B2) > exprime 4 zones, dont 2 parasites.
+Le probleme d’extraction de regles quantitatives ne peut pas e^tre une simple exten-
+sion de celui des regles categoriques. La principale raison est que dans le cas categorique,
+on teste nalement tous les cas possibles de regles ce qui est clairement impossible dans
+le cas numerique. Le probleme est donc du ressort de l’optimisation : la recherche de
+regles d’association perd alors de son caractere non supervise et est pluto^t guidee par
+la forme des regles.
+RNTI - 1
+RNTI-E-3 504
+Cyril Nortet et al.
+Nous avons presente dans cet article QuantMiner, qui repose sur un algorithme
+genetique permettant de decouvrir de facon dynamique les intervalles des variables
+numeriques qui optimisent le support et la conance d’une regle d’association. Quant-
+Miner est un outil convivial et interactif, ou la presence de l’expert reste indispensable
+pour aller a l’essentiel et visionner les regles au plus fort potentiel.
+Remerciements Nous remercions les relecteurs pour leurs remarques et sugges-
+tions. Elles nous ont ete tres utiles pour l’amelioration de cet article.
+References
+Agrawal R., Imielinski T. et Swami A. N. (1993). Mining association rules between
+sets of items in large databases. Dans Buneman P. et Jajodia S., editeurs, Proceedings
+of the 1993 ACM SIGMOD, pages 207{216, Washington, D.C.
+Agrawal R. et Srikant R. (1994). Fast algorithms for mining association rules. Dans
+Bocca J. B., Jarke M. et Zaniolo C., editeurs, Proc. 20th Int. Conf. Very Large Data
+Bases., pages 487{499. Morgan Kaufmann.
+Aumann Y. et Lindell Y. (1999). A statistical theory for quantitative association
+rules. Dans Knowledge Discovery and Data Mining, pages 261{270.
+Bayardo R. J. (1998). Eciently mining long patterns from databases. Dans Proc.
+1998 ACM-SIGMOD Int. Conf. Management of Data, pages 85{93, Seattle.
+Brin S., Motwani R. et Silverstein C. (1997). Beyond market baskets: generalizing
+association rules to correlations. Dans Proc. of ACM SIGMOD, pages 265{276.
+Fisher R. (1936). The use of multiple measurements in taxonomic problems. Annals
+of Eugenics 7.
+Fukuda T., Morimoto Y., Morishita S. et Tokuyama T. (1996a). Data mining using
+two-dimensional optimized association rules: Scheme, algorithms and visualization.
+Dans Proc. of the Int’l Conf. ACM SIGMOD, pages 12{23.
+Fukuda T., Morimoto Y., Morishita S. et Tokuyama T. (1996b). Mining optimized
+association rules for numeric attributes. Dans Proc. of the fteenth ACM SIGACT-
+SIGMOD -SIGART PODS’96, pages 182{191. ACM Press.
+Lent B., Swami A. N. et Widom J. (1997). Clustering Association Rules. Dans Gray
+A. et Larson P.-A., editeurs, Proceedings of the 13th International Conference on Data
+Engineering, April 7-11, 1997 Birmingham U.K, pages 220{231.
+Mata J., Alvarez J. L. et Riquelme J. C. (2002). An evolutionary algorithm to discover
+numeric association rules. Dans Proceedings of the 2002 ACM symposium on Applied
+computing SAC’2002, pages 590{594.
+Miller R. J. et Yang Y. (1997). Association rules over interval data. SIGMOD Rec.,
+26(2):452{461.
+Murphy P. M. et Aha D. W. (1995). UCI Repository of Machine Learning Databases.
+Machine-readable collection, Dept of Information and Computer Science, University
+of California, Irvine. [Available by anonymous ftp from ics.uci.edu in directory
+pub/machine-learning-databases].
+RNTI - 1
+RNTI-E-3505
+Regles d’Association Quantitatives - Application Medicale
+Nortet C. Extraction de Regles d’Association Quantitatives. Memoire de Master,
+BRGM et LIFO Universite d’Orleans.
+Rastogi R. et Shim K. (1999). Mining optimized support rules for numeric attributes.
+Dans Proceedings of the 15th International Conference on Data Engineering, 23-26
+March 1999, Sydney, Austrialia, pages 206{215. IEEE Computer Society.
+Salleb A. (2003). Recherche de Motifs Frequents pour l’Extraction de Regles d’Asso-
+ciation et de Caracterisation. These de doctorat, Universite d’Orleans, France.
+Salleb A., Maazouzi Z. et Vrain C. (2002). Mining Maximal Frequent Itemsets by a
+Boolean Based Approach. Dans Harmelen F., editeur, 15th European Conference on
+Articial Intelligence Ecai, pages 385{389, Lyon, France. IOS Press Amsterdam.
+Salleb A., Turmeaux T., Vrain C. et Nortet C. (2004). Mining quantitative asso-
+ciation rules in a atherosclerosis dataset. Dans Proceedings of the PKDD Discovery
+Challenge 2004 (co-located with the 6th European Conference on Principles and Prac-
+tice of Knowledge Discovery in Databases), pages 98{103, Pisa, Italy.
+Srikant R. et Agrawal R. (1996). Mining quantitative association rules in large rela-
+tional tables. Dans Jagadish H. V. et Mumick I. S., editeurs, Proceedings of the 1996
+ACM SIGMOD International Conference on Management of Data, pages 1{12.
+Wang K., Tay S. H. W. et Liu B. (1998). Interestingness-based interval merger for
+numeric association rules. Dans Agrawal R., Stolorz P. E. et Piatetsky-Shapiro G.,
+editeurs, Proc. 4th Int. Conf. Knowledge Discovery and Data Mining, KDD, pages
+121{128. AAAI Press.
+Webb G. I. (2001). Discovering associations with numeric variables. Dans Proceedings
+of the seventh ACM SIGKDD international conference on Knowledge discovery and
+data mining, pages 383{388. ACM Press.
+Zaki M. J. (2000). Scalable algorithms for association mining. IEEE Transactions on
+Knowledge and Data Engineering, 12(3):372{390.
+Zhang Z., Lu Y. et Zhang B. (1997). An eective partitioning-combining algorithm
+for discovering quantitative association rules. Dans Proceedings of the of the First
+Pacic-Asia Conference on Knowledge Discovery and Data Mining.
 Summary
-Retrieving desired data from large-scale databases often leads to an overabundant answers
-problem. A possible approach to reduce the set of retrieved items and to make it more manage-
-able is to constrain the initial query with additional predicates. The approach presented in this
-paper relies on the identification of correlation links between predicates related to attributes
-of the relation of interest. Thus, the inital query is intensified by additional predicates that are
-semantically close with the user-specified ones.
-RNTI-E-19 - 284 -
+Mining association rules in databases has long been studied. However, most re-
+searches have focused on mining eciently such rules in databases composed of boolean
+or categorical attributes, when in practice many tables contain also numeric attributes.
+In this paper, we propose QuantMiner, a system for mining multi-dimensional quan-
+titative association rules. QuantMiner looks for the best intervals for numeric at-
+tributes relying on a genetic-based algorithm. Basically, in order to get high quality
+rules, both the support and condence are optimized during the mining process. We
+conducted an intensive experimental evaluation of our algorithm on real datasets. Our
+experiments showed the usefulness of QuantMiner as an interactive data mining tool.
+Keywords: data mining, association rule, numeric attribute, discretization, categorical
+attribute, evolutionary algorithm.
+RNTI - 1
+RNTI-E-3 506

@@ -1,537 +1,421 @@
-Découverte de motifs d’évolution significatifs dans les séries
-temporelles d’images satellites
-Francois Petitjean∗1, Florent Masseglia∗∗, Pierre Gancarski∗
-∗LSIIT (UMR 7005 CNRS/UdS) – Bd Sébastien Brant – 67412 Illkirch – France
-{fpetitjean,gancarski}@unistra.fr
-∗∗INRIA – 2004, route des Lucioles – BP 93 – 06902 Sophia Antipolis – France
-florent.masseglia@inria.fr
-Résumé. Les séries temporelles d’images satellites (ou Satellite Image Time
-Series – SITS) sont d’importantes sources d’informations sur l’évolution du ter-
-ritoire. Étudier ces images permet de comprendre les changements sur des zones
-précises mais aussi de découvrir des schémas d’évolution à grande échelle. Tou-
-tefois, découvrir ces phénomènes impose de répondre à plusieurs défis qui sont
-liés aux caractéristiques des SITS et à leurs contraintes. Premièrement, chaque
-pixel d’une image satellite est décrit par plusieurs valeurs (les niveaux radiomé-
-triques sur différentes longueurs d’ondes). Deuxièmement, ces motifs d’évolu-
-tion portent sur des périodes très longues et ne sont pas forcément synchrones
-selon les régions. Troisièmement, les régions qui ne sont pas concernées par des
-évolutions signiticatives sont majoritaires et leur domination rend difficile l’ex-
-traction des motifs d’évolution. Dans cet article, nous proposons une méthode
-qui répond à ces difficultés et nous la validons sur une série d’images satellites
-acquises sur une période de 20 ans.
+Résumé hybride de flux de données par échantillonnage et
+classification automatique
+Nesrine Gabsi∗,∗∗, Fabrice Clérot ∗∗
+Georges Hébrail∗
+∗Institut TELECOM ; TELECOM ParisTech ; CNRS LTCI
+46, rue Barrault 75013 Paris
+PrénomAuteur.NomAuteur@telecom-paristech.fr,
+∗∗ France Telecom RD
+2, avenue P.Marzin 22307 Lannion
+PrénomAuteur.NomAuteur@orange-ftgroup.com
+Résumé. Face à la grande volumétrie des données générées par les systèmes in-
+formatiques, l’hypothèse de les stocker en totalité avant leur interrogation n’est
+plus possible. Une solution consiste à conserver un résumé de l’historique du
+flux pour répondre à des requêtes et pour effectuer de la fouille de données.
+Plusieurs techniques de résumé de flux de données ont été développées, telles
+que l’échantillonnage, le clustering, etc. Selon le champ de requête, ces résumés
+peuvent être classés en deux catégories: résumés spécialisés et résumés géné-
+ralistes. Dans ce papier, nous nous intéressons aux résumés généralistes. Notre
+objectif est de créer un résumé de bonne qualité, sur toute la période temporelle,
+qui nous permet de traiter une large panoplie de requêtes. Nous utilisons deux
+algorithmes : CluStream et StreamSamp. L’idée consiste à les combiner afin de
+tirer profit des avantages de chaque algorithme. Pour tester cette approche, nous
+utilisons un Benchmark de données réelles "KDD_99". Les résultats obtenus
+sont comparés à ceux obtenus séparément par les deux algorithmes.
 1 Introduction
-La détection du changement est un domaine important de la télédétection et les progrès
-technologiques récents2 ont accentué l’attention qui lui est portée. Les séries temporelles
-d’images satellites (ou Satellite Image Time Series – SITS) sont une source importante d’in-
-formation pour étudier l’occupation des sols et son évolution. Considérons par exemple la
-scène illustrée par la figure 1. Chaque image contient quatre régions principales (R1 à R4)
-et la série montre leurs évolutions. En juillet 2007, les régions R1 et R2 étaient principale-
-ment constituées d’arbres et sont urbanisées en mai 2009. Ce schéma illustre un phénomène
-d’urbanisation dans lequel les arbres disparaissent au profit de routes et d’habitations. Ces évo-
-lutions constituent une information importante qui peut être utilisée dans diverses applications
-(Coppin et al., 2004; Campbell, 2007; Jensen, 2007) mais leur découverte soulève deux défis
+Il existe actuellement plusieurs applications qui génèrent des informations en très grande
+quantité. Ces applications sont issues de domaines variés tels que la gestion du trafic dans un
+réseau IP. Lorsque le volume de données augmente, il devient très coûteux de stocker toutes
+les données avant de les analyser : il est judicieux d’adopter un traitement à la volée pour ces
+informations. Un nouveau mode de traitement de l’information émerge. Il s’agit du traitement
+de flux de données. Dans (Golab et Özsu, 2003), les auteurs définissent un flux de données
+comme étant une séquence d’items continue, ordonnée, arrivant en temps réel avec des débits
 importants.
-1Ce travail a été partiellement financé par le CNES et Thales Alenia Space.
-2La prochaine génération de satellites (e.g. V enµs, Sentinel-2) sera capable d’acquérir les images avec une fré-
-quence élevée.
-Découvertes de motifs dans les images satellites
-July 2007 May 2009 September 2009 May 2010
-FIG. 1 – Exemple de changement dans une scène avec le motif “arbres→ sol nu→ urbain”.
-Premièrement, les changements peuvent se produire sur de longues périodes (l’ur-
-banisation peut prendre plusieurs années) ou peuvent être cycliques (comme la rotation des
-cultures). Un exemple de motif intéressant serait “arbres→ sol nu→ urbain” dans la figure 1
-qui est observé pour 50% des pixels (avec un décalage selon les régions).
-Deuxièmement, les satellites ne donnent pas de labels automatiquement (comme “ar-
-bre” ou “route”) aux différentes régions de pixels. Les valeurs des pixels sur chaque bande ne
-permettent pas de distinguer toutes les surfaces. Il est donc indispensable de considérer toutes
-les bandes disponibles pour chaque pixel afin d’extraire des motifs d’évolution informatifs.
-A notre connaissance, il n’existe pas de travaux permettant d’extraire des évolutions dans
-les SITS et montrant des motifs qui s’expriment sur plusieurs bandes. Les travaux existants
-étant expérimentalement validés par des motifs de non-évolution limités à une bande. Nous
-proposons une heuristique d’extraction qui évite l’explosion combinatoire liée aux caractéris-
-tiques des motifs d’évolution sur plusieurs bandes dans les SITS. Nous en donnons les limites
-théoriques et nous montrons des résultats d’expérimentations ainsi qu’un principe de visuali-
-sation permettant de synthétiser les résultats.
-2 Contexte, motivation et travaux existants
-Il existe différentes méthodes pour l’analyse de séries temporelles d’images satellites qui
-peuvent être réparties en trois catégories. Les méthodes bi-temporelles s’intéressent à l’extrac-
-tion des zones de changement entre deux images, une avant le changement et une après (ex :
-Bruzzone et Prieto (2000)). Une deuxième famille correspond à des méthodes statistiques,
-s’appliquant à deux images ou plus. Ces méthodes s’intéressent généralement à transformer
-l’espace des données, comme par une ACP (Howarth et al., 2006). Enfin, une troisième famille
-de méthode s’intéresse à l’étude de séries temporelles d’images satellites. Ces techniques sont
-généralement dédiées à l’analyse de trajectoires radiométriques de pixels (ex : Kennedy et al.
-(2007)). Dans le domaine de la télédétection, la nécessité d’utiliser plusieurs bandes est bien
-connu. En effet, une bande couvre généralement 255 niveaux alors que le nombre de combi-
-naisons sur n bandes pour un pixel peut atteindre 255n valeurs possibles. Par exemple, une
-valeur de 200 sur la bande “infra-rouge” peut correspondre à des toits ou à des routes ce qui ne
-permet pas de les distinguer alors que sur la bande “rouge”, les toits et les routes peuvent être
-différenciés par leurs valeurs (i.e. 200 et 280). Cependant, la bande “rouge” ne permet pas de
-discriminer toutes les surfaces. Par exemple, la réponse spectrale des conifères et des feuillus
-F. Petitjean et al.
-dans la bande “rouge” (i.e. 120) ne permet pas de les distinguer, mais sur la bande “infra-
-rouge”, leurs valeurs permettent de les séparer (i.e. 145 et 200). Le motif suivant pourrait, par
-exemple, être découvert grâce à l’utilisation de plusieurs bandes :
-50% : (coniferes/resineux︸ ︷︷ ︸
-Rouge
-)→ ( sol︸︷︷︸
-Rouge
-, sol/coniferes︸ ︷︷ ︸
-Infra−Rouge
-)→ (toits/route︸ ︷︷ ︸
-Infra−Rouge
-)
-Ce qui pourrait être résumé par un motif plus générique du type “arbres → sol → ur-
-bain”, exprimant le fait que dans 50% des pixels de l’image, les arbres sont progressivement
-remplacés par du sol nu puis par des éléments urbains. Si l’analyse se contente des valeurs
-mesurées sur la bande infra-rouge, alors seul le motif “sol/coniferes→ toits/route” serait dé-
-couvert, laissant le doute sur le premier élément du motif (sol ou conifères ? ). Le problème
-serait identique avec la bande infra-rouge qui ne permet de découvrir qu’une seule partie du
-motif. En revanche, avec les deux bandes, l’expert peut rapidement corroborer les informations
-pour déterminer la texture correspondante. Extraire ce type de motif est un problème proche
-de celui de l’extraction de motifs séquentiels décrit par Agrawal et Srikant (1995).Toutefois, il
-ne s’agit pas d’une application directe, dans la mesure où les contraintes et caractéristiques des
-SITS ne le permettent pas. L’extraction de séquences fréquentes dans les SITS a été introduite
-par Julea et al. (2006, 2008). Les auteurs y étudient deux types d’applications : la météorologie
-et l’agronomie. Toutefois, leur proposition décrit des séquences dans des séries d’images ou
-les valeurs sont mesurées sur une seule bande. Ces travaux sont ensuite étendus dans Julea
-et al. (2010) avec, en particulier, une fonction attentive aux régions de pixels dans le calcul des
-motifs.
-3 Extraction de motifs séquentiels fréquents
-Les motifs séquentiels sont généralement extraits à partir de grands ensembles de données.
-Ces données contiennent des séquences de valeurs prises dans un ensemble de symboles spé-
-cifiques, comme indiqué dans la définition 1 (inspirée des définitions de Agrawal et Srikant
-(1995)).
-Définition 1 Soit I = {i1, i2, ..., im}, un ensemble dem valeurs (ou items). Soit I = {t1, t2,
-...tn}, un sous-ensemble de I. I est un itemset noté (t1; t2; ...; tn). Une séquence s est un
-ensemble d’itemsets non vide noté < s1, s2, . . . , sn > où sj est un itemset. Une séquence de
-données est une séquence de l’ensemble des données à analyser.
-La définition 2 donne les conditions de l’inclusion entre deux séquences. En d’autres
-termes, s1 est incluse dans s2 si chaque itemset de s1 est inclus dans un itemset de s2 en
-respectant l’ordre dans les séquences (comme illustré par l’exemple 1).
-Définition 2 Soit s1 =< a1, a2, . . . , an > et s2 =< b1, b2, . . . , bm > deux séquences. s1
-est incluse dans s2 (s1 ≺ s2) si et seulement si ∃i1 < i2 < . . . < in des entiers tels que
-a1 ⊆ bi1 , a2 ⊆ bi2 , . . . an ⊆ bin .
-Découvertes de motifs dans les images satellites
-· · ·
-Image 1 Image 2 · · · Image 34 Image 35
-FIG. 2 – Extrait de la STIS utilisée provenant de la Base de données LITTORAL – KALIDEOS.
-c© CNES 2010 – Distribution Spot Image
-Exemple 1 La séquence s1 =< (3) (4; 5) (8) > est incluse dans la séquence s2 =< (7)
-(3; 8) (9) (4; 5; 6) (8) > (i.e s1 ≺ s2) car (3) ⊆ (3; 8), (4; 5) ⊆ (4; 5; 6) et (8) ⊆ (8).
-Cependant, la séquence s3 =< (3; 8; 9) (4; 5) > n’est pas incluse dans s2 car (3; 8; 9) n’est
-inclus dans aucun itemset de s2.
-Dans cet article, la caractéristique principale des motifs extraits est leur fréquence. Cette
-notion est basée sur le nombre d’apparitions d’un motif rapporté au nombre total de séquences
-de données, comme indiqué par la définition 3. Enfin, pour simplifier la lecture des résultats,
-seuls les motifs fréquents les plus longs (i.e. inclus dans aucun autre motif fréquent) sont
-conservés.
-Définition 3 Une séquence de données sd supporte une séquence s si s ≺ sd. Soit D l’en-
-semble des séquences de données. Le support de s dans D est donné par le pourcentage de
-séquences de D qui supportent : support(s) = |{sd ∈ D|s ≺ sd}|/|D|. Soit minSupp le
-support minimum donné par l’utilisateur, alors une séquence dont le support est supérieur à
-minSupp est dite fréquente.
-4 Prétraitement des images
-Les images utilisées dans cet article sont extraites de la base de données Littoral du pro-
-gramme KALIDEOS3 et se situent dans le sud-ouest de la France. Nous avons extrait de cette
-base de données une série de 35 images (illustrée en figure 2).
-Afin de garantir que les niveaux radiométriques d’un pixel (x, y) soient comparables le
-long de la série d’images, des corrections ont été effectuées par le CNES avant leur intégration
-dans la base de données. Ces corrections sont de trois types : des corrections géométriques
-assurant qu’un pixel (x, y) représente toujours la même zone géographique quelle que soit
-l’image, des corrections d’éclairement solaire ainsi que des corrections atmosphériques.
-Une fois ces corrections effectuées, chaque pixel de la série de 35 images est décrit sur
-trois bandes : Proche Infra-Rouge (PIR), Rouge (R) et Vert (V). À ces trois bandes, nous
-ajoutons un quatrième attribut, correspondant à l’index de végétation NDVI couramment utilisé
-en télédétection et calculé pour un pixel p comme suit : NDV I = (PIR− R) / (PIR+ R).
-3http://kalideos.cnes.fr
-F. Petitjean et al.
-Définissons comment les séquences sont construites à partir de cette série d’images. Pour
-cela, la Définition 4 formalise le concept d’image multivaluée afin de définir la construction
-des séries temporelles en Définition 5.
-Définition 4 Soit Simage =< I1, . . . , IN > une série de N images de largeur W et de
-hauteurH. Soit B le nombre de bandes des images. Soit
-∏
-le produit cartésien. Chaque image
-In (n ∈ [[1,N ]]) multivaluée (avec plusieurs bandes) peut être vue comme une fonction :
-In : [[1,W]]× [[1,H]] → ZB
-(x, y) 7→ In(x, y) =
-∏B
-b=1 I
-n
-b (x, y)
-(1)
-Définition 5 Soit Sv le jeu de données construit à partir de la série d’images. Sv est un
-ensemble de séquences défini comme :
-Sv = {< I1(x, y), · · · , IN (x, y) > |x ∈ [[1,W]], y ∈ [[1,H]]} (2)
-Ainsi, chaque séquence est une série de t-uplets (PIR,R,V,NDVI).
-Finalement, il est nécessaire de discrétiser les valeurs des bandes afin de réduire le nombre
-d’items possibles pour l’étape d’extraction de motifs. Pour cela, B jeux de donnéesDb (16b6B)
-sont tout d’abord créés. Ces jeux de données contiennent toutes les valeurs apparaissant dans
-la série sur la bande b correspondante. Formellement, chaque jeu de données est défini de la
-façon suivante :
-Db = ∀(x, y) ∈ [[1,W]]× [[1,H]] :
-N⊎
-n=1
-Inb (x, y) (3)
-Puis, chaque jeu de données Db est discrétisé grâce à l’algorithme K-MEANS (MacQueen
-(1967)) afin d’obtenir K groupes de valeurs. Pour une question de lisibilité, ces groupes sont
-ordonnés et nommés en fonction de la valeur de leurs centroides, c’est-à-dire en fonction de la
-valeur moyenne du groupe. Ainsi, le cluster PIR1 correspond à la première tranche de PIR,
-i.e., le groupe de PIR contenant les plus faibles valeurs, et PIRK correspond à la dernière
-tranche de PIR, i.e., le groupe de PIR contenant les valeurs les plus élevées. La définition 6
-détaille la création du jeu de données S utilisé pour l’extraction de motifs séquentiels.
-Définition 6 Soit Clus la fonction associant les B valeurs décrivant un pixel (i.e., un quadru-
-plet (pir, r, v, ndvi)) aux B tranches correspondantes calculées par l’algorithme K-MEANS.
-Le jeu de données S est défini par :
-S = {< Clus(I1(x, y)), · · · , Clus(IN (x, y)) > |x ∈ [[1,W]], y ∈ [[1,H]]} (4)
-Pour chaque pixel, nous disposons donc d’une séquence de valeurs discrètes, comme
-par exemple (PIR1;R6;V3;NDV I16) → · · · → (PIR12;R3;V14;NDV I19) où
-(PIR1;R6;V3;NDV I16) signifie que les valeurs de ce pixel dans la première image font
-partie du premier groupe de proche infra-rouge, dans le sixième groupe de rouge, dans le troi-
-sième groupe de vert et dans le 16ème groupe de NDV I .
-Découvertes de motifs dans les images satellites
-FIG. 3 – Une série de 3 images avec 4 pixels, décrits sur 3 bandes.
-5 Extraction et visualisation des motifs issus des SITS
-Le prétraitement décrit en section 4 produit des données où chaque pixel est décrit sur
-plusieurs mesures. Considérons les trois images de quatre pixels données en Figure 3. Nous
-voulons en extraire les motifs d’évolution. Cela signifie qu’un ensemble de pixels assez signifi-
-catif doit avoir le même “comportement” pour qu’un motif en soit déduit. Dans notre exemple,
-chaque pixel est décrit sur 3 valeurs (les bandes B1 à B3). Avec un support minimum de 100
-%, il n’y a pas de motif fréquent. Avec un support de 50 % on trouve deux motifs :
-1. < (B1, blanc;B2, blanc) (B1, gris;B2, rouge) >. Ce motif correspond au pixel p2
-sur les images 1 et 2 (ou 3) et p3 sur les images 1 (ou 2) et 3.
-2. < (B1, blanc;B2, blanc) (B1, blanc;B2, blanc) > (p1 et p3, images 1 and 2).
-Notons que les motifs peuvent être fréquents même si les images qui les supportent ne sont pas
-les mêmes d’un pixel à l’autre (comme l’indique la définition 3).
-5.1 Extraction de motifs séquentiels dans les séries d’images
-La principale difficulté liée à la découverte d’évolutions fréquentes à l’aide de mo-
-tifs séquentiels dans les SITS vient du fait que la très grande majorité des motifs ex-
-traits sont “plats”, c’est-à-dire qu’ils n’expriment aucune évolution. En d’autres termes, ces
-motifs fréquents contiennent le même item, répété plusieurs fois. Par exemple, le motif
-< (arbre)(arbre)(arbre) > qui traduit le fait que la plupart des pixels contiennent une valeur
-correspondant à des arbres sur trois images de la série. Ces motifs ne sont pas très informatifs.
-Dans les SITS, les motifs avec les supports les plus élevés correspondent très souvent à des
-zones géographiques qui n’évoluent pas. Pourtant, les pixels qui se “comportent” de manières
-similaires peuvent aider à découvrir des évolutions significatives dans les SITS. Le défi consiste
-donc à extraire des motifs qui respectent un support minimum tout en exprimant une évolution.
-Il y a plusieurs approches, naïves ou élaborées, pour répondre à ce problème mais elles ont
-toutes leurs inconvénients :
-– Un première approche consisterait à supprimer les pixels qui n’évoluent pas. Ce n’est pas
-suffisant car les pixels restant peuvent encore supporter des motifs plats (par exemple en
-gardant la même valeur sur toutes les images, sauf sur la dernière).
-– On peut également baisser le support minimum jusqu’à éliminer les motifs les plus fré-
-quents (qui sont plats) et trouver des motifs d’évolution. Le fait de baisser le support est
-une difficulté bien connue en extraction de connaissances car elle s’accompagne souvent
-F. Petitjean et al.
-d’une explosion combinatoire qu’il est préférable d’éviter. De plus, le nombre de motifs
-extraits serait très difficile à gérer.
-– Dans (anonymisé) nous avons proposé une solution qui interdit, dans le processus d’ex-
-traction des motifs séquentiels, les motifs qui présentent deux valeurs successives iden-
-tiques. Cette approche fonctionne mais elle est limitée car un motif plat peut prendre
-ses valeurs sur plusieurs bandes. Par exemple, le motif < (arbre, b1) (arbre, b2) >
-correspond à la valeur des arbres sur la bande 1 puis sur la bande 2 (étant donné que
-(arbre, b1) 6= (arbre, b2), ce motif plat est accepté).
-– Finalement, une solution naïve et extrême, consisterait à supprimer les items très fré-
-quents du processus d’extraction. Dans ce cas, certains motifs importants seraient igno-
-rés. Si l’item (arbre, b1) est très fréquent mais qu’il apparait dans le motif< (arbre, b1)
-(urbain, b3) > alors il ne faut pas l’exclure du processus d’extraction.
-Compte tenu des limites de ces approches, nous proposons un principe d’extraction des
-motifs d’évolution qui est basé sur ALGOMS4. Ce principe consiste à éviter, dans le processus
-d’extraction des motifs séquentiels, la succession de deux items très fréquents. Cela implique
-l’utilisation d’un support maximum (qui s’ajoute au support minimum). Au delà de sa capacité
-à éviter les motifs plats, ce principe réduit considérablement l’espace de recherche.
-Définition 7 SoitmaxSup un support de fréquence maximum etH l’ensemble des items dont
-le support est supérieur à maxSup (i.e. H = {i ∈ I|support(i) > maxSupp}). Soit
-minSup le support de fréquence minimum et FI l’ensemble des items dont le support est
-supérieur à minSup. Le facteur de reduction h qui s’applique à FI en fonction de maxSup
-est donné par h = |FI|/|FI\H|.
-Un nombre d’items réduit permet de diminuer l’espace des combinaisons possibles. Le
-théorème 1 fournit une borne sur cette réduction. Pour simplifier l’écriture, nous considérons
-que l’itemset vide fait partie des combinaisons possibles. De plus, ce raisonnement est limité
-aux séquences de longueur paire, mais il peut-être généralisé à tous les types de séquences.
-Théorème 1 Soit n le nombre d’items fréquents et h le facteur de réduction introduit dans la
-définition 7. Soit St l’ensemble des séquences de longueur t possibles et P[0..t] =
-⋃t
-j=0 Sj
-l’ensemble des séquences possibles de longueur 0 à t. Soit S′t l’ensemble des séquences pos-
-sibles de longueur t qui ne présentent pas d’occurrences successives d’items avec un support
-supérieur à maxSup. Soit P ′[0..t] =
-⋃t
-j=0 S
-′
-j l’ensemble des séquences possibles de ce type
-et de longueur comprise entre 0 et t. Alors |P[0..t]| =
-∑t
-j=0 2
-nj et |P ′[0..t]| =
-∑t
-j=0
-2nj
-h
-j
-2
-(et
-|P ′[0..t]| < |P[0..t]|).
-Preuve. Commençons par un rappel sur les propriétés des motifs séquentiels. |PI|, le
-nombre de motifs séquentiels possibles avec n items fréquents est donné par |PI| = 2n−1 (ou
-|PI| =
-∑n
-k=1 C
-k
-n = 2
-n si on ne considère pas l’itemset vide). |St|, le nombre de séquences
-possibles de longueur t est donnée par |St| = 2nt. En effet, le nombre de combinaisons pos-
-sibles pour St est donné par : 2n × 2n × . . .× 2n︸ ︷︷ ︸
-t fois
-.
-4Algorithme anonymisé pour la soumission. Toutefois, ce principe peut s’appliquer à n’importe quel algorithme
-d’extraction de motifs séquentiels
-Découvertes de motifs dans les images satellites
-Et |P[0..t]|, le nombre de motifs séquentiels possibles de longueur 0 à t est donné par :
-|P[0..t]| = |
-⋃t
-j=0 St| =
-∑t
-0 2
-nj
-Donnons maintenant une borne supérieure au nombre de motifs séquentiels quand deux
-items deH ne peuvent pas être consécutifs. |PI\H|, le nombre d’itemsets possibles composés
-d’items i tels queminSupp < support(i) < maxSup est donné par |PI\H| = |PI|
-h
-= 2
-n
-h
-.
-Le nombre de combinaisons possibles pour St, les séquences de longueur t sans occur-
-rences contigües d’items de H est donné par : 2n × 2
-n
-h
-× 2n ×
+Plusieurs travaux ((Babcock et al., 2002), (Golab et Özsu, 2003), (Ma et al., 2007), (Towne
+et al., 2007)) montrent que les Systèmes de Gestion de Base de Données (SGBD) sont in-
+adaptés pour ce type d’applications. Ceci est essentiellement dû à la nature continue du flux
+Résumé hybride de flux de données
+ainsi que la volumétrie des données qui transitent. En réponse aux besoins spécifiques des
+applications qui traitent des flux de données, plusieurs Systèmes de Gestion de Flux de Don-
+nées (SGFD), académiques et commerciaux, ont été développés : Stream (Arasu et al., 2004),
+Aurora (Abadi et al., 2003), etc.
+Les SGFD permettent d’exprimer des requêtes continues qui s’évaluent au fur et à mesure
+sur un flux ou sur des fenêtres (sous ensembles finis du flux) (Babcock et al., 2002). Ces
+requêtes doivent être spécifiées avant l’arrivée du flux. De nouveaux besoins peuvent parfois
+apparaître après le passage de l’information. Dans ce cas, le système ne pourra pas répondre
+aux requêtes posées car toutes les données n’appelant aucun traitement sont définitivement
+perdues. Il est donc nécessaire dans certains cas de conserver un résumé du flux de données.
+Il existe dans la littérature de nombreux travaux sur des structures de résumé (Gemulla et
+Lehner, 2008), (Cormode et Garofalakis, 2007), (Guha et Harb, 2005), (Guha et al., 2001),
+(Flajolet et Martin, 1985), (Bloom, 1970) qui sont des structures dédiées à une tâche particu-
+lière. La problématique de cet article concerne les résumés généralistes. Leur objectif est de
+fournir un résultat approché pour n’importe quelle analyse sur les données d’origine (requête
+ou fouille) posée à l’instant présent sur une fenêtre du passé. Ce domaine est encore récent et
+il n’existe à ce jour que peu de travaux (Csernel et al., 2006), (Aggarwal et al., 2003).
+Dans ce papier, nous nous intéressons à la préservation à long terme des données du flux.
+Notre objectif est d’élaborer un résumé à la fois générique (opérationnel pour tout type d’ap-
+plication), généraliste, évolutif (adaptable aux variations des flux) et de bonne qualité (repré-
+sentatif du flux d’origine) sur toute la période temporelle. Nous utilisons deux algorithmes
+StreamSamp (Csernel et al., 2006) et CluStream (Aggarwal et al., 2003) afin de tirer profit
+des avantages de ces deux approches et de créer un résumé robuste qui respecte les critères
+énoncés.
+Nous proposons dans ce papier une méthode hybride qui permet de résumer des grands flux
+de données numériques. Il est possible de lancer, sur le résumé conçu, des requêtes et d’obtenir
+des réponses proches de celles qu’on aurait obtenues en présence de la totalité des données.
+2 Résumés de flux de données
+De nombreuses structures de résumé ont été développées. Certaines structures sont à vo-
+cation généraliste, alors que d’autres sont destinées à un type particulier de traitement. Nous
+nous intéressons dans ce papier aux résumés généralistes.
+2.1 Résumé généraliste
+D’après (Csernel, 2008) un résumé généraliste doit remplir quatre conditions : répondre
+aux requêtes posées sur n’importe quel horizon temporel fixé, traiter un large champ de re-
+quêtes (sélection, médiane, etc.), permettre des analyses supervisées des données (arbres de
+décision, etc.) et autoriser des tâches d’analyse exploratoire (classification, etc.).
+Une autre façon de définir un résumé généraliste consiste à réaliser une organisation tem-
+porelle d’une série d’informations extraites d’un flux de données. Ces extractions peuvent être
+réalisées par le biais de solutions mémoires telles que l’échantillonnage, les histogrammes, etc.
+N. GABSI et al.
+2.1.1 Solutions Mémoires
+Les solutions mémoires permettent de conserver des résumés soit de la totalité des flux
+de données, soit des résumés qui portent sur les dernières observations. Il existe deux grandes
+opérations d’extraction de l’information : l’échantillonnage et les histogrammes.
+L’échantillonnage. L’échantillonnage est une technique directement issue des statistiques
+ayant pour objectif de fournir des informations sur une large population à partir d’un échan-
+tillon représentatif issu de celle-ci. Les techniques d’échantillonnages classiques ne sont pas
+toutes adaptées aux flux de données. En effet, elles nécessitent d’avoir l’intégralité de la base
+afin de sélectionner un échantillon représentatif. Dans le cadre des flux de données, cette
+contrainte ne peut être respectée.
+De nouveaux algorithmes d’échantillonnage ont été développés. Vitter (Vitter, 1985) a
+introduit une technique d’échantillonnage aléatoire incrémentale. Cette technique permet de
+concevoir un résumé sur la totalité du flux de données. Il existe des techniques plus sophisti-
+quées qui permettent de maintenir un échantillon aléatoire sur une fenêtre glissante (Babcock
+et al., 2002).
+L’objectif de notre approche est de permettre des interrogations sur le passé lointain. Adap-
+ter une technique d’historisation selon le principe de Babcock serait à l’encontre de cet objectif.
+Les histogrammes. La technique des histogrammes est très proche de la technique de l’agré-
+gat. Un histogramme permet de grouper les données d’une variable du flux selon les valeurs
+possibles. Pour chaque groupe, une surface est construite dont la base correspond aux valeurs
+de ce groupe, et dont la taille est proportionnelle au nombre d’observations dans le groupe.
+2.1.2 Solutions temporelles
+Les solutions temporelles permettent de gérer au cours du temps les flux d’informations
+produits par les techniques mémoires. Elle permettent d’archiver des résumés qui couvrent
+l’intégralité du flux avec un espace borné.
+Les fenêtres inclinées. Cette structure permet de conserver des résumés couvrant des pé-
+riodes temporelles de tailles variables. Comme le montre la Figure 1, les résumés ont une taille
+constante mais s’étalent sur des périodes temporelles de durées variables, plus courtes pour le
+présent et plus longues pour le passé lointain.
+FIG. 1 – Structure des fenêtres inclinées.
+Résumé hybride de flux de données
+Les systèmes de clichés. Tout comme les fenêtres inclinées, cette technique permet un trai-
+tement efficace de la dimension temporelle. L’objectif est simple, il s’appuie sur la sauvegarde
+à des instants réguliers de l’état du système au moment où un cliché est pris. Le cliché ainsi
+obtenu fournit des informations sur le traitement du flux depuis son lancement jusqu’à l’ins-
+tant de sa capture. Ces clichés sont ensuite conservés selon une structure pyramidale. Comme
+le montre la Figure 2, cette structure privilégie les instants récents par rapport aux instants les
+plus anciens. Proportionnellement au temps, le nombre de clichés conservés est de plus en plus
+faible.
+FIG. 2 – Représentation des clichés sur la structure pyramidale.
+2.2 Clustream : approche par clustering
+CluStream (Aggarwal et al., 2003) est un algorithme robuste basé sur la classification au-
+tomatique des données numériques. L’idée consiste à construire un résumé du flux de données
+sous la forme d’un ensemble de micro-classes évolutives dont des clichés sont mémorisés ré-
+gulièrement. Pour développer cet algorithme, Aggarwal s’est inspiré de l’algorithme BIRCH
+(Zhang et al., 1996) en utilisant la structure des CFVs (Cluster Feature Vector). Cette structure
+conserve des données statistiques qui résument l’ensemble des éléments d’une micro-classe
+(effectif total, somme des éléments de chaque variable et somme de leurs carrés). Dans (Aggar-
+wal et al., 2003), Aggarwal ajoute aux CFVs l’extension temporelle des variables. Lorsqu’un
+nouvel élément du flux arrive, on calcule sa distance par rapport au barycentre de chaque
+micro-classe et on l’ajoute à la classe la plus proche. Lors de l’ajout d’un élément, le CFV
+de la micro-classe est automatiquement mis à jour sans que l’appartenance de l’élément à la
+classe soit mémorisée.
+Cet algorithme permet de mémoriser, dans un cliché, l’état de toutes les micro-classes. Ces
+clichés sont ensuite conservés selon une structure pyramidale. Grâce aux propriétés mathéma-
+tiques des CFVs, on peut suivre l’évolution de ces micro-classes. On effectue des opérations
+de soustractions sur les clichés afin d’obtenir le contenu du flux entre deux prises de clichés.
+Cette technique permet de fournir, dans la limite du nombre de clichés pris, une version du
+résumé pour n’importe quelle section du flux située entre la prise de deux clichés.
+En se basant sur une technique de clustering couplée avec une structure de fenêtre py-
+ramidale, CluStream permet de conserver des clichés représentatifs même pour des données
+anciennes. Ceci permet de suivre l’évolution du flux de données au cours du temps. Cependant,
+son inconvénient est le traitement relativement lourd des calculs de distance lorsque le débit
+du flux est élevé.
+2.3 StreamSamp
+StreamSamp est également un algorithme de résumé généraliste basé sur l’échantillonnage
+aléatoire du flux de données. Dès leur arrivée, les données du flux sont échantillonnées à un
+N. GABSI et al.
+taux α et placées dans des échantillons de taille T . Lorsque T est atteint, StreamSamp mémo-
+rise l’échantillon ainsi que sa date de début et fin de constitution. L’ordre 0 est associé à cet
+échantillon. Plus on avance dans le temps, plus le nombre d’échantillons constitués, d’ordre 0,
+augmente. Il est impossible de mémoriser de façon permanente tous ces échantillons.
+Pour réduire l’espace, l’algorithme se base sur la structure des fenêtres inclinées. Lorsque
+L (nombre maximal d’échantillons par ordre) est atteint, on fusionne les deux échantillons
+d’ordre i les plus anciens. Un nouvel échantillon de taille T qui couvre une période temporelle,
+deux fois plus grande, et qui sera affecté à l’ordre i+1 est construit par ré-échantillonnage aléa-
+toire. Par ailleurs, StreamSamp permet l’exploitation et l’analyse du résumé créé. Pour traiter
+une période temporelle, les échantillons qui appartiennent à cette période sont concaténés et
+pondérés de façon à conserver la même représentativité pour chaque élément de l’échantillon
+final.
+Le résumé conçu à partir de StreamSamp a la particularité d’être petit et rapide à élaborer.
+Il ne dépend pas de la vitesse d’arrivée des éléments. Cependant la qualité du résumé produit
+pour des anciennes périodes temporelles se dégrade. En effet, les anciens éléments ont un poids
+croissant pour une taille d’échantillon constamment fixe. Par conséquent, si un échantillon
+contient des éléments récents (poids beaucoup plus faible) et des éléments anciens, ces derniers
+vont considérablement augmenter les erreurs dans le résultat des requêtes. L’utilisation des
+fenêtres inclinées ne permet donc pas de privilégier (en terme de précision) une autre période
+que le passé récent.
+3 Approche hybride de résumé généraliste
+Dans cet article nous proposons une nouvelle approche pour l’amélioration des résumés gé-
+néralistes. Cette approche, intitulée "approche hybride", combine les avantages de StreamSamp
+et CluStream, tout en évitant leurs inconvénients. Étant donné qu’on fait intervenir CluStream,
+seul le cas des données numériques peut être considéré.
+Comme le montre la Figure 3, le flux est d’abord envoyé dans le processus StreamSamp
+qui permet de conserver des échantillons aléatoires. Lorsque les échantillons ne sont plus re-
+présentatifs au sens des critères détaillés plus bas (section 3.1), ils sont envoyés dans le pro-
+cessus CluStream. Pour respecter la chronologie de CluStream il faut, avant l’envoi de ces
+échantillons, envoyer les échantillons des ordres supérieurs. L’insertion des échantillons se fait
+élément par élément tout en respectant leur pondération.
+Le passage d’un processus vers l’autre n’est pas aléatoire mais doit respecter un certain
+nombre de critères. Les critères de passage définis ci-dessous permettent de déterminer quand
+un échantillon est représentatif ou non.
+3.1 Critères de passage
+Le choix des critères de passage est basé sur les propriétés intrinsèques des deux tech-
+niques : StreamSamp est guidé par le ré-échantillonnage aléatoire et CluStream par la mise-à-
+jour de micro-classes évolutives. Maintenir une bonne qualité pour ces deux processus permet
+de conserver un résumé précis et de qualité. Le premier critère (test sur la variance) surveille
+le ré-échantillonnage aléatoire qui entraine une dégradation du résumé de StreamSamp. Le se-
+cond critère se base sur la conservation des centroides, mode de représentation de CluStream.
+Résumé hybride de flux de données
+FIG. 3 – Approche de passage de StreamSamp vers CluStream.
+3.1.1 Critère de variance
+Notre objectif est de mesurer la qualité de la représentation par un échantillon sur chaque
+variable, ce qui revient à étudier une contrainte sur la variance. En effet, une fusion de deux
+échantillons d’une période donnée donne lieu à deux fois moins d’individus qui s’étalent sur
+une période de même durée. Le mode de représentation utilisé dans StreamSamp est ainsi de
+moins en moins précis, donc de moindre qualité.
+Un échantillon est de bonne qualité s’il permet de répondre de façon suffisamment précise
+aux requêtes posées. Il doit pouvoir bien estimer les agrégats (nombre d’individus, moyenne,
+somme, etc.).
+Puisqu’il s’agit d’un échantillonnage aléatoire, étudier la précision sur l’estimation d’un
+agrégat revient à calculer sa variance. Ce qui permet de quantifier l’erreur relative d’un estima-
+teur. L’utilisation d’un critère de variance permet de fixer une borne sur l’erreur relative (err)
+ce qui revient à fixer une borne sur la variance, calculée sur l’échantillon. Dans la théorie des
+sondages, l’erreur relative est calculée comme suit :
+err =
+∣∣F̂−F ∣∣
+F̂
+avec F : valeur de l’agrégat et F̂ : estimateur de F
+La question posée concerne la précision d’un échantillon E3 issu de la fusion de deux échan-
+tillons E1 et E2. Pour cela, nous cherchons à estimer l’erreur sur E3. Dans ce qui suit, on
+prendra l’exemple de la moyenne qui est estimée à partir de l’échantillon (E1 ∪ E2).
+Vu que notre sondage est aléatoire simple, nous obtenons ainsi avec une probabilité de
+95% : ∣∣∣x− x̂(E3)
+∣∣∣ ≤ 2
+√
+V ar(x̂(E1 ∪ E2))
+Avec : E1 et E2 : les deux échantillons à fusionner, E3 : l’échantillon résultant de la fusion,
+x̂ : l’estimateur de la moyenne calculé sur E3 et x : la vraie moyenne.
+Si on vérifie l’inégalité suivante : 2
+√
+V ar(̂x(E1∪E2))
+x̂(E3)
+≤ err alors on estime qu’on a conservé
+un échantillon de bonne qualité (erreur relative inférieure ou égale à err).
+N. GABSI et al.
+La variance de l’estimateur sur l’échantillon, est calculée comme suit :
+V ar(x̂(E1 ∪ E2)) = (1−
 2n
-h
-× . . .× 2n ×
+N
+)(
+1
 2n
-h︸ ︷︷ ︸
-t
-2
-fois
-Donc |S′t| = (2n × 2
-n
-h
-)
-t
-2 = 2
-2n t
-2
-h
-t
-2
-= 2
-nt
-h
-t
-2
-et le nombre de séquences possibles de ce type
-avec une longueur entre 0 et t est donné par : |P ′[0..t]| = |
-⋃t
-j=0 S
-′
-j | =
-∑t
-0
-2nj
-h
-j
-2
-¤
-Si l’impact de h sur le nombre d’itemsets possibles est significatif, il devient crucial pour
-les motifs séquentiels. Nos expérimentations montrent que ce filtre permet d’accélérer les
-temps de calcul d’au moins un ordre de grandeur.
-5.2 Visualiser un ensemble de motifs séquentiels extraits
-Le but de cette section est de proposer une méthode permettant de visualiser les motifs
-extraits de la SITS. Le grand nombre de motifs extraits par les algorithmes de fouille de don-
-nées usuels est un problème important, qui est d’ailleurs traité dans de nombreuses contribu-
-tions (Pei et al., 2004; Soulet et Crémilleux, 2008; Jeudy et Boulicaut, 2002). Dans le cas de
-l’extraction de motifs à partir d’images satellites, nous disposons d’un avantage pour la vi-
-sualisation de ces motifs, de par le fait que les séquences représentent l’évolution d’une zone
-géographique. L’idée de notre méthode de visualisation est d’utiliser la position spatiale des
-séquences afin de construire une carte représentant les motifs extraits. Nous pouvons ainsi
-construire une imageH×W , sur laquelle chaque séquence participant au support d’un ou plu-
-sieurs motifs fréquents peut être affichée. De plus, en assignant des niveaux de gris progressifs
-en fonction de la participation d’une séquence aux différents motifs, il est possible de visualiser
-sur une seule carte, un ensemble de motifs extraits. A notre connaissance, il s’agit de la pre-
-mière méthode permettant de donner une représentation synthétique d’un ensemble de motifs
-séquentiels extraits d’une série d’images. La Définition 8 présente la “fréquence de contribu-
-tion” d’une séquence à un ensemble de motifs séquentiels ; plus il y a de motifs supportés par
-une séquence, plus sa fréquence de contribution est élevée.
-Définition 8 Soit FS l’ensemble des motifs séquentiels fréquents dans S. La fréquence de
-contribution d’une séquence sx,y =< Clus(I1(x, y)), · · · , Clus(In(x, y)) > dans FS est
-définie par :
-C(sx,y) =
-|{sF ≺ sx,y | sF ∈ F
-S}|
-|FS |
-(5)
-Définition 9 Soit C(sx,y) la fréquence de contribution d’une séquence sx,y . L’image de fré-
-quence de contribution IC est définie par :
-IC : [1,W]× [1,H] ⊂ N
-2 −→ [0, 1] ⊂ R
-(x, y) 7−→ IC(x, y) = C(sx,y)
-(6)
-F. Petitjean et al.
-(a) IC paramètres (0.005,0.3) (b) IC paramètres (0.01,0.4) (c) IC paramètres (0.02,0.3)
-(d) IC paramètres (0.05,0.5) (e) IC paramètres (0.07,0.3) (f) IC paramètres (0.07,0.5)
-FIG. 4 – Images IC pour différents paramètres d’extraction (support minimum, support maxi-
-mum). Les pixels blancs correspondent aux valeurs élevées de C(sx,y).
-Étant donnée la définition 8, C(sx,y) peut être calculée pour chaque séquence sx,y (i.e.,
-pour chaque coordonnée (x, y)). La définition 9 détaille la formation de l’image IC représen-
-tant la contribution de chaque séquence à l’ensemble de motifs séquentiels. Une fois cette
-représentation synthétique obtenue, l’expert dispose d’une carte lui permettant d’identifier ra-
-pidement les différentes zones impliquées dans l’ensemble de motifs extraits. Par exemple,
-si l’expert identifie principalement des zones agricoles, il peut alors parcourir l’ensemble des
-motifs extraits à la recherche de rotations de cultures.
-6 Expérimentations
-Nous disposons de 35 images d’une résolution de 202 500 pixels (450x450). Elles sont
-extraites de la base de données Littoral du programme KALIDEOS et se situent dans le sud-
-ouest de la France. Nous avons extrait de cette base de données une série de 35 images SPOT-
-1, SPOT-2 et SPOT-4 (illustrée en figure 2). Une fois ces images prétraitées (C.f. la section
-4), chaque pixel est décrit par quatre attributs (PIR,R,V,NDVI) et les séries correspondantes
-contiennent 28 millions de valeurs.
-Découvertes de motifs dans les images satellites
-6.1 Visualisation d’ensembles de motifs extraits des SITS
-La Figure 4 présente différents exemples d’images IC calculées pour différents FS . De
-façon non surprenante, le support minimum influe de façon directe sur le nombre de séquences
-supportant les différents motifs. Aussi, lorsque ce support est faible, les motifs extraits sont
-supportés par peu de séquences et inversement. Au delà de cette observation évidente, la Fi-
-gure 4(a) montre que les séquences (et donc les pixels des images IC) supportant les motifs
-avec de faibles valeurs de supports correspondent principalement à des zones industrialisées.
-La Figure 4(c), quant à elle, contient un peu plus de séquences supportant l’ensemble des
-motifs extraits et correspond à des zones urbaines ou asséchées. Enfin, la Figure 4(e) laisse
-apparaître, en plus des zones urbaines, des zones humides (marais) en gris foncé. Cette image
-nous informe également sur un autre point : la constance du niveau de gris sur les zones ur-
-baines indique que ces régions supportent souvent en même temps les différents motifs de
-l’ensemble.
-6.2 Expressivité (évolution) des motifs extraits
-Les images construites selon le principe décrit en 5.2 fournissent aux experts une visualisa-
-tion intuitive des types de motifs extraits en fonction des supports minimum et maximum. De
-ces ensembles, trois motifs ont été extraits par un expert géographe ; nous détaillons ci-dessous
-leur interprétation géographique :
-1. Le motif <(IR,1) (NDVI,20)>, qui correspond à des zones marécageuses. Le niveau
-oscille entre un niveau très faible de proche infra-rouge quand les zones sont recouvertes
-d’eau en hiver et un fort niveau NDVI en été, car la végétation apparait, et est de plus
-très irriguée et donc très chlorophyllienne.
-2. Le motif <(R,17) (R,18 ; NDVI,3)> qui correspond à des zones urbaines s’étant den-
-sifiées (augmentation de 25% de la réflectance). La présence d’urbain est de plus corro-
-borée par le niveau final très faible de NDVI indiquant une quasi-absence de végétation.
-L’intérêt d’une approche sur plusieurs bandes est donc particulièrement bien illustré par
-ce motif.
-3. Le motif <(NDVI,2) (G,20) (NDVI,1)> correspond à des zones industrielles s’étant
-densifiées. Ici, la diminution de NDVI indique un recul du couvert végétal et le niveau
-maximum atteint dans le vert corrobore la présence de toits plats (type tôle ondulée)
-caractéristiques des zones industrielles.
-6.3 Impact du support maximum sur les temps de calcul
-La notion de support maximum introduite en 5.1 a une grande influence sur le nombre
-d’items fréquents qui ne sont pas autorisés à apparaitre de manière contigüe (et donc sur le
-nombre total de motifs évalués). La figure 5 (gauche) indique le nombre d’items qui sont
-combinés dans les motifs. Par exemple, avec un support maximum de 75%, le nombre d’items
-i dont le support est compris entre 50% et 75% est de 37. Cela correspond à un facteur de
-réduction h = 1, 7 par rapport au nombre original. Les temps de réponses avec un support
-maximum de 80%, 75% et 70% sont reportés en figure 5 (droite) et sont comparés aux temps
-de réponses obtenus avec les items sans support maximum (“Original”). On peut y observer
-F. Petitjean et al.
-0.6 0.59 0.58 0.57 0.56 0.55 0.54 0.53 0.52 0.51 0.5
-support minimum
-0
-10
-20
-30
-40
-50
-60
-70
-|FI\H|
-Original
-support max = 0.8
-support max = 0.75
-support max = 0.7
-0.6 0.59 0.58 0.57 0.56 0.55 0.54 0.53 0.52 0.51 0.5
-support minimum
-0
-2000
-4000
-6000
-8000
-10000
-12000
-14000
-Temps (s)
-Original
-support max = 0.8
-support max = 0.75
-support max = 0.7
-FIG. 5 – Nombre d’items dans |FI\H| (gauche) et temps de réponses (droite).
-que l’influence de h est très importante sur les temps de réponses, comme attendu et décrit
-en 5.1. Le principe du support maximum est très adapté à la fouille de SITS, dans la mesure
-où les motifs plats sont évités et les performances dépassent celle d’une application directe
-d’environ un ordre de grandeur. Lors de nos expérimentations, nous avons pu constater qu’avec
-un support minimum de 50% et sans support maximum, l’extraction pouvait prendre plusieurs
-heures. Avec un support minimum de 10% l’extraction pouvait prendre plusieurs semaines. En
-revanche, avec un support minimum de 10% et un support maximum de 50%, l’extraction se
-termine en quelques minutes.
-7 Conclusion
-Les motifs séquentiels sont très adaptés à la découverte et la description d’évolutions dans
-les données. Toutefois, quand il s’agit d’extraire des motifs d’évolution dans les SITS, le défi
-consiste à filtrer le très grand nombre de motifs plats, afin de ne pas saturer les experts. Dans
-cet article, nous avons proposé i) une méthode permettant d’extraire les motifs d’évolution
-dans les SITS, ii) un principe permettant de filtrer les motifs plats et iii) une technique de
-visualisation qui permet de localiser les zones d’évolution de manière rapide et intuitive. Nos
-expérimentations montrent la pertinence de notre approche et des motifs extraits.
+)[
+1
+2n− 1
+∑
+k∈E1∪E2
+(xk − x)
+2]
+où n : taille d’un échantillon, N : taille de la population concernée
+3.1.2 Critère de conservation des centroïdes
+Dans notre approche de passage, le cycle de vie d’un échantillon est composé de deux
+phases complémentaires. La première étape est l’évolution de l’échantillon dans StreamSamp.
+La deuxième est l’intégration de cet échantillon dans le processus de CluStream.
+Il est de ce fait important de prendre en considération les contraintes relatives à chaque
+processus. Nous avons étudié dans la section précédente la contrainte sur le fondement de
+StreamSamp (contrainte sur la variance). En suivant la même logique, nous étudions la conser-
+vation des centroïdes lors de l’insertion des échantillons dans CluStream. En effet, CluStream
+permet de regrouper les éléments "proches" dans une même micro-classe. Le processus de ré-
+échantillonnage aléatoire entraîne une dégradation du résumé. Conséquence, la précision sur
+la position des centroides se dégrade. Nous avons alors ajouté un second critère qui se base sur
+la conservation des centroides pour respecter CluStream.
+Afin de conserver cette précision, nous calculons lors de chaque opération de ré-échantillonnage,
+la distance entre le centroïde (G) (calculé à partir des échantillons à fusionner (E1 ∪E2)) et le
+centroïde (G) (calculé à partir de l’échantillon estimé (E3)).
+La distance entre (G) et (G) doit être inférieure à un seuil fixé (D). Si cette condition n’est
+plus respectée, le processus d’échantillonnage est arrêté pour passer à CluStream.
+Comme le montre la Figure 4, nous calculons à partir des individus deE1 etE2 le centroïde
+(G). Nous estimons par la suite E3 à partir de E1 et E2 et nous calculons (G) à partir de
+l’échantillon E3.
+Nous vérifions par la suite si d2(G,G) ≤ D. Avec D =  ×
+∑
+E1∪E2
+(d2(x, xi)), l’inertie
+intra-classe de l’échantillon constitué à partir de (E1 ∪ E2).
+4 Expérimentations
+Toutes les expérimentations ont été lancées sur un ordinateur équipé d’un processeur Intel
+Core 2 Duo 1.66 Ghz avec 1000 Mo de mémoire. Le système d’exploitation est Windows XP
+Professionnel. Tous les algorithmes ont été codés dans le langage de programmation Java. Pour
+évaluer l’efficacité de notre algorithme, nous l’avons comparé aux algorithmes CluStream et
+StreamSamp. Les expériences ont été lancées sur un jeu de données réelles, KDD-CUP’99
+Network Intrusion Detection stream data set. Il s’agit du même jeu de données préalablement
+utilisé pour l’évaluation de CluStream et StreamSamp. Ce jeu correspond à l’ensemble des
+connexions TCP enregistrées sur une période de deux semaines de trafic sur le réseau LAN
+géré par le MIT Lincoln Labs. Le jeu sur lequel nous avons mené nos expériences contient
+500000 enregistrements avec 34 variables numériques. Chaque enregistrement correspond à
+une connexion. Une connexion fait appel à un service (http, Telnet, etc.). Les variables utilisées
+dans nos expérimentations sont :
+Résumé hybride de flux de données
+FIG. 4 – Calcul de distance entre les centroides G et G.
+• Variable 16 (Count) : Nombre de connexions émises durant les 2 dernières secondes vers
+la machine destinataire de la connexion courante ;
+• Variable 24 (srv_diff_host_rate) : Pourcentage des connexions faisant appel au même
+service que la connexion courante mais vers des destinataires différents ;
+• Variable 26 (dst_host_srv_count) : Nombre de connexions ayant le même service et la
+même destination que la connexion courante ;
+• Variable 28 (dst_host_diff_srv_rate) : Pourcentage des connexions vers le même desti-
+nataire et faisant appel à des services différents que ceux de la connexion courante ;
+• Variable 29 (dst_host_same_src_port_rate) : Pourcentage des connexions vers la même
+destination que la connexion courante et utilisant le même port.
+Étude de la variabilité du flux. Pour étudier la variabilité du flux, nous avons calculé la
+moyenne et la variance pour chaque variable sur une fenêtre glissante de taille 5000 et avec
+un pas de 1000 éléments. Les résultats obtenus ont permis de vérifier que le flux de données
+utilisé n’est pas stationnaire pour les moments d’ordre 1 et 2. De ce fait, ce jeu de données est
+intéressant pour évaluer notre approche.
+Dégradation des données dans StreamSamp. Cette expérience consiste à étudier la dégra-
+dation des données dans StreamSamp pour des périodes temporelles anciennes. Nous avons
+étudié l’évolution de l’estimation de la moyenne sur la période temporelle [0-10000]. Nous
+avons lancé StreamSamp (α = 30%, L = 4, T = 50) 500 fois pour chacune des variables
+étudiées. Ces paramètres ont été choisis de façon à garantir plusieurs opérations de fusions
+dans StreamSamp. Nous avons calculé à différents instants d’observation : (1) l’erreur relative
+moyenne sur les différents tirages où il existe une estimation ainsi que, (2) le pourcentage des
+tirages dans lesquels des estimations peuvent être effectuées. La Figure 5 montre les résultats
+obtenus. Nous constatons que pour chacune des variables étudiées l’erreur relative moyenne
+N. GABSI et al.
+StreamSamp CluStream Approche Hybride
+T = 50 Nb- classes = 50 err = 4.10−2
+α = 30% k-means = 10  = 10−4
+L = 4 Instant de prise de cliché : T = 1
+Nombre max de clichés par ordre : L = 50
+TAB. 1 – Paramètres des expérimentations.
+augmente avec le nombre d’éléments traités. Ce qui représente une dégradation des perfor-
+mances de StreamSamp au cours du temps.
+FIG. 5 – Erreur relative moyenne sur la période [0-10000] à différents instants d’observation.
+Performance de l’approche hybride. L’objectif de cette expérience est de comparer les per-
+formances de notre approche par rapport à StreamSamp et CluStream. Pour cela, nous avons
+traité tout le flux de données et évalué l’erreur relative moyenne de l’estimation sur la période
+temporelle [0-10000]. Nous avons répété ce test 50 fois. Le Tableau 1 présente les paramètres
+avec lesquels nos expérimentation ont été lancées. La Figure 6 montre que pour une période
+temporelle assez ancienne [0-10000], évaluée à la fin du flux, l’approche hybride estime beau-
+coup mieux la moyenne que StreamSamp et ceci pour toutes les variables étudiées. Par ailleurs,
+les performances en termes de qualité d’estimation de notre approche sont proches de celles
+calculées par CluStream qui permet de conserver la moyenne exacte des variables.
+Vitesse d’exécution. La Figure 7(a) montre les performances en termes de temps d’exécution
+(échelle logarithmique) accomplies pour les trois algorithmes. Il est clair que StreamSamp
+fournit de meilleurs résultats comparé à CluStream et à l’approche hybride. Notre approche
+hybride est un peu plus lente que StreamSamp mais reste beaucoup plus rapide que CluStream.
+Ordre de bascule. Comme le montre la Figure 7(b), sur les 500 000 enregistrements, l’ordre
+de bascule varie de 1 à 4. La majorité de ces enregistrements basculent vers CluStream à l’ordre
+1. Ceci va impliquer un passage "forcé" des échantillons d’ordre supérieur (plus anciens).
+En effet, afin de respecter la chronologie de CluStream, si un problème de fusion est détecté
+Résumé hybride de flux de données
+FIG. 6 – Erreur relative moyenne sur la période [0-10000] observée en t = 500000.
+entre deux échantillons d’ordre i, alors il faut basculer les échantillons les plus anciens vers
+CluStream.
+FIG. 7 – (a)Vitesse d’exécution, (b)Taux des échantillons basculés, pour chaque ordre, vers
+CluStream.
+5 Conclusion et perspectives
+L’objectif de cet article est de proposer une nouvelle approche pour la conception d’un
+résumé de flux de données. Il s’agit de développer un résumé à la fois généraliste et de bonne
+qualité pour toute la période temporelle.
+Nous avons présenté une stratégie de passage de l’algorithme StreamSamp vers l’algo-
+rithme CluStream en nous basant sur les avantages de chacune de ces méthodes. L’instant
+de passage n’est pas aléatoire, il est basé sur les propriétés intrinsèques des deux techniques.
+Si l’un de ces critères n’est plus vérifié, le processus de fusion des échantillons de Stream-
+Samp est arrêté et les échantillons sont envoyés vers CluStream. Cependant, avant d’envoyer
+ces échantillons, il faut tout d’abord faire basculer tous les échantillons des ordres supérieurs
+pour respecter la chronologie de CluStream. L’inconvénient avec cette approche est que nous
+condamnons des échantillons à passer tôt vers ce processus alors qu’ils vérifient encore les
+critères de passage. Des travaux sont en cours afin de développer des techniques permettant
+d’éviter cet inconvénient.
+N. GABSI et al.
+Une extension naturelle de ce travail concerne l’intégration des données qualitatives. Avec
+StreamSamp, le problème d’utilisation de variables catégorielles ne se pose pas. Concernant
+CluStream, il existe des extensions qui traitent les variables catégorielles (HClustream (Yang
+et Zhou, 2006), SCLOPE (Kok leong Ong et al., 2004)). Intégrer les données qualitatives dans
+notre approche est possible à condition de redéfinir les paramètres de tests pour la transition.
 Références
-Agrawal, R. et R. Srikant (1995). Mining Sequential Patterns. In Proceedings of the 11th
-International Conference on Data Engineering (ICDE’95), pp. 3–14.
-Bruzzone, L. et D. Prieto (2000). Automatic analysis of the difference image for unsupervised
-change detection. IEEE Transactions on Geoscience and Remote Sensing 38(3), 1171–1182.
-Campbell, J. B. (2007). Introduction to Remote Sensing. The Guilford Press.
-Découvertes de motifs dans les images satellites
-Coppin, P., I. Jonckheere, K. Nackaerts, B. Muys, et E. Lambin (2004). Digital change de-
-tection methods in ecosystem monitoring : a review. International Journal of Remote Sen-
-sing 25, 1565–1596.
-Howarth, P., J. Piwowar, et A. Millward (2006). Time-Series Analysis of Medium-Resolution,
-Multisensor Satellite Data for Identifying Landscape Change. Photogrammetric engineering
-and remote sensing 72(6), 653–663.
-Jensen, J. R. (2007). Remote Sensing of the Environment : An Earth Resource Perspective.
-Prentice Hall.
-Jeudy, B. et J. Boulicaut (2002). Using condensed representations for interactive association
-rule mining. In Proceedings of the 6th European Conference on Principles of Data Mining
-and Knowledge Discovery, pp. 225–236.
-Julea, A., N. Méger, C. Rigotti, M.-P. Doin, C. Lasserre, E. Trouvé, P. Bolon, et V. Lazarescu
-(2010). Extraction of Frequent Grouped Sequential Patterns from Satellite Image Time
-Series. In Proceedings of the International Geoscience and Remote Sensing Symposium,
-2010. IGARSS 2010. IEEE International. International Geoscience and Remote Sensing
-Symposium, 2010. IGARSS 2010., Honolulu USA, pp. 4.
-Julea, A., N. Méger, et E. Trouvé (2006). Sequential patterns extraction in multitemporal
-satellite images. In Workshop on Practical Data Mining (in conjunction with PKDD), pp.
-96–99.
-Julea, A., N. Méger, E. Trouvé, et P. Bolon (2008). On extracting evolutions from satel-
-lite image time series. In IEEE International Geoscience and Remote Sensing Symposium
-(IGARSS), Volume 5, pp. 228–231.
-Kennedy, R. E., W. B. Cohen, et T. A. Schroeder (2007). Trajectory-based change detection
-for automated characterization of forest disturbance dynamics. Remote Sensing of Environ-
-ment 110(3), 370–386.
-MacQueen, J. (1967). Some methods for classification and analysis of multivariate observa-
-tions. In Proceedings of 5th Berkeley Symposium on Mathematical Statistics and Probabi-
-lity, pp. 281–297.
-Pei, J., G. Dong, W. Zou, et J. Han (2004). Mining condensed frequent-pattern bases. Know-
-ledge and Information Systems (KAIS) 6(5), 570–594.
-Soulet, A. et B. Crémilleux (2008). Adequate condensed representations of patterns. In Pro-
-ceedings of the European Conference on Machine Learning and Knowledge Discovery in
-Databases (ECML / PKDD), pp. 20–21. Springer-Verlag.
+Abadi, D. J., D. Carney, U. Çetintemel, M. Cherniack, C. Convey, S. Lee, M. Stonebraker,
+N. Tatbul, et S. Zdonik (2003). Aurora : a new model and architecture for data stream
+management. The VLDB Journal 12(2), 120–139.
+Aggarwal, C. C., J. Han, J. Wang, et P. S. Yu (2003). A framework for clustering evolving data
+streams. In VLDB ’2003 : Proceedings of the 29th international conference on Very large
+data bases, pp. 81–92. VLDB Endowment.
+Arasu, A., B. Babcock, S. Babu, J. Cieslewicz, K. Ito, R. Motwani, U. Srivastava, et J. Wi-
+dom (2004). Stream : The stanford data stream management system. In In Data-Stream
+Management : Processing High-Speed Data Streams. Springer-Verlag.
+Babcock, B., S. Babu, M. Datar, R. Motwani, et J. Widom (2002). Models and issues in data
+stream systems. In PODS ’02 : Proceedings of the twenty-first ACM SIGMOD-SIGACT-
+SIGART symposium on Principles of database systems, New York, NY, USA, pp. 1–16.
+ACM.
+Bloom, B. H. (1970). Space/time trade-offs in hash coding with allowable errors. Commun.
+ACM 13(7), 422–426.
+Cormode, G. et M. Garofalakis (2007). Sketching probabilistic data streams. In SIGMOD ’07 :
+Proceedings of the 2007 ACM SIGMOD international conference on Management of data,
+New York, NY, USA, pp. 281–292. ACM.
+Csernel, B. (2008). Résumé Généraliste de flux de données. Ph. D. thesis, Ecole Nationale
+Supérieure des Télécommunications.
+Csernel, B., F. Clérot, et G. Hébrail (2006). Datastream clustering over tilted windows through
+sampling. Knowledge Discovery from Data Streams Workshop (ECML/PKDD).
+Flajolet, P. et G. N. Martin (1985). Probabilistic counting algorithms for data base applications.
+J. Comput. Syst. Sci. 31(2), 182–209.
+Gemulla, R. et W. Lehner (2008). Sampling time-based sliding windows in bounded space.
+In SIGMOD ’08 : Proceedings of the 2008 ACM SIGMOD international conference on
+Management of data, New York, NY, USA, pp. 379–392. ACM.
+Golab, L. et M. T. Özsu (2003). Issues in data stream management. SIGMOD Rec. 32(2),
+5–14.
+Guha, S. et B. Harb (2005). Wavelet synopsis for data streams : minimizing non-euclidean
+error. In KDD ’05 : Proceedings of the eleventh ACM SIGKDD international conference on
+Knowledge discovery in data mining, New York, NY, USA, pp. 88–97. ACM.
+Guha, S., N. Koudas, et K. Shim (2001). Data-streams and histograms. In STOC ’01 : Procee-
+dings of the thirty-third annual ACM symposium on Theory of computing, New York, NY,
+Résumé hybride de flux de données
+USA, pp. 471–475. ACM.
+Kok leong Ong, W. L., W. keong Ng, et E. peng Lim (2004). Sclope : An algorithm for
+clustering data streams of categorical attributes. Technical report.
+Ma, L., W. Nutt, et H. Taylor (2007). Condensative stream query language for data streams. In
+ADC ’07 : Proceedings of the eighteenth conference on Australasian database, Darlinghurst,
+Australia, Australia, pp. 113–122. Australian Computer Society, Inc.
+Towne, K., Q. Zhu, C. Zuzarte, et W.-C. Hou (2007). Window query processing for joining
+data streams with relations. In CASCON ’07 : Proceedings of the 2007 conference of the
+center for advanced studies on Collaborative research, New York, NY, USA, pp. 188–202.
+ACM.
+Vitter, J. S. (1985). Random sampling with a reservoir. ACM Trans. Math. Softw. 11(1), 37–57.
+Yang, C. et J. Zhou (2006). Hclustream : A novel approach for clustering evolving heteroge-
+neous data stream. In ICDMW ’06 : Proceedings of the Sixth IEEE International Conference
+on Data Mining - Workshops, Washington, DC, USA, pp. 682–688. IEEE Computer Society.
+Zhang, T., R. Ramakrishnan, et M. Livny (1996). Birch : An efficient data clustering method
+for very large databases. In H. V. Jagadish et I. S. Mumick (Eds.), Proceedings of the
+1996 ACM SIGMOD International Conference on Management of Data, Montreal, Quebec,
+Canada, June 4-6, 1996, pp. 103–114. ACM Press.
 Summary
-Satellite Image Time Series (SITS) provide us with precious information on land cover
-evolution. By studying these series of images we can understand the changes of specific areas
-but also discover global phenomena that spread over larger areas. However, discovering these
-evolution patterns implies to consider two main challenges, related to the characteristics of
-SITS and the domain’s constraints. We propose a SITS mining framework that allows for dis-
-covering these patterns despite these constraints and characteristics. Our proposal is inspired
-from sequential pattern mining and provides a relevant visualisation principle.
+Given the large volume of data generated by computer systems, storing all data before
+querying them is not possible. One solution is to keep a summary of the history of data streams.
+This history can be used to answer queries and perform data mining. Many data summariz-
+ing techniques have been already developed such as sampling, clustering, etc. According to
+the scope of applications, these summaries are classified into two categories: specialized sum-
+maries and generalist summaries. This paper focuses on generalist summaries. The objective is
+to create a good quality summary which covers a long time period and allows to process a wide
+range of queries. The reported work focuses on two algorithms: CluStream and StreamSamp.
+In order to take advantages of the benefits of each algorithm, we suggest their integration into
+one process. To test this approach, we use the "KDD_99" real Benchmark data. The results
+are separately compared to those obtained by StreamSamp and Clustream.

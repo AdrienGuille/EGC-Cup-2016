@@ -63,7 +63,7 @@ class GetGScholarInfo():
             #         self.save_citations_disk(citations_dic)
             citations_list.append(n_citations)
         self.df["n_citations"] = citations_list
-        self.df.to_csv("../../input/RNTI_articles_export_fixed1347_ids_ncits.txt", sep="\t", encoding="utf-8",
+        self.df.to_csv("../../input/RNTI_articles_export_fixed1347_ids.txt", sep="\t", encoding="utf-8",
                        index=False,
                        index_label=False)
 

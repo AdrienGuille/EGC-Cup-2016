@@ -1,233 +1,1119 @@
-Détection de changements de distribution dans un flux de
-données : une approche supervisée
-Alexis Bondu∗, Marc Boullé∗∗
-∗EDF R&D ICAME/SOAD, 1 avenue du Général de Gaulle, 92140 Clamart.
-alexis.bondu@edf.fr
-∗∗Orange Labs, 2 avenue Pierre Marzin, 22300 Lannion.
-marc.boulle@orange-ftgroup.com
-Résumé. L’analyse de flux de données traite des données massives grâce à des
-algorithmes en ligne qui évitent le stockage exhaustif des données. La détec-
-tion de changements dans la distribution d’un flux est une question importante
-dont les applications potentielles sont nombreuses. Dans cet article, la détec-
-tion de changement est transposée en un problème d’apprentissage supervisé.
-Nous avons choisi d’utiliser la méthode de discrétisation supervisée MODL car
-celle-ci présente des propriétés intéressantes. Notre approche est comparée fa-
-vorablement à une méthode de l’état-de-l’art sur des flux de données artificiels.
+S, une nouvelle approche incrémentale pour
+l’extraction de motifs séquentiels fréquents dans les
+Data streams
+Lionel V∗, Jean-Émile S∗, Alban M∗∗ et Pascal P∗∗∗
+∗G, Université des Antilles et de la Guyane, Martinique, France.
+{lionel.vinceslas,je.symphor}@martinique.univ-ag.fr
+∗∗alban@mancheron.infos.st
+∗∗∗
+-2/site EERIE, Parc Scientifique Georges Besse, 30035 Nîmes Cedex, France.
+pascal.poncelet@ema.fr
+Résumé. L’extraction de motifs séquentiels fréquents dans les data
+streams est un enjeu important traité par la communauté des chercheurs
+en fouille de données. Plus encore que pour les bases de données, de
+nombreuses contraintes supplémentaires sont à considérer de par la na-
+ture intrinsèque des streams. Dans cet article, nous proposons un nouvel
+algorithme en une passe : SPAMS, basé sur la construction incrémentale,
+avec une granularité très fine par transaction, d’un automate appelé SPA,
+permettant l’extraction des motifs séquentiels dans les streams. L’infor-
+mation du stream est apprise à la volée, au fur et à mesure de l’insertion
+de nouvelles transactions, sans pré-traitement a priori. Les résultats ex-
+périmentaux obtenus montrent la pertinence de la structure utilisée ainsi
+que l’efficience de notre algorithme appliqué à différents jeux de données.
 1 Introduction
-Ces dernières années, la quantité de données à traiter a considérablement augmenté dans
-de nombreux domaines applicatifs. Les méthodes d’apprentissage “classiques” passent diffi-
-cillement à l’échelle sur de tels volumes de données. L’analyse de flux de données (ou “Data
-stream mining”) est une des réponses possibles au traitement des données massives. Le pa-
-radigme des “flux de données” prend en compte plusieurs contraintes : i) l’ordre d’arrivé des
-données (ou tuples 1) n’est pas contrôlé ; les débits des flux d’entrée sont fluctuants et ne sont
-pas contrôlés ; les ressources matérielles disponibles sont limitées (mémoire RAM et CPU). Du
-fait de ces contraintes, les tuples ne peuvent pas être stockés exhaustivement et sont analysés à
-la volée. Une analyse sur flux de données fournit un résultat en “temps réel” qui évolue conti-
-nuellement. L’objectif est de maximiser la qualité de l’analyse, compte tenu des contraintes
-imposées par les flux, et étant donnés les ressources matérielles disponibles. La mise au point
-de méthodes de détection de changements de distribution qui soient génériques, capables de
-passer à l’échelle, et pertinentes d’un point de vue statistique est un véritable challenge. La dé-
-tection de changements dans un flux de données consiste à comparer la distribution des tuples
-observés sur deux fenêtres temporelles distinctes : la “référence” et la “courante”. Dans le
-cadre de cet article, nous traitons le cas de la détection relative à un régime de fonctionnement
-normal. Dans la littérature, il existe plusieurs manières d’aborder le problème de la détection
-de changements. Par exemple, un test statistique impliquant deux échantillons de tuples (Dries
-et Rückert, 2009) peut être utilisé. Le test de “Wald-Wolfowitz et Smirnov” a notamment été
-généralisé au cas des données multidimensionnelles (Friedman et Rafsky, 2006), ce qui est
-1. Les données élémentaires émises dans un flux sont appelées des "tuples"
-Approche supervisée pour la détection de changement
-pertinent dans le cas du traitement de flux de données. D’autres approches basées sur la mé-
-thode des plus proches voisins (Hall, 2002), ou encore, sur des distances entre distributions
-(Bondu et al., 2010) ont été développées. Enfin, des travaux sur la détection de rupture ont
-été réalisés (Desobry et Davy, 2003). Dans cet article, la Section 2 propose une approche ori-
-ginale qui transpose la détection de changement en un problème d’apprentissage supervisé.
-Notre approche est comparée favorablement à une méthode de l’état-de-l’art lors d’une vali-
-dation expérimentale menée à la Section 3. Enfin, les perspectives de nos futurs travaux sont
-discutées à la Section 4.
-2 Une approche supervisée pour la détection de changement
-Comme le montre l’étape 1 de la Figure 1, l’approche proposée dans cet article exploite
-deux fenêtres temporelles 2 définies a priori par un expert : i) la fenêtre de référence représente
-le fonctionnement normal du système observé ; ii) la fenêtre courante caractérise l’état actuel
-du système. La fenêtre de référence est fixe et la fenêtre courante est glissante. La définition de
-ces deux fenêtres constitue le seul paramétrage demandé à l’utilisateur. Les tuples sont ensuite
-étiquetés (cf étape 2 Figure 1). Les tuples appartenant à la fenêtre de référence [ respectivement
-à la fenêtre courante ] sont estampillés comme appartenant à la classe “0” [ respectivement la
-classe “+” ]. La qualité du classifieur caractérise le niveau de changement dans la distribution
-des tuples. Le contexte des flux de données impose de traiter les tuples le plus rapidement
-possible, c’est pourquoi nous avons choisi de simplifier le problème de classification initial en
-considérant K problèmes de classification univariés. Les tuples sont projetés sur chacune des
-variables (cf étape 3 Figure 1) et plusieurs classifieurs sont entraînés en parallèle.
-FIG. 1 – Détection de changement posé comme un problème de classification supervisée.
-Le choix de la méthode de classification est critique dans notre démarche et doit répondre
-aux critères suivants :
- le classifieur doit estimer les densités conditionnelles des classes ;
- la méthode ne doit pas demander de connaissances a priori ;
- la méthode ne doit pas impliquer de paramètres utilisateur ;
- le classifieur doit être peu sensible aux valeurs atypiques ;
- la méthode doit être régularisée pour éviter le sur-apprentissage ;
-Etant donnés ces critères, nous avons choisi d’utiliser l’approche de discrétisation supervi-
-sée MODL (Boullé, 2006) qui s’est distinguée lors de challenges (Guyon et al., 2006).
-2. Une fenêtre temporelle est définie par une “date de début” et une “date de fin”, elle contient les tuples émis dans
-cet intervalle de temps.
-A. Bondu et al
-2.1 Détection et diagnostic
-Le critère d’évaluation d’une discrétisation Ck(M) = − log[P (M |Dk)] correspondant à
-la probabilité qu’un modèle de discrétisationM explique le type de régime du flux (référence
-ou courant) connaissant les données Dk, caractérisées par la variable k. On note “Map” le
-modèle qui minimise ce critère. Soit M0 le modèle qui discrétise la variable k en un seul
-intervalle. Le gain de compression (Boullé, 2009) est défini selon la formule : Gaink(M) =
-1 − Ck(M)/Ck(M0). Notre approche exploite Gaink(Map), qui vaut 0 quand la variable k
-ne permet pas de discriminer le type de régime, et qui est strictement positive quand il existe
-une différence de distribution significative de k selon le type de régime. Gaink(Map) vaut 1
-quand la variable k permet de discriminer parfaitement les deux types de régime.
-quantification du changement de distribution : Le critère proposé ici a pour objectif de quan-
-tifier de manière globale le changement de distribution des tuples sur les deux fenêtres tem-
-porelles. Ce changement est caractérisé indépendamment sur chaque variable k ∈ K par
-Gaink(Map). Il convient alors de définir un critère agrégeant ces indicateurs de changement :
-Change = 1
-K
-∑
-k∈[1,K]
-Gaink(Map) (1)
-contribution de chaque variable : La somme des contributions Contrib(k) sur l’ensemble des
-variables explicatives correspond au changement évalué par le critère Change. La contribution
-de la variable k est définie par :
-Contrib(k) = Gaink(Map)
-K
-3 Validation expérimentale
-Lors de cette validation expérimentale, nous utilisons deux flux de données artificiels qui
-partagent la même structure temporelle. Les tuples sont émis chaque seconde selon une distri-
-bution sous-jacente qui varie au cours du temps (voir Figure 2 ). Les distributions “initiale" et
-“modifiée" sont définies par le Tableau 1 pour les deux flux de données artificiels. Il s’agit de
-distributions normales notées N (m, v), où m est un vecteur à deux dimensions caractérisant
-la moyenne et v est la matrice de covariance.
-Distribution of the data stream
-0 4000 8000
-Time (sec)
-12000
-Initial distribution
-Reference set up
-Modified distribution
-FIG. 2 – Structure temporelle des deux flux de données artificiels.
-distribution initiale distribution modifiée
-Flux 1 : changement de moyenne N
-„
-0 0 ,
-1 0
-0 1
-«
-N
-„
-4 8 ,
-1 0
-0 1
-«
-Flux 2 : changement d’écart type N
-„
-0 0 ,
-1 0
-0 1
-«
-N
-„
-0 0 ,
-4 0
-0 9
-«
-TAB. 1 – Définition des distributions “initiale” et “modifiée” pour les deux flux de données.
-Approche supervisée pour la détection de changement
-3.1 Protocole expérimental
-Le fenêtrage du flux d’entrée constitue le seul paramètrage requis par notre approche de dé-
-tection de changements. Dans le cadre de nos expérimentations, la fenêtre de référence est fixe
-et comporte les 2000 premiers tuples du flux. L’ensemble de ces tuples est supposé être repré-
-sentatif du fonctionnement normal du système observé. La fenêtre de référence est glissante 3
-et comporte, à chaque instant, les 300 derniers tupes émis dans le flux.
-3.2 Méthode concurrente
-Notre stratégie de détection est comparée à une méthode de l’état-de-l’art basée sur l’es-
-timation en ligne de la distribution des tuples (Bondu et al., 2010). Cette méthode met en jeu
-quatre étapes successives :
-1 le résumé du flux par la méthode de micro-clustering “DenStream” qui exploite une pondé-
-ration temporelle des tuples (Feng Cao et al., 2006) ;
-2 l’estimation de la distribution courante par une version des fenêtres de Parzen adaptée aux
-micro-cluster ;
-3 la comparaison de la distribution courante à une distribution de référence grâce à la diver-
-gence de Kullback-Leibler ;
-4 l’estimation de la contribution de chaque variable grâce à un critère exploitant la divergence
-de Kullback-Leibler dans un sous-espace.
-3.3 Résultat comparatifs
-FIG. 3 – Résultats comparatifs sur le 1er flux, où un changement de moyenne apparaît
-Les deux approches de détection sont évaluées selon trois critères : i) la précocité de la
-détection ; ii) la netteté de la détection ; iii) la capacité à évaluer les contributions. La Figure 3
-présente les résultats obtenus sur le premier flux de données, où un changement de moyenne
-apparaît. Le graphique de gauche correspond à la méthode concurrente et le graphique de droite
-à notre approche. Dans les deux cas, l’axe horizontal représente le nombre de tuples émis de-
-puis le début de l’expérience. L’axe vertical caractérise le niveau du changement détecté, soit
-grâce à la divergence de Kullback-Leibler (à gauche), soit par le critère Change donné par
-3. Afin de réduire le temps de calcul de nos expériences, nous avons choisi d’effectuer un point de mesure tous les
-dix tuples.
-A. Bondu et al
-l’Equation 1 (à droite). Sur chaque graphique, la somme des contributions correspond au ni-
-veau global de détection. Comme le montre la Figure 3, notre approche commence à détecter
-le changement de distribution de manière très précoce (après 4100 tuples contre 4500 pour
-la méthode concurrente). Notre approche domine également la méthode concurrente du point
-de vue de la netteté de la détection, les courbes sont beaucoup moins bruitées. Dans le cas
-de notre approche, les contributions semblent être correctes uniquement pendant les régimes
-transitoires. Entre 6000 et 8000 tuples les deux contributions ont sensiblement la même valeur
-et forment un plateau. Cela s’explique par le fait que les deux classes sont parfaitement dis-
-criminées sur chacune des variables. Les deux variables apportent des quantités d’information
-équivalentes vis-à-vis de la discrimination des classes.
-FIG. 4 – Résultats comparatifs sur le 2ème flux, où un changement de variance apparaît
-De la même manière que précédemment, la Figure 4 présente les résultats obtenus par les
-deux méthodes de détection sur le 2ème flux de données, où un changement de variance appa-
-raît. Encore une fois, notre approche détecte le changement de distribution très précocement
-(4050 tuples contre 4800 pour la méthode concurrente). Notre approche domine la méthode
-concurrente du point de vue de la détection, qui est beaucoup plus nette. L’effet de seuil sou-
-ligné précédemment lors du calcul des contributions n’apparaît pas ici. Cela s’explique par le
-fait que les classes sont moins faciles à discriminer dans le cas de ce flux de données.
-Pour conclure, les expériences comparatives présentées dans cette section montrent que
-notre approche domine la méthode de l’état-de-l’art. Notre approche est pourtant plus simple
-à mettre en oeuvre car elle n’implique aucun ajustement de paramètres utilisateur.
-4 Conclusion et perspectives
-Cet article propose de transposer la détection de changement dans la distribution d’un flux
-de données en un problème d’apprentissage supervisé. Deux fenêtres temporelles qui corres-
-pondent chacune à une classe sont définies sur le flux : i) la fenêtre de référence représente
-le fonctionnement normal du système observé ; ii) la fenêtre courante représente l’état actuel
-du système. La qualité du classifeur entrainé sur ces données caractérise le niveau de change-
-ment observé entre les deux fenêtres temporelles. Nous choisissons d’utiliser la méthode de
-discrétisation supervisée MODL (Boullé, 2006) en raison de ses bonnes propriétés (cf Sec-
-tion 2). Notre approche est comparée favorablement à une méthode de l’état-de-l’art (Bondu
-et al., 2010) sur deux flux de données artificiels. Il apparaît que notre approche détecte les
-changements de distribution plus tôt et que la détection est plus nette. Lors de travaux futurs,
-les contraintes matérielles (RAM et CPU) et applicatives (délais de détection) pourraient être
-Approche supervisée pour la détection de changement
-prises en compte explicitement par notre approche. L’objectif serait d’optimiser automatique-
-ment la taille de la fenêtre de référence et le pas de calcul des indicateurs de changement et
-de diagnostic. Enfin, une version incrémentale de l’algorithme utilisé pour l’optimisation du
-critère C(M) pourrait être proposée.
+Concerné par de nombreux domaines d’application (e.g. le traitement des données
+médicales, le marketing, la sécurité et l’analyse financière), l’extraction de motifs sé-
+quentiels fréquents est un domaine de recherche actif qui intéresse la communauté des
+chercheurs en fouille de données. Initialement, les premiers travaux présentés traitent
+du cas des bases de données statiques et proposent des méthodes dites exactes d’ex-
+traction de motifs séquentiels. On peut citer, à titre d’exemple, les algorithmes GSP,
+SPADE, PrefixSpan et SPAM, respectivement proposés par Srikant et Agrawal (1996);
+Zaki (2001); Pei et al. (2001); Ayres et al. (2002). Plus récemment ces dernières années,
+de nouvelles applications émergentes, telles que l’analyse de traffic dans les réseaux,
+la fouille de données “clickstream”1 ou encore la détection de fraudes et d’intrusions,
+induisent de nouvelles problématiques qui impactent les méthodes de fouilles. En
+1clickstream : flot de requêtes d’utilisateurs sur des sites web.
+S, Sequential Patterns Automaton forMining Streams
+effet, ces applications supposent la prise en compte d’un nouveau type de données
+plus connus sous l’intitulé data streams. Le traitement d’un data stream doit satisfaire
+de nouvelles contraintes. Les données sont générées rapidement de façon continue
+voire illimitée et donc ne peuvent être complètement stockées en mémoire. On ne
+peut, de plus, s’autoriser qu’un seul et unique passage sur les données qui doivent
+être traitées le plus rapidement possible. Ainsi, les premièresméthodes d’extraction de
+motifs séquentiels ne sont plus du tout adaptées. Il a été montré dans (cf. Garofalakis
+et al. (2002)) que des méthodes approchées étaient tout à fait adaptées au contexte
+des streams. Toutefois, ces méthodes doivent trouver un compromis satisfaisant entre
+les temps de réponses, la consommation mémoire et la qualité des résultats tant en
+précision qu’en rappel. A l’heure actuelle, il existe peu de travaux qui ont abordé la
+problématique de l’extraction de motifs dans les streams et ils se répartissent en deux
+catégories. La première concerne les méthodes où le traitement des données s’effectue
+par batchs de transactions. On peut citer, les travaux de Kum et al. (2002); Marascu et
+Masseglia (2006) avec respectivement les algoritmes ApproxMap et SMDS. Ils effec-
+tuent un clustering du stream en plusieurs batchs, selon la similarité entre les motifs et
+procèdent par compression de séquences similaires selon une méthode d’alignement
+multiple, afin de réduire la consommation mémoire. Ces méthodes présentent l’in-
+convénient d’effectuer un traitement hors ligne du stream, car ne peuvent s’exécuter
+qu’après l’obtention d’un groupe dedonnées. Elles requièrent donc des tailles critiques
+suffisantes pour les batchs, ce qui n’est pas complètement réaliste compte tenu des
+contraintes inhérentes aux streams. La seconde catégorie concerne les méthodes qui
+opèrent directement par transactions. Chang et Lee (2005) ont proposé l’algorithme
+eISeq, basé sur une structure d’arbre, effectuant un traitement en ligne des données
+par transaction parcourue en une seule passe. Plus lesmotifs sont longs à traiter, moins
+l’algorithme est performant du fait de la phase de génération de tous les sous motifs.
+Par exemple, si < a1, · · · , ai > est un motif, il y a (2i − 1) sous motifs à créer. Pour pal-
+lier cette difficulté, Li et Chen (2007) ont présenté l’algorithme GraSeq, développant
+une approche à partir d’une structure de type graphe orienté pondéré permettant de
+limiter la phase de génération de sous motifs. Toutefois, cette approche suppose un
+pré-traitement des transactions pour en effectuer un regroupement.
+Dans cet article, nousproposonsunnouvel algorithmeune-passe :SPAMS (Sequential
+Pattern Automaton for Mining Streams). Il est basé sur la construction et la mise à
+jour incrémentale par transaction d’une structure d’automate : SPA (Sequential Pattern
+Automaton) et permet l’extraction des motifs séquentiels dans les data streams. Il ne
+nécessite pas d’effectuer un pré-traitement visant à opérer un regroupement de tran-
+sactions. SPA est un automate dont, seuls sont parcourus, les états et les transitions
+qui doivent l’être, lors de l’insertion des nouvelles transactions du stream. On évite,
+ainsi les parcours multiples de la structure, prohibitifs et pénalisants pour les perfor-
+mances des algorithmes. De plus, notre approche permet de réduire sensiblement la
+génération des motifs candidats tout en conservant une qualité d’approximation très
+satisfaisante tant en rappel qu’en précision. La suite de l’article est organisée de la
+manière suivante. La section 2 présente formellement la problématique. La section 3
+rapelle les concepts requis pour présenter notre approche qui est décrite à la section 4.
+Les expérimentations sont fournies à la section 5 et la conclusion est proposée dans la
+L. V & al.
+dernière section.
+2 Définition du problème
+Dans cette section, nous donnons une définition formelle du problème de l’extrac-
+tion des motifs séquentiels dans les data streams. Tout d’abord, nous résumons la
+description formelle présentée par Srikant et Agrawal (1996), classiquement utilisée
+dans le cas des bases de données statiques. Nous étendons ensuite la problématique
+au cas des data streams.
+Soit I = {i1, i2, . . . , im} un ensemble ordonné d’items utilisés dans une base de
+donnéesDB de transactions, où chaque transaction tr est identifiée de manière unique
+par un Cid, un temps et est associée à un ensemble d’items de I. Un ensemble X ⊆ I
+est appelé un itemset. Une séquence s est un ensemble d’itemsets ordonnés selon leur
+temps et est représentée par < s1s2 · · · sn >, où s j, pour j ⊆ [1..n], est un itemset. Une k-
+séquence est une séquence de k items oude longueur k. Une séquence S′ =< s′1s
+′
+2 · · · s
+′
+n >
+est une sous séquence d’une autre séquence S =< s1 s2 · · · sn >, que l’on note S′ ≺ S
+s’il existe des entiers i1 < i2 < · · · i j · · · < in tels que s′1 ⊆ si1 , s
+′
+2 ⊆ si2 , · · · , s
+′
+n ⊆ sin .
+Toutes les transactions relatives à unmême Cid sont regroupées et triées selon leur
+ordre d’apparition, pour obtenir une séquence de données. Une séquence de données
+contient une séquence S, si S en est une sous-séquence. Le support d’une séquence S,
+noté supp(S), correspond au nombre d’occurences de S dans DB. Pour décider si une
+séquence est fréquente ou non, une valeur de support minimum, notée σ, est spécifiée
+par l’utilisateur. Une séquence S est dite θ-fréquente si supp(S) ≥ σ, où σ = pθ × |DB|q
+avec θ ∈]0; 1] et |DB| la taille de la base de données. Etant donnée une base de données
+de transactions de clientsCid, le problèmede l’extractiondemotifs séquentiels consiste
+à trouver toutes les séquences, dont le support est supérieur ou égal au support
+minimum fixé par l’utilisateur dansDB. Cette problématique, étendue au cas des data
+streams, peut s’exprimer simplement comme suit. Formellement, un data stream DS
+peut être défini par une suite de transactions DS = (T1,T2, · · · ,T j, · · · ). Chacune des
+transactions, identifiée par un Tid, est associée à un Cid (voir par exemple la table 1).
+L’extraction des motifs séquentiels fréquents revient à trouver toutes les séquences,
+dont le support est supérieur ou égal au support minimum fixé par l’utilisateur pour
+la partie connue du stream à un moment donné.
+C1 C2 C3
+T1 T2 T3 T4 T5 T6 T7
+bd abd acd bcd bd ab c
+T. 1 – Ensembles des transactions par Cid construites sur I = {a, b, c, d}.
+S, Sequential Patterns Automaton forMining Streams
+3 Prérequis sur les couvertures statistiques
+Nous reprenons ci-dessous le théorème proposé et prouvé par Laur et al. (2007)
+concernant les couvertures statistiques. Les auteurs proposent de biaiser la valeur du
+support fixé par l’utilisateur afin d’obtenir des ensembles de motifs qui permettent de
+maximiser les résultats tant en rappel qu’en précision.
+Théorème 1 ∀θ, 0 < θ ≤ 1,∀δ, 0 < δ ≤ 1, soit m et m∗ respectivement le nombre de motifs
+(θ-fréquent et θ-infrequent) dans la partie connue du stream et dans tout le stream, si on
+choisit  tel que :
+ ≥
+√
+1
+2m
+ln
+m∗
+δ
+,
+cela implique que le Rappel = 1 et respectivement la Précision = 1 avec une probabilité
+d’au moins 1 − δ, après suppression de tous les motifs qui ne sont pas θ′-frequent à partir de
+l’observation, avec θ′ = θ−  et respectivement θ′ = θ+ . Le paramètre δ est le paramètre de
+risque statistique fixé par l’utilisateur et les valeurs θ′ = θ ±  sont les supports statistiques.
+La sup-(θ, )-couverture représente le quasi-optimal plus petit ensemble de motifs
+avec une probabilité d’au moins 1 − δ contenant tous les motifs qui sont θ-fréquent
+dans tout le stream (éventuellement infini). Il n’y a pas de résultats faux négatifs avec
+une forte probabilité. La inf-(θ, )-couverture représente le quasi-optimal plus grand
+ensemble demotifs avec une probabilité d’aumoins 1−δ contenant tous les motifs qui
+sont θ-fréquent dans tout le stream (éventuellement infini). Dans cet ensemble, il n’y
+a pas de résultats faux positifs avec une forte probabilité, mais avec des faux négatifs.
+Par quasi-optimal, les auteurs expriment que toute technique obtenant de meilleures
+bornes est condamnée à se tromper (i.e. le critère à maximiser n’est plus égal à 1). Ils
+précisent aussi, qu’ils ne font aucune hypothèse concernant la distribution du stream.
+4 L’approche SPAMS
+Notre approche, repose sur la construction incrémentale d’une structure d’au-
+tomate qui permet l’indexation des motifs séquentiels du stream. Le traitement du
+stream s’effectue avec une granularité très fine, par transaction et pour chaque tran-
+saction item par item. Il n’est point nécessaire de procéder à un pré-traitement pour
+regrouper les transactions par Cid. Aussi, nous ne pré-supposons au départ de l’algo-
+rithme ni la connaissance de l’alphabet des items ni la connaissance du nombre des
+Cid du stream. Cette information est apprise incrémentalement, à la volée, au fur et à
+mesure de l’insertion des nouvelles transactions du stream. Par ailleurs, afin d’obtenir
+une qualité d’approximation satisfaisante, tant en rappel qu’en précision, en plus des
+motifs séquentiels θ-fréquents, nous indexons également les motifs (θ − ) fréquents
+de la couverture statistique supérieure. On conserve donc ici, le nombre minimal de
+motifs candidats supplémentaires limitant ainsi l’explosion combinatoire.
+L. V & al.
+4.1 SPA : l’automate des motifs séquentiels
+Nous définissons formellement dans cette section l’automate SPA. Pour une infor-
+mation détaillée sur la théorie des automates, nous suggérons la présentation faite par
+Hopcroft et Ullman (1990). SPA est un automate fini déterministe, i.e. un quintuple tel
+que SPA =
+(
+Q, q0, F, I, δ
+)
+où
+• Q est un ensemble fini d’états dont chaque état est représenté par un identifiant
+unique associé à une valeur de support.
+• q0 ∈ Q est l’état initial, dont le support correspond au nombre de clients lu pour
+le stream en cours d’acquisition.
+• F ⊆ Q est l’ensemble des états finaux, i.e. les états ayant un support supérieur ou
+égal au support seuil.
+• Σ ⊆ I est l’alphabet des items reconnus.
+• δ : Q × Σ → Q est la fonction de transition non totale permettant d’indexer les
+motifs séquentiels fréquents du stream.
+4.2 L’algorithme SPAMS
+4.2.1 Présentation
+Le principe de SPAMS repose sur l’idée centrale suivante concernant la construc-
+tion de l’automate. Nous construisons SPA en imposant la condition suivante : un état
+ne peut être accessible que par un seul item, avec une valeur de support qui corres-
+pond au nombre d’occurences de chaque motif séquentiel reconnu à cet état. Si après
+lecture d’un item la condition précédente ne peut plus être vérifiée pour un état (i.e. le
+nombre d’occurences de certains motifs séquentiels reconnus à cet état doit être incré-
+menté), il convient de dupliquer l’état. Le nouvel état créé, recoit les seules transitions
+entrantes appartenant aux motifs séquentiels dont le support doit être incrémenté et
+recoit également les transitions sortantes de l’état dupliqué. Après initialisation de
+l’automate SPA, notre algorithme se décompose en trois modules principaux. Le pre-
+mier, I, permet la lecture et l’insertion d’un nouvel item acquis dans le stream.
+Le second, S, permet de supprimer, pendant l’exécution du module I,
+les états et les transitions relatifs aux séquences devenues non (θ − )-fréquentes. Le
+dernier, S, permet de terminer le traitement d’une transaction avant de passer à
+la transaction suivante. Nous utiliserons le symbole ’-’ comme séparateur des itemsets
+à l’intérieur des séquences.
+• Initialisation de l’automate : création de l’état initial q0 et d’un état transitoire,
+noté q∞, utilisé pendant la construction. Ce dernier n’appartient pas à l’automate
+final.
+• Lecture et Insertion d’un item α pour un client cid donné : à chaque insertion
+d’un item α, il va s’agir dans un premier temps de déterminer tous les états
+derrières lesquels il faudra ajouter une transition libellée par l’item α, et cela afin
+d’ indexer incrémentalement toutes les sous-séquences incluses dans la séquence
+en cours de lecture. Pour cela on maintient une liste Qcid ⊆ Q correspondant aux
+états atteints lors du traitement des séquences du client cid.
+S, Sequential Patterns Automaton forMining Streams
+Σ : Alphabet de l’automate.
+Q : Ensemble des états de l’automate.
+T : Ensemble des transitions de l’automate.
+Ts : Ensemble des transitions entrantes sur l’état s ∈ Q.
+Q− : Ensemble des états de l’automate accessibles par l’item ’-’.
+Qcid : Ensemble des états atteints par le client cid.
+Σcid : Alphabet du client cid.
+Ta : Ensemble des transitions atteintes lors de l’insertion d’un item.
+|s| : Support de l’état s ∈ Q.
+s
+α
+7−→ s′ : Transition de l’état s à l’état s′, étiqueté par α.
+C : Ensemble des identifiants client.
+T. 2 – Notations utilisées dans S
+1. Si cid < C, alors C = C ∪ { cid } , Qcid = { q0 } et Σcid = ∅.
+2. Ensuite, ∀s ∈ Qcid , si @ s′ ∈ Q | s
+α
+7−−→ s′ ∈ T , alors T = T ∪ {s
+α
+7−−→ q∞}.
+3. On récupère l’ensemble des dernières transitions atteintes Ta ⊆ T tel que
+Ta =
+{
+s
+α
+7−−→ s′ ∈ T | s ∈ Qcid et s′ ∈ Q
+}
+.
+4. Pour tout état s′ tel que s
+α
+7−−→ s′ ∈ Ta, on effectue les opérations suivantes :
+(i) Si s′ , q∞ et |Ts′ | = |Ts′ ∩ Ta| , alors Qcid = Qcid ∪ { s′ }.
+De plus, si α < Σcid alors Σcid = Σcid ∪ { α } et |s′| = |s′| + 1.
+(ii) Sinon, i.e. s′ = q∞ ou |Ts′ | , |Ts′ ∩ Ta|, on crée un nouvel état p et
+Qcid = Qcid ∪ { p }. Si α < Σcid alors Σcid = Σcid ∪ { α } et |p| = |s′| + 1, sinon
+|p| = |s′|.
+Ensuite, ∀s′
+β
+7−→ z ∈ T, avec β ∈ Σ et z ∈ Q , on a T = T ∪
+{
+p
+β
+7−→ z
+}
+.
+Ensuite, ∀z
+α
+7−→ s′ ∈ Ts′ ∩ T
+a, on a T = T \
+{
+z
+α
+7−→ s′
+}
+∪
+{
+z
+α
+7−→ p
+}
+avec z ∈ Q.
+• Suppression d’un état s : la suppression d’un état sde l’automate, est réalisée par
+le module S. Elle consiste à supprimer l’état s et toute sa descendance,
+i.e. tous les états et transitions accessibles à partir de l’état s.
+• Transaction suivante : quand tous les items αi d’une transaction donnée (pour
+un client cid) ont été lus et insérés dans l’automate, le module S est appelé.
+Ce module fonctionne en trois étapes :
+(i) réduction de l’ensemble des états atteints : Qcid = Qcid \ {Qcid ∩ Q− ∪ {q0}}
+(ii) appel du module I sur l’item ’-’.
+(iii) mise à jour de l’ensemble des états atteints : Qcid = Qcid ∪ { q0 }.
+4.2.2 Exemple de construction & pseudo-code
+Afin d’illustrer l’exécution de S, nous reprenons l’exemple de la table 1, traité
+sous forme de stream, représentée par le schéma de la figure 1. Nous conservons ici
+L. V & al.
+toute la généralité du stream et ne présupposons pas d’ordonancement des transac-
+tions par Cid. Les schémas des figures 2, 3, 5, 6, 7 et 9 illustrent la lecture et l’insertion
+d’items (voir les explications de la section 4.2.1 pour les points sur l’initialisation et la
+lecture et l’insertion d’items). Les schémas des figures 4, 8 illustrent la fin du traite-
+ment de transactions (voir les explications de la section 4.2.1 pour la partie transaction
+suivante). Nous présentons à la figure 10 le pseudo-code de notre algorithme.
+SPAMS
+︷            ︸︸            ︷
+(1, 1, b) (1, 1, d)
+︷                      ︸︸                      ︷
+(2, 4, b) (2, 4, c) (2, 4, d)
+︷                      ︸︸                      ︷
+(1, 2, a) (1, 2, b) (1, 2, d) · · ·
+F. 1 – Exemple de data stream non ordonné (voir table 1)
+q0
+1
+q∞
+0
+b
+(i) Lecture de l’item b
+q0
+1
+q∞
+0
+q1
+1B
+(ii) Création de q1 et déplacement des
+transitions atteintes
+q0
+1
+q∞
+0
+q1
+1b
+(iii) Automate final
+F. 2 – Lecture et insertion de l’item b (transaction 1)
+q0
+1
+q∞
+0
+q1
+1b
+d
+d
+(i) Lecture de l’item d
+q0
+1
+q∞
+0
+q1
+1
+q2
+1
+b
+d
+d
+(ii) Création de q2 et déplacement des
+transitions atteintes
+q0
+1
+q∞
+0
+q1
+1
+q2
+1
+b
+d
+d
+(iii) Automate Final
+F. 3 – Lecture et insertion de l’item d (transaction 1)
+q0
+1
+q∞
+0
+q1
+1
+q2
+1
+b
+d
+d
+−
+−
+(i) Lecture de l’item −
+q0
+1
+q∞
+0
+q1
+1
+q3
+1
+q2
+1
+b
+d
+d
+−
+−
+(ii) Création de q3 et déplacement des
+transitions atteintes
+q0
+1
+q∞
+0
+q1
+1
+q3
+1
+q2
+1
+b
+d
+d
+−
+−
+(iii) Automate final
+F. 4 – Fin du traitement de la transaction 1
+L’automate final comprend 21 états et 27 transitions indexant tous les motifs sé-
+quentiels de la table 1. Par manque de place, nous ne représentons pas cet automate.
+S, Sequential Patterns Automaton forMining Streams
+q0
+1
+q∞
+0
+q1
+1
+q3
+1
+q2
+1
+b
+d
+d
+−
+−
+(i) Lecture de l’item b
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+1
+b
+d
+d
+−
+−
+(ii) Automate final
+F. 5 – Lecture et insertion de l’item b (transaction 2)
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+1
+b
+d
+d
+−
+−
+c
+c
+(i) Lecture de l’item c
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+1
+q4
+1
+b
+d
+d
+−
+−
+c
+c
+(ii) Création de q4 et déplacement des
+transitions atteintes
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+1
+q4
+1
+b
+d
+d
+−
+−
+c
+c
+(iii) Automate final
+F. 6 – Lecture et insertion de l’item c (transaction 2)
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+1
+q4
+1
+b
+d
+d
+−
+−
+c
+c
+d
+(i) Lecture de l’item d
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+b
+d
+d
+−
+−
+c
+c
+d
+(ii) Création de q5 et déplacement des
+transitions atteintes
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+b
+d
+d
+−
+−
+c
+c
+d
+(iii) Automate final
+F. 7 – Lecture et insertion de l’item d (transaction 2)
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+b
+d
+d
+−
+−
+c
+c
+d
+−
+−
+−
+−
+(i) Lecture de l’item −
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+q6
+1
+b
+d
+d
+−
+−
+c
+c
+d
+−
+−
+−
+−
+(ii) Création de q6 et déplacement des
+transitions atteintes
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+q6
+1
+b
+d
+d
+−
+−
+c
+c
+d
+−
+−
+−
+−
+(iii) Automate final
+F. 8 – Fin de traitement de la transaction 2
+5 Expérimentations
+Plusieurs expérimentations ont été réalisées afin de tester l’efficacité de notre ap-
+proche. Des expérimentations empiriques ont été faites sur des jeux de données synté-
+L. V & al.
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+q6
+1
+b
+d
+d
+−
+−
+c
+c
+d
+−
+−
+−
+−
+a
+a
+(i) Lecture de l’item a
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+q6
+1
+q7
+1
+b
+d
+d
+−
+−
+c
+c
+d
+−
+−
+−
+−
+a
+a
+(ii) Création de q7 et déplacement des
+transitions atteintes
+q0
+1
+q∞
+0
+q1
+2
+q3
+1
+q2
+2
+q4
+1
+q5
+1
+q6
+1
+q7
+1
+b
+d
+d
+−
+−
+c
+c
+d
+−
+−
+−
+−
+a
+a
+(iii) Automate final
+F. 9 – Lecture et insertion de l’item a (transaction 3)
+tiques générés à partir du simulateur IBM2. Nous avons fait varier le nombre de clients
+D, le nombre de transactions par client C, le nombre moyen d’items par transaction T,
+la taille moyenne des séquences maximales S et la taille moyenne des transactions des
+séquences maximales I. Nous avons utilisé une implémentation en C++ de SPAMS
+compilée avec l’option -03 du compilateur g++, sur un Intel Pentium D, 2Go ram.
+Nous illustrons sur les figures 11-(i) et 11-(ii) les performances en temps et en consom-
+mation mémoire de SPAMS, pour différentes valeurs de support, sur les jeux de don-
+néesdepetite,moyenne et grande taille, respectivementD7C7T7S7I7,D8C10T10S10I10
+et D18C18T18S18I18. Les figures 11-(iii) à 11-(v) représentent l’évolution du temps,
+de la mémoire et du nombre de Cid en fonction du nombre de transactions sur
+D18C18T18S18I18 avec un support fixé à 20%.
+La figure 11-(vi) permet d’illustrer sur le jeu de données D18C18T18S18I18 que le
+support statistique utilisé tend vers le support seuil au fur et à mesure de l’acquisition
+des transactions, diminuant ainsi l’ensemble des motifs (θ − )-fréquents de la cou-
+verture statistique. Pour le calcul de  (voir section 3), nous avons choisi la valeur de
+0.01 pour le risque statistique δ. Ces expérimentations montrent que nous trouvons
+un compromis très satisfaisant entre les performances temporelles, la consommation
+mémoire et la qualité des résultats de l’extraction tant en précision qu’en rappel. Elles
+montrent aussi, l’applicabilité et le passage à l’échelle de l’algorithme SPAMS.
+6 Conclusion
+Dans cet article, nous apportons une contribution originale en proposant un nouvel
+algorithme une-passe : SPAMS, basé sur l’élaboration d’un nouvel automate nommé
+SPA, qui permet de traiter de façon efficace la problématique de l’extraction des motifs
+séquentiels fréquents dans les data streams. SPA présente des propriétés incrémen-
+tales qui permettent son initialisation sans aucune information. Sa mise à jour, dans
+le cas des data streams, se fait avec une granularité très fine par transaction, sans
+qu’il soit nécessaire de procéder à un pré-traitement pour regrouper les transactions
+par client Cid. Par ailleurs, chaque transaction est acquise item par item et nous ne
+pré-supposons au départ de l’algorithme ni la connaissance de l’alphabet des items ni
+2simulateur disponible à l’adresse http://www.almaden.ibm.com/cs/quest
+S, Sequential Patterns Automaton forMining Streams
+Algorithme 1 – S
+données : Stream, θ
+so r t i e : θ
+début
+Créer les états q0 et q∞
+T← ∅ ; Q←
+{
+q0, q∞
+}
+|q0| ← 1 ; |q∞| ← 0 ; cid← null
+tid← null ; C← ∅ ; min_sup← 0
+pour chaque (cid′, tid′, α) ∈ Stream f a i r e
+si (cid , cid′) ou (tid , tid′) alors⌊
+S(cid, cid′)
+cid← cid′; tid← tid′
+I(α, cid)
+f in
+Algorithme 2 – S
+données : cid, cid′
+début
+s i cid , null a lors⌊
+I(′−′, cid)
+Qcid ← Qcid ∩Q
+− ∪ { q0 }
+s i cid′ < C a lors
+C← C∪ { cid′ }
+Qcid′ ← { q0 }
+←
+√
+1
+2.|C| ln
+|C|
+δ
+min_sup← d(θ − ) × |C|e
+f in
+Algorithme 3 – S
+données : s
+début
+· Supprimer les transitions entrantes de s
+pour chaque s
+β
+7−→ s′ ∈ T f a i r e⌊
+S(s′)
+· Supprimer l’état s
+f in
+Algorithme 4 – I
+données : α, cid
+début
+Ta ← ∅
+pour chaque s ∈ Qcid f a i r e
+si ∃ s′ ∈ Q | s
+α
+7−→ s′ ∈ T alors⌊
+Ta ← Ta ∪
+{
+s
+α
+7−→ s′
+}
+sinon⌊
+Ta ← Ta ∪
+{
+s
+α
+7−→ q∞
+}
+Q′ ←
+{
+s′ ∈ Q | s
+α
+7−→ s′ ∈ Ta
+}
+pour chaque s′ ∈ Q′ f a i r e
+si |s′| + 1 >= min_sup alors
+si s′ , q∞ et |Ts′ ∩ Ta| = |Ts′ | alors
+si α < Σcid alors⌊
+|s′| ← |s′| + 1
+Σcid ← Σcid ∪ {α}
+sinon
+· Créér un état s′′
+· Q← Q∪ {s′′}
+si α < Σcid or s′ = q∞ alors⌊
+|s′′| ← |s′| + 1
+Σcid ← Σcid ∪ {α}
+· Dupliquer les transitions sortantes
+de s′ sur s′′
+· Déplacer les transitions Ts′ ∩ Ta
+de s′ vers s′′
+Ta ← Ta \ {Ts′ ∩ T
+a}
+si |s′| < min_sup alors S(s′)
+f in
+F. 10 – Pseudo-code de l’algorithme S
+la connaissance du nombre des clients du stream. Cette information est apprise incré-
+mentalement, à la volée, au fur et àmesure de l’insertion des nouvelles transactions du
+stream. Les expérimentations montrent que nous trouvons un compromis satisfaisant,
+en limitant la phase de génération des candidats avec la couverture statistique, tout en
+conservant de bons résultats tant en rappel qu’en précision avec également de bonnes
+performances en temps et enmémoire. Plusieurs perspectives peuvent être envisagées
+à la suite de ce travail. Cela concerne, par exemple, la suppression incrémentale de
+motifs séquentiels dans l’automate, ou encore la représentation de motifs tels que les
+L. V & al.
+motifs fermés et maximaux.
 Références
-Bondu, A., B. Grossin, et M. Picard (2010). Density estimation on data streams : an application
-to Change Detection. In EGC (Extraction et Gestion de l’Information).
-Boullé, M. (2006). MODL: A bayes optimal discretization method for continuous attributes.
-Machine Learning 65(1), 131–165.
-Boullé, M. (2009). Optimum simultaneous discretization with data grid models in supervised
-classification: a bayesian model selection approach. Advances in Data Analysis and Classi-
-fication 3(1), 39–61.
-Desobry, F. et M. Davy (2003). Support Vector-Based Online Detection of Abrupt Changes.
-In Proc. IEEE ICASSP, Hong Kong, pp. 872–875.
-Dries, A. et U. Rückert (2009). Adaptive Concept Drift Detection. In SIAM Conference on
-Data Mining, pp. 233–244.
-Feng Cao, F., M. Ester, W. Qian, et A. Zhou (2006). Density-based clustering over an evolving
-data stream with noise. In SIAM Conference on Data Mining, pp. 328–339.
-Friedman, J. et L. Rafsky (2006). Multivariate generalizations of the Wald-Wolfowitz and
-Smirnov two-sample tests. Annals of Statistic 7(4), 697–717.
-Guyon, I., A. Saffari, G. Dror, et J. Bumann (2006). Performance prediction chal-
-lenge. In International Joint Conference on Neural Networks, pp. 2958–2965.
-http://www.modelselect.inf.ethz.ch/index.php.
-Hall, P. (2002). Permutation tests for equality of distributions in high-dimensional settings.
-Biometrika 89(2), 359–374.
+Ayres, J., J. Gehrke, T. Yiu, et J. Flannick (2002). Sequential pattern mining using a
+bitmap representation. pp. 429–435. ACM Press.
+Chang, J. H. et W. S. Lee (2005). Efficient mining method for retrieving sequential
+patterns over online data streams. J. Inf. Sci. 31(5), 420–432.
+Garofalakis, M., J. Gehrke, et R. Rastogi (2002). Querying and mining data streams :
+you only get one look a tutorial. In SIGMOD ’02 : Proceedings of the 2002 ACM
+SIGMOD international conference on Management of data, New York, NY, USA, pp.
+635–635. ACM.
+Hopcroft, J. E. et J. D. Ullman (1990). Introduction to Automata Theory, Languages, and
+Computation. Addison-Wesley Longman Publishing Co., Inc.
+Kum, H., J. Pei, W.Wang, et D. Duncan (2002). Approxmap : Approximate mining of
+consensus sequential patterns.
+Laur, P.-A., R.Nock, J.-É. Symphor, et P. Poncelet (2007). Mining EvolvingData Streams
+for Frequent Patterns. Pattern Recognition 40(2), 492–503.
+Li, H. et H. Chen (2007). Graseq : A novel approximate mining approach of sequential
+patterns over data stream. In ADMA, pp. 401–411.
+Marascu, A. et F. Masseglia (2006). Extraction de motifs séquentiels dans les flots de
+données d’usage du web. In EGC, pp. 627–638.
+Pei, J., J. Han, B.Mortazavi-asl, H. Pinto, Q. Chen, U. Dayal, etM. chunHsu (2001). Pre-
+fixspan : Mining sequential patterns efficiently by prefix-projected pattern growth.
+pp. 215–224.
+Srikant, R. et R. Agrawal (1996). Mining sequential patterns : Generalizations and
+performance improvements. pp. 3–17.
+Zaki, M. J. (2001). Spade : an eficient algorithm for mining frequent sequences. In
+Machine Learning Journal, special issue on Unsupervised Learning, pp. 31–60.
 Summary
-Data stream mining process massive data processing treating pieces of data on the fly. The
-detection of changes in a data stream distribution is an important issue. This article turns the
-changes detection into a supervised learning problem. The MODL supervised discretization
-method has been chosen because of its interesting properties. Our approach is favorably com-
-pared with a competitor method on artificial data streams.
+Mining sequential patterns on data streams is a new challenging problem for the
+datamining community since data arrives sequentially in the form of continuous rapid
+streams. More still than for databases, many additional constraints have to be con-
+sidered due to the intrinsic nature of the streams. In this paper, we propose a new
+one-pass algorithm named: SPAMS, based on the incremental updating of an automa-
+ton structure: SPA, for mining sequential patterns in data streams. The information
+of the stream is learned progressively, from the insertion of new transactions, without
+preprocessing step a priori. The experimental results obtained show the relevance of
+the structure used, as well as the efficiency of our algorithm applied on datasets.
+S, Sequential Patterns Automaton forMining Streams
+ 1
+ 10
+ 100
+ 1000
+ 10000
+ 0.1  0.15  0.2  0.25  0.3
+te
+m
+p
+s
+ e
+n
+ s
+e
+c
+o
+n
+d
+e
+s
+support
+Temps de construction de l'automate
+D7C7T7S7I7
+D8C10T10S10I10
+D18C18T18S18I18
+(i) temps
+ 10000
+ 100000
+ 1e+06
+ 0.1  0.15  0.2  0.25  0.3m
+e
+m
+o
+ir
+e
+ v
+ir
+tu
+e
+lle
+ m
+a
+x
+im
+a
+le
+ (
+K
+o
+)
+support
+Consommation memoire de SPAMS
+D7C7T7S7I7
+D8C10T10S10I10
+D18C18T18S18I18
+(ii) mémoire
+ 10
+ 100
+ 0  5  10  15  20  25  30
+te
+m
+p
+s
+ e
+n
+ s
+e
+c
+o
+n
+d
+e
+s
+transactions (x 10000)
+D18C18T18S18I18 (θ=0.2)
+SPAMS
+(iii) Temps sur D18C18T18S18I18
+ 100000
+ 1e+06
+ 0  5  10  15  20  25  30m
+e
+m
+o
+ir
+e
+ v
+it
+u
+e
+lle
+ m
+a
+x
+im
+a
+le
+ (
+K
+o
+)
+transactions (x 10000)
+D18C18T18S18I18 (θ=0.2)
+SPAMS
+(iv) Mémoire sur D18C18T18S18I18
+ 100
+ 1000
+ 10000
+ 100000
+ 0  5  10  15  20  25  30
+n
+o
+m
+b
+re
+ d
+e
+ c
+lie
+n
+ts
+transactions (x 10000)
+D18C18T18S18I18 (θ=0.2)
+SPAMS
+(v) Acquisition des clients sur D18C18T18S18I18
+ 0.01
+ 0.1
+ 1
+ 0  5  10  15  20  25  30
+v
+a
+le
+u
+r
+transactions (x 10000)
+D18C18T18S18I18 (θ=0.2)
+θ - ε
+θ
+ε
+(vi) Évolution du support statistique sur
+D18C18T18S18I18
+ 0.1
+ 1
+ 0.1  0.15  0.2  0.25
+v
+a
+le
+u
+r
+support
+D18C18T18S18I18
+Rappel
+Precision
+(vii) Rappel et précision sur D18C18T18S18I18
+ 10
+ 100
+ 1000
+ 0  5  10  15  20  25  30n
+o
+m
+b
+re
+ d
+'e
+ta
+ts
+ e
+t 
+d
+e
+ t
+ra
+n
+s
+it
+io
+n
+s
+transactions (x 10000)
+D18C18T18S18I18 (θ=0.2)
+etats
+transitions
+(viii) Nombre d’états et de transitions sur
+D18C18T18S18I18
+F. 11 – Expérimentations de SPAMS

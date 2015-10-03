@@ -1,568 +1,692 @@
-Analyse flexible dans les entrepôts de données :
-quand les contextes s’en mêlent
-Yoann PITARCH∗, Cécile FAVRE∗∗
-Anne LAURENT∗, Pascal PONCELET∗
-∗LIRMM - Université Montpellier 2, Montpellier, France
-{pitarch,laurent,poncelet}@lirmm.fr
-∗∗ERIC, Université Lyon 2, Lyon, France
-cecile.favre@univ-lyon2.fr
-Résumé. En autorisant l’observation des données à plusieurs niveaux de préci-
-sion, les hiérarchies occupent une place importante dans les analyses d’entrepôts
-de données. Malheureusement, les modèles d’entrepôts existants ne considèrent
-qu’un sous-ensemble restreint des types possibles de hiérarchie. Par exemple, il
-n’est pas possible de modéliser le fait que le caractère “faible”, “normal” ou
-“élevé” de la tension artérielle d’un patient (qui constitue une hiérarchisation de
-la mesure) dépend de son âge (élément lié à la dimension). Ces hiérarchies, dites
-contextuelles, ont récemment été introduites dans des travaux précédents. Dans
-cet article, nous proposons la première approche pour les modéliser. Une base
-experte représentant la connaissance du domaine est créée. Ensuite, un algo-
-rithme de réécriture de requêtes est proposé pour permettre une analyse flexible,
-efficace et adéquate d’un entrepôt possédant de telles hiérarchies. Par exemple,
-il est désormais possible de répondre à la requête “Quels patients ont eu une
-tension faible au cours de la nuit?” en prenant en compte de manière adéquate
-les contextes associés au caractère “faible” de la mesure tension.
+Bordures statistiques pour la fouille incrØmentale de donnØes
+dans les Data Streams
+Jean-Emile Symphor, Pierre-Alain Laur
+GRIMAAG-DØpt Scientique Interfacultaire,
+UniversitØ des Antilles et de la Guyane, Campus de Schoelcher,
+B.P. 7209, 97275 Schoelcher Cedex, Martinique, France
+fje.symphor,palaurg@martinique.univ-ag.fr.
+Résumé. RØcemment la communautØ Extraction de Connaissances s’est intØ-
+ressØe à de nouveaux modŁles oø les donnØes arrivent sØquentiellement sous la
+forme d’un ot rapide et continu, i:e: les data streams. L’une des particularitØs
+importantes de ces ots est que seule une quantitØ d’information partielle est
+disponible au cours du temps. Ainsi aprŁs diffØrentes mises à jour successives,
+il devient indispensable de considØrer l’incertitude inhØrente à l’information re-
+tenue. Dans cet article, nous introduisons une nouvelle approche statistique en
+biaisant les valeurs supports pour les motifs frØquents. Cette derniŁre a l’avan-
+tage de maximiser l’un des deux paramŁtres (prØcision ou rappel) dØterminØs
+par l’utilisateur tout en limitant la dØgradation sur le paramŁtre non choisi. Pour
+cela, nous dØnissons les notions de bordures statistiques. Celles-ci constituent
+les ensembles de motifs candidats qui s’avŁrent trŁs pertinents à utiliser dans le
+cas de la mise à jour incrØmentale des streams. Les diffØrentes expØrimentations
+effectuØes dans le cadre de recherche de motifs sØquentiels ont montrØ l’intØrŒt
+de l’approche et le potentiel des techniques utilisØes.
 1 Introduction
-Les entrepôts de données (Inmon (1996)) permettent de consolider, stocker et organiser
-ces données à des fins d’analyse. Des faits peuvent alors être analysés à travers des indicateurs
-(les mesures) selon différents axes d’analyse (les dimensions). En s’appuyant sur des méca-
-nismes d’agrégation, les outils OLAP (On Line Analytical Process)(Agrawal et al. (1997);
-Chen et al. (1996); Han (1997)) permettent de naviguer aisément le long des hiérarchies des
-dimensions. La puissance de ces outils place les entrepôts au centre des systèmes d’informa-
-tion décisionnels (Mallach (2000)). Ces considérations justifient l’émergence d’entrepôts dans
-des domaines aussi variés que l’analyse de ventes, la surveillance de matériel, le suivi de don-
-nées médicales (Einbinder et al. (2001))... Dans cet article, nous considérons cette dernière
-application afin d’exhiber un manque d’expressivité dans les solutions actuelles et ainsi illus-
-trer l’intérêt de notre proposition.
-Entrepôts de données avec hiérarchies contextuelles de mesure
-Considérons un entrepôt de données médicales enregistrant les paramètres vitaux (e.g., le
-pouls, la tension artérielle...) des patients d’un service de réanimation. Afin de réaliser un suivi
-efficace des patients, un médecin souhaiterait par exemple connaître ceux qui ont eu une ten-
-sion artérielle basse au cours de la nuit. Pouvoir formuler ce type de requête suppose l’existence
-d’une hiérarchie sur la tension artérielle dont le premier lien d’agrégation serait une catégori-
-sation de la tension artérielle (e.g., basse, normale, élevée). Toutefois, cette catégorisation est
-délicate car elle dépend à la fois de la tension artérielle mesurée mais aussi de certaines ca-
-ractéristiques physiologiques (âge du patient, fumeur ou non, ...). Dès lors, une même tension
-peut être généralisée différemment selon le contexte d’analyse considéré. Par exemple, 13 est
-une tension élevée chez un nourrisson alors qu’il s’agit d’une tension normale chez un adulte.
-Introduites formellement par Pitarch et al. (2009), ces hiérarchies dites contextuelles ne sont
-implantées dans aucun modèle d’entrepôt de données actuel.
-En effet, la plupart des solutions logicielles existantes pour construire un entrepôt de don-
-nées souffre de deux faiblesses majeures quant à leur gestion des hiérarchies :
-– Une hiérarchie ne peut être définie que sur un attribut associé à une dimension d’analyse.
-Si l’on considère l’exemple précédent, il n’est dont pas possible de définir une hiérarchie
-sur la tension artérielle car cet attribut est une mesure ;
-– Les hiérarchies sont considérées implicitement indépendantes (orthogonales) (Eder et
-Koncilia (2001)). Dès lors, l’agrégation d’une valeur n’est fonction que d’elle-même. Il
-n’est donc pas possible de modéliser le fait qu’une caractéristique externe puisse influen-
-cer le lien d’agrégation d’une valeur. Cette orthogonalité des dimensions par rapport à
-la dimension temporelle interdit également toute historisation des dimensions dans la
-plupart des cas et condamne ces hiérarchies à rester statiques.
-Dans cet article, nous abordons la problématique de l’implémentation de ces hiérarchies
-contextuelles dans un entrepôt de données en nous posant les deux questions suivantes : (1)
-comment stocker efficacement cette connaissance et (2) comment l’exploiter en vue d’accroître
-les possibilités d’analyse offertes au décideur. En effet, dans le domaine du décisionnel, on
-parle généralement de contexte d’analyse pour désigner le cadre multidimensionnel qui consti-
-tue le cadre d’analyse des faits. Autrement dit, par ce terme de contexte, il est sous-entendu que
-les faits (à travers les valeurs que prennent les mesures) sont fonction des valeurs prises par les
-dimensions. Or, dans la réalité des données, il s’avère que finalement les mesures elle-mêmes
-peuvent être hiérarchisées et que les valeurs des attributs caractérisant cette hiérarchisation de
-mesure peuvent elles-mêmes dépendre d’un certain contexte.
-Afin de répondre à cet objectif, nous proposons de modéliser la connaissance experte du
-domaine d’application afin de représenter ces hiérarchies contextuelles. Notons que nous par-
-lons de hiérarchie mais nous nous intéresserons ici à la création en particulier du premier
-niveau de cette hiérarchie (généralisation de la mesure), ceci pouvant s’étendre à plusieurs ni-
-veaux. La création d’une base de connaissances externe permet la définition des différents liens
-d’agrégation en fonction des différents contextes. Cette base de connaissances est composée de
-deux tables. Une méta-table des connaissances permet de modéliser la structure des différents
-contextes existants dans l’entrepôt. Par exemple, nous y représentons le fait que la normalité
-de la tension artérielle d’un patient est fonction de la tension mesurée, de la catégorie d’âge du
-patient et du fait que le patient soit ou ne soit pas fumeur. Ensuite, la table des connaissances
-Pitarch et al.
-permet de modéliser les différentes instances des contextes. Par exemple, c’est dans cette table
-que sera exprimé le fait qu’une tension à 17 chez un adulte fumeur est élevée. Nous décrivons
-ensuite une méthode pour exploiter cette base externe en permettant la création d’un cube pour
-l’analyse des mesures généralisées.
-La suite de l’article est organisée de la façon suivante. La section 2 expose un cas d’étude
-sur des données médicales qui permettra d’illustrer le problème posé et le modèle proposé.
-Nous discutons dans la section 3 de l’inadéquation des différentes solutions existantes par
-rapport à la problématique de cet article. La section 4 présente justement notre solution pour
-répondre à cette problématique à travers une formalisation. Dans la section 5, nous montrons
-comment mettre en œuvre cette approche en nous appuyant sur le cas d’étude précédemment
-présenté. Enfin, nous concluons et indiquons les perspectives à ce travail dans la section 6.
-2 Cas d’étude
-Pour illustrer la problématique liée à notre approche, nous considérons le cas d’un entrepôt
-de données enregistrant, pour chaque patient d’un service de réanimation, sa tension ainsi que
-les médicaments prescrits au fil du temps. Ces valeurs sont mesurées par des capteurs et ali-
-mentent directement l’entrepôt. Dès lors, le volume des données stockées au sein de l’entrepôt
-est potentiellement immense. Cette considération justifie de modéliser l’entrepôt sans norma-
-liser les dimensions (principe du modèle en étoile mais avec plusieurs table de faits) afin de
-minimiser le nombre de jointures à effectuer lors de son interrogation. Le schéma décrivant cet
-entrepôt est présenté dans la figure 1. Notons qu’une hiérarchie implicite sur l’âge existe dans
-la table PATIENT.
-FIG. 1 – Schéma simplifié de l’entrepôt de données pour l’analyse de la tension et de la poso-
-logie ; extrait de la hiérarchie associée à l’attribut Âge des patients.
-En pratique, un médecin qui consulte un tel entrepôt peut trouver que les informations qui y
-sont stockées sont insuffisantes pour assurer un suivi efficace des patients du service. En effet,
-offrir la possibilité de formuler des requêtes telles que “Quels sont les patients dont la tension
-artérielle a été élevée pendant la nuit ?” ou “Quels sont les patients qui se sont vus prescrire
-une quantité trop importante de médicament X ?” faciliterait le travail des médecins en leur
-évitant une analyse manuelle des tables de faits.
-Malheureusement, le modèle présenté sur la figure 1 ne permet pas de répondre à de telles
-requêtes pour deux raisons. Premièrement, la notion de tension (resp. posologie) élevée peut
-Entrepôts de données avec hiérarchies contextuelles de mesure
-être considérée comme une généralisation de la tension mesurée (resp. de la quantité pres-
-crite). Dans la mesure où les modèles classiques ne permettent pas d’établir une hiérarchie
-sur les mesures, ces requêtes ne peuvent être formulées. De plus, même si l’on suppose que
-de telles requêtes sont formulables, les notions de tension élevée ou de posologie élevée sont
-directement liées à certaines caractéristiques des patients et/ou des médicaments prescrits. Par
-exemple, un bébé ne doit pas recevoir la même quantité d’un médicament qu’un adulte. Ainsi,
-une même posologie pourra être considérée comme faible, normale ou élevée selon l’âge du
-patient considéré. Une connaissance experte est alors nécessaire pour (1) définir quels sont les
-attributs qui impactent sur la généralisation d’une mesure et (2) décrire cette généralisation en
-fonction des valeurs prises par ces attributs. Dans la suite de cet article, nous nous focalisons
-sur la catégorisation d’une tension pour illustrer l’approche proposée. Le tableau 1 présente
-quelques exemples de connaissances expertes sur la catégorisation d’une tension en fonction
-des attributs CatÂge et Fumeur d’un patient. Par exemple, une tension à 13 est normale chez
-un adulte fumeur mais est élevée chez un nourrisson.
-CatÂge Fumeur Tension CatTension
-Nourrisson Oui ou Non >12 Élevée
-Adulte Oui >14 Élevée
-3e`me âge Oui ou Non > 16 Élevée
-Nourrisson Oui ou Non Entre 10 (inclus) et 12 (inclus) Normale
-Adulte Oui Entre 12 (inclus) et 14 (inclus) Normale
-. . . . . . . . . . . .
-TAB. 1 – Exemple de règles expertes décrivant la catégorie d’une tension (CatTension) en
-fonction de la tension mesurée, de la classe d’âge d’un patient (CatÂge) et de l’attribut Fu-
-meur.
-Considérons les extraits de la table de dimension PATIENTS et de la table de faits TENSIONS
-(figure 2). En s’appuyant sur les règles expertes du tableau 1, la réponse à la requête “Quels
-sont les patients (idPatient) qui ont eu une tension élevée à la date 1 ?” sera “Les patients 1
-et 4”. Dans la suite de cet article, nous décrivons le modèle utilisé pour représenter cette base
-experte ainsi que l’algorithme mis au point pour répondre efficacement à ce type de requêtes.
-3 État de l’art
-De nos jours une des grandes puissances des outils d’analyse en ligne est donc la navigation
-au travers de données plus ou moins détaillées. Comme évoqué en introduction, ceci s’appuit
-sur des opérateurs d’agrégation qui fonctionnent à partir de la hiérarchisation des dimensions.
-Ainsi un certain nombre de travaux se sont d’ores et déjà intéressés aux hiérarchies de dimen-
-sion, et aux problèmes d’additivité des mesures selon les dimensions qui peuvent en découler.
-Cependant, à notre connaissance, aucune proposition sur la hiérarchisation de mesure n’a été
-apportée. On retrouve «simplement» la notion de mesure dérivée (ou calculée).
-Compte-tenu de notre problématique de hiérarchisation de mesure contextuelle (non figée
-vis-à-vis du chemin d’agrégation), nous nous sommes donc intéressés aux différents travaux
-Pitarch et al.
-FIG. 2 – Extraits des tables PATIENTS et TENSIONS pour l’analyse de la catégorie d’une
-tension.
-introduisant une certaine forme de flexibilité ou de capacité d’expression au niveau des dimen-
-sions et de leurs hiérarchies afin de voir dans quelle mesure une adaptation pour la hiérarchi-
-sation de mesure était envisageable.
-Notons tout d’abord qu’un travail important de formalisation conceptuelle des différentes
-hiérarchies a été proposée par Malinowski et Zimányi (2004), tentant d’établir une liste des
-hiérarchies possibles, plus ou moins complexes, posant plus au moins de problème quant à
-leur exploitation lors du processus d’agrégation. Mentionnons également le travail fait dans le
-domaine des hiérarchies floues présenté par Laurent (2003). Mais ces travaux se situent dans le
-contexte de dimensions indépendantes. Et finalement, dans le problème que nous avons posé,
-l’enjeu est de pouvoir prendre en compte le fait que les dimensions ne sont pas forcément
-indépendantes, et surtout, que les mesures peuvent elles-mêmes être hiérarchisées en prenant
-en compte le contexte.
-Afin de pouvoir rendre l’analyse plus flexible, un langage à base de règles a été développé
-dans Espil et Vaisman (2001) pour la gestion des exceptions dans le processus d’agrégation. Le
-langage IRAH (Intensional Redefinition of Aggregation Hierarchies) permet de redéfinir des
-chemins d’agrégation pour exprimer des exceptions dans les hiérarchies de dimensions pré-
-vues par le modèle. Ce travail permet aux utilisateurs d’exprimer eux-mêmes les exceptions
-dans le processus d’agrégation. En effet, afin de prendre en compte ces exceptions, les utilisa-
-teurs définissent et exécutent un programme IRAH, produisant ainsi une révision des chemins
-d’agrégation. L’exemple considéré est l’étude des prêts d’une compagnie de crédit en fonction
-de la dimension emprunteur qui est hiérarchisée. La catégorie de l’emprunteur est définie en
-fonction de son revenu. Mais les auteurs expliquent qu’il est possible que l’analyste veuille ré-
-affecter un emprunteur dans une autre catégorie en voulant tenir compte d’autres paramètres
-que le revenu. Dans ce cas, le processus d’agrégation doit tenir compte de cette «exception».
-Dans ces travaux les auteurs proposent alors un langage à base de règles qui permet de définir
-des analyses révisées qui tiennent compte de ce type d’exception. Si ce langage constitue une
-alternative à la rigidité du schéma multidimensionnel dans le processus d’agrégation pour les
-utilisateurs, il ne fait qu’en modifier les chemins en fonction d’exceptions dans les hiérarchies
-de dimension. Or dans notre cas, il ne s’agit pas de prendre en compte des exceptions, mais bel
-et bien de prendre en compte des chemins d’agrégation qui dépendent d’un contexte, au niveau
-Entrepôts de données avec hiérarchies contextuelles de mesure
-des mesures, en se basant sur des connaissances d’experts.
-Dans Favre et al. (2007), un précédent travail s’est penché sur la proposition d’un modèle
-d’entrepôt à base de règles qui visait à représenter la création de nouveaux niveaux d’analyse
-pour répondre à un besoin de personnalisation des analyses en fonction de la connaissance
-individuelle d’utilisateurs. Les nouveaux niveaux étaient créés le long des hiérarchies de di-
-mension (insertion d’un niveau ou ajout en fin de hiérarchie), forcément au-dessus du premier
-niveau (dimension). Le lien d’agrégation exprimé ne peut être directement lié à la table des
-faits, empêchant l’expression d’une hiérarchisation de mesure comme nous avons besoin de le
-faire.
-Une alternative pouvant présenter un certain intérêt vis-à-vis du problème posé par la né-
-cessité de prendre en compte le fait que les chemins d’agrégation le long d’une hiérarchie
-peuvent changer est le versionnement. Il s’agit de pouvoir exprimer un changement (plutôt
-temporel) au niveau des instances de dimension comme proposé par Bliujute et al. (1998),
-au niveau des liens d’agrégation comme envisagé par Mendelzon et Vaisman (2000) ou de
-la structure comme proposé par Morzy et Wrembel (2003). Ceci répond au problème évoqué
-dans l’introduction sur l’indépendance des dimensions, par rapport à la dimension temporelle
-entre autres. Le versionnement est mis en avant pour la possibilité de stocker le fait que les
-dimensions puissent évoluer. Le versionnement permet donc non seulement d’historiser les
-données de la table des faits à travers une dimension temporelle, mais également les modifica-
-tions au sein même des hiérarchies de dimension. Le problème majeur de ces approches et que
-ces versions sont développées par rapport à une évolution dans le temps et ne sont pas faites
-pour prendre en compte une modification non pas dans le temps mais par rapport à ce que nous
-avons appelé «contexte». Par ailleurs, cela ne résoud pas le problème du point de vue de la
-hiérarchisation de mesure que nous avons besoin de modéliser.
-Si l’ensemble des travaux présentés ici apportent une flexibilité dans l’analyse des données
-en se focalisant sur ce qui définit en l’occurrence le contexte d’analyse, à savoir les dimensions,
-ils ne prennent pas en compte le besoin de flexibilité au niveau de la mesure. Et il ne s’agit pas
-de « simples » hiérarchies dépendant seulement de la valeur de la mesure. A notre connais-
-sance, il n’y a pas de travaux proposant ou permettant de solutionner ce problème. Ainsi, par la
-suite, nous proposons une modélisation, un stockage, une exploitation permettant de prendre
-en compte cette hiérarchisation contextuelle de mesure.
-4 Formalisation pour une prise en compte des connaissances
-Notre approche vise à permettre la prise en compte de contextes dans le processus d’agré-
-gation vis-à-vis des mesures lorsque cela est nécessaire. Ainsi, ce que nous cherchons à pouvoir
-représenter et à exploiter est le fait que la détermination de la valeur d’un attribut pour géné-
-raliser une mesure dépend de connaisances experts que nous allons représenter et qui devront
-être ainsi prises en compte dans le processus d’analyse.
-Si nous nous focalisons sur le besoin de prise en compte de contexte, il s’agit plus parti-
-culièrement d’attributs dont la valeur va dépendre des valeurs prises par d’autres attributs de
-dimension, ainsi que de la table des faits : de la mesure que l’on cherche à généraliser en l’oc-
-currence. De ce fait, pour garder une cohérence du modèle, cette donnée ne peut figurer ni dans
-la table de dimension, ni dans la table de faits. Ceci ne peut donc être traité lors de la phase clas-
-sique de chargement de l’entrepôt mais doit donc être pris en compte dans le cadre de la phase
-Pitarch et al.
-d’analyse. Il s’agit de connaissances dont il faut tenir compte lors du processus d’agrégation,
-connaissances qui pourraient faire d’ailleurs l’objet d’un enrichissement au cours du temps par
-les experts. Ainsi, l’objectif est de pouvoir disposer d’une méthode de prise en compte de ces
-connaissances durant le processus d’analyse.
-Pour supporter le processus qui vise à la prise en compte de contextes par rapport à la
-détermination de la valeur de certains attributs généralisant les mesures, il est alors crucial de
-disposer d’un modèle d’entrepôt qui retrace cette contextualisation, par conséquent un modèle
-plus flexible.
-Dans cette formalisation, nous restreignons donc le cadre de cet article au cas d’un schéma
-en étoile présentant donc une seule table des faits avec des dimensions dénormalisées (mais
-dont les attributs peuvent être porteurs d’informations hiérarchisées implicitement).
-Définition 1 (Dimensions). Soit {Ds, s = 1..t} l’ensemble des t tables de dimension. Soit
-As = {asg/s = 1..t, g = 1..hs} l’ensemble des hs attributs de la dimensionDs pour s = 1..t.
-Notons idDs l’attribut de As identifiant la dimension Ds.
-Exemple 1. Dans notre étude sur la tension, t = 2 : D1 ≡ PATIENT , D2 ≡ DATE.
-A1 = {IdPatient, Age, CatAge, Fumeur}, A2 = {IdDate, LabelDate}.
-idD1 ≡ IdPatient, idD2 ≡ IdDate
-Définition 2 (Faits). La table des faits est déterminée structurellement par un ensemble de
-dimensions et de mesures.
-F = (D,M) avec D = {idDs , s = 1..t} les identifiants des t dimensions décrivant F et
-M = {Mu, u = 1..v} dénote l’ensemble des v mesures de F .
-Exemple 2. Pour l’étude de la tension, on a :
-F = ({IdPatient, IdDate}, {Tension})
-Définition 3 (Attributs contextualisés et contextualisant). Un attribut L est dit contextualisé si
-sa valeur dépend des valeurs prises par un ensemble d’autres attributs de l’entrepôt (qualifiés
-alors de contextualisant). Ainsi, cet attribut contextualisé est la généralisation de la mesure
-que l’on calcule et les attributs contextualisant sont les attributs de dimensions et la mesure
-elle-même.
-Exemple 3. Dans l’étude de la tension, CatTension est un attribut contextualisé puisque sa
-valeur dépend des attributs contextualisant CatAge, Fumeur et Tension.
-Définition 4 (Univers de l’entrepôt). L’univers U de l’entrepôt est un ensemble d’attributs, tel
-que :
-U = U1 ∪ U2
-où U1 = {Kα, α = 1..z} = {As
-⋃
-Mu, /s = 1..t, u = 1..v} est l’ensemble des z attributs
-appartenant aussi bien à la table de faits qu’aux tables de dimension et U2 = {Lβ , β ≥ 1} est
-l’ensemble des attributs contextualisés, c’est à dire dont les valeurs dépendent du contexte et
-qui sont donc déterminées par des connaissances.
-Exemple 4. U1 = {IdPatient, Age, CatAge, Fumeur, IdDate, LabelDate, Tension}
-U2 = {CatTension}
-Entrepôts de données avec hiérarchies contextuelles de mesure
-Définition 5 (Contexte : structure). Soit {ci, i = 1..n} l’ensemble des n structures de contexte.
-La structure du contexte ci est définie par un sous-ensemble d’attributs de U1 et un sous-
-ensemble de U2 :
-ci = ({KΩ}, {LΨ})
-avec {KΩ} ⊂ U1 et {LΨ} ⊂ U2 tels que 1 ≤ Ω ≤ z′ avec z′ ≥ 2, Ψ ≥ 1.
-Notons ainsi que {LΨ} peut se ramener à un singleton (un seul attribut contextualisé défini
-par un contexte) et, qu’en général, {KΩ} contient au minimum deux attributs (dans le cas
-contraire, la valeur de l’attribut contextualisé ne dépendrait plus que d’une seule valeur, et on
-se ramènerait à une conception classique de hiérarchie).
-Exemple 5. c1 = ({CatAge, Fumeur, Tension}, {CatTension})
-Définition 6 (Contexte : instances). Chaque structure de contexte est ensuite instanciée. On
-a alors C = {cji , i = 1..n, j = 1..mi} qui constitue l’ensemble de toutes les instances de
-contextes.
-Notons cji l’instance j de la structure du contexte i. Elle est définie par l’instanciation de
-chacun des attributs.
-L’instanciation des attributs correspond à l’affectation d’une expression. En terme d’im-
-plémentation en base de données qui sera évoquée par la suite, cette expression devra respecter
-une syntaxe SQL valide.
-L’instanciation Ij des attributs contextualisés de {LΨ} correspond à une expression ca-
-ractérisant l’affectation d’une et une seule valeur :
-Ij(LΨ) =“= valjΨ”
-Exemple 6. Instanciation d’attribut contextualisé :
-I1(L1)=“=′Elevée′”
-Par contre, l’instanciation des autres attributs du contexte ne correspond pas forcément à
-l’expression d’une affectation de valeur. Elle correspond à une expression pouvant représenter
-plusieurs valeurs.
-Ainsi ce terme peut être noté comme suit :
-Soit Tωji le terme correspondant à l’instance j de l’attribut ω du contexte i. T
-ωj
-i est de la
-forme “ op {ens|val}” où op est un opérateur (=, <, ≤, ≥, 6=, ∈, ...) ; ens est un ensemble
-de valeurs et val une valeur.
-Exemple 7. Instanciation d’attributs contextualisant :
-T 111 =“=
-′Nourrisson′”
-T 211 =“IN(
-′Oui′,′Non′)”
-T 311 =“> 12”
-Exemple 8. Contexte :
-c11 = ({“=′ Nourrisson′”,“IN(′Oui′,′Non′)”,“> 12”}, {“=′Elevée′”})
-Dans la suite, l’appelation contexte représente en fait une instance de contexte (à la fois
-sa structure et ses valeurs) lorsque nous ne précisons pas spécifiquement qu’il s’agit de la
-structure.
-Pitarch et al.
-5 Mise en œuvre de notre approche : stockage et interroga-
-tion
-Maintenant que les hiérarchies contextuelles ont été formellement introduites, nous nous
-focalisons sur leur implantation et leur utilisation au sein d’un entrepôt de données.
-5.1 Stockage des connaissances : méta-table et table
-Cette section aborde la problématique de la représentation et du stockage de ces connais-
-sances expertes dans l’hypothèse d’une mise en œuvre dans un système relationnel (ROLAP)
-pour le stockage de l’entrepôt de données. Pour cela, nous proposons la création d’une base de
-données externe dont nous détaillons ici le contenu.
-Dans la mesure où plusieurs contextes peuvent cohabiter au sein d’un même entrepôt (e.g.,
-la catégorisation d’une tension artérielle et celle d’une posologie), il est nécessaire de stocker
-quels sont les attributs qui interviennent dans chaque contexte (i.e., quels sont les attributs
-contextualisants) car ceux-ci peuvent différer pour chaque contexte. Nous proposons alors la
-création d’une table MTC (Méta-Table des Connaissances) afin de stocker la structure associée
-à chaque contexte présent dans l’entrepôt.
-Définition 7 (MTC). Soit MTC = (Contexte,Attribut, Table, Type) une table relationnelle
-où :
-– Contexte désigne l’identifiant du contexte (ci) ;
-– Attribut désigne un attribut intervenant dans le contexte ci (i.e., Attribut ∈ KΩ∪LΨ) ;
-– Table correspond à la table relationnelle de l’entrepôt où Attribut est instancié ;
-– Type définit le rôle joué par Attribut dans le contexte ci. Cet attribut vaut “Contexte” si
-Attribut est un attribut contextualisant de ci et vaut “Résultat” si Attribut est l’attribut
-contextualisé de ci.
-Exemple 9. Considérons le cas d’étude présenté dans la section 2 et analysons comment est
-stockée la structure du contexte associé à la généralisation d’une tension artérielle. Nous rap-
-pelons que la catégorisation d’une tension est fonction de plusieurs paramètres : la tension
-mesurée, la catégorie d’âge du patient et du fait qu’il soit fumeur ou non. Par convention, le
-nom donné à chaque contexte est celui de la mesure à généraliser. Ici, l’attribut Contexte vaut
-donc “Tension”. Ensuite, les attributs dont la modalité est Contexte (i.e, les attributs contex-
-tualisant) sont CatÂge, Fumeur et Tension. Ceux-ci sont définis dans les tables PATIENTS et
-TENSIONS. Enfin, l’attribut contextualisé est CatTension. Le tableau de la figure 3 présente
-un extrait de la table MTC associé au contexte Tension.
-Une fois la structure de chaque contexte définie dans MTC, nous nous intéressons à la
-matérialisation des instances de chaque contexte. Pour cela, nous définissons au sein de la base
-de données externe une nouvelle table relationnelle TC (Table des Connaissances). Notons
-que sur l’exemple précédent, la table associée à l’attribut contextualisé (catTension) est cette
-nouvelle table TC. Dans la mesure où les valeurs prises par cet attribut sont dépendante des
-valeurs prises par les attributs contextualisants, ce choix de modélisation semble le plus adapté.
-Entrepôts de données avec hiérarchies contextuelles de mesure
-FIG. 3 – Extraits de la table MTC décrivant le contexte associé à la généralisation d’une
-tension artérielle.
-Définition 8 (TC). Soit TC = (Contexte, Instance_contexte,Attribut, V aleur) une table
-relationnelle de la base de données externe telle que :
-– Contexte désigne l’identifiant du contexte (ci) ;
-– Instance_Contexte identifie l’instance du contexte concernée (correspond à l’indice j
-pour cji ) ;
-– Attribut désigne un attribut intervenant dans le contexte ci (i.e., attribut ∈ KΩ ∪LΨ) ;
-– Valeur correspond à la valeur affectée à Attribut dans cji .
-Pour diminuer la taille de la table TC, le nombre d’instances de contexte stockées peut être
-réduit en autorisant l’attribut Valeur à contenir une expression SQL syntaxiquement correcte.
-Par exemple, “IN (Oui,Non)” évite la création de deux instances de contexte (une pour chaque
-valeur de l’opérateur IN).
-Considérons le contexte Tension présenté lors de l’exemple précédent. Comme illustré dans
-le tableau 1, de nombreuses règles expertes existent pour déterminer la généralisation d’une
-tension artérielle. Alors que la structure de ces règles (i.e., quels sont les attributs qui impactent
-sur la généralisation d’une mesure) est définie au niveau de la méta-table des connaissances
-MTC, les instances de ces contextes (i.e., les règles expertes) sont définies au niveau de la table
-des connaissances TC. Le tableau 4 présente un extrait du contenu stocké dans TC. Chaque
-ligne du tableau 1 représente une instance du contexte Tension.
-Exemple 10. Illustrons le stockage des instances de contexte en considérant la connaissance
-“chez un nourrisson, une tension supérieure à 12 est élevée”. Cette instance est représentée
-dans TC par les 4 n-uplets dont la modalité de l’attribut Contexte est Tension et celle de
-l’attribut Instance_contexte est 1. Parmi ces 4 n-uplets, les 3 premiers permettent de décrire
-les conditions à réunir pour que la généralisation (stockée dans le quatrième n-uplet) soit
-valide.
-5.2 Prise en compte des hiérarchies contextuelles lors de l’interrogation
-Maintenant que nous avons décrit comment représenter et stocker les hiérarchies contex-
-tuelles, nous nous focalisons sur leur exploitation et leur interrogation afin de fournir à l’utili-
-sateur une plus grande flexibilité dans l’analyse des données de l’entrepôt. La solution adoptée
-doit satisfaire deux conditions : ne pas diminuer la puissance d’analyse des outils OLAP et
-Pitarch et al.
-FIG. 4 – Extraits de la table TC présentant quelques instances de contexte associées au
-contexte Tension.
-autoriser l’interrogation des hiérarchies contextuelles. Pour cela, nous proposons la prise en
-compte de ces hiérarchies lors de la création du cube de données pour l’analyse.
-Ainsi, en assimilant la construction du cube à la création d’une vue, notre problème d’inter-
-rogation est résolu par la création de la vue adéquate. Pour illustrer cette solution, nous partons
-sur l’hypothèse de la création d’une vue FG dont les attributs sont (1) ceux de la table de faits
-et (2) un attribut contenant la généralisation de la mesure considérée. Les analyses OLAP clas-
-siques sont alors possibles en considérant au choix la table des faits ou la nouvelle vue FG.
-L’interrogation des hiérarchies contextuelles peut quant à elle être réalisée en interrogeant FG.
-Notons en outre que, par définition, la création de cette vue n’entraîne pas d’augmentation du
-volume de données stockées (si cette vue n’est pas matérialisée).
-La génération de la requête associée à cette vue est présentée dans l’algorithme 1. Dans
-un premier temps, nous recherchons quels sont les attributs ayant un impact sur la mesure
-que nous désirons généraliser. Pour cela, il est nécessaire de recherche dans MTC quels sont
-les attributs contextualisant appartenant au contexte recherché. Afin de faciliter les jointures
-futures, les tables dans lesquelles sont stockés ces attributs sont également récupérées. L’al-
-gorithme se poursuit par la recherche de l’attribut contextualisé. L’étape suivante (lignes 4 à
-12) permet d’écrire la requête générant la vue souhaitée. Pour cela, une sous-requête calculant
-l’instance du contexte associé à chaque n-uplet de la table de faits est mise en place et se base
-sur le principe suivant. Pour chaque attribut contextualisant, il faut d’abord récupérer la valeur
-associée puis trouver dans TC quelles sont les instances de contexte qui concordent avec cette
-valeur. Enfin, l’intersection de ces ensembles de contextes permet de récupérer le contexte qui
-valide toutes les conditions associées à chaque n-uplet de la table de faits. En vue de la mise en
-œuvre de ce modèle, nous envisageons l’utilisation du modèle relationnel-objet. Finalement,
-la requête permettant de créer la vue est générée.
-Entrepôts de données avec hiérarchies contextuelles de mesure
-Algorithme 1: Construction de la vue étendant une table de faits
-Data : F = (k1, . . . , kn,m1, . . . ,mi, . . . ,ml) une table de faits oùmi est la mesure à
-généraliser, T = {T1, . . . , Tn} (avec Ti = (ki, a1i , ...)) les dimensions d’analyse
-associées avec k1, . . . , knles clés primaires de ces tables,MTC la Méta Table
-des connaissances et TC la table des connaissances
-Result : ReqVue,une chaîne de caractères contenant la requête permettant la création de
-la vue généralisée
-/* 1) Recherche des couples <Table,Attribut> associés au
-contexte étudié */
-PairAttrib = SELECT Table, Attribut FROM MTC WHERE Contexte=’mi’ and
-Type=’Contexte’ ;
-/* 2) Recherche de l’attribut contextuaisé */
-attrGen = SELECT Table, Attribut FROM MTC WHERE Contexte=’mi’ AND
-Type=’Resultat’ ;
-/* 3) Construction du nom de la vue qui sera créée */
-nameView =mi+’_View’ ;
-ReqVue = “CREATE OR REPLACE VIEW nameView AS
-SELECT’ F.k1,. . .,F.kn,F.m1, . . . , F.mi, . . . , F.ml, (SELECT Valeur FROM
-TC WHERE Attribut = ’Resultat’ AND Contexte = ’mi’ ;
-pour chaque 〈Ti, Ai〉 ∈ PairAttrib faire
-ReqVue = ReqVue + “ AND instanceCtxt IN (select instance_match FROM ”;
-si Ti = F alors
-ReqVue = ReqVue + “ instance_match(‘mi’,mi,‘mi’,F ) ”;
-sinon
-ReqVue = ReqVue + “ instance_match(‘mi’,F ,ki,‘ki’,Ai,Ti) ”;
-ReqVue = ReqVue + “) as AttrGen FROM F ”;
-retourner ReqVue ;
-Illustrons cet algorithme en utilisant le cas d’étude présenté au cours de la section 2. Ici,
-nous cherchons à généraliser les tensions des patients. Dès lors, les attributs contextualisants
-sont CatÂge, Fumeur et Tension. L’attribut contextualisé est CatTension. Étudions maintenant
-la requête générée grâce à la boucle qui permet de déterminer l’instance du contexte associé
-à chaque n-uplet de la table des faits. Pour cela, nous considérons le premier n-uplet de la
-table des faits. Si l’on considère l’extrait de la table TC présentée dans la figure ??, l’instance
-du contexte Tension associée à un nourrisson dont la tension est 13 est l’instance 1. En effet,
-l’instance 1 est la seule dont les modalités de l’attribut Valeur associées aux attributs CatÂge
-et Tension coïncident avec celles du n-uplet de la table de faits étudié ici. Nous remarquons par
-contre que les contextes 1 et 3 sont tous les deux valides pour l’attribut Fumeur. L’intersection
-de ces ensembles d’instances permet de déduire que l’instance 1 du contexte Tension doit être
-associée au premier n-uplet de la table de faits. Par conséquent, lors de la création de la vue
-FG, la modalité de l’attribut contenant la généralisation sera “=Élevée” (i.e., celle stockée dans
-l’attribut Valeur dont le contexte est Tension, l’instance du contexte est 1 et la modalité de
-Pitarch et al.
-l’attribut Attribut est CatTension).
-A travers cet exemple, nous avons illustré comment est stockée et exploitée la connaissance
-experte du domaine. Dès lors, la puissance d’analyse d’un entrepôt utilisant des hiérarchies de
-mesure contextuelles est accrue. De plus, cette apport de flexibilité n’entraîne pas une com-
-plexification du processus d’analyse dans la mesure où la création de la vue est transparente
-pour l’utilisateur. En outre, notons que l’ajout ou la modification de connaissances au sein des
-méta-table et table de connaissances peut être rendue très aisée grâce à une interface de saisie.
-5.3 Discussion
-Notre approche permet ainsi de répondre à la problématique de représentation et de sto-
-ckage de contextes. Elle offre ainsi un moyen de prendre en compte une certaine forme de
-hiérarchisation de mesure, définie par un contexte.
-Cette approche présente différents avantages. Ce mode de représentation permet de repré-
-senter différents contextes composés de structures différentes. Elle constitue ainsi une approche
-générique et permet l’ajout facile de contextes, autrement dit de nouvelles connaissances. Les
-contextes sont stockés dans une même table évitant que chaque contexte soit représenté par
-différentes tables, facilitant à terme le processus de réécriture de requêtes.
-Un des intérêts de cette proposition est également de pouvoir regrouper des instances en-
-semble pour définir la fonction d’agrégat plutôt que de stocker le chemin d’agrégation de
-chaque instance, ce qui constitue un avantage en terme de complexité. Par exemple, chaque
-valeur de tension ne va pas faire l’objet de l’expression de son propre chemin d’agrégation
-mais un chemin pourra être défini pour un ensemble de valeurs (ainsi > 12 pour l’attribut
-Tension, reprend un ensemble de tensions).
-Le choix d’une représentation relationnelle permet alors d’exploiter la puissance d’inter-
-rogation relationnelle. Et dans un contexte d’implémentation tel que celui-ci, le recours à la
-construction d’une vue semble constituer une approche pertinente. L’algorithme de construc-
-tion de vue constitue une première proposition pour l’exploitation de ce type de connaissances.
-Il méritera d’être affiné au niveau de la construction des cubes, prenant donc en entrée d’autres
-paramètres. Mais dans un premier temps, cela permet une exploitation réelle de ces connais-
-sances introduites.
-6 Conclusion et perspectives
-Dans cet article, nous proposons la première approche pour prendre en compte les hiérar-
-chies contextuelles au sein d’un entrepôt de données du point de vue des mesures. Afin de
-représenter les différents contextes de généralisation, nous proposons la construction de deux
-tables externes pour stocker la connaissance experte du domaine. La méta-table des connais-
-sances stocke la structure des différents contextes de l’entrepôt (e.g., la normalité d’une tension
-artérielle dépend de la tension mesurée, de la catégorie d’âge du patient et du fait qu’il fume ou
-non). La table des connaissances permet quant à elle d’exprimer les différentes instances d’un
-contexte donné (e.g., une tension supérieure à 14 chez un adulte fumeur est une tension éle-
-vée). En nous appuyant sur ces tables, nous proposons la création d’une vue étendant la table
-Entrepôts de données avec hiérarchies contextuelles de mesure
-de faits et garantissant à l’utilisateur une analyse flexible, efficace et adéquate de l’entrepôt de
-données. Cette création peut s’apparenter à la construction d’un cube.
-De nombreuses perspectives s’ouvrent à la suite de ce travail. A court terme, l’implémen-
-tation de cette méthode sur un jeu de données proche du cas d’étude présenté dans cet article
-permettra de valider expérimentalement ce modèle. La mise en place d’une interface centrée
-utilisateur pour la saisie, la définition et la modification des contextes sera alors une étape fon-
-damentale dans le processus de validation du système par l’utilisateur. Il faudra bien évidem-
-ment porter une attention particulière à l’aspect performances. En outre, la proposition d’une
-formalisation générique adaptée aux différents modèles d’entrepôts présents dans la littéra-
-ture (modèle en flocon, constellation, ...) améliorerait l’applicabilité de la solution proposée
-dans cet article. Une perspective connexe est la mise en place d’un système de découverte
-semi-automatique de contextes grâce à des approches de fouille de données. Enfin, l’étude
-de l’adéquation de notre approche aux différents modèles d’entrepôts existants dans la littéra-
-ture est envisagée. Plus particulièrement, dans la mesure où notre modèle permet la mise en
-place de hiérarchies sur des mesures, il serait intéressant d’étudier l’intégration des hiérarchies
-contextuelles à un modèle dit « en galaxie » proposé par Ravat et al. (2007) ne comportant pas
-de faits (tout y est dimension initialement).
-Références
-Agrawal, R., A. Gupta, et S. Sarawagi (1997). Modeling multidimensional databases. In Data
-Engineering, 1997. Proceedings. 13th International Conference on, pp. 232–243.
-Bliujute, R., S. Saltenis, G. Slivinskas, et C. Jensen (1998). Systematic Change Management
-in Dimensional Data Warehousing. In IIIrd International Baltic Workshop on Databases
-and Information Systems, Riga, Latvia, pp. 27–41.
-Chen, M., J. Han, et P. S. Yu (1996). Data mining : An overview from a database perspective.
-IEEE Trans. on Knowl. and Data Eng. 8(6), 866–883.
-Eder, J. et C. Koncilia (2001). Changes of dimension data in temporal data warehouses. In IIIrd
-International Conference on Data Warehousing and Knowledge Discovery (DaWaK 01),
-Munich, Germany, pp. 284–293. Springer-Verlag.
-Einbinder, J. S., K. W. Scully, R. D. Pates, J. R. Schubart, et R. E. Reynolds (2001). Case
-study : a data warehouse for an academic medical center. Journal of Healthcare Information
-Management : JHIM 15(2), 165–175. PMID : 11452578.
-Espil, M. M. et A. A. Vaisman (2001). Efficient Intensional Redefinition of Aggregation Hie-
-rarchies in Multidimensional Databases. In IVth ACM International Workshop on Data
-Warehousing and OLAP (DOLAP 01), Atlanta, Georgia, USA, pp. 1–8. ACM Press.
-Favre, C., F. Bentayeb, et O. Boussaid (2007). Evolution et personnalisation des analyses
-dans les entrepôts de données : une approche orientée utilisateur. In XXVème congrès IN-
-Formatique des ORganisations et Systèmes d’Information et de Décision (INFORSID 07),
-Perros-Guirec, France, pp. 308 – 323.
-Han, J. (1997). OLAP mining : An integration of OLAP with data mining. IN PROCEEDINGS
-OF THE 7TH IFIP 2.6 WORKING CONFERENCE ON DATABASE SEMANTICS (DS-7,
-1—9.
-Pitarch et al.
-Inmon, W. H. (1996). Building the Data Warehouse, 2nd Edition (2 ed.). Wiley.
-Laurent, A. (2003). Querying fuzzy multidimensional databases : unary operators and their
-properties. Int. J. Uncertain. Fuzziness Knowl.-Based Syst. 11(Supplement), 31–45.
-Malinowski, E. et E. Zimányi (2004). OLAP Hierarchies : A Conceptual Perspective. In XVIth
-International Conference on Advanced Information Systems Engineering (CAiSE 04), Riga,
-Latvia, Volume 3084 of LNCS, pp. 477–491. Springer.
-Mallach, E. G. (2000). Decision Support and Data Warehouse Systems. McGraw-Hill Higher
-Education.
-Mendelzon, A. O. et A. A. Vaisman (2000). Temporal Queries in OLAP. In XXVIth Internatio-
-nal Conference on Very Large Data Bases (VLDB 00), Cairo, Egypt, pp. 242–253. Morgan
-Kaufmann.
-Morzy, T. et R. Wrembel (2003). Modeling a Multiversion Data Warehouse : A Formal Ap-
-proach. In Vth International Conference on Enterprise Information Systems (ICEIS 03),
-Angers, France, pp. 120–127.
-Pitarch, Y., A. Laurent, et P. Poncelet (2009). A conceptual model for handling personalized
-hierarchies in multidimensional databases. In Proceedings of the International Conference
-on Management of Emergent Digital EcoSystems, France, pp. 107–111. ACM.
-Ravat, F., O. Teste, R. Tournier, et G. Zurfluh (2007). A Conceptual Model for Multidimen-
-sional Analysis of Documents. In International Conference on Conceptual Modeling (ER),
-Auckland, New Zealand, Number 4801 in LNCS, pp. 550–565. Springer.
+Ces dix derniŁres annØes un grand nombre de travaux ont ØtØ proposØs pour rechercher des
+motifs frØquents dans de grandes bases de donnØes. En fonction des domaines d’applications
+les motifs extraits sont soit des itemsets (Srikant, 1995; Zaki, 2001; Pei et al., 2001; Ayres et al.,
+2002) soit des sØquences (Agrawal et al., 1993; Han et al., 2000). RØcemment les travaux issus
+de la communautØ des chercheurs en base de donnØes et en fouille de donnØes considŁrent le
+cas des data streams oø l’acquisition des donnØes s’effectue de façon rØguliŁre, continue ou
+incrØmentalement et cela sur une durØe longue voire Øventuellement illimitØe.
+Compte tenu de la grande quantitØ d’information mise en jeu dans le cas des data streams,
+le problŁme de l’extraction de motifs frØquents est toujours d’actualitØ ((Li et al., 2004; Jin
+et al., 2003; Demaine et al., 2002; Manku et Motwani, 2002; Golab et Ozsu, 2003; Karp et al.,
+2003)). Dans ce contexte, un motif est dit -frØquent s’il est observØ au moins une fraction ,
+appelØe support du motif, sur tout le stream. Le paramŁtre theta, tel que 0 <  < 1, est xØ
+par l’utilisateur.
+- 615 - RNTI-E-6
+Bordures statistiques pour la fouille incrØmentale dans les data streams
+Dans le cas des data streams, sujets à des mises à jour rØguliŁres et frØquentes, les approches
+traditionnelles ne conviennent pas car les rØsultats obtenus pour l’ancienne base ne sont que
+partiellement valables pour la nouvelle et il n’est pas envisageable de relancer l’algorithme
+sur la base de donnØes mise à jour. En effet, dans tous les travaux dØveloppant une approche
+par mise à jour incrØmentale (Masseglia et al., 2003; Cheng et al., 2004), la problØmatique
+principale d’optimisation et de performance consiste à construire et à maintenir, au fur et à
+mesure des diffØrentes mises à jour successives, un ensemble de motifs candidats. Celui-ci est
+utilisØ pour mettre à jour les motifs frØquents et Øviter de relancer l’algorithme depuis zØro.
+Il convient Øgalement de souligner une autre caractØristique intrinsŁque des data streams
+qui dØcoule du fait que la connaissance du stream n’est que partielle quel que soit l’instant
+considØrØ. En consØquence, il est nØcessaire de prendre en compte l’incertitude engendrØe par
+la connaissance toujours incomplŁte du data stream. PrØcisØment, cela se traduit dans le cas de
+la recherche de motifs frØquents en soulignant que les motifs frØquents obtenus ne sont en fait
+que des motifs frØquents observØs. En fait, à cause de cette incertitude, deux sources d’erreurs
+doivent Œtre considØrØes :
+ Les motifs observØs comme frØquents ne sont peut Œtre plus du tout frØquents sur une
+longue pØriode d’observation du stream.
+ Inversement des motifs classØs comme non frØquents peuvent le devenir sur une plus
+longue pØriode d’observation du stream.
+Pour Øviter ces erreurs, il est nØcessaire de dØvelopper une approche pour connaître si un motif
+est frØquent sur une partie dØjà examinØe du stream. Cette approche doit de plus Œtre prØdictive
+pour savoir avec quelle probabilitØ un motif est frØquent ou non sur l’ensemble du stream.
+De nombreuses applications, par exemple dans le domaine de la prØvision mØtØorologique
+ou encore dans l’analyse de tendance en nance nØcessitent ce type d’approche. MŒme en
+disposant d’une trŁs grande partie du stream, d’un point de vue statistique, il est impossible de
+s’affranchir de ces deux sources d’erreur (Vapnik, 1998). Notre objectif sera donc d’essayer
+d’approcher le mieux possible une solution optimale.
+Dans cet article nous proposons une approche qui permet, tout en considØrant l’incertitude
+inhØrente à la connaissance des streams, de construire et de maintenir des ensembles de motifs
+candidats bien choisis. Ceci constitue un prØalable fondamental et nØcessaire à toute approche
+pertinente dans le cadre de la mise à jour incrØmentale des data streams.
+La suite de la prØsentation est organisØe de la façon suivante. Dans le paragraphe 2, nous
+introduisons les concepts qui permettent de contrôler l’incertitude dØcoulant des sources d’er-
+reurs. Au paragraphe 3, nous montrons comment obtenir les ensembles de motifs pertinents
+pour effectuer la mise à jour incrØmentale. Le paragraphe 4 prØsente une expØrimentation de
+notre approche, suivie d’une analyse comparative avec des travaux connexes au paragraphe 5.
+Nous concluerons notre Øtude au paragraphe 6.
+2 Supports statistiques
+2.1 Dénitions
+Pour formaliser notre problØmatique, nous dØnissons les diffØrents ensembles utilisØs. Le
+data stream est obtenu à partir d’un Øchantillonnage effectuØ sur un domaineX potentiellement
+trŁs grand qui contient tous les motifs possibles (gure 1). Chaque motif est ØchantillonnØ in-
+- 616 -RNTI-E-6
+JE. Symphor et PA. Laur
+S
+X
+Echantillonnage
+X;D (non connue)
+data stream (observe): S
+X
+FIG. 1  Le problŁme.
+dØpendemment à partir d’une distributionD sur laquelle nous ne formulons aucune hypothŁse,
+exceptØ celle de dire qu’il n’y a pas de biais. Nous renvoyons le lecteur intØressØ par des ap-
+proches prenant en compte le biais dans les cas de fouilles de donnØes supervisØes aux travaux
+de (Fan et al., 2004;Wang et al., 2003). La partie du stream observØe est reprØsentØe par S dans
+la gure 1. A partir d’une valeur xØe par l’utilisateur du paramŁtre , le support thØorique,
+on voudrait connaître l’ensemble des motifs vrais -frØquents deX . Cet ensemble nommØX
+est reprØsentØ en grisØ sur la gure 1. Hormis l’incertitude et les aspects liØs à l’estimation
+statistique, l’approximation de l’ensemble X recouvre un aspect combinatoire qui provient
+de la trŁs grande taille de X mŒme si cet ensemble peut Œtre ni. Nous nommons S l’en-
+semble des motifs observØs extraits du stream avec jSj = m (jSj << jX j). Nous rØduisons
+cette diffØrence à l’aide d’un algorithme qui permet d’obtenir un super ensemble S de S avec
+jSj = m > m. Typiquement, S contient des motifs supplØmentaires obtenus à partir d’une
+gØnØralisation des ØlØments de S (Mannila et Toivonen, 1997). Ce n’est pas le propos de cet ar-
+ticle de traiter l’aspect combinatoire, l’essentiel est que S ne sera jamais sufsamment grand
+pour engloberX, au regard de la façon dont il est construit (voir gure 1). Ainsi l’importance
+du problŁme d’estimation statistique demeure entier.
+Soit l’ensemble X
+
+(gures 1 et 2) qui reprØsente l’ensemble des motifs vrais -frØquents
+de X pour l’ensemble S, nous rappelons que cet ensemble ne peut Œtre connu totalement
+compte tenu non seulement du fait que jSj << jX j, mais aussi des deux sources d’erreurs
+prØcØdemment indiquØes qui en dØcoulent. Nous recherchons 0 pour approcher au mieux
+l’ensemble X
+
+, en utilisant S
+0
+(gure 2) qui reprØsente l’ensemble des motifs observØs 0-
+frØquents du stream dans S.
+S
+
+0
+FP
+S
+FN
+V P V N
+X
+
+FIG. 2  Estimation de l’erreur.
+Pour apprØcier l’approximation effectuØe, consØcutivement aux deux sources d’erreurs ,
+les sous-ensemblesX
+
+et S
+0
+nous permettent de dØnir les quatre paramŁtres suivants (gure
+2) :
+- 617 - RNTI-E-6
+Bordures statistiques pour la fouille incrØmentale dans les data streams
+ VP (vrais positifs) : reprØsente l’ensemble des motifs, vrais -frØquents de X
+
+et Øgale-
+ment observØs 0-frØquents de S.
+ FP (faux positifs) : reprØsente l’ensemble des motifs, vrais non -frØquents de X
+
+mais
+observØs 0-frØquents de S.
+ FN (faux nØgatifs) : reprØsente l’ensemble des motifs, vrais -frØquents de X
+
+mais
+observØs non 0-frØquents de S.
+ VN (vrais nØgatifs) : reprØsente l’ensemble des motifs, vrais non -frØquents du stream
+et Øgalement observØs non 0-frØquents de S.
+A partir des ensembles dØnis ci-dessus, on peut indiquer les formules de la prØcision et
+du rappel qui permettent d’estimer l’approximation effectuØe.
+P = V P=(V P + FP ) (1) R = V P=(V P + FN) (2)
+La prØcision permet de quantier la proportion des motifs -frØquents estimØs qui sont
+en fait non vrais -frØquents, en dehors de S
+0
+. Si on cherche à Maximiser P, cela revient
+à minimiser la premiŁre source d’erreurs. SymØtriquement, le rappel permet de quantier la
+proportion de motifs, vrais -frØquentsmanquant dansS
+0
+. Si on cherche cette fois à maximiser
+R, cela revient à minimiser la seconde source d’erreurs.
+2.2 Choix de 0
+Dénition 1 0 est un support statistique pour , 0 < 0 < 1, s’il est utilisØ pour approcher
+les motifs vrais -frØquents du stream.
+Une approche naïve pour approcher au mieux l’ensembleX
+
+consisterait à choisir 0 =  ;
+autrement dit, la question que l’on pourrait se poser est de savoir si  est un support statistique
+pour lui-mŒme. Malheureusement, la principale et seule propriØtØ de l’ensemble S
+0
+dans ce
+cas, est qu’il tend à correspondre avec une probabilitØ de 1 à l’ensembleX
+
+lorsque le cardinal
+de l’ensemble S tend vers1 selon le lemme de Borel-Cantelli (Devroye et al., 1996). Cela
+reviendrait à connaître tout le stream, ce qui n’est pas possible en pratique. Le thØorŁme de
+Glivenko-Cantelli permet de montrer que l’on peut borner l’erreur commise sur les motifs
+vrais -frØquents en fonction de divers paramŁtres parmi lesquels le cardinal de l’ensemble
+S, mais on ne peut pas faire mieux. Bien souvent, en traitement de l’information ou encore en
+medecine, plutôt que de simplement borner l’erreur, il est beaucoup plus important d’estimer
+et de contrôler des parties de l’erreur. On peut par consØquent dØvelopper une approche qui
+consiste à maximiser soit la prØcision P soit le rappel R. Le choix des valeurs aux limites de 0
+pourraient convenir en ce sens oø l’on maximise la prØcision ou le rappel mais ces valeurs sont
+inintØressantes pour les applications en fouille de donnØes. Par exemple, si on choisit 0 = 0,
+on obtient S0 = S et ainsi R = 1. Mais, nous avons Øgalement dans ce cas P = jX j=jSj,
+qui correspond à une valeur trop faible pour bien des applications, et donc tous les ØlØments
+de S sont considØrØs comme des motifs vrais -frØquents du stream. On pourrait aussi choisir
+0 = 1 pour Œtre sßr de maximiser P cette fois, mais il en dØcoule que R = 0 et il se pourrait
+qu’aucun ØlØment de S ne soit un motif vrai -frØquent.
+Ces exemples avec les valeurs aux limites de 0 nous permettent de bien cadrer les principes
+de notre approche. L’idØe gØnØrale est de choisir subtilement 0 diffØrent mais sufsamment
+- 618 -RNTI-E-6
+JE. Symphor et PA. Laur
+proche de , respectivement plus grand ou plus petit que , de sorte qu’il soit possible de
+contrôler en maximisant soit la prØcision soit le rappel, pour garantir avec une trŁs forte pro-
+babilitØ que P = 1 ou respectivement que R = 1 tout en limitant la dØgradation du paramŁtre
+non contrôlØ. On obtient ainsi un ensemble S
+0
+pas trop petit contenant des informations signi-
+catives. Il y a une barriŁre statistique autour de  qui empŒche que 0 ne soit ni trop proche
+ni trop ØloignØ de  pour conserver la contrainte que P = 1 ou alors que R = 1, avec une forte
+probabilitØ. Notre objectif pour maximiser la prØcision ou le rappel avec une forte probabilitØ
+est par consØquent de rechercher les valeurs de 0 les plus proches possibles de cette barriŁre.
+Le thØorŁme ci-dessous permet d’Øtablir les valeurs des supports statistiques que nous pro-
+posons en calculant la valeur de " :
+Théorème 1 8X; 8D; 8m > 0; 80    1; 80 <   1, on choisit " tel que :
+" 
+r
+1
+2m
+ln
+jSj
+
+:
+Si on xe 0 = + ", alors P = 1 avec une probabilitØ au moins de 1  . Si on xe 0 =   ",
+alors R = 1 avec une probabilitØ au moins de 1   .  est le risque statistique liØ aux data
+streams. Les valeurs  + ",    " sont les supports statistiques au sens de la dØnition 1.
+Les supports obtenus (0 =  ") sont statistiquement presque optimaux. Faute de place, nous
+renvoyons à l’article (Nock et al., 2005) 1 pour la dØmonstration complŁte. Celle-ci repose
+sur l’utilisation d’inØgalitØs de concentration de variables alØatoires, qui, dans ce cas prØçis,
+permettent d’obtenir des rØsultats statistiquement presque optimaux. Par optimalitØ, nous en-
+tendons que toute technique d’estimation obtenant de meilleures bornes est condamnØe à se
+tromper (le critŁre à maximiser n’est plus Łgal à un) quelque soit son temps de calcul.
+3 Bordures statistiques pour la mise à jour incrØmentale
+Dans cette section nous introduisons deux bordures statistiques (supØrieure et infØrieure)
+qui vont Œtre pertinentes dans le choix des motifs frØquents à conserver lors de la mise à jour
+incrØmentale. L’objectif avec la bordure statistique infØrieure est de maximiser la prØcision
+P, tandis qu’avec la bordure statistique supØrieure il s’agit de maximiser le rappel R. Nous
+adoptons la notation probabiliste dØnie par (McAllester, 1999).2
+A partir du thØorŁme 1, nous dØnissons l’ensemble suivant : pour un risque statistique 
+xØ par l’utilisteur, en choisissant 0 = + ", on construit l’ensemble S
++" tel que 8 ; S+" 
+X
+
+avec 8 ;P = 1. Ainsi, il n’y a plus la premiŁre source d’erreurs avec une forte probabilitØ.
+Tous les motifs de S
++" sont des motifs, vrais -frØquents deX , mais on ne les a pas tous (voir
+gure 3). S
++"
+est le plus grand ensemble possible qui contient uniquement des motifs vrais
+-frØquents de X
+
+aprŁs un temps d’observation du stream. Nous dØnissons cet ensemble
+comme Øtant la bordure statistique infØrieure de X
+
+à partir de l’Øchantillon des motifs S de
+X . De façon symØtrique, à partir du thØorŁme 1, nous dØnissons l’ensemble suivant : pour un
+1www.pa-laur.com/LNSP_CIKM05.pdf
+2Cette notation concise, s'écrivant 8P , précise que : le prédicat P est vrai à une fraction près  pour l'ensemble
+S obtenu à partir de la distribution D. De façon équivalente, cela signie que le prédicat P est vrai avec une probabilité
+ 1   pour l'ensemble S obtenu à partir de la distribution D.
+- 619 - RNTI-E-6
+Bordures statistiques pour la fouille incrØmentale dans les data streams
+FN
+S
+S
++"
+VP VN
+X
+
+FIG. 3  Bordure statistique infØrieure.
+S
+FP
+S
+ "
+VP
+VN
+X
+
+FIG. 4  Bordure statistique supØrieure.
+risque statistique  xØ par l’utilisteur, en choisissant 0 =   ", on construit l’ensemble S
+ "
+tel que 8 ; X
+
+ S
+ "
+avec 8 ;R = 1. Ainsi, il n’y a plus la deuxiŁme source d’erreurs avec
+une forte probabilitØ, c’est à dire que S
+ "
+contient tous les motifs, vrais -frØquents de X
+
+,
+mais il en contient d’autres (gure 4). S
+ "
+est le plus petit ensemble possible qui contient tous
+les motifs vrais -frØquents de X
+
+aprŁs un temps d’observation du stream. Nous dØnissons
+cet ensemble comme Øtant la bordure statistique supØrieure deX
+
+à partir de l’Øchantillon des
+motifs S du streamX .
+Stream
+(a) (b)
+(c)
+         Motifs
+DB db
+P , R, F
+S
++"
+S
+ "
+DB [ db
+S
+X
+0
+
+
+S
+0
+=
+FIG. 5  Bordures statistiques pour la mise à jour incrØmentale.
+La gure 5 illustre l’utilisation de bordures dans un processus de mise à jour incrØmentale.
+Nous recherchons les motifs -frØquents à partir des bordures statistiques (notØes (a) et (b) sur
+la gure 5). Ces bordures sont construites pour le support  choisi à partir de la valeur de ",
+calculØe pour S (DB). Ces bordures, nous permettent d’approcher au mieux l’ensemble de
+tous les motifs vrais -frØquents pour S 0 , qui reprØsente la base DB mise à jour par l’ajout
+de db, S0 = S [ db. Dans la section suivante lors de nos expØrimentations, nous comparerons
+les motifs -frØquents obtenus grâce aux bordures statistiques par rapport à l’ensemble X 0
+
+( (c) sur la gure 5). Cet ensemble reprØsente les vrais motifs -frØquents aprŁs mise à jour
+incrØmentale (DB [ db).
+4 ExpØrimentation
+Comme nous l’avons prØcisØ dans la section prØcØdente notre objectif lors des expØrimen-
+tations ne consiste pas à Øvaluer les temps de rØponse associØs à nos bordures mais plutôt
+- 620 -RNTI-E-6
+JE. Symphor et PA. Laur
+Database  tailleDB taille db
+Dragons [0.07, 0.2] / 0.03 [0.2,0.6] / 0.1 [0.1, 0.5] /0.1
+BuAG [0.08, 0.2] / 0.03 [0.2,0.6] / 0.1 [0.1, 0.5] /0.1
+FIG. 6  Valeurs des paramŁtres de la forme [a; b]=c, oø a est la valeur de dØpart, c est
+l’incrØment, et b est la valeur nale.
+d’Øvaluer leur qualitØ. Pour cela, nous utilisons les mesures de prØcision P et de rappel R dØ-
+nies prØcØdemment dans les Øquations (1) et (2). Du fait de l’indØpendance de notre mØthode
+vis à vis des motifs recherchØs, nous avons utilisØ un algorithme traditionnel de recherche de
+motifs sØquentiels frØquents SPADE (Zaki, 2001).
+Lors de cette Øvaluation, nous avons utilisØ deux jeux de donnØes issus de serveurs Web.
+Le premier appelØ Dragons, est obtenu sur le site internet3. Ces donnØes reprØsentent la
+navigation d’utilisateurs sur ce site. La taille du chier de log reprØsente environ 2,54Go (132k
+transactions). La deuxiŁme base de donnØes, appelØe BuAG, est obtenue à partir des 3,48Go
+(54k transactions) de Web log du serveur web de la bibliothŁque de l’UniversitØ4.
+Pour analyser la qualitØ de nos bordures stastiques, nous Øvaluons diffØrentes situations en
+faisant varier un ensemble de paramŁtres (une exception est faite pour , qui est xØ à .05).
+Les variations de ces paramŁtres sont dØcrites dans la gure 6. Le premier paramŁtre dØnit
+les diffØrentes valeurs de support sur lesquelles nous allons rØaliser l’expØrimentation ( ).
+Le second paramŁtre, dØnit la taille de DB par rapport à la taille du stream simulØ (taille
+DB). Le dernier paramŁtre, quant à lui, dØnit la taille de db par rapport à celle deDB. Dans
+notre cas db reprØsentera au plus 50% de DB (taille db), ce paramŁtre permet de contrôler
+la taille de l’incrØment par rapport à la partie stockØe initialement. Pour gØrer et organiser ces
+expØriences un gØnØrateur est chargØ de coordonner tous les tests à effectuer.
+Au lieu d’utiliser un vrai data stream, qui aurait pu limiter la qualitØ de l’Øvaluation de
+nos bordures statistiques, nous avons choisi d’en simuler un à l’aide de la connaissance de
+son domaine X . Plus prØcisØment, pour simuler le stream nous Øchantillonnons chaque base
+de donnØes en fragments DB (S). Par exemple, nous pouvons considØrer que les donnØes ar-
+rivent successivement depuis la base de donnØes Dragons et que nous ne pouvons en stocker
+que 20%. Pour cela nous prenons 20% des transactions contenues dans cette base de don-
+nØes et nous les conservons dans DB. Il ne reste alors plus qu’à prendre un incrØment, db par
+exemple de taille 10%, de cette base. Nous construisons alors les bordures statistiques (bordure
+infØrieure et bordure supØrieure) dØnies dans la section 3 pourDB.
+Les gures 7 et 8 montrent les rØsultats d’expØriences obtenues, avec  = 0:05, respective-
+ment sur les bases Dragons et BuAG. Pour Øvaluer la qualitØ de ces bordures pour la mise à jour,
+nous reprØsentons leurs comportements pour P et R par rapport à S 0 (S0 = DB [ db). Ainsi,
+les courbes P+" et P ", reprØsentent la prØcision respectivement pour la bordure statistique
+infØrieure et pour la bordure statistique supØrieure. De mŒme les courbes R" reprØsentent le
+rappel. Les courbes P et R correspondent au choix trivial 0 = . Nous constatons que ces
+courbes ont un comportement assez similaire :
+ la prØcision P vaut ou approche 1 pour la plupart des bases stockØes quand 0 =  + ",
+3www.elevezundragon.com.
+4www.univ-ag.fr/buag/.
+- 621 - RNTI-E-6
+Bordures statistiques pour la fouille incrØmentale dans les data streams
+Dragons,  = 0:07, S = 60%
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+ 0.9
+ 1
+ 65  70  75  80  85  90
+P
+Taille S'(%)
+(Pθ, Pθ+ε, Pθ-ε) = f(taille S')
+Pθ+ε
+Pθ-ε
+Pθ
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+ 0.9
+ 1
+ 65  70  75  80  85  90
+R
+Taille S' (%)
+(Rθ, Rθ+ε, Rθ-ε) = f(taille S')
+Rθ+ε
+Rθ-ε
+Rθ
+Dragons,  = 0:19, S = 20%
+ 0.65
+ 0.7
+ 0.75
+ 0.8
+ 0.85
+ 0.9
+ 0.95
+ 1
+ 32  34  36  38  40  42  44  46
+P
+Taille S'(%)
+(Pθ, Pθ+ε, Pθ-ε) = f(taille S')
+Pθ+ε
+Pθ-ε
+Pθ  0.4
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+ 0.9
+ 1
+ 21  22  23  24  25  26  27  28  29  30
+R
+Taille S' (%)
+(Rθ, Rθ+ε, Rθ-ε) = f(taille S')
+Rθ+ε
+Rθ-ε
+Rθ
+FIG. 7  reprØsente les courbes P (à gauche) et R (à droite) sur la base Dragons pour trois
+valeurs de 0 :    ";  et  + ", deux valeurs de  et deux tailles de S (% par rapport à |X|).
+ le rappel R vaut ou approche 1 pour la plupart des bases stockØes quand 0 =    ".
+Ces observations sont en accords avec les rØsultats thØoriques de la section 2. Nous obser-
+vons Øgalement un autre phØnomŁne : le rappel R associØ à 0 =  + " n’est pas trŁs ØloignØ
+de celui associØ à 0 = . Il en est de mŒme pour la prØcision P associØe à 0 =    ". Ce qui
+montre que la maximisation de la prØcision P ou du rappel R est obtenue avec un coßt rØduit au
+niveau de la dØgradation de l’autre paramŁtre. Nous notons aussi que les courbes de prØcision
+P ont de meilleures performances que celles du rappel R notamment sur la gure 8. Ceci n’est
+pas trŁs surprenant (c:f: section 2), car la fourchette de valeur pour la prØcision P est beaucoup
+plus restreinte que pour le rappel R.
+La variation de la taille de S (DB) possŁde Øgalement une importance et vient conforter
+un rØsultat thØorique auquel on pouvait s’attendre. En effet si on s’intØresse au rappel R, on
+constate, que ce soit sur les gures 7 ou 8, que les valeurs observØes pour cette quantitØe aug-
+mentent avec la taille de S. Cela traduit le fait que plus nous possØdons de donnØes observØes
+plus la qualitØ de la prØdiction augmente.
+Sur ces bases de donnØes un autre phØnomŁne semble apparaître. PremiŁrement, à cause
+des faibles valeurs de , certains tests n’ont pas pu Œtre rØalisØs car la valeur de    " Øtait
+infØrieure à 0. De plus, les diffØrences observØes entre les courbes semblent Œtre liØes aux
+tailles des bases de donnØes utilisØes. La base de donnØes BuAG est plus petite que celle de
+Dragons d’un facteur 2.4. Nous pensons que ceci explique la diffØrence entre les courbes : il
+s’agit de phØnomŁnes liØs à des bases de donnØes de petites tailles et qui ne devraient pas Œtre
+prØsents dans des bases de donnØes plus consØquentes ou dans de vrais data streams.
+Sur ces courbes (gures 7 et 8), le choix de 0 =  donne de meilleurs rØsultats en ce qui
+concerne la moyenne de P et R que le choix des deux valeurs de 0, sachant que ni P, ni R
+ne sont trŁs proches de 1 avec une forte probabilitØ dans ce cas. Avec notre approche, on peut
+efcacement optimiser le processus de mise à jour incrØmentale. Dans le cas oø on aurait un
+- 622 -RNTI-E-6
+JE. Symphor et PA. Laur
+BuAG,  = 0:08, S = 20%
+ 0.55
+ 0.6
+ 0.65
+ 0.7
+ 0.75
+ 0.8
+ 0.85
+ 0.9
+ 0.95
+ 1
+ 22  23  24  25  26  27  28  29  30  31
+P
+Taille S'(%)
+(Pθ, Pθ+ε, Pθ-ε) = f(taille S')
+Pθ+ε
+Pθ-ε
+Pθ
+ 0.2
+ 0.3
+ 0.4
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+ 0.9
+ 1
+ 22  23  24  25  26  27  28  29  30  31
+R
+Taille S' (%)
+(Rθ, Rθ+ε, Rθ-ε) = f(taille S')
+Rθ+ε
+Rθ-ε
+Rθ
+BuAG,  = 0:08, S = 40%
+ 0.6
+ 0.65
+ 0.7
+ 0.75
+ 0.8
+ 0.85
+ 0.9
+ 0.95
+ 1
+ 44  46  48  50  52  54  56  58  60  62
+P
+Taille S'(%)
+(Pθ, Pθ+ε, Pθ-ε) = f(taille S')
+Pθ+ε
+Pθ-ε
+Pθ  0.3
+ 0.4
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+ 0.9
+ 1
+ 44  46  48  50  52  54  56  58  60  62
+R
+Taille S' (%)
+(Rθ, Rθ+ε, Rθ-ε) = f(taille S')
+Rθ+ε
+Rθ-ε
+Rθ
+FIG. 8  reprØsente les courbes P (à gauche) et R (à droite) sur la base BuAG pour trois
+valeurs de 0 :    ";  et  + ", deux valeurs de  et deux tailles de S (% par rapport à |X|).
+espace sufsant de stockage, on choisirait 0 =    ", la bordure supØrieure, pour laquelle on
+possŁde des garanties importantes sur la prØsence des futurs frØquents en son sein (R = 1).
+Dans ce cas, le nombre de calculs supplØmentaires sera faible lors de la mise à jour. Par contre
+dans le cas oø on devrait se limiter pour des raisons de taille à conserver une bordure disons
+moins volumineuse, 0 =  + ", la bordure infØrieure, sera alors utilisØe car elle contient les
+informations les plus pertinentes (P = 1). On peut ainsi voir les bordures statistiques comme
+des outils de mise à jour incrØmentale indiquant les limites au delà desquelles : soit il est inutile
+de stocker plus d’informations dans le cas de 0 =   " (valeur limite infØrieure pour 0) ; soit
+la perte d’information serait trop importante 0 =  + " (valeur limite supØrieure pour 0 ).
+5 Travaux connexes
+Depuis 1996, de nombreux travaux de recherche se sont focalisØs sur la maintenance des
+ensembles de motifs frØquents obtenus dans les bases de donnØes statiques. Dans ce para-
+graphe nous regardons leur adØquation par rapport à notre problØmatique. Partition et FUP
+(Fast UPdate) (Cheung et al., 1996) sont deux algorithmes oø un partitionnement de la base
+de donnØes est effectuØ pour rechercher dans un premier temps les itemsets frØquents locaux
+relatifs à chaque partition puis dans un second temps en dØduire les itemsets frØquents glo-
+baux par validation croisØe. Cela repose sur l’hypothŁse que les itemsets frØquents de la base
+doivent l’Œtre dans au moins l’une des partitions. (Parthasarathy et al., 1999) ont dØveloppØ un
+algorithme de mise à jour incrØmentale ISM (Incremental Sequence Mining) en maintenant un
+treillis, de motifs de la base, construit à partir de tous les motifs frØquents et de tous les motifs
+de la bordure nØgative. (Zheng et al., 2002) ont dØveloppØ un algorithme IUS( Incrementally
+Updating Sequence) en utilisant une valeur support pour limiter la taille de l’espace des candi-
+- 623 - RNTI-E-6
+Bordures statistiques pour la fouille incrØmentale dans les data streams
+dats de la bordure nØgative. Ces diffØrentes approches se heurtent aux inconvØnients inhØrents
+à l’utilisation de la bordure nØgative :
+ l’espace des motifs candidats à maintenir est trŁs important ;
+ il est nØcessaire de considØrer les relations structurelles qui existent entre les motifs
+notamment dans le cas des motifs qui auraient une faible valeur de support.
+Les diffØrents algorithmes utilisant la bordure nØgative sont trŁs coßteux en temps et sont
+consommateurs d’espace mØmoire.
+(Masseglia et al., 2003) ont dØveloppØ un algorithme de mise à jour incrØmentale ISE
+utilisant une approche par gØnØration et test de candidats. Les inconvØnients sont que :
+ l’espace des candidats peut Œtre trŁs grand, ce qui rend la phase de test trŁs lente ;
+ l’algorithme requiert plusieurs passages sur toute la base. Cela est trŁs coßteux en temps
+particuliŁrement pour les motifs sØquentiels à sØquences longues.
+−−−−−−− −− −− − −− −−−−−−−−−−−−
+−
++ ++ + ++ ++ + + ++++ + +
++
++ + +
++ +
++
+++
++
++
++
++
+++ + + + + + + + +
++ + ++
++ + + + +
++
++
++++++
++++
++
++
+Bordure statistique
+Bordure statistique
+SFS
+Vrais frequents
+inferieure
+Frequents observes
+superieure
+FIG. 9  Comparaison.
+L’algorithme IncSpan (IncrementalMining of Sequential Patterns in large database) dØveloppØ
+par (Cheng et al., 2004) repose sur une approche statistique oø l’on construit un ensemble de
+motifs semi-frØquents (SFS) en diminuant la valeur du support à partir d’un ratio. L’idØe est
+de dire qu’à partir d’un ensemble de motifs "presque frØquents" (SFS), plusieurs des motifs
+frØquents de la base mise à jour proviendraient de SFS ou alors seraient dØjà observØs frØ-
+quents dans la base connue prØcØdant la mise à jour. Autrement dit, SFS constituerait une
+zone frontiŁre entre les motifs frØquents et non frØquents. Sur la gure 9, nous reprØsentons
+un exemple d’ensemble SFS. Cette approche prØsente des insufsances majeures d’un point
+de vue statistique tant pour l’estimation de l’incertitude intrinsŁque liØe aux data streams que
+pour la construction de l’ensemble des motifs candidats permettant la mise à jour incrØmen-
+tale. En effet, pour diminuer la valeur du support, le choix du ratio est simplement heuristique
+sans justication thØorique. Ainsi, cette approche n’offre aucune certitude ni indication sur
+l’erreur commise lors de la construction de l’ensemble des motifs semi-frØquents quant aux
+motifs vrais -frØquents du stream (zone identiØe avec les symboles - sur la gure 9). De
+plus, nous n’avons aucune garantie sur la minimalitØ de cet ensemble (zone identiØe avec les
+symboles + sur la gure 9), ce qui est fortement pØnalisant pour sa rØutilisation dans l’objectif
+d’optimisation de la mØthode de mise à jour incrØmentale.
+6 Conclusion
+Dans cet article, nous abordons la problØmatique de la mise à jour incrØmentale pour les
+motifs frØquents dans le cas des grandes bases de donnØes. Dans le contexte des data streams,
+- 624 -RNTI-E-6
+JE. Symphor et PA. Laur
+il est plus pertinent, de construire et de maintenir des ensembles de motifs vrais -frØquents et
+non simplement observØs comme tels. Plusieurs travaux, (Kearns et Mansour, 1998; Nock et
+Nielsen, 2004; Vapnik, 1998), ont montrØ l’intØrŒt de l’approche statistique notamment dans
+la dØtermination de rŁgles de prØvision pour l’optimisation d’algorithmes. Notre contribution
+majeure porte prØcisØment sur ce point par l’introduction de supports statistiques en complØ-
+ment des supports classiques permettant d’obtenir des bordures statistiques qui constituent les
+ensembles statistiquement presque optimaux (à une constante prŁs) à considØrer dans le cadre
+de la mise à jour incrØmentale. Les expØrimentations prØsentØes montrent la robustesse de
+l’approche, dans le cas des motifs sØquentiels, au regard de la taille des bases stockØes et des
+diffØrentes valeurs supports testØes. Ces rØsultats encourageants sont des points positifs quant à
+l’applicabilitØ et le passage à l’Øchelle de la mØthode. Plusieurs extensions de ces travaux sont
+possibles dans bien des domaines de recherche en fouille de donnØes. On citera notamment les
+travaux qui portent sur les structures de donnØes oø l’on cherche à maintenir des ensembles
+d’items qui sont observØs frØquents avec un rappel maximum, (Jin et al., 2003). Nos prØoc-
+cupations actuelles concernent la question suivante : est-il possible de construire un ensemble
+intermØdiaire qui conserverait au mieux les propriØtØs de chacune de ces bordures ? Celui-ci
+reprØsenterait un compromis entre une bordure statistique trop imposante à stocker et une autre
+pour laquelle le nombre d’accŁs à la base de donnØes est trop important.
+RØfØrences
+Agrawal, R., T. Imielinski, et A.-N. Swami (1993). Mining association rules between sets of
+items in large databases. In Proc. of the ACM SIGMOD ICMD’93, pp. 207216.
+Ayres, J., J. Flannick, J. Gehrke, et T. Yiu (2002). Sequential pattern mining using bitmap
+representation. In Proc. of KDD’02.
+Cheng, X., X. Yan, et J. Han (2004). Incspan : Incremental mining of sequential patterns in
+large database. In Proc. of KDD’04.
+Cheung, D., J. Han, V. Ng, et C. Wong (1996). Maintenance of discovered association rules in
+large databases : an incremental updating technique. In Proc. of ICDE’96, pp. 106114.
+Demaine, E., A. Lopez-Ortizand, et J.-I. Munro (2002). Frequency estimation of internet pa-
+cket streams with limited space. In Proc. of the 10th European Symposium on Algorithms.
+Devroye, L., L. Györ, et G. Lugosi (1996). A Probabilistic Theory of Pattern Recognition.
+Fan, W., Y.-A. Huang, H. Wang, et P.-S. Yu (2004). Active mining of data streams. In Proc. of
+the 4th SIAM International Conference on Data Mining, pp. 457461.
+Golab, L. et M. T. Ozsu (2003). Issues in data stream management. ACM SIGMOD Records 2.
+Han, J., J. Pei, B. Mortazavi-asl, Q. Chen, U. Dayal, et M. Hsu (2000). Freespan : Frequent
+pattern-projected sequential pattern mining. In Proc. of KDD’00.
+Jin, C., W. Qian, C. Sha, J.-X. Yu, et A. Zhou (2003). Dynamically maintaining frequent items
+over a data stream. In Proc. of CIKM’03, pp. 287294. ACM Press.
+Karp, R.-M., S. Shenker, et C.-H. Papadimitriou (2003). A simple algorithm for nding ele-
+ments in streams and bags. ACM Trans. on Database Systems 28, 5155.
+- 625 - RNTI-E-6
+Bordures statistiques pour la fouille incrØmentale dans les data streams
+Kearns, M. J. et Y. Mansour (1998). A Fast, Bottom-up Decision Tree Pruning algorithm with
+Near-Optimal generalization. In Proc. of ICML’98, pp. 269277.
+Li, H.-F., S.-Y. Lee, et M.-K. Shan (2004). An efcient algorithm for mining frequent itemsets
+over the entire history of data streams. In Proc. of the 1st Int. Workshop on Knowledge
+Discovery in Data Streams.
+Manku, G. et R. Motwani (2002). Approximate frequency counts over data streams. In Proc.
+of the 28 th International Conference on Very Large Databases, pp. 346357.
+Mannila, H. et H. Toivonen (1997). Levelwise search and borders of theories in knowlede
+discovery. Data Mining and Knowledge Discovery 1, 241258.
+Masseglia, F., P. Poncelet, et M. Teisseire (2003). Incremental mining of sequential patterns in
+large databases. Data and Knowledge Engineering 46.
+McAllester, D. (1999). Some PAC-Bayesian theorems. Machine Learning 37, 355363.
+Nock, R., P. Laur, P. Poncelet, et J. Symphor (2005). On the estimation of frequent itemsets
+for data streams : Theory and experiments. In Proc. of CIKM’05.
+Nock, R. et F. Nielsen (2004). Statistical Region Merging. IEEE Trans. on Pattern Analysis
+and Machine Intelligence 26, 14521458.
+Parthasarathy, S., M. Zaki, M. Orihara, et S. Dwarkadas (1999). Incremental and interactive
+sequence mining. In Proc. of CIKM’99.
+Pei, J., J. Han, B. Mortazavi-asl, H. Pinto, Q. Chen, et U. Dayal (2001). Prexspan : Mining
+sequential patterns efciently by prex-projected pattern growth. In Proc. of ICDE’01.
+Srikant, R. A. R. (1995). Mining sequential patterns. In Proc. of ICDE’95 Conference.
+Vapnik, V. (1998). Statistical Learning Theory. John Wiley.
+Wang, H., W. Fan, P.-S. Yu, et J. Han (2003). Mining concept-drifting data streams with
+ensemble classiers. In Proc. of KDD’03, pp. 226235.
+Zaki, M. (2001). SPADE : An efcient algorithm for mining frequent sequences. Machine
+Learning Journal 42.
+Zheng, Q., K. Xu, S. Ma, et W. lv (2002). The algorithms of updating sequential patterns. In
+Proc. of ICDM’02.
 Summary
-Allowing multilevel analysis, hierarchies are considered as a central concept in dataware-
-houses. Unfortunately, the current datawarehouse models do not consider all the categories of
-hierarchy which are described in the litterature. For instance, there is no way to model the fact
-that a given arterial pressure is either low, normal or high depending on the age of the patient.
-In a previous work, we present these contextual hierarchies. In this paper, we propose the
-first approach to implement these hierarchies in a datawarehouse system. An external database
-stores the domain knowledge. Then, in order to provide a flexible, efficient and appropriate
-analysis, we propose a query rewriting algorithm to take the various contexts into account.
-Thus, it is now possible to correctly answer to the query “Who has had a low arterial pressure
-this night?”.
+Recently the knowledge extraction community takes a closer look to new models where
+data arrive in timely manner like a fast and continous ow, i:e: data streams. One of the most
+important singularity inside streams relies on that only a part of it is available. After some
+following updates, it’s necessary, to cope with uncertainty as only a part of it is available. In
+this paper, we introduce a new statiscal approach which biases the initial support for sequential
+patterns mining. This approach holds the advantage to maximize one of the parameters (pre-
+cision or recall) chosen by the user while limiting the degradation of the other criterion. Thus,
+we dene the statistical borders which are the relevant sets of frequent patterns in incremental
+mining of streams. Experiments performed on sequential patterns demonstrate the interest of
+this approach and the potential of such techniques.
+- 626 -RNTI-E-6

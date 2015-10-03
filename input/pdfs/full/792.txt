@@ -1,568 +1,548 @@
-Algorithmes pour la sélection des vues à matérialiser avec
-garantie de performance1
-Nicolas Hanusse∗, Sofian Maabout∗
-Radu Tofan∗
-∗LaBRI. Université Bordeaux 1
-nom@labri.fr
-Résumé. Nous considérons dans cet article le problème du choix des vues à
-matérialiser dans le contexte des cubes de données. Contrairement à la plupart
-des autres travaux, la contrainte que l’on prend en compte ici est relative à la
-performance des requêtes non pas l’espace mémoire disponible. Nous montrons
-l’avantage de notre approche avec des arguments théoriques et nous le confir-
-mons par des expériences menées sur des jeux de données différents.
-1 Introduction
-Dans les applications OLAP, l’optimisation des requêtes analytiques est primordial. Ainsi,
-on a souvent recours à un pré-calcul ou d’une manière équivalente à la matérialisation des
-requêtes. Ces dernières peuvent être trop nombreuses pour être toutes pré-calculclées. Ceci
-pour deux raisons : soit à cause du temps qu’il faut pour toutes les calculer ou bien de l’espace
-mémoire nécessaire pour toutes les stocker. Ainsi, on a besoin d’algorithmes permettant de
-choisir les “meilleures" vues à stocker. Les performances des algorithmes de sélection sont
-évalués selon trois critères : (1) l’espace requis pour stocker les vues sélectionnées, (2) le
-temps d’évaluation des requêtes et (3) le temps nécessaire pour exécuter l’algorithme, i.e sa
-complexité. La plupart des solutions proposées jusqu’à présent consistent à choisir un sous-
-ensemble de vues permettant d’optimiser l’évaluation des requêtes sans dépasser une limite
-d’espace mémoire fixée par l’utilisateur. Certaines variantes de ce problèmes ont été étudiées :
-(1) la nature des données qu’on peut stocker, e.g seulement des vues ou des index aussi, (2)
-le modèle de coût e.g minimiser non seulement le temps d’évaluation des requêtes mais aussi
-la coût de mise à jour ou finalement (3) l’ensemble des requêtes susceptibles d’être posées
-e.g toutes ou bien un sous-ensemble. Dans ce dernier cas, le problème peut être raffiné en
-considérant la fréquence ou charge des requêtes qu’on veut optimiser. En général, le problème
-peut être décrit par un problème d’optimisation sous contrainte : la contrainte étant l’espace
-disponible qu’il ne faut pas dépasser et la fonction à optimiser est le coût moyen des requêtes
-qu’il faut minimiser. A notre connaissance, aucune des solutions proposées dans la littérature
-n’offre un bon compromis entre complexité de l’algorithme de sélection, minimalité du coût
-moyen de la solution et garantie de performance.
-L’article est organisé de la manière suivante : nous présentons d’abord quelques notations
-et défintions nous permettant de formaliser le problème à traiter. Nous décrivons par la suite
-quelques travaux relatifs. Dans la section 3, nous présentons notre solution pour cas où tous
-Algorithmes de sélection de vues à matérialiser
-les cuboïdes d’un cube de données peuvent être interrogés ensuite nous traitons le cas où l’on
-dispose d’un ensemble de requêtes fixé (Section 4). Dans la section 5, nous présentons quelques
-unes des expériences que nous avons conduites permettant de valider notre approche et nous
-terminons par une conclusion récapitulant notre apport en mentionnant quelques perspectives
-de travaux futurs.
-2 Préliminaires
-Notation Une table de faits T est une relation où l’ensemble des attributs est divisé en 2
-parties : l’ensemble des dimensionsDim(T ) et l’ensemble des mesuresMesures(T ). En gé-
-néral, Dim(T ) forme une clé pour la table T . Le cube de données Jim Gray (1997) construit
-à partir de T est obtenu en agrégeant T et en regroupant ses tuples dans toutes les manières
-possibles i.e tous les Group By c où c est un sous-ensemble de Dim(T ). Chaque c corres-
-pond à un cuboïde2. Le cube de données associé à T est noté DC(T ). Par abus de notation
-Dim(DC(T )) désigneraDim(T ). SoitDC(T ) un cube de données,Dim(T ) ses dimensions
-et |Dim(T )| = D. L’ensemble des cuboïdes de DC(T ) est noté C(T ). Il est évident que
-|C(T )| = 2D. La table T est un cuboïde particulier de C(T ). Il est appelé cuboïde de base et
-est noté cb. La taille d’un cuboïde c correspond au nombre de ses lignes et est notée size(c).
-La taille d’un ensemble de cuboïdes S est notée size(S). Le treillis du cube de données est
-induit par une relation d’ordre partiel  entre cuboïdes qui est définie comme suit : v  w ssi
-Dim(v) ⊆ Dim(w). On dit que w est un ancêtre de v. Aussi, si |Dim(w)| = |Dim(v)| + 1
-alors w est un parent de v. En fait, si v  w alors v peut être calculé à partir de w. 3
-Modèle de coût Soient S ⊆ C l’ensemble des cuboïdes matérialisés et v un cuboïde. Alors,
-Sv = {w ∈ S|v  w} est l’ensemble de cuboïdes matérialisés à partir desquels v peut
-être calculé. Le coût de v respectivement à S est défini comme suit : si S ne contient aucun
-ancêtre de v alors cost(v,S) = ∞ sinon cost(v,S) = argminw∈Sv size(w), i.e v est évalué
-à partir son ancêtre qui a la plus petit nombre de tuples. C’est la mesure généralement utilisée
-pour évaluer le coût des requêtes (voir par exemple Harinarayan et al. (1996); Shukla et al.
-(1998); Talebi et al. (2008)). Noter que quand v ∈ Sv alors cost(v,S) = size(v). Ceci est
-le coût minimal pour v. Nous définissons le coût induit par S comme étant le coût de toutes
-les requêtes possibles, i.e cost(S) = ∑c∈C cost(c,S). Quand S = C i.e tous les cuboïdes
-sont stockés, cost(S) = ∑c∈C size(c). Ceci est le coût minimal et est noté MinCost. Si
-S = {cb} alors cost(S) = |C| ∗M oùM = size(cb). Ceci représente le coût maximal et est
-notéMaxCost. Ainsi, pour tout S, on a∑c∈C size(c) ≤ cost(S) ≤ |C| ∗M 4.
-Nous définissons la performance d’un ensemble S comme suit :
-Définition 1 (Facteur de performance). Soit S l’ensemble des cuboïdes matérialisés et c un
-cuboïde de C. Le facteur de performance de S resp. à c est défini par f(c,S) = cost(c,S)size(c) . le
-facteur de performance moyen de S resp. à C′ ⊆ C est défini par f˜(C′, S) =
-P
-c∈C′ f(c,S)
-|C′|
-2Dans la suite de l’article, nous utiliserons d’une manière équivalente les termes cuboïde, vue et requête.
-3Dans cet article, on ne considère que les mesures algébriques.
-4On ne considère que les S qui contiennent cb car sinon cost(S) =∞.
-N. Hanusse et al.
-Intuitivement, le facteur de performance mesure le ratio entre le temps d’exécution d’une
-requête à partir de S par rapport au coût minimal de cette requête. L’exemple ci-dessous permet
-d’illustrer les notions qu’on a introduites dans cette section.
-2000
-600 600 1000 600
-100 300 180 60 250
-30 40 100 40
-10 30 2 20 30
-1
-AB
-ABCDE
-ABCD ABCE ABDE ACDE BCDE
-ABC ABD ABE ACD ACE ADE BCD BCE BDE
-CDE
-DECECDBEBDBCAEADAC
-A B C D E
-Apex
-250 15 50 40 150
-50
-300300 300 180300
-1000
-FIG. 1 – Un exemple de cube de données
-Exemple 1. Considérons le graphe de la Figure 1. Il représente le treillis du cube de don-
-nées associé à une table T dont les dimensions sont A,B,C,D et E. Nous allons utiliser cet
-exemple tout au long de l’article. Chaque nœud du graphe représente un cuboïde décrit par
-ses dimensions ainsi que sa taille. Le coût minimal pour évaluer toutes les requêtes correspond
-au cas où tous les cuboïdes sont stockés. Ainsi,MinCost =
-∑25
-i=1 size(ci) = 8928. Le coût
-maximal est obtenu en considérant que seul le cuboïde de base est stocké ainsiMaxCost =
-25 ∗ size(ABCDE) = 2000 ∗ 32 = 64000. Noter néanmoins que ceci correspond à l’espace
-mémoire minimum que l’on doit utiliser pour pouvoir répondre à toutes les requêtes.
-Supposons maintenant que S = {ABCDE,BE}. Les mesures de performance de S sont
-comme suit : L’espace mémoire utilisé est Mem(S) = size(ABCDE) + size(BE) =
-2000 + 100 = 2100. Le coût pour évaluer les 25 requêtes possibles est obtenu de la ma-
-nière suivante. D’abord, prenons le cuboïde stocké BE. Ce dernier sert à calculer BE, B,
-E et Apex5. Tous les autres cuboïdes sont calculés à partir de ABCDE. Ainsi, Cost(S) =
-4 ∗ size(BE) + 28 ∗ size(ABCDE) = 56400. Considérons maintenant les cuboïdes BE et
-BC. leurs facteurs de performance respectifs sont Tf(BE,S) = cost(BE,S)size(BE) = 100/100 = 1
-et f(BC,S) = cost(BC,S)size(BC) = size(ABCDE)/40 = 2000/40 = 50. Cela signifie qu’en ma-
-térialisant ABCDE et BE, le coût de BE en utilisant S est égal à son coût minimal, par
-contre pour BC, le coût est 50 fois son coût minimal.
-Formalisation du problème Dans cet article nous traitons le problème suivant :
-Etant donnés
-– un nombre réel f ≥ 1 et
-– un ensemble de requêtes Q ⊆ C
-trouver un ensemble de cuboïdes S tel que
-5Apex est le cuboïde sans dimensions.
-Algorithmes de sélection de vues à matérialiser
-– pour tout c ∈ Q, on a cost(c,S) ≤ f ∗ size(c) et
-– S est de taille minimale
-Nous étudions dans cet article deux cas : celui où Q = C (appelée plus loin absence de
-charge) et celui oùQ ⊂ C (présence de charge). Le modèle absence de charge correspond au
-cas où on ne dispose pas de connaissance préalable sur les requêtes fréquentes.
-Travaux relatifs Avant de présenter nos solutions, nous rappelons d’abord quelques travaux
-relatifs. Aucun des travaux que nous avons trouvés dans la littérature ne pose le problème de
-sélection des vues dans les termes que nous avons utilisés. La plupart considère une limiteM
-sur l’espace mémoire disponible et essaye de trouver le sous-ensemble dont la taille ne dépasse
-pasM et qui réduit au maximum la somme des coûts des requêtes. Dans Harinarayan et al.
-(1996), les auteurs montrent que ce problème est NP-complet et proposent donc un algorithme
-glouton pour le résoudre. Ils utilisent pour cela la notion de gain qu’on rappelle ici.
-Définition 2 (Gain). Soit S ⊂ C. Le gain de S est défini par cost({cb})− cost(S).
-Noter que cost({cb}) est MaxCost. L’algorithme qu’ils proposent tend à trouver un en-
-semble S qui maximise le gain. Les auteurs montrent que le gain apporté par leur solution
-est supérieur à 63% du gain apporté par la solution optimale. Ceci représente leur garantie de
-performance. Cependant, il faut faire ici quelques remarques : (i) L’algorithme glouton qu’ils
-proposent a une complexité enO(n) avec n qui est le nombre de cuboïdes au total. On sait bien
-que ce nombre est 2D. On est donc en présence d’un algorithme exponentiel en nombre de di-
-mensions. Aussi, (2) l’algorithme suppose la connaissance de la taille de tous les cuboïdes.
-Ceci est largement non réaliste dans le cas où le nombre de dimensions est grand. Enfin, (3)
-la garantie du gain qu’ils prouvent pour leur algorithme n’implique pas une garantie de per-
-formance. Autrement dit, le rapport entre le coût de leur solution sur le coût de la solution
-optimale n’est pas borné par une constante. Cette même remarque a été soulevée dans Kar-
-loff et Mihail (1999). Ces derniers ont démontré que dans les graphes généraux, l’algorithme
-glouton ne garantissait pas une performance de requêtes. Ils ont néanmoins laissé ouverte la
-question quant aux cubes de données. Nous en avons fait la démonstration dans le cadre par-
-ticulier des cubes de données mais faute d’espace nous ne la présentons pas ici. Pour pallier
-au problème de complexité de Harinarayan et al. (1996), les auteurs de Shukla et al. (1998)
-en ont proposé une simplification qui consiste tout simplement à prendre les cuboïdes selon
-l’ordre croissant de leurs tailles jusqu’à épuiser l’espace mémoire disponible. Ils montrent que
-souvent les solutions qu’ils trouvent étaient comparables à celle de Harinarayan et al. (1996).
-Bien sûr, cette méthode souffre des même travers que ceux de Harinarayan et al. (1996) quant
-aux performances. D’autres auteurs ont eu une vision plus générale du problème. Par exemple,
-Gupta et al. (1997); Talebi et al. (2008); Maiz et al. (2006) considèrent la possibilité de stocker
-en plus certains index. Gupta et al. (1997) a utilisé une extension de Harinarayan et al. (1996)
-alors que Talebi et al. (2008) a montré que le problème pouvait se modéliser par un programme
-linéaire qu’on pouvait résoudre exactement, i.e trouver la solution optimale, quand le nombre
-de variables n’était pas trop élevé sinon, ils ont proposé une relaxation pour réduire la taille du
-problème mais dans ce cas, ils n’ont montré l’efficacité de cette approche que d’une manière
-expérimentale.
-N. Hanusse et al.
-3 Sélection de cuboïdes en l’absence de charge : recherche
-de bordures
-Dans cette section, nous considérons le cas où l’ensemble des requêtes susceptibles d’être
-posées par l’utilisateur correspond à tous les cuboïdes du cube de données. Cette situation peut
-avoir lieu lors de la création du cube de données, puisqu’à ce moment on ne sait pas encore
-quelles sont les requêtes qui seront le plus souvent posées. Nous aborderons par la suite le cas
-où l’on dispose de cette information. Nous donnons d’abord quelques définitions.
-Définition 3 (Petit cuboïde et Bordure). Soit f > 1 un nombre réel etM = size(cb).
-– Un cuboïde c est dit petit si size(c) ≤M/f .
-– Soit c un petit cuboïde. Alors c est maximal ssi aucun de ses parents n’est petit.
-– L’ensemble des cuboïdes maximaux représente une bordure du cube de données C rela-
-tivement à f . On la note Bf (C) ou simplement Bf quand C est compris du contexte.
-Exemple 2. Reprenons le cube de données de la figure 1 et supposons f = 10. Comme
-size(ABCDE) = 2000 alors les petits cuboïdes sont ceux dont la taille ne dépasse pas
-2000
-10 . On peut facilement vérifier que Bf = {ACD,ADE,BCD,BDE}.
-Tous les cuboïdes qui sont au dessus de la bordure peuvent être calculés à partir du cuboïde
-de base en ayant une garantie de performance sur leurs coûts :
-Lemme 1. Soient f > 1 et Bf . Pour tout c ancêtre d’un élément de Bf , cost(c, {cb}) ≤
-f ∗ size(c).
-Comment obtenir la même garantie pour les autres cuboïdes ? Il suffit de calculer les autres
-bordures Bf2 ,Bf3 . . .
-Définition 4 (Bordures). Soient f > 1 et M = size(cb). Soit Bf =
-⋃blogf (M)c
-i=0 Bfi . L’en-
-semble Bf désigne les bordures de C.
-Exemple 3. Reprenons notre exemple courant. La figure 2 montre l’ensemble des bordures de
-C. Ses éléments sont représentés par des cercles pleins.
-Les bordures d’un cube de données permettent de garantir la performance des requêtes :
-Théorème 1 (Hanusse et al. (2009)). Soit f > 1 et Bf . Alors pour tout c ∈ C, cost(c,Bf ) ≤
-size(c) ∗ f .
-Ceci signifie que si l’utilisateur fixe une valeur pour f , nous sommes capables de lui re-
-tourner un ensemble de cuboïdes qui garantit que le coût de chaque requête ne dépasse pas f
-fois le coût minimale de cette dernière. Du théorème précédent, on déduit le corolaire suivant :
-Corollaire 1. Soient f > 1 et Bf . SoitM = size(Bf ). Soit CM = {S ⊆ C| size(S) ≤M}.
-Soit S∗ = argminS∈CM cost(S). Alors, cost(Bf ) ≤ f ∗ cost(S∗).
-Autrement dit, si avec un espace mémoire disponible égal àM, la meilleure solution, i.e
-celle qui réduit au maximum le coût des requêtes, est S∗ alors le coût de Bf est au maximum
-f fois le coût de S∗.
-Algorithmes de sélection de vues à matérialiser
-2000
-600 600 1000 1000 600
-300 300 300 100 300 180 60 300 180 250
-250 15 30 50 40 40 100 40 50 150
-10 30 20 30
-1
-AB
-ABCDE
-ABCD ABCE ABDE ACDE BCDE
-ABC ABD ABE ACD ACE ADE BCD BCE BDE
-CDE
-DECECDBEBDBCAEADAC
-A B C D E
-Apex
-2
-f=10
-f=1
-f=100
-f=1000
-1
-0
-2
-3
-FIG. 2 – Les bordures du cube de données pour f = 10.
-Exemple 4. Pour illustrer notre proposition, reprenons la Figure 2. Les courbes représentent
-les bordures relatives aux différentes puissances de f quand f = 10. Les nœuds représentés
-par des cercles remplis sont donc les seuls à être matérialisés. La taille totale du cube de
-données est de 8928. Ceci représente le coût minimal pour évaluer toutes les requêtes. Le coût
-maximal est de 32*2000=64000. Par ailleurs, size(Bf ) = 2607 et cost(Bf ) = 27554. Noter
-néanmoins que même si on a fixé le facteur de performance à f = 10, le ratio entre le coût de
-Bf et le coût minimal est 275548927 = 3.09. Ainsi, le coût moyen pour répondre à n’importe quelle
-requête en utilisant Bf est 3 fois le coût minimal. Avec HRU, l’algorithme de Harinarayan
-et al. (1996) et avec la contrainte sur l’espace qui ne doit pas dépasser size(Bf ), les seuls
-cuboïdes qui seront retenus sont ABCDE et BCDE. On obtient ainsi un coût de 41600 ce
-qui représente un ratio, toujours par rapport au coût minimal, de 416008927 = 4.67. Notons aussi
-que PBS, l’algorithme de Shukla et al. (1998), retourne 16 cuboïdes (les 16 premiers cuboïdes
-selon l’ordre croissant de leurs tailles respectives). Le coût de cette solution est de 34518. Ce
-qui correspond à un ratio de 345188927 = 3.87 meilleur que HRU.
-Maintenant que nous avons caractérisé les vues que l’on veut matérialiser avec la contrainte
-de performance, nous allons présenter un algorithme qui permet de les retrouver d’une manière
-relativement efficace. La notion de bordure que nous avons introduite est analogue à celle
-qui est utilisée dans le contexte de l’extraction des ensembles fréquents maximaux dans le
-domaine du datamining Gouda et Zaki (2005); Bayardo (1998); Burdick et al. (2001). En effet,
-la notion de “petit cuboïde" est une propriété antimonotone puisque si c n’est pas un petit
-cuboïde alors aucun de ses ancêtres ne peut l’être et s’il est petit alors tous ses descendants
-le sont. Ainsi, on pourrait adapter les algorithmes de calcul des fréquents maximaux à notre
-contexte. Cependant, ces algorithmes optimisent le temps de calcul en comptant la fréquence
-de plusieurs itemsets lors d’une même itération. Ceci n’est pas possible dans le cadre des cubes
-de données, du moins ce n’est pas efficace de procéder de la sorte, car cela nécessiterait de
-garder en mémoire plusieurs tables simultanément chacune correspondant à un cuboïde pour
-lequel on veut calculer la taille. Finalement, nous avons utilisé un algorithme qui calcule la
-taille d’un seul cuboïde à chaque itération. Pour faciliter la présentation de cet algorithme, nous
-décrivons d’abord un codage des cuboïdes. On trie les dimensions en considérant par exemple
-N. Hanusse et al.
-l’ordre lexicographique. Cela nous permet de définir le rang d’une dimension qui correspond
-à sa position dans l’ordre lexicographique. Par exemple, si Dim = {A,B,C,D,E} alors
-rang(A) = 1 et rang(C) = 3. Chaque cuboïde est codé par une chaîne de bits de taille
-|Dim|. La position i de la chaîne est égale à 1 ssi la dimension de rang i est présente dans
-le cuboïde. Par exemple, le cuboïde ADE est codé par 10011. L’algorithme a besoin des
-paramètres suivants : i représente une position sur la chaîne qui code les cuboïdes, une chaîne
-s qui code les cuboïdes à traiter, un entier n qui représente le nombre de dimensions du cube
-de données, un entierM qui désigne la taille maximale des petits cuboïdes et enfin B qui est
-la liste des cuboïdes formant la bordure.
-Procédure Générer_B(entier i, chaîne s, entier n, entierM, liste B)
-Si i ≤ n alors
-s[i]← 1
-Si s a un ancêtre dans B Alors
-Générer_B(i+ 1, s, n,M, B)
-Sinon
-Si size(s) ≤M Alors
-Ajouter s à B
-Supprimer de B tous les descendants de s
-Générer_B(i+ 1, s, n,M, B)
-Finsi
-FinSi
-s[i]← 0
-Générer_B(i+ 1, s, n,M, B)
-FinSi
-Fin Procédure
-Générer_B(1, 0n, n,M/f j , ∅) est appelée par la procédure Générer_B(f,M) pour j allant
-de blogf (M)c à 0 et en faisant l’union des bordures de paramêtresM/f j . f désigne le facteur
-de performance etM la taille du cuboïde de base.
-La partie la plus coûteuse pour le calcul de B est l’exécution de la fonction size qui néces-
-site le parcours de la table de faits.
-4 Sélection de vues en présence de charge
-Dans cette section, nous considérons un ensembleQ qui représente l’ensemble des requêtes
-que l’on veut optimiser. Rappelons que les requêtes que l’on considère dans cet article sont
-celle de la forme select * from c où c est un des cuboïdes de C6. Il s’agit donc de
-trouver un ensemble S ⊆ C tel que :
-– Pour chaque q ∈ Q il existe c ∈ S t.q q  c i.e q peut être calculée
-– Pour chaque q ∈ Q il existe c ∈ S t.q q  c et size(c) ≤ f ∗ size(q) i.e q peut être
-calculée efficacement
-– S doit avoir une taille minimale
-6On pourrait inclure les requêtes du type select * from c where att=val sans changer fondamentale-
-ment les résultats car on n’a pas considéré la possibilité d’avoir des index.
-Algorithmes de sélection de vues à matérialiser
-Notre contribution pour résoudre ce problème est double : (1) nous donnons un algorithme
-de complexité polynomiale retournant une log n-approximation de l’optimal et (2) un pro-
-gramme linéaire en nombre entiers qui retourne la solution optimale mais en un temps non
-borné.
-Nous introduisons d’abord quelques notations. On note parAf (q) l’ensemble des cuboïdes
-qui sont (1) ancêtres d’une requête q ∈ Q et (2) dont la taille est inférieure ou égale à f ∗
-size(q). Soit Af (Q) =
-⋃
-q∈QAf (q). Noter que Q ⊆ Af (Q). Il est facile de voir que la
-solution à notre problème est un sous-ensemble de Af (Q). En effet,
-Lemme 2. Soit S∗ ⊆ C le plus petit ensemble de cuboïdes (en terme de taille mémoire) t.q
-cost(q,S∗) ≤ f ∗ size(q) pour chaque q ∈ Q. Alors S∗ ⊆ Af (Q).
-Considérons maintenant le graphe G(V,E) où V = Af (Q) et (v1, v2) ∈ E ssi (i) v2 ∈ Q
-et (ii) v1 ∈ Af (v2). Partant de ce graphe, la sélection du plus petit S revient à chercher
-l’ensemble de sommets de V de poids minimum (avec le poids qui correspond à la taille du
-cuboïde représenté par le sommet) qui couvre tous les éléments de Q. Ce problème est une
-instance du problème bien connu du minimal weighted set cover (MWSC) qui est NP-complet
-Karp (1972). Cependant, il existe un algorithme glouton de complexité polynomiale qui per-
-met de le résoudre avec une “bonne” approximation de la solution optimale Chvàtal (1979).
-Par ailleurs, il est bien connu que le problème MWSC peut être modélisé par un programme
-d’optimisation linéaire qui peut être résolu assez rapidement par les solveurs existants lorsque
-le nombre de variables n’est pas trop élevé.
-Solution approchée Nous présentons d’abord l’algorithme approché et par la suite nous
-donnons le programme d’optimisation linéaire modélisant la solution exacte.
-Procédure PickFromfAncestors()
-S = ∅
-Tant que Q 6= ∅
-c∗ = arg minc∈Af (Q)
-size(c)
-|Γ(c)|
-// Γ(c) sont les voisins de c
-S = S ∪ {c∗}
-Af (Q) = Af (Q)\({c∗} ∪ Γ(c∗))
-Q = Q\Γ(c∗)
-Fin Tant Que
-Retourner S
-Fin Procédure
-L’algorithme consiste à choisir lors de chaque itération, l’ancêtre qui a la "charge" mini-
-male. Cette dernière est définie comme étant la taille de l’ancêtre divisée par le nombre de ses
-voisins (i.e le nombre de requêtes de Q qu’il couvre). Dès qu’un ancêtre est choisi, on le met
-dans la solution S et on le supprime du graphe ainsi que les requêtes qu’il couvre. Ceci a pour
-incidence de modifier le nombre de voisins des sommets restants. En utilisant le résultat de
-Chvàtal (1979) nous montrons le facteur d’approximation obtenu par cet algorithme.
-Théorème 2. Soit f > 1 et S la solution retournée par PickFromfAncestors. Alors
-– Pour chaque q ∈ Q, cost(q,S) ≤ f ∗ size(q)
-N. Hanusse et al.
-– Soit S∗ la solution optimale (i.e la plus petite en taille mémoire), alors size(S) ≤ ln(n)∗
-size(S∗) où n = arg maxc∈Af (Q) |Γ(c)|.
-Solution exacte Nous donnons maintenant le programme d’optimisation linéaire. Avant cela,
-nous décrivons les variables utilisées :
-– si désigne la taille du cuboïde ci ∈ Af (Q),
-– xi ∈ {0, 1} et signifie que ci est choisi pour être matérialisé (1) ou non (0),
-– yij ∈ {0, 1} telle que yij = 1 ssi qi ∈ Q utilise cj pour être calculée
-min
-∑
-j:cj∈Af (Q)
-xj ∗ sj (1)
-∀i : qi ∈ Q
-∑
-j:cj∈Af (qi)
-yij = 1 (2)
-∀i : qi ∈ Q, ∀j : cj ∈ Af (qi) yij ≤ xj (3)
-∀j : cj ∈ Af (Q) xj ∈ {0, 1} (4)
-∀i : ci ∈ Q, ∀j : cj ∈ Af (qi) yij ∈ {0, 1} (5)
-La contrainte (2) impose que qi n’utilise qu’un seul cuboïde et la contrainte (3) implique
-que qi ne peut utiliser cj que si cj est stocké. Enfin, les contraintes (4) et (5) imposent que les
-xi et les yij sont des variables binaires. Résoudre ce problème revient à affecter des valeurs
-aux variable xj et yij qui permettent de minimiser la valeur de l’expression (1).
-La solution "exacte" à notre problème correspond donc à S = {cj ∈ Af (Q) : xj =
-1}. On peut se demander pourquoi avoir recours à un algorithme approché lorsqu’on peut
-résoudre exactement un problème. En fait, les solveurs tels que Cplex, ou LP_Solve 7,
-sont très puissants jusqu’à un certain nombre de variables. Or, le nombre de xi et de yij peut
-croître assez rapidement avec l’accroissement de |Q| ou avec l’accroissement de f . Dans les
-expérimentations que nous avons menées, nous avons utilisé LP_Solve qui est un outil gratuit
-qui, bien que efficace, ne nous a néanmoins pas permis de traiter des cas où |Q| était “grand”.
-5 Expérimentations
-Dans cette section nous montrons quelques unes des expérimentations que nous avons en-
-treprises pour valider notre approche. La fonction size utilisée calcul la taille exacte d’un
-cuboïde. Nous aurions pu nous contenter d’une estimation de ces tailles en utilisant des tech-
-niques présentées par exemple dans Aouiche et al. (2006); Aouiche et Lemire (2007). Nous
-avons préféré utiliser les tailles exactes car nous désirions surtout montrer expérimentalement
-la qualité de la solution que nous obtenions. Quand le facteur temps de calcul est primordial,
-il est bien sûr utile d’avoir recours à ces techniques.
-5.1 Le cas sans charge
-Nous avons utilisé les données suivantes :
-7Disponible à l’URL http ://lpsolve.sourceforge.net/5.5/
-Algorithmes de sélection de vues à matérialiser
-– USData10 : contient 2.5 millions de tuples avec 10 attributs correspondant aux 10 pre-
-miers attributs de US Census 1990 data disponible à http ://kdd.ics.uci.edu/.
-Nous avons exclu le premier attribut qui est une clé.
-– USData13 : Les mêmes données qu’auparavant mais avec les 13 premières dimensions.
-– Objects : contient “seulement" 8000 tuples avec 12 attributs ayant trait à des données
-issues de fouilles archéologiques8. Ce cas est intéressant car le nombre de dimensions
-est relativement grand par rapport à la taille de la base de faits.
-– Zipf10 : est un ensemble de données synthétiques. Il contient 106 enregistrements et 10
-dimensions. Plusieurs observations ont montré qu’en en général, les valeurs des attributs
-ne suivaient pas une distribution uniforme mais plutôt une loi en puissance. Intuitive-
-ment, si on classe les valeurs prises par un attribut selon un ordre particulier, alors la
-probabilité que la i_ème valeur soit prise est proportionnelle à 1(i)α , α > 0. Générale-
-ment, α se trouve dans l’intervalle [2, 3]. Dans nos expérimentations, nous avons fixé
-α = 2.
-La table 1 résume quelques caractéristiques de ces données. Rappelons queMinCos corres-
-pond au cas où tout le cube est stocké etMaxCost correspond au cas où seulement le cuboïde
-de base est stocké.
-Dataset MinCost MaxCost
-USdata10 4.37 ∗ 106 5.35 ∗ 107
-USdata13 1.05 ∗ 108 1.19 ∗ 109
-Objects 1.72 ∗ 107 3.05 ∗ 107
-ZIPF10 4 ∗ 107 3.93 ∗ 108
-TAB. 1 – MinCost et MaxCost des Datasets
-Le jeu de données objects se distingue par rapport aux 3 autres au niveau de la différence
-entre les coûts minimaux et maximaux. En effet, pour objects nous avons un rapport qui est
-moins de 2 alors que pour les autres le rapport avoisine 10. Ainsi, objects serait qualifié de
-non dense.
-Algorithmes pour la comparaison
-A notre connaissance, il n’existe pas d’autres algorithmes permettant de résoudre le pro-
-blème de sélection de vues tel que nous l’avons formulé. Cependant, pour se comparer avec
-d’autres travaux, nous avons adapté ces derniers à notre contexte. Nous avons choisi 2 algo-
-rithmes bien connus de la littérature : HRU de Harinarayan et al. (1996) et PBS de Shukla
-et al. (1998). Ces deux algorithmes choisissent le meilleur ensemble de vues à stocker avec
-comme contrainte, un espace mémoire à ne pas dépasser. Afin d’effectuer une comparaison,
-nous avons fixé différentes valeurs de f et pour chacune nous avons considéré la taille de notre
-solution S comme étant la contrainte pour ces 2 algorithmes.
-8Nous remercions Noël Novelli pour les avoir mises à notre disposition.
-N. Hanusse et al.
-Analyse Mémoire/Coût
-Les figures ci-dessous montrent l’évolution du coût de l’évaluation de toutes les requêtes
-en fonction de la mémoire utilisée. Dans ces graphiques, la courbe PickBorders représente
-notre solution.
-Coûtt/Mémoire pour USData10. Coût/Mémoire pour USData13.
-Coût/Mémoire pour ZIPF10. Coût/Mémoire pour Objects.
-D’après ces graphiques, on voit bien que HRU l’emporte dans tous les cas quand on considère
-le rapport entre espace utilisé et coût des requêtes. Noter néanmoins que pour exécuter HRU,
-nous avons besoin de connaître la taille de tous les cuboïdes, au moins une estimation, alors
-que notre approche n’en a pas besoin. D’ailleurs, nous n’avons pas réalisé des tests sur un
-nombre élevé de dimensions (USData1990 en compte 68) car ni HRU ni PBS n’aurait pu être
-exécuté. Aussi, il faut préciser que ce qui est représenté dans ces graphiques c’est la somme des
-coûts. C’est en quelque sorte une indication sur le coût moyen. Or notre proposition consiste à
-optimiser "individuellement" chacune des requêtes. Ainsi, le fait d’avoir des sommes de coûts
-Algorithmes de sélection de vues à matérialiser
-proches de ceux obtenus par HRU est plutôt un avantage.
-Analyse du facteur de performance
-Pour analyser plus en détail le comportement de ces algorithmes, nous avons étudié le
-facteur de performance. Bien que ni PBS ni HRU n’aient été conçus en vue de garantir une
-performance des requêtes respectivement au coût moyen, nous avons procédé à une comparai-
-son de ces algorithmes avec les résultats qu’on obtient avec notre approche. A cet effet, nous
-avons procédé de la même manière que précédemment, c’est à dire faire varier la valeur de f
-et pour chaque valeur prendre la taille de notre solution comme limite pour HRU et PBS. La
-figure 3 montre que notre solution a un meilleur facteur de performance moyen que ceux des
-deux autres algorithmes. (On montre juste les résultats pour f = 3.38 et f = 11.39).
-FIG. 3 – Facteur de performance moyen pour f = 3.38 et f = 11.39.
-Les figures ci-dessous permettent une analyse encore plus détaillée de la distribution des
-facteurs de performance.
-Distribution du facteur Distribution du facteur
-de performance quand f = 3.38. de performance quand f = 11.39.
-N. Hanusse et al.
-Par exemple, en exécutant HRU avec une limite d’espace mémoire de 830000, il y a 7
-cuboïdes non matérialisés dont le plus petit ancêtre matérialisé a une taille plus que 100 fois
-plus grande que leurs tailles. Nous avons lancé PBS et HRU avec 309000 et 830000 comme
-contraintes d’espace. Ce sont les tailles de nos solutions quand f est fixé à 3.38 et 11.39. La
-première catégorie représente les cuboïdes dont le facteur de performance est égal à 1. Ce sont
-ceux qui sont matérialisés ou bien leur ancêtre a la même taille qu’eux. La seconde catégorie
-représente ceux dont le facteur de performance est dans ]1, 2]. La troisième, ceux dont le fac-
-teur est dans ]2, 3.5] et ainsi de suite. On peut noter que la première catégorie reflète l’esprit
-des différents algorithmes : PBS a tendance à stocker beaucoup de cuboïdes de petites taille
-(puisqu’il commence par eux jusqu’à épuiser l’espace imparti), HRU tend plutôt à privilégier
-les cuboïdes de grande taille, quant à notre approche, elle a tendance à choisir une combinaison
-de cuboïdes de différentes tailles.
-5.2 Le cas avec charge
-Nous avons considéré USdata10. La taille du cuboïde de base est de 52278 (une fois les
-doublons de la table de faits enlevés). Nous avons géréné Q de manière aléatoire uniforme
-en faisant varier la cardinalité de la charge entre 4 et 1024. Nous avons comparé la mé-
-moire de Q avec la mémoire de la solution optimale Sopt ainsi que la solution retournée par
-PickFromfAncestors pour la valeur f = 10. PickFromfAncestors se comporte trés bien par
-FIG. 4 – Comparaison entre PickFromfAncestors et la solution optimale.
-rapport à la solution optimale et le gain de mémoire par rapport à la matérialisation complète
-de Q est extrêmement important. Le véritable apport de PickFromfAncestors par rapport à la
-programmation linéaire est le temps d’exécution : pour PickFromfAncestors, cela va de 0.01s
-(|Q| =4) à 0.29s (|Q| =1024). Or le programme linéaire exécuté sur CPLEX met de 0.1s
-(|Q| =4) à 3366s (|Q| =1024)9. En dimension supérieure, la programmation linéaire prend
-9LP_Solve était incapable de résoudre des programme d’une taille aussi grande.
-Algorithmes de sélection de vues à matérialiser
-beaucoup trop de temps. En dimension ≥ 20, PickFromfAncestors donne une solution en
-temps inférieur à la minute. Bien entendu, cela dépend de la valeur de f et de |Q|.
-6 Conclusion
-Nous avons présenté dans cet article des techniques permettant de sélectionner les vues à
-matérialiser dans le cadre des cubes de données. L’intérêt de notre approche est que le critère
-de sélection est basé sur le facteur de performance de l’évaluation des requêtes non pas sur
-l’espace mémoire requis. Nous pensons que ce critère est peut être plus fondé car d’un coté
-une solution qui occupe un espace mémoire M à un instant ti occupera un espace M +m à
-ti+1. Faudra-t-il alors recalculer les vues à matérialiser ? Aussi, nous pensons que les solutions
-basées sur le facteur de performance seront plus stables dans le temps car il y a bon espoir
-que les rapports entre les tailles soient préservés lorsque les données évoluent avec le temps.
-Ceci représente une des voies que l’on compte explorer : analyser l’évolution des bordures sous
-certaines hypothèses de distribution des données. Enfin, nous avons étudié deux cas de figures :
-celui où toutes les requêtes sont possibles et celui où on restreint l’ensemble des requêtes. On
-peut se dire que le premier cas n’est en fait qu’un cas particulier du second (Q = C). En effet,
-lorsque le nombre de dimensions est réduit, on peut utiliser les techniques de programmation
-linéaire pour résoudre le problème. Nous comptons dans nos prochains travaux enrichir notre
-modèle pour pouvoir tenir compte des coûts de mise à jour dans le même esprit que Baralis
-et al. (1997); Baril et Bellahsene (2003) et pour intégrer la possibilité d’avoir des requêtes qui
-ont besoin de plusieurs vues (cf. Gupta et Mumick (2005); Palpanas et al. (2008)). Enfin, nous
-n’avons pas considéré des dimensions structurées sous forme de hiérarchies. Or dans l’analyse
-en ligne des cubes de données, les opérations de RollUp et DrillDown sont communes. La
-prise en compte de ces hiérarchies ne pose pas de problèmes majeurs. En effet, comme cela
-a été montré dans Harinarayan et al. (1996), les hiérarchies elles mêmes forment des treillis.
-Comme le produit de deux treillis est lui même un treillis, on se retrouve donc finalement
-avec la même structure. Il faudra néanmoins modifier quelque peu le programme (ou le codage
-des cuboïdes) de recherche des bordure car e.g c1 peut être un parent de c2 alors que les
-deux cuboïdes ont exactement le même nombre de dimensions. Pour terminer, nous comptons
-étudier la possibilité d’intégrer notre approche avec celle adoptée par Bellatreche et al. (2008)
-en proposant de matérialiser des parties (horizontales) des tables d’un schéma en étoile.
+Contrôle du risque multiple pour la sélection de règles
+d'association significatives
+Stéphane Lallich
+∗
+, Elie Prudhomme
+∗
+, Olivier Teytaud
+∗∗
+∗
+Laboratoire E.R.I.C, Université Lumière Lyon 2
+5, avenue Pierre Mendès-France, 69676 BRON Cedex  France
+stephane.lallich@univ-lyon2.fr, Elie.Prudhomme@etu.univ-lyon2.fr
+∗∗
+Artelys
+215 avenue Jean-Jacques Rousseau, 92136 Issy-les-Moulineaux
+olivier.teytaud@artelys.com
+Résumé. Les algorithmes d'extraction de règles d'association parcourent
+efficacement le treillis des itemsets pour constituer une base de règles ad-
+missibles à des seuils de support et de confiance, mais donnent une mul-
+titude de règles peu exploitables. Nous suggérons d'épurer de telles bases
+en éliminant les règles non statistiquement significatives. La multitude de
+tests pratiqués conduit mécaniquement à multiplier les règles sélection-
+nées à tort. Après avoir présenté des procédures issues de la biostatistique
+qui contrôlent non pas le risque, mais le nombre de fausses découvertes,
+nous proposons BS_FD, un algorithme original fondé sur le bootstrap
+qui sélectionne les règles significatives en contrôlant le nombre de fausses
+découvertes. Des expérimentations montrent l'efficacité de ces procédures.
+Mots-clefs : Règle d'association, qualité, contrôle du risque multiple.
+1 Admissibilité, intérêt et signification statistique
+La recherche des règles d'association intéressantes est un problème classique de
+l'Extraction des Connaissances à partir des Données à la suite des travaux de [Agrawal
+et al., 1993] dans le cadre des bases de données transactionnelles. Dans une telle base, un
+enregistrement est une transaction et les champs correspondent aux articles disponibles.
+On note n le nombre de transactions et p le nombre d'articles. L'acte d'achat (item)
+associé à chaque article est une variable booléenne. Sur l'ensemble des transactions,
+on a une matrice booléenne X, de dimensions n et p. La conjonction des actes d'achat
+(itemset) associés à un ensemble d'articles est vue comme une variable booléenne.
+A partir de la matrice booléenne X, on veut extraire des règles du type "si un client
+achète du pain et du fromage, alors probablement il achète aussi du vin". Une règle
+d'association est une expression r du type A→ B, où l'antécédent A et le conséquent
+B sont des itemsets qui n'ont pas d'items communs. On note na et nb les nombres
+de transactions qui réalisent respectivement les items de A et de B, nab le nombre de
+celles qui réalisent à la fois A et B. Les proportions correspondantes sont désignées par
+pa, pb et pab. Ce formalisme se généralise à toute base de données dont on a extrait
+une table booléenne cas-attributs.
+Contrôle du risque et sélection de règles
+Les algorithmes d'extraction usuels reposent sur le support et la confiance, en
+particulier Apriori l'algorithme fondateur [Agrawal et Srikant, 1994] et les amélio-
+rations qui en ont été proposées. Le support d'une règle est la proportion de tran-
+sactions qui réalisent à la fois A et B, Supp (A→ B) = pab = nabn , alors que sa
+confiance est la proportion de transactions qui réalisent B, parmi celles qui réalisent
+A, Conf (A→ B) = pabpa = nabna = 1−
+nab
+na
+.
+Les algorithmes d'extraction "support-confiance" parcourent le treillis des itemsets
+pour rechercher les itemsets fréquents, dont le support dépasse un seuil minsupp, avec
+une efficacité liée à l'antimonotonie du treillis. On en déduit les règles dont la confiance
+dépasse le seuil minconf , obtenant la base de règles admissibles aux seuils choisis. De
+telles bases comportent un grand nombre de règles, pas toujours intéressantes.
+La sélection des règles intéressantes à partir d'une base de règles admissibles néces-
+site d'évaluer celles-ci à l'aide de mesures ayant les qualités requises compte tenu de la
+nature des règles d'association et des attentes de l'utilisateur. Nous avons recensé de
+telles mesures et proposé des critères pour les évaluer [Lallich et Teytaud 2003], ainsi
+qu'une procédure d'aide à la décision pour les choisir [Lenca et al., 2003]. Pour chaque
+mesure choisie, on fixe le seuil minimal à partir duquel une règle est sélectionnée ou
+l'on retient un nombre fixé des meilleures règles.
+Le critère "prise en compte du nombre d'observations" oppose les mesures statis-
+tiques et les mesures descriptives. Il est logique a priori de souhaiter qu'une mesure soit
+statistique, les résultats observés étant d'autant plus fiables que n est grand. Cependant,
+compte tenu de la taille des bases sur lesquelles on recherche des règles d'association, de
+telles mesures perdent leur pouvoir discriminant, ainsi l'indice d'implication [Lerman
+et al., 1981] et l'intensité d'implication [Gras 1979]. Des solutions très intéressantes ont
+été proposées : l'indice probabiliste discriminant [Lerman et Azé, 2003] qui centre et
+réduit les valeurs de l'indice d'implication sur une base de règles et l'intensité d'impli-
+cation entropique [Gras et al., 2001] qui affecte l'intensité d'implication d'un facteur
+correctif tenant compte de l'entropie des expériences B/A et A/B. Mais il s'ensuit un
+mélange des notions de signification et d'intérêt, une perte d'intelligibilité de la mesure
+et sa loi est plus difficile à étudier.
+Paradoxalement, le nombre de cas n est le même pour toutes les règles de la base,
+ce qui milite pour d'abord tester la signification statistique des règles, au sens de sa-
+voir si elles renforcent réellement la probabilité du conséquent. On testera l'hypothèse
+d'indépendance de A et B, notée H0, en direction d'une dépendance positive (hypo-
+thèse alternative unilatérale notée H1), pour ensuite utiliser des mesures descriptives
+intelligibles et discriminantes de l'intérêt des règles sur la base filtrée. Nous proposons
+ainsi une nouvelle démarche qui dissocie la signification statistique de l'évaluation de
+l'intérêt. Elle comporte trois étapes :
+ étape 1 : application d'un algorithme "support-confiance" à la base de cas, pour
+constituer une base de règles admissibles aux seuils choisis.
+ étape 2 : filtrage de la base de règles par le test d'indépendance de A et B pour
+chaque règle, soit une multitude de tests ; on pourrait tester tout à la fois l'indé-
+pendance et le dépassement significatif des seuils de support et de confiance.
+ étape 3 : analyse des règles figurant dans la base filtrée par des mesures descrip-
+tives vérifiant les critères retenus par l'utilisateur [Lenca et al., 2003].
+RNTI - 1
+Lallich et al.
+Dans cet article, nous approfondissons l'étape 2 qui pose le problème de contrôler
+la multiplicité de tests, pour éviter l'inflation de "faux positifs". En effet, si chaque test
+est pratiqué au risque de 1e espèce α, on engendre mécaniquement des "faux positifs",
+ici des règles sélectionnées alors qu'elles ne renforcent pas réellement la probabilité
+du conséquent. Nous avons proposé des méthodes de contrôle du risque utilisant la
+théorie de l'apprentissage statistique et la VC-dimension [Teytaud et Lallich, 2001],
+ou le bootstrap [Lallich et Teytaud, 2003]. Dans la pratique, ces méthodes sont peu
+puissantes, ignorant des règles significatives.
+La section 2 détaille le test de signification appliqué à chaque règle. Le contrôle
+des faux positifs et l'idée de contrôler le nombre de fausses découvertes plutôt que le
+risque sont exposés en section 3. Les procédures de contrôles récemment développées en
+biostatistique sont présentées en section 4 et une méthode de contrôle originale fondée
+sur le bootstrap est proposée en section 5. Enfin, nous appliquons ces méthodes pour
+filtrer quelques bases de règles (section 6) et nous concluons (section 7).
+2 Test de signification d'une règle
+Considérons une règle A → B et une mesure de qualité µ, croissante avec nab à
+marges fixées. On dira que la règle A→ B est significative au sens de la mesure µ si la
+valeur µobs = µ (A→ B) remet en cause H0 dans le sens de H1, au risque de 1e espèce
+α. Pour décider de la signification, on calcule la p-value de µobs qui est la probabilité
+d'obtenir une valeur aussi grande que µobs sous H0 et on sélectionne la règle si l'on a
+p-value < α. Cette démarche impose de connaître la loi de µ (A→ B) sous H0.
+Dans le cadre d'une modélisation à marges fixées, on suppose que sous H0 les
+"1" de A et les "1" de B sont répartis au hasard, indépendamment, en respectant
+les marges. On démontre que le nombre d'exemples suit une loi hypergéométrique,
+Nab ≡ H(n,npa,pb) ≡ H(n,npb,pa) (par convention, les variables aléatoires sont en
+majuscules). Pour une valeur observée nab, à marges fixées :
+p− value = Pr(Nab ≥ nab) = Pr(H(n,npa,pb) ≥ nab)
+On peut opérer l'approximation normale de cette loi hypergéométrique sous des
+conditions peu contraignantes, à savoir nanb ≥ 5n et nanb ≥ 5n, où Φ est la fonction
+de répartition de la loi normale centrée réduite N(0,1). En notant tab = nabnanb , la valeur
+attendue de Nab sous H0, r le coefficient de corrélation entre A et B, il vient :
+p− value = 1− Φ
+(
+nab−tab√
+na
+n−1 tabpb
+)
+u 1− Φ
+(
+nab−tab√
+npapbpapb
+)
+= 1− Φ (r√n)
+Le coefficient de corrélation r est donc une mesure privilégiée pour tester l'indépen-
+dance (H0) face à une dépendance positive (H1).
+3 Risque et erreurs de 1e espèce
+Pour rechercher les règles A → B statistiquement significatives parmi les m règles
+de la base de règles, on répète m fois le test d'indépendance entre A et B face à une
+dépendance positive. On rencontre ainsi un problème classique en fouille des données,
+RNTI - 1
+Contrôle du risque et sélection de règles
+Réalité \ Décision Acceptation Rejet Total
+H0 est vraie U V m0
+H1 est vraie T S m1
+Total W R m
+Tab. 1  Synthèse des résultats de m tests
+le contrôle des erreurs de 1e espèce (ou faux positifs). Si l'on teste m règles non signifi-
+catives au risque α, mécaniquement on sélectionne à tort mα règles (soit 500 règles, si
+m = 10000 et α = 0.05). La correction de Bonferroni, qui consiste à pratiquer chaque
+test au risque
+α
+m , pour que le risque de rejeter au moins une fois à tort H0, noté par la
+suite FWER, soit égal à α, n'est pas une bonne solution pour deux raisons :
+ le FWER est en fait non contrôlé, compris entre αmet α, ne valant α que si toutes
+les règles sont indépendantes.
+ le FWER est très conservateur en faveur de H0, ce qui augmente considérable-
+ment le risque de 2e espèce ou risque de ne pas sélectionner une règle pertinente.
+Pour régler ce problème, il faut évaluer les erreurs de 1e espèce par une quantité
+moins sévère que le FWER et contrôler celle-ci, notamment lorsque les tests ne sont
+pas indépendants. Les règles ne sont pas indépendantes en raison des items qu'elles
+partagent et des dépendances entre items. Différentes solutions ont été développées, le
+plus récemment en sélection de gènes s'exprimant différemment suivant l'étiquette de
+la biopsie. On trouvera une remarquable synthèse de ces travaux dans [Ge et al., 2003].
+L'idée fondamentale [Benjamini et Hochberg, 1995] est de considérer non pas le
+risque d'erreur de la procédure de test lorsqu'elle est pratiquée une fois, mais le nombre
+d'erreurs commises lorsque l'on réitèrem fois la procédure. A partir du tableau 1 (où les
+quantités en majuscules sont des variables aléatoires observables, celles en minuscules
+étant fixes, mais inconnues en ce qui concerne m0 et m1), on peut définir différents
+indicateurs des erreurs commises. Nous présentons ici les deux plus connus, le FWER
+(Family wise error rate ou taux d'erreur en famille complète) et le FDR (False discovery
+rate ou taux de fausses découvertes).
+FWER est la probabilité de rejeter au moins une fois à tortH0, FWER = Pr(V > 0).
+Il a l'inconvénient d'être bien trop sévère pour une multiplicité de tests, mais il nous a
+suggéré une variante flexible originale, où l'on s'autorise V0 fausses découvertes. Nous
+l'appelons User Adjusted Family Wise Error Rate, UAFWER = Pr(V > V0), pour le
+contrôle duquel nous proposons un algorithme fondé sur le bootstrap (section 5).
+Pour remédier aux inconvénients du FWER, diverses quantités reposant sur l'es-
+pérance de V , le nombre de fausses découvertes, éventuellement normalisée, ont été
+proposées. La plus connue est le FDR [Benjamini et Hochberg 1995], la proportion
+attendue de règles sélectionnées à tort parmi les règles sélectionnées. Lorsque R = 0,
+on pose
+V
+R = 0, soit FDR = E(Q), où Q vaut
+V
+R si R > 0, 0 sinon. Il s'ensuit :
+FDR = E(VR | R > 0)P (R > 0)
+[Storey, 2001] a proposé le pFDR, une variante du FDR, adaptée à l'estimation du
+taux d'erreur sachant que l'hypothèse nulle a été refusée au moins une fois :
+pFDR = E(VR | R > 0)
+RNTI - 1
+Lallich et al.
+Ces quantités ont l'intérêt d'être moins sévères sur le résultat des m tests, au prix
+de l'acceptation de quelques sélections à tort dont on contrôle la proportion, ce qui
+augmente pour chaque test la probabilité pour qu'une règle pertinente soit sélectionnée
+(puissance). On a FDR ≤ FWER et FDR ≤ pFDR, d'où FDR ≤ pFDR ≤ FWER
+pour m grand, car Pr(R > 0) tend vers 1 quand m croît. Une fois choisie une définition
+du risque multiple de 1e espèce, se pose le problème de son contrôle. Nous allons
+examiner successivement le cas du FWER et celui du FDR.
+4 Procédures de contrôle
+4.1 Contrôle du FWER
+Correction de Bonferroni La correction de Bonferroni consiste à calculer des p-
+values ajustées afin de prendre en compte la multiplicité des tests. Etant données la
+statistique de test Tr relative à la règle r, r = 1,2,...m, et la p-value correspondante pr,
+on définit la p-value ajustée, notée p˜r, par p˜r = min {mpr,1} . On sélectionne toutes
+les règles ayant une p-value ajustée inférieure au risque α0. On montre :
+FWER = 1− Pr(⋂mr=1 (Pr > α0m ) | H0)
+Sous condition d'indépendance des règles, il vient FWER = 1− (1− α0m )m ≈ α0.
+A défaut d'indépendance, on a :
+α0
+m ≤ FWER ≤ α0.
+Procédure Step-down de Holm Les procédures pas à pas examinent les p-values
+par ordre croissant et font évoluer le seuil tout au long de la procédure. [Holm, 1979]
+considère qu'une variable sélectionnée correspond à une situation où H0 est fausse, ce
+qui amène à ne prendre en compte pour le nouveau seuil que les variables restant à
+examiner. Les p-values étant rangées dans l'ordre croissant, où p(k) désigne la k
+e
+p-
+value, on refuse H0 tant que p(k) <
+α0
+m−k+1 . On accepte H0 pour toutes les p-values qui
+suivent la première acceptation. Cette procédure, facile à mettre en oeuvre, donne de
+bons résultats lorsque le nombre de tests est faible, la correction du seuil ayant alors
+de l'importance. Elle reste mal adaptée à un grand nombre de tests.
+Procédure minP de Westfall et Young [Westfall et Young, 1993] ont proposé
+minP une procédure d'ajustement des p-values qui contrôle le FWER mais oblige à
+calculer p˜r = Pr(mink=1,2,...,m Pk ≤ pr | H0). Ce calcul doit être opéré par randomi-
+sation des étiquettes de cas, si les variables (ici des règles) ne sont pas indépendantes.
+Bien adapté à la recherche des gènes s'exprimant différemment suivant l'étiquette de
+la biopsie, ce procédé ne convient pas à la recherche des règles d'association.
+4.2 Contrôle du FDR
+Procédure Benjamini, Liu On doit à [Benjamini et Liu, 1999], une méthode sé-
+quentielle pour contrôler le FDR en cas d'indépendance. Les p-values sont prises dans
+l'ordre croissant et l'on rejette l'hypothèse nulle tant que la p-value examinée p(i) est
+inférieure à
+iα0
+m . Cette procédure assure un FDR égal à
+m0
+m α0 en cas d'indépendance.
+Elle est compatible avec des données positivement dépendantes.
+RNTI - 1
+Contrôle du risque et sélection de règles
+Procédure SAM de Storey Cette procédure [Storey, 2001] repose sur l'estimation
+de m0 puis celle de E(V ) et enfin celle du FDR. Nécessitant une randomisation des
+étiquettes, elle n'est pas adaptée au cas des règles.
+pFDR Pour estimer pFDR = E(VR | R > 0), qui est la proportion de fausses détec-
+tions, on utilise l'approximation [Storey, 2001] :
+ˆpFDR(δ) = 0ˆ.m.δ#{pi≤δ,i=1,...,m}
+- m est le nombre de variables à tester, ici le nombre de règles ;
+- δ définit la zone de rejet ; les hypothèses correspondant aux p-value inférieures ou
+égales à δ sont rejetées ;
+- pi est la i
+eme
+plus grande p-value ;
+- pi0 = m0m est la proportion d'hypothèses nulles ; ici, pi0 est estimé par fˆ(1), où fˆ est
+une cubic spline avec 3 degrés de liberté de 0ˆ(λ) sur λ. On a 0ˆ(λ) =
+#{pi≥λ,i=1,...,m}
+m(1−λ)
+et λ désigne la zone d'acceptation dont les valeurs sont comprises entre 0 et 0.95.
+Le pFDR est donc défini par rapport à une zone de rejet qu'il faut choisir par avance.
+Une fois le pFDR global calculé, les variables sont contrôlées par une procédure step-
+down grâce aux q-values définies pour chaque p-value par qˆ(pm) = 0ˆ.pm et :
+qˆ(pi) = min
+(
+0ˆ.m.pi
+i ,qˆ(pi+1)
+)
+; i = m− 1, . . . ,1
+La q-value est au pFDR ce que la p-value est à l'erreur de 1
+e
+espèce ou ce que la
+p-value ajustée est au FWER. Pour toute règle dont la p-value a une q-value inférieure
+au pFDR, on rejette H0 et l'on sélectionne la règle.
+5 Contrôle du UAFWER par l'algorithme BS_FD
+5.1 Notations
+ on note T l'ensemble des transactions, n = Card(T ), p le nombre d'items ;
+ R une base de règles d'association valides au sens de critères prédéfinis, par
+exemple le support et la confiance, m = Card(R), R∗ un sous-ensemble de R
+rassemblant les règles valides significatives au sens du critère c ;
+ c(r) désigne l'évaluation de la règle r selon le critère c, c′(r) l'évaluation empirique
+de la règle r selon le critère c sur l'ensemble T ;
+ V : nombre de faux positifs, δ : risque de la procédure de contrôle des faux positifs,
+avec V0 nombre de faux positifs que l'on ne souhaite pas dépasser au risque δ.
+5.2 But
+On veut sélectionner parmi les règles r de la base R celles qui sont statistiquement
+significatives pour le critère c, au sens où leur évaluation c(r) est significativement plus
+élevée que c0(r), valeur attendue sous H0, l'hypothèse d'indépendance de A et B.
+Nous avons suggéré [Lallich et Teytaud, 2003] différents algorithmes qui utilisent
+les outils de l'apprentissage statistique pour garantir que 100% des règles trouvées
+sont significatives au risque α donné, ainsi l'algorithme BS fondé sur le bootstrap.
+RNTI - 1
+Lallich et al.
+Les expérimentations ont confirmé que cette approche était trop prudente et par là
+même peu puissante. Prenant en compte l'idée d'accepter de façon contrôlée un certain
+nombre de fausses découvertes, à l'instar des travaux de Benjamini (section 3), nous
+proposons BS_FD qui adapte l'algorithme BS au contrôle du nombre de faux positifs.
+L'algorithme BS_FD sélectionne les règles candidates de telle sorte que l'on contrôle
+UAFWER = P (V > V0), assurant que le nombre de règles sélectionnées à tort (faux
+positif) ne dépasse pas V0 au risque δ. Plus précisément, on garantit que P (V > V0)
+converge vers δ, à la limite d'un grand échantillon de transactions.
+5.3 Algorithme BS_FD
+Pour garantir c(r) > c0(r), on peut se limiter sans perte de généralité à garantir
+c(r) > 0, en remplaçant c(r) par le critère translaté c(r)− c0(r). On note par la suite
+# l'opérateur "cardinal", associant à un ensemble son cardinal (i.e. #E est le cardinal
+de l'ensemble E.
+1. Définir c′(r), l'évaluation empirique de c(r) sur l'ensemble T de transactions.
+2. Un grand nombre de fois (pour i = 1,2,...,l) - Tirer au sort, avec remise, une liste
+T ′ d'éléments de T , de même cardinal que T .
+- Définir c”(r), l'évaluation de c(r) sur la liste T ′ de transactions.
+- Calculer ε(V0,i) minimal, tel que #{c”(r) > c′(r) + ε(V0,i)} ≤ V0
+3. On obtient l valeurs ε(V0,i). Calculer ε(δ), le quantile (1− δ) des ε(V0,i).
+4. Garder dans R∗ toutes les règles r de R telles que c′(r) > ε(δ).
+Pour réaliser la dernière partie de l'étape 2. de l'algorithme, on applique la procédure
+"calculerEpsilon(i,δ,V0)" définie ci-dessous.
+Procédure "calculerEpsilon(i,δ,V0)"
+- tableauEpsilon = (0,0,...,0) tableau de taille m
+- pour r variant de 0 à m− 1 : tableauEpsilon(r) = c”(r)− c′(r)
+- Calculer le (V0 + 1)
+e
+plus grand élément de tableauEpsilon
+5.4 Justification de la méthode
+Les méthodes de bootstrap [Efron, 1979] ont d'abord un aspect très intuitif de par
+leur idée d'approcher l'écart entre la loi empirique et la loi réelle par l'écart entre
+la loi bootstrappée et la loi empirique. En outre, elles ont de profondes justifications
+mathématiques [Giné et Zinn, 1984] qui nécessitent une formalisation précise de la
+question posée.
+Formellement, l'objectif est que la fonction de répartition du nombre de règles telles
+que c(r) < 0 malgré c′(r) >  ait pour valeur au moins 1 − δ en V0. On a #{c(r) ≤ 0
+et c′(r) > } majoré par #{c′(r) ≥ c(r) + }.
+Les théorèmes sur le bootstrap appliqué à une famille de fonctions vérifiant des
+hypothèses minimales [Van der Waart et Wellner, 1996], nous permettent d'approcher
+cette quantité par #{c′′(r) ≥ c′(r) + }.
+RNTI - 1
+Contrôle du risque et sélection de règles
+5.5 Cas de plusieurs critères
+En pratique, on s'intéresse souvent à plusieurs critères, dans notre cas à la confiance,
+au support, plus un critère de non-indépendance. L'extension de l'algorithme BS_FD,
+notée BS_FD_mc se fait simplement en utilisant comme critère unique le min des
+différents critères. Ainsi pour un travail sur 3 critères c1, c2 et c3, considère-t-on c(r) =
+min {c1(r),c2(r),c3(r)}. Utiliser BS_FD_mc sur c au risque δ fournit bien des règles
+garanties à la fois pour les critères c1, c2 et c3 au risque δ.
+Afin d'optimiser le risque de seconde espèce, on gagnera à travailler sur des trans-
+formations (différentiables au sens de Hadamard) des ci qui rendent ces critères ho-
+mogènes, par exemple des p-values ou des réductions, en divisant l'écart empirique de
+chaque critère à sa valeur de référence par l'estimation de l'écart-type issue des c′(r).
+5.6 Complexité de BS_FD
+La complexité de BS_FD est proportionnelle à l × m × n, en considérant que le
+générateur de nombres au hasard fonctionne en temps constant. En effet, la complexité
+de recherche du ke plus grand élément d'un tableau est proportionnelle à la taille du
+tableau. La valeur de l doit être assez grande pour que l'imprécision liée à la finitude de
+l ne nuise pas à la confiance globale, mais elle ne dépend ni de m ni de n. L'algorithme
+est donc globalement linéaire en m× n, avec une forte constante l, liée au bootstrap.
+6 Expérimentations
+6.1 Description des données
+Les méthodes de filtrage présentées ici ont été appliquées à cinq bases de règles
+disponibles sur la plateforme HERBS [Vaillant et al. 2003]. Celles-ci ont été extraites
+à l'aide d'Apriori suivant l'implémentation de [Borgelt et Kruse 2002] de bases de
+cas du site UCI (http://www.ics.uci.edu/mlearn/MLSummary.html) : Contraceptive
+Method Choice (CMC), Flags (Flags), Wisconsin breast Cancer (WBC), Solar Flare
+I (SFI) et Solar Flare II (SFII). Nous avons calculé pour chaque méthode le taux de
+réduction de chaque base, après retrait des règles non significatives.
+6.2 Caractéristiques et résultats
+Le tableau ci-dessous est composé de deux sous-tableaux qui récapitulent les carac-
+téristiques de chaque base et le nombre de règles sélectionnées suivant chaque méthode :
+ Contrôle à 5% : on sélectionne les règles ayant une p-value ≤ 5%.
+ Bonferroni : la correction est appliquée sur un seuil de 5%.
+ Holm : la procédure est appliquée avec un seuil de 5%.
+ BS_FD (r) : risque de 5%, avec un V0 égal au résultat du pFDR, appliqué au
+coefficient de corrélation r comparé à 0, unilatéralement à droite.
+RNTI - 1
+Lallich et al.
+Caractéristiques CMC Flags WBC SF I SF II
+Nb cas 1473 194 699 323 1066
+Nb règles 2878 3329 3095 5402 3596
+Tx couverture 100% 100% 96.2% 100% 100%
+Tx recouvrement 259 1848 646 1828.6 2277
+Seuil support 5% 50% 10% 20% 20%
+Seuil confiance 60% 90% 70% 85% 85%
+Résultats CMC Flags WBC SF I SF II
+contrôle à 5% 1401 2181 3094 2544 2558
+pFDR 916 (3) 1200 (3) 3095 (0) 900 (5) 1625 (4)
+FDR (Benj.) 913 (0.003) 1198 (0.0027) / 899 (0.006) 1626 (0.0022)
+BS_FD (r) 794 (3) 1074 (3) 3093 (0) 604 (5) 738 (4)
+Holm 742 564 3094 432 1020
+Bonferroni 731 539 3042 427 1006
+Tab. 2  Filtrage de quelques bases de règles
+ FDR : la méthode décrite en section 4 est utilisée avec un seuil égal à celui de la
+dernière q-value sélectionnée par le pFDR, indiqué entre parenthèses (pour pou-
+voir comparer grossièrement le pFDR et le FDR, il est nécessaire de sélectionner
+les règles à un degré de contrôle voisin).
+ pFDR : la méthode est utilisée avec une zone de rejet de 0.1%. Entre parenthèses
+est indiqué le nombre moyen de rejets à tort. La zone de rejet est choisie telle
+que ce nombre soit le plus acceptable possible.
+ BS_FD (m.c) : identique à BS_FD (r) avec trois critères, r (comparé à 0), le
+support et la confiance (comparés aux seuils utilisés en extraction).
+A partir du tableau 2, on opère différentes constatations :
+ Sur l'une des bases, WBC, le filtrage est totalement inefficace y compris la cor-
+rection de Bonferroni. La raison en est qu'une seule règle de la base de départ a
+une p-value supérieure à 0.05 (à savoir 0.184), une autre est à 0.023, les autres
+p-values sont inférieures à 0.01, 3036 d'entre elles valent 0.0000 !
+ Pour les 4 autres bases, le filtrage par la simple répétition du test d'indépendance
+réduit notablement la base : 51%, 34%, 53%, 39%.
+ Dans la base ainsi filtrée, il reste encore beaucoup de faux positifs, que les diffé-
+rentes méthodes de contrôle du risque permettent encore d'éliminer.
+ Comme prévu, la procédure de contrôle du risque la plus sévère est la correction
+de Bonferroni, donnant sur les 4 bases des taux de réduction de 75%, 81%, 65% et
+60%. Par sa sévérité même, cette procédure est peu puissante, limitant certes les
+faux positifs, mais au prix d'une augmentation des faux négatifs. La procédure
+de Holm donne des résultats voisins, son inefficacité venant du très grand nombre
+de règles qui rend inutile la correction du seuil pas à pas.
+ Les méthodes pFDR, FDR(Benjamini) et notre méthode BS_FD donnent des ré-
+sultats intermédiaires, correspondant à ce que l'on pouvait attendre. La méthode
+BS_FD apparaît comme la plus sévère des 3, plus particulièrement sur Solar
+RNTI - 1
+Contrôle du risque et sélection de règles
+Résultats CMC_app CMC_val croisement Taux
+sans contrôle 3391 2742 2742 0.81
+contrôle à 5% 1835 1462 1238 0.68
+pFDR 1347 (3) 996 (4) 938 0.70
+BS_FD (r) 1302 (3) 955 (4) 903 0.69
+Holm 1149 858 795 0.69
+BS_FD (m.c) 159 (3) 276 (4) 125 0.79
+Tab. 3  Résultats de la base CMC en validation
+Flare II, mais la raison est que le paramétrage de pFDR et FDR(Benjamini) as-
+sure un nombre moyen de fausses découvertes égal à V0, alors que BS_FD assure
+que V0 n'est dépassé qu'avec le risque 0.05, ce qui est plus exigeant.
+ La procédure de filtrage est d'autant plus nécessaire qu'elle permet d'éliminer
+des règles qui seraient sélectionnées avec bon nombre de mesures de qualité.
+Ainsi les règles logiques dont le conséquent est très fréquent (e.g. Solar Flare II)
+ont-elles une valeur maximale pour toutes les mesures qui donnent une valeur
+fixe maximale aux règles logiques, alors qu'elles n'ont aucune espèce d'intérêt et
+que leur p-value est non significative. A l'inverse, le calcul des p-values ne préjuge
+pas du classement ultérieur des règles par des mesures descriptives favorisant les
+règles les plus intéressantes, par exemple des mesures à la fois dissymétriques et
+qui avantagent les règles dont le conséquent est rare.
+6.3 Validation des résultats
+Alors que le découpage de la base de cas en base d'apprentissage et base de validation
+est courant en apprentissage supervisé, il n'est jamais pratiqué dans le domaine des
+règles d'association. La raison est sans doute que les règles d'association ressortent de
+l'apprentissage non supervisé et que leur extraction suivant le support et la confiance
+est une tâche déterministe clairement définie, comme le souligne [Freitas, 2000]. Dans
+la mesure où nous avons introduit un test de signification, il est logique de distinguer
+base d'apprentissage et base de validation pour étudier la pertinence sur la base de test
+des règles sélectionnées sur la base d'apprentissage.
+La base CMC a été séparée au hasard pur en 2 bases de même taille. Sur CMC_app,
+nous avons extrait une base de règles admissibles au sens de l'algorithme Apriori et
+nous avons filtré ces règles à l'aide des différentes méthodes présentées. Ensuite (tableau
+3), nous avons examiné comment se comportaient les règles admissibles issues de la base
+CMC_app (col. 1) lorsqu'elles étaient appliquées à la base CMC_val (col. 2) et nous
+avons calculé parmi les règles sélectionnées par chaque méthode sur CMC_app combien
+étaient encore sélectionnées par la même méthode sur CMC_val (col. 3). On constate
+ainsi que 80% des règles admissibles pour CMC_val le sont encore pour CMC_app,
+alors que ce taux descend à 70% lorsque l'on filtre la base de règle pour ne garder
+que les règles significatives, quelle que soit la méthode. En revanche, l'application de
+BS_FD(m.c) avec les trois critères, support, confiance et r, permet de revenir à ce taux
+de 80% au prix il est vrai d'une sérieuse diminution du nombre de règles.
+RNTI - 1
+Lallich et al.
+7 Conclusion et travaux futurs
+Nous partons d'un principe simple, il ne faut garder dans une base de règles que
+celles qui renforcent la conclusion sur le conséquent. Pour ce faire, nous proposons une
+stratégie de filtrage des bases de règles qui conduit à pratiquer une multitude de tests
+unilatéraux à droite sur le coefficient de corrélation entre A et B. Cette stratégie est
+fondée sur le contrôle du nombre de règles sélectionnées à tort et non pas du risque,
+assurant par là une plus grande puissance, tout en permettant à l'utilisateur d'arbi-
+trer entre "règles sélectionnées à tort" et "règles pertinentes non sélectionnées". Nous
+proposons un algorithme original BS_FD qui a l'avantage de contrôler directement le
+nombre de "faux positifs" et non pas leur moyenne, en tenant compte de la dépendance
+des règles, tout en permettant de tester plusieurs critères à la fois. Les expérimenta-
+tions montrent l'efficacité de la stratégie proposée qui permet de réduire sensiblement
+la taille de la base, facilitant le recours ultérieur à des mesures de qualité descriptives
+qui apportent un point de vue complémentaire sur la pertinence des règles.
+Une extension de travail est prévue en fouille des données génomiques pour re-
+chercher des règles discriminantes. Les procédures de contrôle du risque intéressent
+l'ensemble des méthodes de fouille des données où l'on multiplie les tests.
 Références
-Aouiche, K., P.-E. Jouve, et J. Darmont (2006). Clustering-based materialized view selection
-in data warehouses. In Proceedings of ADBIS’06 conference.
-Aouiche, K. et D. Lemire (2007). A comparison of five probabilistic view-size estimation
-techniques in olap. In Proceedings of DOLAP’07 conference.
-Baralis, E., S. Paraboschi, et E. Teniente (1997). Materialized views selection in a multidimen-
-sional database. In Proceedings VLDB’97 conference.
-Baril, X. et Z. Bellahsene (2003). Selection of materialized views : A cost-based approach. In
-Proceedings of CAiSE’03 conference.
-N. Hanusse et al.
-Bayardo, Jr., R. J. (1998). Efficiently mining long patterns from databases. In Proceedings of
-SIGMOD’98 conference.
-Bellatreche, L., K. Boukhalfa, et P. Richard (2008). Data partitioning in data warehouses :
-Hardness study, heuristics and ORACLE validation. In Proceedings of DaWaK’08 confe-
-rence.
-Burdick, D., M. Calimlim, et J. Gehrke (2001). Mafia : A maximal frequent itemset algorithm
-for transactional databases. In Proceedings of ICDE’01 conference.
-Chvàtal, V. (1979). A greedy heuristic for the set covering problem. Mathematics of operation
-research 4(3), 233–235.
-Gouda, K. et M. J. Zaki (2005). GenMax : An efficient algorithm for mining maximal frequent
-itemsets. Data Mining and Knowledge Discovery 11(3), 223–242.
-Gupta, H., V. Harinarayan, A. Rajaraman, et J. D. Ullman (1997). Index selection for olap. In
-Proceedings of ICDE’97 conference.
-Gupta, H. et I. S. Mumick (2005). Selection of views to materialize in a data warehouse. IEEE
-Trans. on Knowl. and Data Eng. 17(1), 24–43.
-Harinarayan, V., A. Rajaraman, et J. D. Ullman (1996). Implementing data cubes efficiently.
-In Proceedings of SIGMOD’96 conference.
-Jim Gray, et al. (1997). Data cube : A relational aggregation operator generalizing group-by,
-cross-tab, and sub totals. Data Mining and Knowledge Discovery 1(1), 29–53.
-Karloff, H. et M. Mihail (1999). On the complexity of the view-selection problem. In Procee-
-dings of PODS’99 conference.
-Karp, R. (1972). Reducibility among combinatorial problems. In R. E. Miller et J. W. Thatcher
-(Eds.), Complexity of Computer Computations, pp. 85–103. Plenum Press.
-Maiz, N., K. Aouiche, et J. Darmont (2006). Sélection automatique d’index et de vues maté-
-rialisées dans les entrepôts de données. In Proceedings de (EDA 06).
-Hanusse, N., S. Maabout, et R. Tofan (2009). A view selection algorithm with performance
-guarantee. In Proceedings of EDBT’09 Conference.
-Palpanas, T., N. Koudas, et A. Mendelzon (2008). On space constrained set selection problems.
-Data Knowl. Eng. 67(1), 200–218.
-Shukla, A., P. Deshpande, et J. F. Naughton (1998). Materialized view selection for multidi-
-mensional datasets. In Proceedings of VLDB’98 conference.
-Talebi, Z. A., R. Chirkova, Y. Fathi, et M. Stallmann (2008). Exact and inexact methods for se-
-lecting views and indexes for olap performance improvement. In Proceedings of EDBT’08.
+[Agrawal et Srikant, 1994] R. Agrawal et R. Srikant. Fast algorithms for mining asso-
+ciation rules. Proc. of the 20th VLDB Conference, Santiago, Chile, 1994.
+[Agrawal et al., 1993] R. Agrawal, T. Imielinski et A. Swami. Mining associations
+between sets of items in large databases, Proc. of the ACM SIGMOD Conf., Wa-
+shington DC, USA, 1993.
+[Benjamini et Hochberg, 1995] Y. Benjamini, Y. Hochberg. Controlling the false dis-
+covery rate : a practical and powerful approach to multiple testing, J. R. Statisc.
+Soc., B, 57:289-300, 1995.
+[Benjamini et Liu, 1999] Y. Benjamini et W. Liu. A step-down multiple-hypothesis
+procedure that controls the false discovery rate under independance, J. Stat. Planng
+Inf., 82:163-170, 1999.
+[Borgelt et Kruse, 2002] C. Borgelt et R. Kruse. Induction of association rules : Apriori
+implementation. Proc. 15th Conf. on Comp. Stat., Physika Verlag, Germany, 2002.
+[Efron, 1979] B. Efron. Bootstrap methods: Another look at the jacknkife, Annals of
+statistics, 7:1-26, 1979.
+[Freitas, 2000] A. Freitas. Understanding the crucial difference between classification
+and discovery of association rules. SIGKDD Explorations, vol. 2, 1:65-69, 2000.
+[Ge et al., 2003] Y. Ge, S. Dudoit et T.P. Speed. Resampling-based multiple testing
+for microarray data analysis, Tech. Rep. 663, Univ. of California, Berkeley, 2003.
+[Giné et Zinn, 1984] E. Giné et J. Zinn. Bootstrapping general empirical measures,
+Annals of probability, 18:851-869, 1984.
+[Gras, 1979] R. Gras. Contribution à l'étude expérimentale et à l'analyse de certaines
+acquisitions cognitives et de certains objectifs didactiques en mathematiques, Thèse
+RNTI - 1
+Contrôle du risque et sélection de règles
+d'Etat, Rennes 1, 1979.
+[Gras et al., 2001] R. Gras, P. Kuntz, R. Couturier et F. Guillet. Une version entropique
+de l'intensité d'implication pour les corpus volumineux, Revue ECA, Extraction des
+Connaissances et Apprentissage, Hermès, 1:69-80, 2001.
+[Holm, 1979] S. Holm. A simple sequentially rejective multiple test procedure. Scand.
+J. Statistic., 6:65-70, 1979.
+[Lallich et Teytaud, 2003] S. Lallich et O. Teytaud. Evaluation et validation de l'intérêt
+des règles d'association, à paraître RNTI, Revue des Nouvelles Technologies de
+l'Information, Cépaduès, Toulouse.
+[Lenca et al. 2003] P. Lenca, P. Meyer, P. Picouet, B. Vaillant et S. Lallich. Cri-
+tères d'évaluation des mesures de qualité des règles d'association, RNTI, Revue
+des Nouvelles Technologies de l'Information, 1:123-134, Cépaduès, Toulouse.
+[Lerman et Azé, 2003] I.C. Lerman et J. Azé, Une mesure contextuelle dicriminante
+de qualité des règles d'association, EGC'03, RIA-ECA, 17, 1-2-3:247-262, 2002.
+[Lerman et al., 1981] I.C. Lerman, R. Gras et H. Rostam. Elaboration et évalua-
+tion d'un indice d'implication pour des données binaires, I et II, Mathématiques et
+Sciences Humaines, 74:5-35, 75:5-47, 1981.
+[Storey, 2001] J.D. Storey. The positive false discovery rate and the q-value, écrit en
+2001, à paraître Annals of Statistics 2003.
+[Teytaud et Lallich, 2001] O. Teytaud et S. Lallich. Bornes uniformes en extraction de
+règles d'association, Actes Colloque CAp'01, Grenoble, 133-148, 2001.
+[Vaillant et al. 2003] B. Vaillant, P. Picouet et P. Lenca. An extensible platform for
+rule quality measure benchmarking. R. Bisdorff (Ed), Human Centered Processes,
+187-191, 2003.
+[Van Der Vaart et Wellner, 1996] A. Van Der Vaart et J.A. Wellner.Weak Convergence
+and Empirical Processes, Springer Series in Statistics, 1996.
+[Vapnik, 1995] V.N. Vapnik. The nature of statistical learning, Springer, 1995.
+[Westfall et Young, 1993] P.H. Westfall et S.S. Young. Resampling based multiple
+testing : examples and methods for p-values adjustment, John Wiley & Sons, 1993.
 Summary
-In this paper we consider the problem of selecting materialized views in the context of
-datacubes. In contrast to most other approaches, the constraint we aim to satisfy is related to
-query performance instead of memory space limit. We show the advantages of our approach
-both theoretically and experimentally.
+Association rules extraction algorithms allow to efficiently go through the item-
+sets lattice in order to constitute a base of rules acceptable at predefined support and
+confidence levels. However they result in a multitude of rules hardly exploitable. We
+suggest to refine such bases by eliminating non statistically significant rules. The mul-
+titude of performed tests mechanically leads to a multiplication in false discoveries. We
+first present procedures issued from biostatistic which aim at controlling not the risk,
+but the number of false discoveries. Then, we propose BS_FD, an original algorithm
+based on bootstrap, which selects significant rules while controlling the number of false
+discoveries. By experimenting these procedures on different rule bases, we show their
+ability to refine rules bases.
+Keywords : Association rule, quality, multiple testing risk control.
+RNTI - 1

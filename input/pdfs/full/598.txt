@@ -1,600 +1,565 @@
-Un modèle de composant pour la reconfiguration dynamique de réseaux
-de capteurs sans fil
-Natacha Hoang, Nicolas Belloir, Xavier Detant, Congduc Pham
-∗LIUPPA
-BP 1155
-64013 Pau CEDEX
-(nom.prenom@univ-pau.fr)
-Résumé. Dans ce papier, nous proposons une approche permettant la reconfiguration dynamique
-des réseaux de capteurs sans fil (WSNs). Cette proposition repose sur une architecture logicielle
-bâtie autour d’un nouveau système d’exploitation et d’un modèle de composant basé sur Fractal.
-Ce système d’exploitation, baptisé Valentine, permet de conserver à l’exécution la construction
-par composant, en opposition à une construction monolithique caractéristique des principales so-
-lutions existantes dans les WSNs. De plus, étant dédié aux WSNs, il est tout naturellement orienté
-événement. Il a été généré à partir du canevas logiciel Think. Le modèle de composant permet de
-réutiliser la flexibilité du modèle abstrait Fractal et d’implémenter le mécanisme de reconfiguration
-dynamique.
+Apprentissage de la structure des réseaux bayésiens à partir
+des motifs fréquents corrélés : application à l’identification
+des facteurs environnementaux du cancer du Nasopharynx
+Alexandre Aussem∗, Zahra Kebaili∗, Marilys Corbex∗∗, Fabien De Marchi∗∗∗
+∗Equipe COMAD, Lab. PRISMa, Université Lyon 1,
+alexandre.aussem@univ-lyon1.fr,
+∗∗Unité d’épidémiologie génétique,
+Centre International de Recherche sur le Cancer (CIRC), Lyon,
+corbex@iarc.fr,
+∗∗∗LIRIS UMR CNRS 5205, Université Lyon 1,
+fabien.demarchi@liris.cnrs.fr
+Résumé. L’apprentissage de structure des réseaux bayésien à partir de données
+est un problème NP-difficile pour lequel de nombreuses heuristiques ont été pro-
+posées. Dans cet article, nous proposons une nouvelle méthode inspirée des tra-
+vaux sur la recherche de motifs fréquents corrélés pour identifier les causali-
+tés entre les variables. L’algorithme opère en quatre temps : (1) la découverte
+par niveau des motifs fréquents corrélés minimaux ; (2) la construction d’un
+graphe non orienté à partir de ces motifs ; (3) la détection des V_structures et
+l’orientation partielle du graphe ; (4) l’élimination des arêtes superflues par des
+tests d’indépendance conditionnelle. La méthode, appliquée au réseau Asia, per-
+met de retrouver la structure du graphe initial. Nous l’appliquons ensuite aux
+données d’une étude épidémiologique cas-témoins du cancer du nasopharynx
+(NPC). L’objectif est de dresser un profil statistique type de la population étu-
+diée et d’apporter un éclairage utile sur les différents facteurs impliqués dans le
+NPC.
 1 Introduction
-Les avancées technologiques confirment la présence croissante de l’informatique dans les objets du monde
-réel : d’après Crnkovic (2006), 98 % du code développé pour les systèmes futurs sera embarqué. De plus en plus
-d’objets physiques se voient dotés de processeurs et de moyens de communication sans fil leur permettant de traiter
-de l’information mais également de la transmettre. Cette évolution prend place dans le contexte de l’informatique
-pervasive, mieux connue sous le nom d’ubiquitous computing (voir Weiser (1993)).
-Les réseaux de capteurs sans fil1 entrent dans ce contexte. Ils sont constitués de petits éléments électroniques,
-appelés capteurs, aux ressources fortement contraintes, mais néanmoins dotés de moyens de communication, de
-traitement et de sauvegarde de l’information. Ils se différencient des capteurs traditionnels généralement fixes ou
-peu mobiles par leur mobilité due à la non présence de câblage ainsi que par leur ressources plus réduites. En
-dépit de cet élément de distinction, ces capteurs sont néanmoins capables d’acquérir des informations sur leur
-environnement proche, de les traiter et de les distribuer. Cela permet d’envisager alors un large panel de nouvelles
-applications plus proches du monde réel.
-Cependant, l’intégration de tels capteurs dans leur environnement cible n’est pas chose aisée. Les problèmes
-rencontrés sont généralement liés aux contraintes inhérentes induites par leurs ressources : par exemple la gestion
-drastique qui doit être faite de la batterie, qui par définition est à capacité fixe et non rechargeable, ou encore les
-problèmes de gestion de la mémoire. Un certain nombre de travaux ont porté sur le développement d’environ-
-nements spécifiques à ces capteurs, pour prendre en compte ces contraintes. Par exemple, Hill et al. (2000) ont
-proposé TinyOS, le système d’exploitation de référence des WSNs. Il gère au plus prêt la mémoire limitée grâce
-à de nombreuses optimisations. Cette optimisation a cependant un coût, notamment au niveau de l’architecture du
-système d’exploitation et du code qui sont généralement monolithiques et par de là même peu souples. Cela rend
-par exemple les capteurs difficiles à reconfigurer dynamiquement.
-D’un autre coté, l’ingénierie logicielle basée composant (voir le livre de Szyperski et al. (2002)) 2, est une
-approche maintenant reconnue permettant le développement d’applications à la fois flexibles et bien structurées,
-ayant souvent des capacités de reconfiguration ou d’administration à distance. Dans ce contexte, la reconfiguration
-dynamique consiste à remplacer un composant logiciel par un autre dans une application en exécution. Cette
-action peut être nécessaire pour plusieurs raisons. Il peut par exemple être nécessaire de substituer un composant
-1WSN pour Wireless Sensor Networks
-2CBSE pour Component-Based Software Engineering
-mal implémenté, c’est-à-dire ne remplissant pas les fonctionnalités ciblées ou les implémentant d’une mauvaise
-manière, ou encore d’ajouter de nouvelles fonctionnalités.
-Dans le contexte des WSN, la reconfiguration dynamique est un challenge important. Elle est nécessaire à la
-reconfiguration du réseau ou encore à l’ajout de nouvelles fonctionnalités. Il y a eu d’ailleurs plusieurs proposition
-pour sa mise en œuvre. De nombreux travaux, notamment en autonomic computing, ont identifié la reconfiguration
-dynamique comme une fonctionnalité fondamentale. L’utilisation de modèles de composant réels est une approche
-à étudier plus précisément, d’autant plus qu’aucune des approches citées en section 2.1 n’aborde ce type de mise
-en œuvre dans l’optique de cette caractéristique.
-Dans ce contexte, nous présentons notre solution pour pallier le problème de la reconfiguration dynamique
-dans les WSNs. Cette solution s’appuie sur deux éléments complémentaires : un nouveau système d’exploitation
-offrant un support modulaire d’une part et un modèle de composant spécialisé pour la reconfiguration dynamique
-d’autre part. Nous nous concentrons sur la partie système d’exploitation dans la section 2.4. Nous présentons
-ce modèle de composant en section 3. Nous montrons alors comment nous avons implémenté ce modèle de
-composant à la section 3.3. Puis nous développons un exemple d’utilisation à la section 5. Finalement, la section 6
-présente une conclusion et des directions pour des travaux futurs.
-2 Valentine : Un système d’exploitation dynamique et adaptatif pour les
-WSNs
-Nous montrerons dans la section 2.1 que les systèmes d’exploitation couramment utilisés dans les WSNs
-ne sont pas adaptés pour la reconfiguration dynamique. C’est le cas notamment de TinyOS qui est le système
-d’exploitation de référence pour les réseaux de capteurs. Nous expliquons en section 2.2 pourquoi il ne répond
-pas à cette problématique. Puis nous donnons en Valentine notre proposition pour pallier ce problème. Cette
-proposition se base sur l’utilisation d’un générateur d’OS, Think, que nous présentons en section 2.3.
-2.1 Travaux connexes
-Nous présentons dans cette section un résumé portant sur les principaux systèmes d’exploitation existants
-dans le contexte des WSNs. Les travaux de Han et al. (2005), de Dunkels et al. (2004) et de Cao et al. (2008)
-sont basés sur approches basées modules. Dans Han et al. (2005), l’architecture de SOS consiste en des modules
-chargés dynamiquement s’appuyant sur un noyau compilé statiquement. Dunkels et al. (2004) présentent Contiki,
-un système d’exploitation léger supportant le chargement et le remplacement dynamique de programmes et de
-services. Balani et al. (2006) s’appuient sur un noyau SOS et implémente une machine virtuelle au dessus.
-D’autres propositions sont basées sur une mise à jour complète de l’image du système et de son code fonc-
-tionnel. Par exemple, TinyOS est un système d’exploitation pour les réseaux de capteurs qui génère à ce titre une
-image binaire de l’application complète. Cependant, même si TinyOS prétend s’appuyer sur une programmation
-modulaire basée sur les composants, ces derniers sont noyés dans le code final et perdent ainsi leur modularité.
-Ainsi, il est impossible de reconfigurer une image. Bhatti et al. (2005) présente Mantis, un système d’exploitation
-basée sur une image monolithique du système. L’inconvénient de ce type de proposition est qu’elle requiert un
-redémarrage du système afin de prendre en compte les éventuelles mises à jour.
-Dans ce contexte nous proposons Valentine : un système d’exploitation basé composant, dynamique et adap-
-tatif pour les WSNs. Nous présentons cet OS dans la section suivante. La Figure 1 présente un tableau récapitulatif
-de ces différents OS.
-2.2 Les limites de TinyOS pour la reconfiguration dynamique
-TinyOS est un système d’exploitation conçu pour les systèmes embarqués et, en particulier, pour les WSNs.
-Dans le but de réduire la taille des systèmes générés, TinyOS effectue des optimisations et impose des restrictions :
-par exemple, la mémoire est allouée statiquement à la compilation et le modèle d’implémentation fournit via nesC
-ne dispose pas de pointeurs de fonctions . . . Par conséquent, l’allocation dynamique n’est pas possible et c’est une
-des limitations de TinyOS.
-D’un point de vue architectural, TinyOS et les applications développées dessus sont construits en utilisant une
-approche basée composant. Cependant, pour des raisons d’optimisation, les composants, lors de la compilation,
-sont noyés dans une seule image binaire monolithique. Par conséquent, le concept de composant disparait lorsque
-l’image du système est générée. Donc, si nous considérons la propriété de reconfiguration et que nous supposons sa
+Les réseaux d’inférence bayésiens (RB) sont des outils d’apprentissage numérique qui per-
+mettent de rendre compte de relations causales entre des variables aléatoires et de construire
+un raisonnement probabiliste à partir de connaissances, parfois incertaines et incomplètes,
+consignées dans les bases de données. L’apprentissage automatique des valeurs numériques
+des probabilités conditionnelles s’opère d’ordinaire à partir d’un ensemble d’apprentissage,
+même incomplet, si la structure du réseau est connue. En revanche, l’apprentissage de la struc-
+ture du RB à partir de données est plus problématique ; la taille de l’espace de recherche est
+super-exponentielle en fonction du nombre de variables et le problème combinatoire associé
+est NP-difficile. Deux grandes familles de méthodes existent : celles fondées sur la recherche
+de causalités via des tests d’indépendance conditionnelle et celles fondées sur la maximisation
+d’un score. Avec les méthodes à base de score, l’ajout d’un arc repose sur un compromis entre
+- 651 - RNTI-E-6
+Apprentissage de la structure des réseaux bayésiens
+augmentation de la vraisemblance et pénalité associée à cet arc. En conséquence, les relations
+causales dans lesquelles la cause apparaît rarement sont souvent ignorées. En outre, l’infé-
+rence d’un modèle causal complet est réputée impossible (Silverstein et al., 1998) lorsque le
+nombre de caractère devient prohibitif (de l’ordre de plusieurs milliers) car ces heuristiques
+sont facilement piégées dans les nombreux minima locaux.
+Dans cet article, l’accent est mis sur la découverte de causalités par des méthodes basées
+sur des contraintes (Cooper, 1997; Friedman et al., 1998; Pearl, 2000; Spirtes et al., 2000). Les
+contraintes imposées à la structure du graphe causal proviennent des informations statistiques
+sur les dépendances et indépendances conditionnelles observées. Deux séries d’algorithmes
+ont été proposées, l’algorithme IC (Inductive Causation) (Pearl et Verma, 1991; Pearl, 2000)
+et les algorithmes SGS, PC (Spirtes et al., 2000). Elles reposent sur l’hypothèse que toutes les
+variables d’intérêt sont connues (suffisance causale), c’est aussi l’hypothèse que nous ferons
+dans cet article. Ces algorithmes commencent par construire un graphe non orienté en rajoutant
+(ou supprimant) au fur et à mesure les arêtes à l’aide des tests d’indépendance conditionnelle,
+cherchent les V-structures puis propagent l’orientation sur les arêtes adjacentes. La recherche
+d’indépendances conditionnelles étant l’étape la plus coûteuse. Pour réduire le nombre a priori
+exponentiel de tests d’indépendance en deux variables A et B conditionnellement à un en-
+semble de variables S, des heuristiques ont été proposées ; PC procède par niveau en considé-
+rant les indépendance conditionnelle d’ordre 0, 1, 2 etc. Ces heuristiques reposent sur un choix
+judicieux des variables dans S (e.g. restrictions aux variables adjacentes à A et B, parcours
+dans l’ordre lexicographique ou selon l’ordre de la statistique choisie pour le test d’indépen-
+dance). Ce parcours par niveau, et l’ordre arbitraire des variables conditionnelles, n’est pas
+sans rappeler les problématiques rencontrées dans la recherche des motifs fréquents.
+Cet article présente une nouvelle heuristique fondée sur la recherche de causalités en ex-
+ploitant des algorithmes de recherche de motifs. Les algorithmes d’extraction de motifs et de
+règles ont fait l’objet de nombreux travaux de recherche ces 10 dernières années ; ce problème
+constitue encore l’une des applications les plus populaires de l’extraction de connaissances
+dans les données, ou fouille de donnée (Han et Kamber, 2000; Hand et al., 2001). L’objectif
+principal annoncé dans cette thématique est le passage à l’échelle, c’est-à-dire l’implantation
+d’algorithmes capables de traiter des jeux de données réels en temps raisonnable, d’où leur
+intérêt pour identifier la structure des RB. La méthode proposée dans cet article s’inspire de
+ces travaux, et plus particulièrement des travaux sur la recherche de motifs fréquents corré-
+lés par des algorithmes par niveau. L’objectif est in fine d’identifier les causalités entre des
+groupes de variables. Les algorithmes d’extraction des motifs reposent généralement sur un
+parcours efficace de treillis et sont facilement parallélisables (Adamo, 2001). Ils bénéficient
+en outre d’efforts de recherche particuliers concernant les structures de données, la gestion
+de la mémoire, ainsi que l’accès aux bases de données. C’est donc dans l’optique d’améliorer
+l’efficacité des heuristiques que nous proposons de marier les techniques de fouilles à l’appren-
+tissage de la structure du RB. L’algorithme opère selon le même schéma que IC : découverte
+par niveau des motifs fréquents corrélés minimaux ; construction d’un graphe non orienté à
+partir de ces motifs ; détection des V_structures ; orientation partielle du graphe, et élimination
+des arêtes superflues par des tests d’indépendance conditionnelle.
+L’algorithme proposé a été développé sous Matlab à l’aide de la Toolbox BNT de (Mur-
+phy, 2001) et de la Toolbox BNT-SLP de Leray et Francois (2004). Appliqué au réseau de la
+dyspnée Asia (Lauritzen et Speigelhalter, 1988), nous montrons qu’il permet de retrouver la
+- 652 -RNTI-E-6
+I. Aussem et al.
+structure du graphe initial à partir de 15000 données. C’est un résultat encourageant comme le
+montre l’évaluation critique des algorithmes d’apprentissage de structure des RB présenté dans
+(Francois et Leray, 2004). Après cette rapide validation sur ce cas d’école, nous appliquons
+ensuite notre heuristique aux données d’une étude épidémiologique cas-témoins du cancer du
+nasopharynx (NPC). L’objectif est de dresser un profil statistique type de la population étudiée
+et d’apporter un éclairage utile sur les différents facteurs impliqués dans le NPC.
+2 Préliminaires
+2.1 Des règles d’association aux motifs corrélés
+La découverte de règles d’association est l’une des tâche de fouille de données les plus étu-
+diées depuis son introduction par (Agrawal et al., 1993). (Agrawal et Srikant, 1994) propose
+une approche en deux temps : la découverte des motifs dits "fréquents" à partir d’un seuil défini
+par l’utilisateur, puis la construction des règles proprement dites. La première étape est alors
+réputée la plus difficile, puisqu’elle constitue la phase d’accès aux données ; les plus grands
+efforts de recherche ont été consacrés à ce sous-problème avec pour objectif le "passage à
+l’échelle" aux gros volumes de données réels. Des algorithmes efficaces ont été alors proposés
+pour réduire, en pratique, l’explosion combinatoire du parcours de l’espace de recherche. Le
+plus populaire, et qui reste encore souvent le seul algorithme implanté dans les outils commer-
+ciaux de fouille de données, est l’algorithme APriori (Agrawal et Srikant, 1994). Celui-ci ex-
+ploite la propriété d’anti-monotonie du prédicat "être fréquent" qui permet, lors d’un parcours
+"par niveau" de l’espace de recherche, d’élaguer un grand nombre de candidats potentiels. De
+très nombreux algorithmes on été proposés par la suite, que ce soit en introduisant des pro-
+priétés supplémentaires améliorant l’élagage (Pasquier et al., 1999; Bastide et al., 2000), en
+changeant le mode de parcours (Bayardo, 1998; Gunopulos et al., 2003), ou encore en optimi-
+sant les structures de données utilisées (Han et al., 2000).
+Au vu de l’efficacité de ces algorithmes, il est tentant de s’inspirer des règles d’association
+pour construire la structure d’un graphe causal. Toutefois, il s’agit de règles logiques, bien
+différentes d’une relation probabiliste entre deux variable aléatoires. Les règles portent sur
+des éléments {A = aj}, avec aj la j-ième modalité du caractère A, tandis que les nœuds d’un
+RB représentent les caractères eux-mêmes. Dans ces conditions, comment exploiter l’efficacité
+des algorithmes de découverte des motifs fréquents, sachant que les motifs qui nous intéressent
+sont désormais des ensembles de variables aléatoires et non plus des ensembles d’événements ?
+Deux solutions existent. La première est de travailler avec les motifs (d’événements) fréquents
+pour ultérieurement appliquer des critères de pertinence de règles d’association proches de la
+notion de causalité probabiliste. Un aperçu assez complet des mesures d’intérêt proposées peut
+être trouvé dans (Bayardo et Agrawal, 1999). La seconde solution est d’extraire directement
+des motifs de variables aléatoires corrélées. Il faut pour cela redéfinir la notion de support et
+définir une mesure de corrélation. Parmi ces mesures possibles, le χ2 présente des propriétés
+intéressantes. Il est en effet possible dans le cas de variables booléennes d’exploiter une pro-
+priété de monotonie qui, lors d’un parcours "par niveau" de l’espace de recherche, permet de
+se concentrer sur les ensembles fréquents corrélés minimaux dans le treillis des parties. C’est
+donc cette option que nous prenons.
+- 653 - RNTI-E-6
+Apprentissage de la structure des réseaux bayésiens
+2.2 Les motifs corrélés minimaux
+Il faut dans un premier temps clarifier la notion de corrélation entre caractères. Soit p(a) la
+probabilité qu’un événement a se produise et p(a) = 1− p(a) celle de l’événement contraire.
+p(ab) est la probabilité que b se produise mais pas a. Les événements a et b sont dits indé-
+pendants si p(ab) = p(a)p(b). De même, si p(abc) = p(a)p(b)p(c) alors a,b et c sont indé-
+pendants. Si l’un des ab, ab, ab, ab est dépendant alors les variables aléatoires A et B sont
+dépendantes. De même si l’une des huit combinaisons de 3 événements (abc, abc, . . . , abc)
+sont dépendants alors la variables aléatoires A,B et C sont dépendantes et ainsi de suite pour
+des ensembles plus grands. Dans la suite, soit I un ensemble de variables aléatoires ; nous ap-
+pellerons motif un sous-ensemble de I . Soit D une base de données constituée d’un ensemble
+d’expériences, pour lesquelles chaque variable A ∈ I prend la valeur a ou a. Une des pro-
+priétés importantes de la dépendance est d’être monotone dans l’ensemble des parties de I
+ordonné par l’inclusion. Si X est un motif dépendant, alors tous ses sur-ensembles sont dé-
+pendants. Dans ce contexte, l’ensemble des motifs dépendants peut-être exactement représenté
+par ses éléments minimaux. Toutefois, la notion de dépendance est théorique, dans la pratique
+seule une mesure de corrélation peut nous renseigner sur le degré de dépendance entre des
+caractères. La statistique du χ2, que nous décrivons dans la suite, permettra de mesurer le de-
+gré de corrélation d’un motif. Nous montrons dans ce qui suit que cette mesure empirique est
+également monotone dans l’ensemble des parties de I ordonné par l’inclusion.
+2.3 La statistique du χ2
+Le test du χ2 est couramment utilisé dans les tests d’adéquation de loi et les tests d’indé-
+pendance. Dans ce qui suit, nous rappelons brièvement les propriétés de la statistique du χ2 et
+son utilisation pour la découverte d’ensembles de variables corrélées minimaux. Considérons
+deux caractères quelconques A et B et un échantillon de taille n issu d’une population. Si l’on
+suppose que A et B possèdent respectivement a et bmodalités, on note nij le nombre d’obser-
+vations appartenant à la i-ème modalité deA et à la j-ème modalité deB, puis ni. =
+∑a
+j=1 nij
+et n.j =
+∑b
+j=1 nij . La statistique du χ
+2 permet de tester l’hypothèse H0 "les deux caractères
+sont indépendants" contre H1 "les deux caractères sont dépendants" au risque α. Pour cela
+on calcule les effectifs théoriques n′ij = ni.n.j/n sous l’hypothèse d’indépendance et l’on
+applique la formule du χ2AB ci-dessous. On rejette H0 si χ
 2
-FIG. 1 – Tableau comparatif sur les différents modèles de programmation
-faisabilité, cela implique que si nous voulons modifier l’implémentation d’un composant, comme le protocole de
-communication par exemple, il est impossible de remplacer seulement ce composant. L’image entière du système
-présent sur le capteur doit être réinstallée. Cela représente un coût important en terme de consommation d’énergie.
-En effet, une fois les capteurs déployés dans leur environnement cible, le seul moyen de déployer une nouvelle
-image est de la transférer via radio, ce qui est fortement énergivore. Les capteurs sont utilisés comme des nœuds
-relais pour la propagation des données. Il est clair qu’une image entière du système est plus grande qu’une partie
-de l’image. Ainsi, si nous supposons l’existence d’un mécanisme de reconfiguration pour un capteur fonctionnant
-sous TinyOS, cela implique de découper cette image en plusieurs paquets afin de les transmettre au capteur cible.
-Par conséquent, le trafic sur le réseau augmente ainsi que l’activité de chaque nœud relais impliqué dans le transfert
-des paquets. Chaque nœud impliqué dans le processus de transfert consomme alors plus d’énergie. Or l’énergie est
-une ressource limitée dans cet type de réseau. Finalement, TinyOS ne fournit pas de mécanisme pour la protection
-mémoire. Donc les systèmes sont particulièrement vulnérables aux crashs et corruptions de la mémoire.
-La remarque précédente montre que TinyOS ne répond pas aux nouveaux besoins des applications futures
-utilisant des réseaux de capteurs. Par conséquent, il apparaît que pour résoudre le problème de la reconfiguration
-dynamique dans les WSNs, il est nécessaire de disposer d’un nouvel OS. C’est pourquoi nouys avons proposé
-Valentine, un nouvel OS basé composant, que nous avons présenté précédemment dans Hoang et al. (2008). Nous
-en décrirons brièvement le concept en section 2.4. Mais avant nous présenterons Think, un générateur d’OS
-embarqués que nous avons utilisé pour créer Valentine.
-2.3 Fractal / Think
-Nous avons choisi d’utiliser Think, un générateur d’OS, afin de créer Valentine. En effet, Think, est un canevas
-logiciel pour les noyaux de systèmes d’exploitation basés composant (voir Fassino et al. (2002)). Il permet aux
-concepteurs d’OS d’implémenter tout noyau de système d’exploitation. Il peut également être utilisé pour dévelop-
-per tout système ou application C.
-De plus, notre principale motivation réside en le fait que Think est une implémentation C du modèle de com-
-posant Fractal. Fractal permet d’implémenter, de déployer et de gérer des systèmes logiciels complexes (voir
-Bruneton et al. (2004)). Ces objectifs sont à l’origine des caractéristiques principales du modèle de composant
-Fractal : les composants composites et partagés, les capacités d’introspection, de configuration et de reconfigura-
-tion. Le modèle de composant Fractal utilise le principe de conception basée sur la séparation des préoccupations.
-L’idée est de séparer en différentes parties distinctes de code ou en entités exécutables les différentes préoccupa-
-tions ou aspects d’une application. En particulier, Fractal utilise trois cas spécifiques de séparation des préoccupa-
-tions appelés : la séparation interface / implémentation, la programmation orientée composant, et l’inversion du
-contrôle. Le premier pattern correspond à la séparation de la conception et de l’implémentation. Le second pattern
-correspond à la séparation de l’implémentation en plusieurs entités composables, plus petites et implémentées
-séparément, appelées composants. Le dernier pattern concerne la séparation du fonctionnel et du non-fonctionnel
-3
-(configuration) : au lieu de trouver et de reconfigurer eux-mêmes les composants et les ressources dont ils ont
-besoin , les composants Fractal sont configurés et déployés par une entité externe et séparée. Le principe de sé-
-paration des préoccupations est aussi appliqué à la structure des composants Fractal. Un composant Fractal est,
-en effet, composé de deux parties : un contenu qui gère la partie fonctionnelle et une membrane de contrôleurs,
-qui gère la partie non-fonctionnelle (introspection, configuration,...). Le contenu est conçu à partir d’autres com-
-posants Fractal. Les interfaces d’introspection et de configuration qui peuvent être fournies par les contrôleurs
-permettent aux composants d’être déployés et reconfigurés dynamiquement. Par exemple, le BindingController
-gère les liaisons entre les composants. Malheureusement, les caractéristiques avancées du modèle Fractal possè-
-dent un coût qui n’est pas toujours compatible avec les ressources limitées des environnements contraints.
-2.4 Valentine
-Malgré les lacunes de TinyOS pour la reconfiguration dynamique, ce dernier a des caractéristiques utiles pour
-les WSNs comme par exemple le modèle d’exécution basé événement. En effet, un tel modèle est souvent utilisé
-dans les systèmes embarqués car il permet, d’une part, de générer une petite empreinte mémoire et, d’autre part,
-de contrôler plus facilement les activités d’ordonnancement. Partant de ces bonnes pratiques, nous avons proposé
-Valentine, un nouveau système d’exploitation basé composant. Celui-ci est construit à partir de la combinaison
-des aspects éprouvés de TinyOS avec l’ingénierie logicielle basée composant au travers de Think. Malgré une
-consommation de ressources notamment mémoire un peu excessive, l’utilisation du modèle proposé par Think
-semble prometteuse plus particulièrement en vue d’ajouter les aspects dynamiques manquants au modèle TinyOS.
-Un capteur a un microprocesseur, plusieurs périphériques d’E/S (réseau, interface série,...) et des périphériques
-mémoires. Chaque composant système doit donc correspondre à un élément matériel. Dans un premier temps,
-il a été nécessaire de déterminer comment l’OS utilise ces composants afin de réaliser les fonctionnalités de
-l’application. Dans un système traditionnel les différentes fonctionnalités sont implémentées par des processus
-légers, appelés threads. Ces derniers sont alloués au processeur par l’ordonnanceur.Néanmoins, utiliser des threads
-pour des WSNs semble être une solution quelque peu coûteuse puisque chaque capteur doit sauvegarder une copie
-du contexte d’exécution en mémoire durant l’ensemble de fonctionnement. De plus, les mécanismes bloquant, tels
-que les attentes de messages, ne doivent pas être autorisés dans le but de ne pas entraver l’exécution des autres
-processus. Par conséquent, nous avons choisi d’implementer un mécanisme de queue FIFO3 telle que celle utilisée
-par TinyOS. En effet, (i) c’est un algorithme simple à implémenter, (ii)le temps d’activité d’un capteur devant être
-le plus court possible, les tâches de longue durée sont considérées comme marginales, (iii) comme nous sommes
-en présence d’un système “mono- utilisateur”, si une tâche monopolise le processeur, il s’agit d’une situation
-acceptable.
-Dans un second temps, nous avons dû déterminer le meilleur type de noyau pour notre OS. De façon évidente,
-un noyaumonolithique est trop volumineux pour pouvoir être utilisé sur des capteurs. Un exonoyau est bien adapté
-car ainsi l’application a directement accès aux composants matériels dont elle a besoin.
-Pour finir, la nature des réseaux de capteurs est fortement basée évènement du fait, premièrement des fortes
-contraintes existantes et deuxièmement du lien très étroit entre le capteur et son environnement proche. Ce sera
-en effet souvent le capteur qui sera à l’origine de la détection d’un phénomène et qui en avertira le système. Par
-conséquent, notre OS repose sur un modèle basé évènement fonctionnant de la manière suivante : les composants
-de plus bas niveau signalent des évènements aux composants de niveau supérieur qui sont capables de les traiter et
-les composants de niveau supérieur peuvent demander l’exécution de tâches à des composants de niveau inférieur
-via des appels de fonction. De même, des composants d’un même niveau communiquent également par des ap-
-pels de fonctions. La Figure 2 schématise ce mécanisme. Du fait de ce côté fortement orienté événement, nous
-proposons un nouveau modèle de composant. Celui-ci ajoute au concept de composant Fractal une partie orienté
-événement. Nous décrivons ce modèle de composant dans la section 3.
-3 Le modèle de composant proposé
-3.1 Description structurelle
-Comme expliqué précédemment, les WSNs sont fortement orientés événement. Durant un traitement, comme
-une agrégation de données, un événement peut survenir. Par exemple, la batterie peut avertir le système qu’elle
-est trop faible pour continuer à alimenter le capteur. Il est donc impératif d’avoir un mécanisme afin de récupérer
-3FIFO abréviation couramment employée pour “First In, First Out” signifiant en français “Premier Arrivé, Premier Servi”.
-4
-Application
-<<SoftwareComponent>>
-System
-<<SoftwareComponent>>
-Hardware Representation
-<<HardwareComponent>>
-Hardware
-<<commands>>
-<<commands>>
-<<commands>> <<signals>>
-<<signals>>
-<<signals>>
-FIG. 2 – Fonctionnement du système
-ces événements et les traiter. Chaque composant requiert donc la présence d’un gestionnaire d’événements cor-
-respondant aux événements nécessaires à son fonctionnement. Par conséquent, nous avons fixé comme règle que
-chaque composant de notre système devait implémenter deux sous-composants : un gestionnaire d’événements
-appelé eventHandler et une partie fonctionelle appelée behaviour. Le sous-composant eventHandler contient la
-liste des événements qui peuvent être signalés ou être à l’origine de l’exécution d’une tâche par le composant. Ces
-événements sont de deux types : les événements dits classiques qui sont à l’origine du déclenchement d’une tâche
-et les événements dits de reconfiguration qui sont, comme leur nom l’indique, à l’origine d’une reconfiguration.
-L’implémentation du gestionnaire d’événements en tant que sous-composant permet de faciliter les éventuelles
-modifications futures du système. En effet, seulement le gestionnaire et les liens optionnels entre les événements
-écoutés et le gestionnaire seront modifiés si de nouveaux événements doivent être pris en considération ou si
-l’ensemble des événements gérés doit être modifié. Le sous-composant behaviour est un composant abstrait. Le
-développeur définira ici le code fonctionnel du composant. La Figure 3 présente ce nouveaumodèle de composant.
-Le composant est composé d’un (ou plusieurs) sous-composant(s) behaviour qui dépend des événements reçus.
-En effet, chaque événement déclenche l’exécution d’une tâche ou d’une reconfiguration. Le code fonctionel de
-chaque tâche est contenu dans un sous-composant behaviour.
-Nous avons utilisé Think pour implémenter notre modèle de composant. Nous avons donc implémenté un
-nouveau composant Think, appelé ValentineComponent, composé d’un sous-composant eventHandler et d’un
-sous-composant behaviour. Les composants génériques Think ont été étendus afin de respecter notre modèle
-de composant. Cette extension correspond à l’encapsulation des composants génériques Think dans des Valen-
-tineComponent.
-La Figure 4 représente le nouveau composant Think. Dans ce cas, le ValentineComponent fournit au moins les
-mêmes interfaces que le ThinkGenericComponent qui est relié aux sous-composants eventHandler et behaviour.
-Le ValentineComponent peut fournir une interface pour signaler des événements. La gestion des événements
-est décrite dans la section 3.2. bc est le BindingController, qui est l’implémentation du contrôleur Fractal du
-même nom. Ce contrôleur est défini un peu plus loin. Celui-ci gère les liaisons entre composants. Nous l’avons
-utilisé pour reconfigurer dynamiquement un ValentineComponent. Par exemple, si un ValentineComponent reçoit
-l’événement reconfigure, le bc délie l’ancien composant et va lier le nouveau composant.
-Les événements sont générés par les composants ou par le système d’exploitation. Ils sont signalés aux dif-
-férents composants par le composant système scheduler. La Figure 5 montre les liaisons entre un composant
-Valentine et le système. Le scheduler est inclus dans le composant ValentineOS. Le UserSpace est un composant
-qui contient toutes les applications en exécution sur le capteur. Chaque composant Application est composé d’un
-ou plusieurs ValentineComponent.
-5
-component
-eventHandler
-event
-behaviour
-ListEvent
-send
-*
-*
-signal
-*
-*
-0..1
-1
-0..1
-1..*
-*1
-FIG. 3 – Le modèle de composant abstrait
-ThinkGenericComponent
-eventHandler
-behaviour
-ValentineComponent
-[opt ional ]
-bc
-FIG. 4 – Représentation d’un ValentineComponent
-3.2 Description dynamique
-Dans la section précédente, nous avons présenté notre système d’exploitation d’un point vue structurel. Nous
-allons maintenant montrer comment un composant se comporte lorsqu’il reçoit un événement. La Figure 6 montre
-le comportement d’un composant à la réception d’un événement.
-A la réception d’un événement, le scheduler le transmet à tous les composants. Chaque composant vérifie si
-l’événement appartient à sa liste d’événements par le biais de son sous-composant eventHandler. Si l’événement
-est dans sa liste, le composant place la tâche à exécuter correspondante dans la queue de l’ordonnanceur. Quand la
-tâche est sélectionnée, l’ordonnanceur envoie un message au composant. Le sous-composant behaviour exécute
-alors la tâche demandée.
-La Figure 7 présente le diagramme de séquence d’une reconfiguration dynamique. Si l’événement est un
-événement reconfiguration, le sous-composant behaviour appelle le BindingController afin de délier l’ancien
-composant et lier le nouveau composant. Ce mécanisme sera décrit dans la section 4.
-6
-eventHandler
-behaviour
-ValentineComponent
-ThinkGenericComponent
-            [optional]
-ValentineOS
-scheduler
-UserSpace
-Application
-FIG. 5 – Liens entre un composant Valentine et le système d’exploitation
-scheduler: component: eventHandler: behaviour: task:
-CLT_handler__execute(event)
-if(search(event)==1)
-SRV_timerHandler__execute(event)
-CLT_task__run()
-SRV_timerHandler__runEvent(event)
-CLT_behaviour__runEvent(event)
-FIG. 6 – Le diagramme de séquence
-scheduler: component: eventHandler: behaviour:
-CLT_handler__execute(reconf)
-if(search(event)==1)
-SRV_timerHandler__execute(reconf)
-SRV_timerHandler__runEvent(reconf)
-CLT_behaviour__runEvent(reconf)
-SRV_bc__unbind(oldcomp)
-SRV_bc__bind(newcomp)
-FIG. 7 – Le diagramme de séquence d’une reconfiguration dynamique
-7
-3.3 Implémentation du modèle de composant
-Dans la section précédente, nous avons présenté le modèle de composant d’un point de vue architecture et d’un
-point de vue dynamique. Nous allons à présent détailler comment nous l’avons implémenté avec Think. Au niveau
-abstrait, ValentineComponent est composé d’un composant eventHandler, d’un composant behaviour et, dans le
-cas d’une extension, du composant générique Think étendu. Quand un événement survient, le ValentineCompo-
-nent composite a besoin de rediriger l’événement à ses sous-composants. Pour cela, nous proposons d’ajouter au
-ValentineComponent un nouveau composant appelé valentineGenericDispatcher. Ce dernier redirige les événe-
-ments vers le sous-composant concerné. La Figure 8 montre la nouvelle structure du ValentineComponent. Cette
-nouvelle structure est appelée astractValentineComponent.
-Le abstractValentineComponent est implémenté ainsi :
-a b s t r a c t component av r . a b s t r a c tV a l e n t i n eCompon en t {
-/ / t h e component h a n d l e r used to r e c e i v e t h e s chedu l e r ’ s o r d e r s
-p r o v i d e s even t . a c t i v i t y . a p i . ComponentHandler as componen tHand le r
-/ / t h e component i s r e c o n f i g u r a b l e
-p r o v i d e s even t . a c t i v i t y . a p i . R e c o n f i g u r a t i o n as r e c o n f i g u r a t i o n
-/ / i t need to add ev en t s t o t h e s c h e d u l e r
-r e q u i r e s even t . a c t i v i t y . a p i . S chedu l e rHand l e r as s c h e d u l e rH and l e r
-/ / a d i s p a t c h e r t o r e c e i v e s chedu l e r ’ s o r d e r s
-c o n t a i n s d i s p a t c h e r : av r . ab s t r a c tComponen t
-/ / an even t h a n d l e r t e a c c e p t o r r e f u s e e v en t s
-c o n t a i n s even tHand l e r = even t . a c t i v i t y . l i b . e v e n t h a n d l e r
-c o n t a i n s behav iou r : even t . a c t i v i t y . l i b . b ehav iou r
-/ / t h e componen tHand le r p r ov id ed i s t h e d i s p a t c h e r ’ s one
-b ind s t h i s . componen tHand le r t o d i s p a t c h e r . componen tHand le r
-b ind s d i s p a t c h e r . even tHand l e r t o even tHand l e r . e v e n t h a n d l e r
-b ind s d i s p a t c h e r . b ehav iou r t o behav iou r . b ehav iou r
-b ind s d i s p a t c h e r . s c h e d u l e rH and l e r t o t h i s . s c h e d u l e rH and l e r
-r e q u i r e s f r a c t a l . a p i . B i n d i n gC o n t r o l l e r as b i n d i n gC o n t r o l l e r
-p r o v i d e s f r a c t a l . a p i . B i n d i n gC o n t r o l l e r as bc in b i n d i n gC o n t r o l l e r
-c o n t e n t f r a c t a l . l i b . b c s t r i n g f o r b i n d i n gC o n t r o l l e r
-s e l f b i n d s b i n d i n g C o n t r o l l e r t o bc
-r e q u i r e s f r a c t a l . a p i . C o n t e n t C o n t r o l l e r as c o n t e n t C o n t r o l l e r
-p r o v i d e s f r a c t a l . a p i . C o n t e n t C o n t r o l l e r as cc i n c o n t e n t C o n t r o l l e r
-c o n t e n t f r a c t a l . l i b . cc f o r c o n t e n t C o n t r o l l e r
-s e l f b i n d s c o n t e n t C o n t r o l l e r t o cc
-r e q u i r e s f r a c t a l . a p i . Componen t I d en t i t y as c ompon en t I d e n t i t y o p t i o n a l
-r e q u i r e s f r a c t a l . a p i . B i n d i n gC o n t r o l l e r as b i n d i n gC o n t r o l l e r O p t i o n a l o p t i o n a l }
-Afin d’implémenter le modèle de composant, nous avons dû créer les composants et interfaces suivants :
-– Composants :
-– eventhandler : Comme son nom l’indique, c’est le sous-composant qui gère les événements.
-– behaviour (abstrait) : Ce composant est abstrait. Le développeur y définit les fonctionnalités du com-
-posant.
-– abstracComponent : C’est le ValentineAbstractComponent. Il contient les sous-composants eventhandler
-et behaviour.
-ThinkGenericComponent
-eventHandler
-behaviour
-abstractValentineComponent
-[opt ional ]
-bc
-valentineGenericDispatcher
-FIG. 8 – Représentation d’un astractValentineComponent
-8
-– Interfaces :
-– Behaviour : Cette interface est utilisée pour interagir avec le sous-composant behaviour.
-– ComponentHandler : Cette interface permet au Scheduler de transmettre les événements aux composants.
-– EventHandler : Cette interface est utilisée pour interagir avec le sous-composant eventhandler.
-– Reconfiguration : Cette interface est utilisée pour effectuer une opération reconfiguration.
-– SchedulerHandler : Cette interface lie le composant au composant système Scheduler.
-Afin d’implémenter notre modèle de composant, nous utilisons les contrôleurs suivant :
-– BindingController : Ce contrôleur permet de gérer les liaisons entre composants.
-– ContentController : Ce contrôleur permet de connaître le contenu, i.e. les sous-composants, d’un composant.
-– ComponentIdentity : Ce contrôleur permet de récupérer l’identité d’un composant.
-4 Implémentation d’une reconfiguration dynamique basée sur le modèle
-de composant
-Nous basons notre proposition et son implémentation sur le modèle de composant Fractal et plus précisément
-sur les interfaces de configuration. Ces interfaces peuvent être fournies par les contrôleurs afin de permettre aux
-composants d’être déployés et reconfigurés dynamiquement. Nous appliquons le modèle de composant proposé
-au composant ValentineComponent. Ainsi, pour reconfigurer un composant, il faut remplacer son sous-composant
-behaviour par un nouveau. Afin de réaliser cela, nous avons besoin d’accéder aux liaisons de ce dernier. Nous
-utilisons le BindingController qui permet la gestion des liaisons d’un composant.
-Soient CCp le contentController du composant parent et BCp son bindingController. Soient CIOp et BCOp
-un componentIdentity et un bindingController optionnels du composant parent. Enfin soient CIf et BCf le com-
-ponentIdentity et le bindingController du composant ciblé (la fonctionnalité). Le but est d’avoir accès au binding-
-Controller de la fonctionnalité depuis le composant parent. Pour cela, on suit la démarche suivante :
-1. on utilise CCp pour obtenir une référence vers CIf
-2. BCp est utilisé afin de lier CIOp à CIf
-3. on utilise CIOp (soit CIf ) pour obtenir une référence vers BCf
-4. on utilise BCp pour lier BCOp à BCf
-Composant ciblé
-CCp CIOp BCOp
-CIf BCf
-1
+AB > χ
 2
-3
-4
-BCp
-FIG. 9 – Mécanisme de reconfiguration dynamique
-Une fois (4) réalisé, nous pouvons lier/délier toutes les interfaces du composant behaviour et ainsi réaliser la
-reconfiguration voulue. La séquence que nous venons de décrire est appelée prise de contrôle.
-Imaginons un composant qui doit faire clignoter une led jaune . Nous souhaitons le reconfigurer pour passer
-de la led jaune à la verte. L’architecture du composant est donc la suivante :
-1. un composant qui ordonne à la led de s’éteindre puis de s’allumer périodiquement afin de la faire clignoter.
-Nous appellerons ce composant clignotant.
-9
-2. un composant qui représente la diode jaune et qui permet via son interface de demander à la diode jaune de
-s’allumer ou de s’éteindre. Il est lié au clignotant.
-3. un composant équivalent au précédent mais pour la diode verte. Il n’est pas lié et est présent librement dans
-le composant.
-Le but de la reconfiguration est donc de remplacer la liaison du clignotant vers la led jaune par une liaison vers
-la led verte. La procédure à suivre est alors la suivante :
-1. prendre le contrôle du clignotant (ou de la led jaune) afin de supprimer la liaison.
-2. prendre le contrôle de la led verte afin d’obtenir une référence vers son interface de contrôle de led.
-3. prendre le contrôle du clignotant et y lier l’interface récupérée en 2 .
-Clignotant
-Led
-Led
-jaune
-verte
-1
+1−α(ν) où χ
 2
-3
-FIG. 10 – Un exemple simple
-Au final, un composant qui doit être reconfigurable possède quatre interfaces dont deux optionnelles :
-– un contentController afin de sélectionner les composants internes
-– un bindingController pour lier les interfaces du composant que l’on veut changer
-– un componentIdentity optionnel et lié dynamiquement. Il est utilisé pour obtenir les interfaces d’un com-
-posant
-– un bindingController optionnel et lié dynamiquement. Il est utilisé pour (dé)lier un composant.
-5 Exemple et évaluation
-5.1 Exemple : l’application de surveillanceMonitorApp
-L’application de surveillance MonitorApp permet de surveiller les changements de l’environnement. Cette
-application est déployée sur chaque capteur afin d’acquérir la temperature, le taux d’humidité et la pression de
-leur environnement proche. Plus précisément, chaque capteur mesure ces trois données, calcule leur moyenne et
-les enregistre. Le capteur transmet les informations à la station de travail pour traitement toutes les heures.
-Cette application est composée d’un composant timerValentine, un composant acquisition, un composant cal-
-culation, un composant storage et un composant radioValentine. Le composant timerValentine est utilisé pour
-envoyer deux événements : un événement mesure toutes les dix minutes et un événement send toutes les heures.
-Les événements sont transmis à tous les composants à travers le composant scheduler. Quand le composant ac-
-quisition reçoit l’événement mesure, il mesure les données demandées, les transmet au composant calculation
-qui calcule la moyenne avant de les transmettre au composant storage. Quand un événement send survient, le
-composant storage communique ses données au composant radioValentine qui les envoie à la station de travail au
-travers du réseau.
-10
-5.2 Application du modèle de composant à cet exemple
-La Figure 11 représente une application utilisant notre modèle de composant. Chaque composant contient un
-composant behaviour et un composant eventHandler. Le composant timerValentine et le composant radioValentine
-sont de type ValentineComponent. Le premier contient le composant générique Think timer et le second contient
-le composant générique Think radio.
-timer
-timerEventHandler
-scheduler
-timerBehaviour
-<<description>>
-The timer 
-component is a 
-Think generic 
-component.
-acquisition
-calculation
-storage
-acquisitionBehaviour
-storageEventHandler
-calculationEventHandler
-acquisitionEventHandler
-calculationBehaviour
-storageBehaviour
-timerValentine
-radioValentine
-radioBehaviour
-radio
-<<description>>
-The radio 
-component is a 
-Think generic 
-component.
-radioEventHandler
-listEvents : list
-addEvent()
-removeEvent()
-init()
-searchEvent()
-execute()
-1..* init()
-1..*
-*
-1
-0..1 0..1
-1..*
-1
-1
-1
-1
-0..1
-1..*
-*1
-1 getData()
-1..*
-0..1
-0..1
-1
-0..1
-0..1
-0..1
-*
-*
-removeEvent()
-listEvents : list
-addEvent()
-searchEvent()
-listEvents : list
-addEvent()
-removeEvent()
-init()
-1
-0..1
-0..1
-1
-1
-1
-execute()
-addData()
-listEvents : list
-addEvent()
-removeEvent()
-init()
-searchEvent()
-execute()
-storeData() listEvents : list
-removeEvent()
-addEvent()
-init()
-searchEvent()
-execute()
-1 searchEvent()
-execute()
-FIG. 11 – L’application de surveillance
-Quand un événement mesure apparaît, le composant acquire envoie un événement au scheduler qui le place
-dans sa file. Quand l’événement est séléctionné, le scheduler l’envoie au composant acquire qui mesure les don-
-nées demandées et les transmet au composant calculation pour calculer la moyenne. Ensuite, ce dernier commu-
-nique ses résultats au composant storage pour sauvegarde. Toutes les heures, sur reception de l’événement send,
-le composant storage transmet ses données au composant radioValentine qui les envoie à la station de travail.
-Quand un événement apparaît, il est traité par chaque sous-composant eventHandler de chaque composant. Les
-tâches (lecture de données, calcul de moyenne,. . . ) sont traitées par chaque sous-composant behaviour de chaque
-composant.
-5.3 Evaluation
-Nous présentons dans cette section les résultats et mesures obtenus. Pour cela, nous avons développé un exem-
-ple simple sous TinyOS et sous Valentine et nous avons comparé les images obtenus. L’exemple consiste en une
-application qui, à intervalle régulier, fait clignoter la led verte. L’application est donc composée d’un composant
-11
-Timer et d’un composant Leds. En implémentant cet exemple avec TinyOS, nous obtenons une image de 4,23 Ko.
-Cette image contient le système ainsi que l’application.
-En ce qui concerne l’évaluation de l’exemple implémenté sous Valentine, nous avons choisi de procéder en
-plusieurs étapes. Dans un premier temps nous avons mesurer la taille de l’image du système d’exploitation seul.
-Comme nous l’avons dit précédemment, Think est gourmand en terme de consommation de ressources et notam-
-ment en ce qui concerne les ressourcesmémoires. Par exemple, l’image deValentine pèse déjà 48,3 Ko, c’est-à-dire
-11 fois plus que l’image obtenu pour l’exemple avec TinyOS. Dans un second temps, nous avons implémenté l’ex-
-emple sans les parties modèle de composant et reconfiguration dynamique. L’image qui en résulte mesure 120,9
-Ko. Ensuite, nous avons appliqué le modèle de composant que nous proposons. Nous obtenons alors une image
-de 189,4 Ko. Pour terminer, l’implémentation de la propriété ainsi que la mise en œuvre du code de reconfigura-
-tion dynamique coûte seulement 0,5 Ko. L’image totale mesure alors 189,9 Ko. La Figure 12 présente un tableau
-récapitulant les tailles des différentes images.
-FIG. 12 – Tableau récapitulatif des tailles des images
-6 Conclusions et travaux futurs
-Dans ce papier, nous avons traité de la reconfiguration dynamique dans le cadre des réseaux de capteurs sans fil.
-Nous avons mis en évidence que TinyOS ne permettait pas cette fonctionnalité à cause du fait que son architecture
-à base de composant est délayée dans le processus d’optimisation. Pour palier cette limitation, nous avons présenté
-notre approche. Celle-ci est basée sur deux contributions. D’une part, nous avons développé un nouveau système
-d’exploitation appelé Valentine. Celui-ci a été généré en utilisant Think, un générateur de systèmes d’exploitation
-basés composants. D’autre part, nous avons développé un modèle de composant basé sur Fractal spécifique à la
-reconfiguration dynamique et déployé sur Valentine. Cette double contribution nous permet d’administrer à la fois
-les composants fonctionnels déployés sur notre système mais aussi les composants même du système.
-Notre système d’exploitation et notre modèle de composants sont aujourd’hui fonctionnels. Afin de finir
-d’outiller notre approche, il nous reste à mettre en place un protocole de reconfiguration prenant en compte les par-
-ticularité des réseaux de capteurs, notamment en terme d’économie d’énergie et donc économe en communication.
-L’étape suivante portera sur l’évaluation de notre travail en terme de performance, de vitesse de reconfiguration et
-de réduction de consommation des ressources.
+1−α(ν) est
+le quantile d’ordre 1 − α de la loi du χ2 à ν = (a − 1)(b − 1) degrés de liberté. En pra-
+tique cette approximation n’est utilisée dès et que n > 30, nij > 5 et n′ij > 5, dans le
+cas contraire, il faut procéder à des regroupements de modalités voisines. L’intervalle de re-
+jet [χ21−α(ν),+∞[ est certes arbitraire (les faibles écarts χ2AB << χ21−α(ν) sont également
+rares) mais il capture la notion intuitive de dépendance. Dans le cas de 3 variables A,B et C,
+χ2ABC s’obtient à partir des n
+′
+ijk = ni..n.j.n..k/n
+2. χ2ABC suit approximativement une loi χ
+2
+à ν = (a − 1)(b − 1)(c − 1). Dans notre étude, le χ2S sert de mesure de corrélation entre un
+ensemble S de caractères. Son avantage par rapport aux mesures classiques de règles d’asso-
+ciation est de prendre en compte simultanément toutes les cellules de la table de contingence et
+définir des seuils ad hoc à partir de tables statistiques. On montre facilement dans le cas binaire
+que la propriété de fermeture reste valable pour la statistique du χ2 : si S est corrélé au risque
+α, tout sur-ensemble est encore corrélé au risque α (e.g. χ2ABC > χ
+2
+AB). De plus, ν = 1 dans
+le cas binaire, ce qui permet de comparer entre elles les valeurs du χ2ABC et de fixer un unique
+- 654 -RNTI-E-6
+I. Aussem et al.
+seuil de confiance à un risque donné. Nous serons également amenés à mesurer le degré de
+dépendance conditionnelle entre deux variables, χ2AB|C avec n
+′k
+ij = ni.kn.jk/n..k. χ
+2
+AB|C suit
+une loi χ2 à ν = (a − 1)(b − 1)c degrés de liberté. On observe, dans le cas binaire, que le
+nombre de degrés de liberté de χ2AB|S où S est un ensemble de n variables binaires varie cette
+fois en 2n. χ2AB , χ
+2
+ABC et χ
+2
+AB|C sont donnés par les formules :
+χ2AB =
+a∑
+i=1
+b∑
+j=1
+(nij − n′ij)2
+n′ij
+, χ2ABC =
+a∑
+i=1
+b∑
+j=1
+c∑
+k=1
+(nijk − n′ijk)2
+n′ijk
+, χ2AB|C =
+a∑
+i=1
+b∑
+j=1
+c∑
+k=1
+(nijk − n′kij )2
+n′ijk
+2.4 Dépendance, indépendance et degré de corrélation
+Dans le suite, nous jonglerons avec plusieurs seuils, χ2dep(ν) et χ
+2
+indep(ν), associés à la loi
+du χ2 à ν degrés de liberté, pour tester la dépendance ou l’indépendance entre des ensembles
+de variables. Ainsi pour tout ensemble S de variables, χ2S > χ
+2
+dep(1) indiquera la dépen-
+dance et χ2S < χ
+2
+indep(1) indiquera l’indépendance, avec χ
+2
+indep(1) ≤ χ2dep(1). Dans le cas où
+χ2indep(1) < χ
+2
+S < χ
+2
+dep(1), l’ensemble S sera donc jugé ni dépendant, ni indépendant, selon le
+test qui lui est apliqué. De même, χ2AB|S < χ
+2
+indep(2
+card(S)) indiquera l’indépendance condi-
+tionnelle de A et B sachant un ensemble S de variables. On prendra pour χ2dep(ν) le quantile
+d’ordre 1 − α (avec α = 0.05) de la loi du χ2 à ν degrés de liberté ; l’autre seuil χ2indep(ν)
+est arbitraire car il n’est pas possible d’estimer la probabilité de mal classer des variables dé-
+pendantes (voir (Silverstein et al., 2000) pour une discussion sur les seuils). Pour comparer le
+degré de corrélation entre AB et AB|C, la comparaison des valeurs du χ2 n’est plus possible
+puisque χ2AB et χ
+2
+AB|S suivent toutes deux une loi χ
+2 mais avec des degrés de liberté distincts.
+Pour contourner ce problème, nous proposons le test suivant : AB|C seront jugés plus corrélés
+que AB dès lors que Fχ2(2)(χ2AB|C) > Fχ2(1)(χ
+2
+AB) où Fχ2(ν) est la fonction de répartition
+d’un χ2 à ν degrés de liberté (i.e. Fχ2(ν)(x) = P (χ2(ν) ∈] −∞, x])). Indépendance et cor-
+rélation sont deux notions intimement liées, car dans le cas de deux variables booléennes A et
+B, on montre aisément que χ2AB = nρ
+2 où ρ est le coefficient de corrélation entre A et B, et n
+la taille des données (Silverstein et al., 2000). La force de la corrélation est donc directement
+mesurée par la statistique du χ2. C’est pourquoi l’estimation du degré de dépendance mesuré
+par le χ2 revient ici à estimer le degré de corrélation entre les variables booléennes.
+3 Une nouvelle heuristique pour l’apprentissage de la struc-
+ture du RB
+Notre méthode d’apprentissage de structure de RB opère en plusieurs étapes. La première
+partie consiste en la découverte de corrélations entre variables à partir de données. La se-
+conde partie traite de la construction du graphe non orienté qui est sensé, une fois les arêtes
+dirigées, représenter la structure du réseau bayésien résultant de l’apprentissage. La dernière
+partie consiste à diriger les arêtes du graphe non orienté et supprimer celles qui sont super-
+flues. Pour illustrer et valider notre approche, nous avons utilisé le réseau de la dyspnée Asia
+(Lauritzen et Speigelhalter, 1988), dont la structure est déjà connue (voir Figure 1).
+- 655 - RNTI-E-6
+Apprentissage de la structure des réseaux bayésiens
+3.1 Découverte des motifs corrélés minimaux fréquents
+Nous décrivons ici succinctement la découverte de motifs corrélés minimaux fréquents
+telle qu’elle a été définie et réalisée dans (Silverstein et al., 1998), donc l’objectif était de
+généraliser des règles d’association en règles de corrélation. Cette phase d’accès aux données
+est la plus coûteuse en terme de complexité. Le permier algorithme a pour objectif d’extraire
+l’ensemble des motifs corrélés minimaux, qui sont, par monotonie, une représentation de tous
+les motifs corrélés. En outre, une notion de fréquence est également utilisée afin d’élaguer
+au mieux les ensembles inutiles. Toutefois, la notion classique de support dans le domaine
+de la découverte de règles d’associations ne s’applique qu’aux modalités des caractères et
+ne caractérise pas une relation probabiliste entre les variables aléatoires. Pour tenir compte
+de toutes les cellules de la table de contingence, une généralisation de la notion de support
+s’impose : un motif X sera dit fréquent dès lors qu’au moins p% des cellules de la table de
+contingence ont un support supérieure à s, p et s étant défini par l’utilisateur. Notons que cette
+définition permet de conserver la propriété d’anti-monotonie du support, sur laquelle repose
+en partie l’efficacité des méthodes d’extraction. En combinant la nouvelle mesure du support
+avec celle du χ2, on obtient l’algorithme 1 "χ2 − support" de (Silverstein et al., 1998) non
+reproduit ici faute de place. L’algorithme parcourt par niveau l’espace de recherche et retourne
+la liste SIG des fréquents corrélés minimaux tels que tous les sous-ensembles de taille i − 1
+des éléments de taille i de SIG sont fréquents mais non-corrélés. La complexité au pire cas
+de l’heuristique proposée est exponentielle en fonction du nombre de caractères. En pratique
+toutefois, l’efficacité dépend de la sélectivité des prédicats d’élagage dont l’étude est encore à
+ce jour un problème ouvert. Dans nos expérimentations préliminaires, le nombre de niveaux
+i explorés n’a jamais dépassé deux. Une étude empirique sur des bancs d’essais permettra de
+comparer cette heuristique avec les autres sur la base du temps de calcul effectif.
+3.2 Construction du graphe non orienté
+Après avoir extrait les ensembles fréquents corrélés minimaux, se pose la question de la
+représentation des variables par un graphe causale non orienté. Relier toutes les variables cor-
+rélées entre elles n’est pas une solution. Si A → B → C où "‘→"’ désigne une relation
+causale, alors A et C seront certainement corrélées par transitivité. Il faut donc s’interroger sur
+l’existence réelle de l’arête (A,C) dans le graphe et éliminer certains couples de caractères
+corrélés sans causalité directe. Dans ce but, nous appliquons la proposition suivante pour tester
+si la relation est de type CCC Cooper (1997) :
+Proposition 1 Pour tous (A,B), (B,C) ∈ E, si χ2(AC|B) < χ2indep(2) alors (A,C) 6∈ E
+L’algorithme 2 (non représenté faute de place) traite dans un premier temps les motifs corrélés
+portant sur des couples de variables. Il utilise l’ensemble des couples corrélés ordonnés dans
+l’ordre décroissant du χ2. Pour tout couple corrélé (A,B), plusieurs cas peuvent se présenter :
+(1) s’il n’existe aucun chemin, à ce stade de l’algorithme, entre A et B, dans G alors l’arête
+(A,B) est ajoutée à E ; (2) s’il existe un chemin de la forme A − C − B, alors on applique
+la proposition 1. Si χ2(AB|C) < χ2indep(2), l’arête (A,B) n’est pas ajoutée à E ; (3) Dans
+les autres cas, on ajoute (A,B) à l’ensemble des arêtes dites potentielles. Il faut attendre de
+connaître la nature des chemins après la détection des V-structures pour statuer sur l’existence
+de l’arc.
+- 656 -RNTI-E-6
+I. Aussem et al.
+Pour les motifs corrélés d’ordre supérieur à deux, disons ABCD, nous avons choisi arbitrai-
+rement de créer une V-structure avec une variable cible, disons B, telle que χ2(ACD|B) soit
+maximal, et de relier A, B et C à B. L’algorithme 1 et 2 ont été appliqués au réseau Asia avec
+les paramètres suivants : pourcentage du support p = 25%, χ2indep(1) = χ
+2
+dep(1) = 3.84 et
+χ2indep(2) = 5.99. 15000 exemples ont été échantillonnés grâce au réseau théorique. La Figure
+2 montre le graphe non orienté obtenu à l’issue cete étape avec les valeurs précédentes. On ob-
+serve que toutes les arêtes du réseau original Asia ont bien été selectionnées mais que 5 arêtes
+supplémentaires figurent à tort sur le graphe.
+3.3 Détection des V-structures
+Comment diriger les arêtes du graphe non-orienté ? Il existe 3 types de connexions : les
+connexions en série A→ B → C ou A← B ← C, la connexion divergente A← B → C et
+la connexion convergente A → B ← C. Ces dernières sont encore appelées V-structures.
+Il faut garder à l’esprit que plusieurs structures peuvent encoder la même loi de probabi-
+lité conjointe (équivalence de Markov). Seules les V-structures, détectées par les tests d’in-
+dépendance conditionnelle, permettent de diriger certains arcs et de propager arbitrairement
+les orientations des autres arcs. Considérons une V-structure A → B ← C, alors, condi-
+tionnellement à B, la relation de corrélation entre A et C est renforcée. On s’attend donc à
+Fχ22(χ
+2(AC|B)) > Fχ21(χ2(AC)), quelque soient les autres chemins entre A et C non repré-
+sentés. Nous ne testons pas l’indépendance entre A et C car ils peuvent ne pas être indépen-
+dants à cause de parents communs comme le sont par exemple O et B dans le réseau Asia. A
+l’inverse, si A ← B ← C, A → B → C ou A ← B → C alors, conditionnellement à B, la
+corrélation entre A et C ne peut que diminuer, quelque soient les autres chemins entre A et B.
+D’où la proposition suivante :
+Proposition 2 SoitA,B,C trois variables telles que (A,B) ∈ E et (B,C) ∈ E. SiFχ2(2)(χ2AC|B) > Fχ2(1)(χ2AC)
+alors on supposera que {ABC} forment une V-structure (A → B ← C). Dans le cas contraire, on supposera que
+la connexion est en série (A→ B → C, A← B ← C) ou qu’elle est divergente A← B → C.
+La Figure 3 montre le graphe à cette étape. Les arêtes potentielles sont également concer-
+nées par les V-structures. On observe que seuls les noeuds D et O constituent les centres des
+connexions convergentes. Ce sont du reste les seules V-structures du réseau Asia original.
+3.4 Suppression des arêtes superflues
+Dans cette dernière étape, on traite les arêtes dites potentielles (cf Chap. 3.2) lors de la
+construction du graphe non orienté. On connaît désormais les chemins entre chaque paire de
+noeuds. On peut donc raisonner ainsi : pour chaque arête (AB) dans le graphe tel qu’il existe
+un autre chemin entre A et B sans V-structure, alors si conditionnellement à un caractère
+quelconque sur ce chemin, A et B deviennent indépendants, alors l’arête (AB) n’a pas lieu
+d’être. Cette proposition, très similaire à l’étape de "‘Thinning"’ dans la procédure BN-Power
+Constructor de Cheng et al. (2002), se généralise à tous les chemins entre A et B sans V-
+structures.
+Proposition 3 Soit G(V,E) un graphe causal et (A,B) ∈ E. Posons chemini(A,B), les chemins entre A et
+B uniquement formés de connexions de type CCC (en série ou divergente pour chaque noeud du chemin). Si
+- 657 - RNTI-E-6
+Apprentissage de la structure des réseaux bayésiens
+FIG. 1 – Réseau Asia original.A désigne ’visite en
+Asie’, T ’tuberculose’, S ’fumeur’, B ’bronchite’, D
+’dyspnée’ (difficulté respiratoire), X ’rayons X’ et L
+’cancer de la langue’.
+FIG. 2 – Graphe non orienté résultant de l’algo-
+rithme 2. Les arêtes en pointillé sont les arêtes dites
+potentielles, les arêtes en trait plein sont les arêtes dé-
+finitives.
+FIG. 3 – Détection des V-structures par l’algo-
+rithme 3.
+FIG. 4 – Suppression de certaines arêtes poten-
+tielles par l’algorithme 4.
+χ2(AB|S) < χ2indep(2card(S)) avec S = ∪Si et Si un noeud quelconque du chemini(A,B), alors l’arête
+(A,B) doit être retirée de E.
+L’algorithme 4 (non représenté) élimine les arêtes superflues du graphe contenant les V_structure
+en exploitant la proposition 3. Les chemins contenant une V_structure sont ignorés. Après
+suppression des arêtes superflues, le graphe partiellement dirigé obtenu par l’algorithme 4 est
+affiché sur la Figure 4. On observe que toutes les arêtes potentielles ont été éliminées hormis
+L − S. Il reste à propager les direction des arêtes en évitant l’ajout de V-structures. (A, T ),
+(L, S),(S,B) peuvent être dirigées dans les deux sens, cependant, on ne doit pas créer la V-
+structure L → S ← B. Le graphe obtenu est un équivalent de Markov du réseau original, il
+représente la même distribution de probabilités que le réseau Asia.
+4 Application au cancer
+4.1 Les données
+Au vu des premiers résultats encourageants obtenus sur le réseau Asia, nous appliquons
+la méthode aux données d’une étude épidémiologique cas-témoins du cancer du nasopharynx
+(NPC). Pour clarifier le rôle de l’environnement dans l’étiologie du NPC, l’Unité d’épidémio-
+logie génétique du CIRC a mené en 2004 une étude multicentrique de cas-témoins dans la
+- 658 -RNTI-E-6
+I. Aussem et al.
+FIG. 5 – RB obtenu après apprentissage de la
+structure sur une restriction des caractères suscep-
+tibles d’être impliqués dans le NPC chez les jeunes
+uniquement. La variable ’JeunesCasNPC’ désigne
+l’occurrence du NPC chez les jeunes de moins de 25
+ans.
+FIG. 6 – RB obtenu après apprentissage de la
+structure sur une restriction des caractères suscep-
+tibles d’être impliqués dans le NPC chez les adultes
+uniquement. La variable ’VieuxCasNPC’ désigne l’oc-
+currence du NPC chez les personnes de plus de 35 ans.
+région endémique du Maghreb. 625 cas et 625 témoins ont été recrutés. Les données extraites
+du questionnaires comporte 1250 enregistrements et 480 caractères. A ce stade, nous faisons
+implictement deux hypothèses fortes : (1) l’efficacité de l’algorithme ne se dégrade pas trop
+lorsque l’on passe de 15000 exemples (Asia) à 1250 exemples ; (2) toutes les variables d’inté-
+rêt sont connues (principe de suffisance causale). Ce projet en phase préliminaire a pour but
+d’identifier les conjonctions de facteurs par des réseaux bayésiens, dans la lignée des travaux de
+recherche récents (Antal et al., 2004; Lucas et al., 2004; Getoor et al., 2004; Acid et al., 2004).
+L’idée est d’apporter un éclairage utile et pertinent sur les différents facteurs causes impliquées
+dans le NPC et dresser un profil statistique type de la population étudiée, que ne permet pas
+nécessairement la régression logistique, modèle couramment employée en épidémiologie.
+4.2 Résultats
+Dans cette section, nous présentons succinctement un travail - très préliminaire - mené sur
+un sous ensemble des données du questionnaire avec un petit réseau bayésien de quelques di-
+zaines de méta variables booléennes, englobant plusieurs variables pré-sélectionnées, construites
+avec un expert à partir de la base de données. La variable à expliquer est " jeunescasNPC " dans
+la Figure 5, et " vieuxcasNPC " dans la Figure 6 (les épidémiologiste suspectent que les facteurs
+étiologiques seraient différents selon l’âge de survenue du cancer) ; les autres sont les variables
+explicatives : consanguinité, nombre de NPC dans la famille, sexe, habitat enfance, exposition
+aux fumées, maladies, allergies, exposition aux substances toxiques, allaitement, contact avec
+la salive adulte, tabac, smen (graisse animale), légumes, nourriture pimentée, neffa (drogue
+locale), cannabis, viande maison ou viande industrielle.
+Les figurent 5 et 6 dressent les profils types des jeunes (<25 ans) et les individus plus
+âgés (>35 ans) atteints du NPC en mettant en évidence les causalités potentielles exhibées par
+l’algorithme. Il s’agit dans chaque cas d’une visualisation graphique des interactions entres
+les variables choisies et donc du profil statistique de la population considérées. Les tables
+de probabilités stockées dans les nœuds ne sont pas représentées. En observant uniquement
+- 659 - RNTI-E-6
+Apprentissage de la structure des réseaux bayésiens
+la structure du graphe, il est possible de dresser un profil moyen des populations analysées en
+gardant à l’esprit que seuls les arcs orientés lors de la découverte de V-structure (puis de la pro-
+pagation de certains arcs après cette étape) correspondent à des relations causales. On observe
+que la cause principale du NPC chez les jeunes est la consommation de graisse animale saturée
+(smen) car cet arc ne peut être inversé sans créer de V-structure. En revanche, comme il n’y a
+aucune V-structure entre Smen, legume, et jeunesNPC, on a le choix en théorie entre plusieurs
+interprétations causales. L’expert du domaine opte pour habenf->salive->smen->legumes. Se-
+lon cette interprétation, le NPC chez les jeunes dépend indirectement les conditions d’habitat
+et le contact avec la salive adulte. A l’inverse, la consanguinité et l’allaitement n’ont manifeste-
+ment aucune influence sur le risque de NPC. Chez les personnes plus âgées, c’est au contraire
+et les maladies et l’exposition aux produits toxiques qui semblent déterminant (V-structure),
+l’exposition étant liée aux conditions d’habitat à l’enfance. On retrouve également des résul-
+tats de bon sens : les hommes sont plus enclins à fumer, à consommer des drogues et être
+exposés à des produits toxiques (au travail), que l’exposition aux fumées (encens, parfums,
+feu de bois etc.) est plus fréquente dans les gourbis que les appartements en villes (habitat
+enfant) ; qu’il y a un lien entre l’habitat adulte et et le nombre de cas de cancer dans la fa-
+mille ; que le smen se consomme avec de la viande maison et des légumes ; que les habitant
+des villes consomment plus de nourriture industrielle etc. On observe aussi que consanguinité,
+allergies et allaitement apparaissent comme variables indépendantes ; que certaines relations
+sont curieuses voire douteuses (e.g. le lien entre le nombre de cas familiaux et les conditions
+d’habitat à l’âge adulte) probalement en raison de l’existence de causes cachées (l’hypothèse
+de suffisance causale semble donc erronée).
+En conclusion, ces graphes nous renseignent sur le mode de vie des sujets maghrébins et ré-
+vèlent certaines chaînes de causalités susceptibles d’entraîner in fine le cancer de nasopharynx.
+Malgré le fait que de nombreux liens de causalité sont confirmés par les experts du domaine
+(e.g. smen, produits toxiques), nous nous gardons bien, à ce stade, de tirer des conclusions
+hâtives sur la pertinence des résultats obtenus.
+5 Conclusion et critiques
+Dans cet article, nous avons proposé une nouvelle méthode inspirée des travaux sur la
+recherche de motifs fréquents corrélés pour l’apprentissage de la structure des réseaux bayésien
+à partir de données. L’objectif est d’identifier les causalités entre les caractères à partir de tests
+d’indépendance conditionnelle et d’une mesure de corrélation, touts deux basés sur le χ2.
+Après une rapide illustration sur le réseau Asia, nous avons appliqué la méthode aux données
+d’une étude épidémiologique cas-témoins du cancer du nasopharynx (NPC).
+De nombreuses difficultés subsistent dans ce travail : le manque de fiabilité des tests d’in-
+dépendance conditionnelle dans les espaces de grande dimension (le nombre de données né-
+cessaires augmentent exponentiellement en fonction du nombre de variables en condition), la
+nécessité de définir des seuils du χ2, un seuil pour le support, de garder en mémoire la nature
+des chemins (existence de V-structure ou non) entre chaque couple de variables. Ce travail pré-
+sente encore de nombreuses faiblesses : il est impératif de mener une validation plus rigoureuse
+de la méthode sur les bancs d’essais disponibles sur Internet et d’étudier l’effet de la taille des
+bases d’exemples sur les performances. La complexité devra être examinée avec soin et les
+temps d’exécution comparée aux d’autres méthodes existantes (K2, GS, PC etc) dans l’esprit
+- 660 -RNTI-E-6
+I. Aussem et al.
+des travaux de (Francois et Leray, 2004). Ces différents points font actuellement l’objet de nos
+travaux de recherche.
 Références
-Balani, R., C. Han, R. K. Rengaswamy, et I. Tsigkogiannis (2006). Multilevel Software Reconfiguration for Sensor
-Networks. ACM Conference on Embedded Systems Software (EMSOFT).
-Bhatti, S., J. Carlson, H. Dai, J. Deng, J. Rose, A. Sheth, B. Shucker, C. Gruenwald, A. Torgerson, et R. Han
-(2005). MANTIS OS : An Embedded Multithreaded Operating System for Wireless Micro Sensor Platforms.
-Volume 10, pp. 563–579.
-12
-Bruneton, E., T. Coupaye, et J.-B. Stefani (2004). The Fractal Component Model Specification. Draft, version
-2.0-3, ObjectWeb Consortium. http://fractal.objectweb.org.
-Cao, Q., T. Abdelzaher, J. Stankovic, , et T. He (2008). The liteos operating system : Towards unix-like abstractions
-for wireless sensor networks. In In Proceedings of the 7th International Conference on Information Processing
-in Sensor Networks (ACM/IEEE IPSN).
-Crnkovic, I. (2006). Component-Based Software Engineering for Embedded Systems. In J.-P. Babau, J. Cham-
-peau, et S. Gérard (Eds.), From MDDConcepts to Experiments and Illustrations, Chapter 5, pp. 71–90. London,
-UK : ISTE.
-Dunkels, A., B. Grönvall, et T. Voigt (2004). Contiki - a Lightweight and Flexible Operating System for Tiny
-Networked Sensors. In Proceedings of the First IEEE Workshop on Embedded Networked Sensors (Emnets-I),
-Tampa, Florida, USA.
-Fassino, J.-P., J.-B. Stefani, J. Lawall, et G. Muller (2002). THINK : A Software Framework for Component-based
-Operating System Kernels. In In the USENIX Annual Technical Conference, Monterey, CA, USA, pp. 73–86.
-Han, C.-C., R. Kumar, R. Shea, E. Kohler, et M. Srivastava (2005). A Dynamic Operating System for Sensor
-Nodes. In Proceedings of the 3rd international conference on Mobile systems, applications, and services,
-Seattle, Washington, USA.
-Hill, J., R. Szewczyk, A. Woo, S. Hollar, D. Culler, et K. Pister (2000). System Architecture Directions for
-Network Sensors. In Proceedings of Ninth International Conference ASPLOS, Cambridge, MA, USA.
-Hoang, N., N. Belloir, C.-D. Pham, et S. Sentilles (2008). Valentine : A Dynamic and Adaptive Operating System
-for Wireless Sensor Networks. In Proceedings of the 1st IEEE International Workshop on Component-Based
-Design of Resource-Constrained Systems, Turku, Finland.
-Szyperski, C., D. Gruntz, et S. Murer (2002). Component Software – Beyond Object-Oriented Programming (2nd
-ed.). ACM Press. New York, NY : Addison-Wesley.
-Weiser, M. (1993). Some Computer Science Issues in Ubiquitous Computing. Communications of the ACM 36(7),
-75 – 84.
+Acid, S., L. M. de Campos, J. M. Fernández-Luna, S. Rodríguez, J. M. Rodríguez, et J. L.
+Salcedo (2004). A comparison of learning algorithms for bayesian networks : a case study
+based on data from an emergency medical service. Artificial Intelligence in Medicine 30(3),
+215–232.
+Adamo, J.-M. (2001). Data Mining for asociation rules and sequential patterns. Springer-
+Verlag New York.
+Agrawal, R., T. Imielinski, et A. N. Swami (1993). Mining association rules between sets of
+items in large databases. In P. Buneman et S. Jajodia (Eds.), SIGMOD conference, Washing-
+ton, D.C., pp. 207–216. ACM Press.
+Agrawal, R. et R. Srikant (1994). Fast algorithms for mining association rules in large da-
+tabases. In J. B. Bocca, M. Jarke, et C. Zaniolo (Eds.), International Conference on Very
+Large Data Bases (VLDB’94), Santiago de Chile, Chile, pp. 487–499. Morgan Kaufmann.
+Antal, P., G. Fannes, D. Timmerman, Y. Moreau, et B. D. Moor (2004). Using literature and
+data to learn bayesian networks as clinical models of ovarian tumors. Artificial Intelligence
+in Medicine 30(3), 257–281.
+Bastide, Y., R. Taouil, N. Pasquier, G. Stumme, et L. Lakhal (2000). Mining frequent patterns
+with counting inference. ACM SIGKDD Exploration 2(2), 66–75.
+Bayardo, R. J. (1998). Efficiently mining long patterns from databases. In L. M. Haas et
+A. Tiwary (Eds.), ACM SIGMOD Conference, Seattle, USA, pp. 85–93.
+Bayardo, R. J. et R. Agrawal (1999). Mining the most interesting rules. In international
+conference on Knowledge discovery and data mining (KDD’99), pp. 145–154.
+Cheng, J., R. Greiner, J. Kelly, D. A. Bell, et W. Liu (2002). Learning bayesian networks from
+data : An information-theory based approach. Artif. Intell. 137(1-2), 43–90.
+Cooper, G. (1997). A simple constraint-based algorithm for efficiently mining observational
+databases for causal relationships. Data Mining and Knowledge Discovery 1(1), 203–224.
+Francois, O. et P. Leray (2004). Evaluation d’algorithmes d’apprentissage de structure pour
+les réseaux bayésiens. In Proceedings of 14ème Congrès Francophone Reconnaissance des
+Formes et Intelligence Artificielle, RFIA 2004, Toulouse, France, pp. 1453–1460.
+Friedman, N., K. Murphy, et S. Russell (1998). Learning the structure of dynamic probabilistic
+networks. In G. F. Cooper et S. Moral (Eds.), Proceedings of the 14th Conference on Uncer-
+tainty in Artificial Intelligence (UAI-98), San Francisco, pp. 139–147. Morgan Kaufmann.
+Getoor, L., J. T. Rhee, D. Koller, et P. Small (2004). Understanding tuberculosis epidemiology
+using structured statistical models. Artificial Intelligence in Medicine 30(3), 233–256.
+Gunopulos, D., R. Khardon, H. Mannila, S. Saluja, H. Toivonen, et R. S. Sharma (2003).
+Discovering all most specific sentences. ACM Transaction on Database System 28(2), 140–
+174.
+- 661 - RNTI-E-6
+Apprentissage de la structure des réseaux bayésiens
+Han, J. et M. Kamber (2000). Data Mining : Concepts and Techniques. Morgan Kaufmann.
+Han, J., J. Pei, et Y. Yin (2000). Mining frequent patterns without candidate generation. In
+W. Chen, J. F. Naughton, et P. A. Bernstein (Eds.), International Conference on Management
+of Data (SIGMOD’00), Dallas, Texas, USA, pp. 1–12. ACM.
+Hand, D., H. Mannila, et P. Smyth (2001). Principles of Data Mining. MIT Press.
+Lauritzen, S. et D. Speigelhalter (1988). Local computations with probabilities on graphical
+structures and their application to expert systems. Royal statistical Society B 50, 157–224.
+Leray, P. et O. Francois (2004). BNT structure learning package : Documentation and experi-
+ments. Technical report, Laboratoire PSI.
+Lucas, P. J. F., L. C. van der Gaag, et A. Abu-Hanna (2004). Bayesian networks in biomedicine
+and health-care. Artificial Intelligence in Medicine 30(3), 201–214.
+Murphy, K. (2001). The bayesnet toolbox for matlab. In Computing Science and Statistics :
+Proceedings of Interface, Volume 33.
+Pasquier, N., Y. Bastide, R. Taouil, et L. Lakhal (1999). Efficient mining of association rules
+using closed itemset lattices. Information Systems 24(1), 25–46.
+Pearl, J. (2000). Causality : Models, Reasoning, and Inference. Cambridge, England : Cam-
+bridge University Press.
+Pearl, J. et T. S. Verma (1991). A theory of inferred causation. In J. F. Allen, R. Fikes, et
+E. Sandewall (Eds.), KR’91 : Principles of Knowledge Representation and Reasoning, San
+Mateo, California, pp. 441–452. Morgan Kaufmann.
+Silverstein, C., S. Brin, R. Motwani, et J. D. Ullman (1998). Beyond market baskets : Genera-
+lizing association rules to correlations. In VLDB, pp. 594–605.
+Silverstein, C., S. Brin, R. Motwani, et J. D. Ullman (2000). Scalable techniques for mining
+causal structures. Data Min. Knowl. Discov. 4(2/3), 163–192.
+Spirtes, P., C. Glymour, et R. Scheines (2000). Causation, Prediction, and Search (2 ed.). The
+MIT Press.
 Summary
-In this paper, we present an approach allowing dynamic reconfiguration in wireless sensor networks (WSNs).
-This proposition is based on a software engineering build around a new operating system and a componnt model.
-This operating system, called Valentine, allows to keep the building by component at runtime, in opposition to
-monolithic contruction used by the main existing solutions in WSNs. It generated through the Think framework.
-The component model allows to reuse the Fractal abtract component model and to implement the mechanism of
-dynamic reconfiguration.
-13
+Learning the structure of a bayesian network from a data set is NP-hard . Several methods
+have been proposed. In this paper, we discuss a new heuristic based on ideas developed for
+mining frequent sets in order to identify causal relations between random variables. We pro-
+pose measuring significance of variable associations via the chi-square statistics. This leads
+to a measure that is upward closed in the itemset lattice, enabling us to reduce the mining
+problem to the search for a border between correlated and uncorrelated sets. A causal graph
+is then constructed from the correleted sets and the edges are afterward directed according to
+the V-structures found in the graph. A few unnecessary edges are then detected by subsequent
+idependence tests and removed. The method is first successfully applied on the Asia network
+benchmark to recover the original structure from data. The algorithm is then applied on the
+nasopharyngeal cancer (NPC) data in order to identify the environmental factors of the NPC.
+- 662 -RNTI-E-6

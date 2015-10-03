@@ -1,482 +1,743 @@
-Détection de communautés dans les graphes bipartites
-The Anh Dang, Emmanuel Viennet∗
-∗L2TI - Université Paris 13, France
-emmanuel.viennet@univ-paris13.fr
-Résumé. La recherche de communautés est un problème important pour de
-nombreux problèmes d’analyse des réseaux sociaux. Nous nous intéressons dans
-ce travail à la détection de communautés en utilisant uniquement le graphe des
-relations, dans la lignée des travaux de Newman. Le problème se formule donc
-comme la recherche de la partition du graphe maximisant un critère de qualité,
-comme la modularité. Le traitement des graphes bipartites est important pour
-de nombreuses applications (clients achetant des produits, objets associés à des
-étiquettes, etc.). La modularité proposée par Newman ne peut pas s’appliquer
-au cas des graphes bipartites, aussi plusieurs variantes ont été récemment propo-
-sées. Dans cet article, nous présentons deux formulations de critères et un algo-
-rithme d’optimimisation heuristique similaire à celui de Louvain. Des résultats
-sur des graphes synthétiques et naturels sont présentés et discutés.
-1 Introduction
-Un graphe bipartite est un graphe comportant deux types de nœuds, tel que chaque arête du
-graphe connecte deux nœuds de types différents. Nous considérons ici des graphes non orienté,
-et distinguons les nœuds « gauche »VX et les nœuds « droits »VY (figure 1). Les graphes bipar-
-tites sont utilisés pour représenter les relations entre des entités de types différents, comme les
-clients et les produits dans un système de vente, ou les auteurs et les articles, ou encore les uti-
-lisateurs et les étiquettes (tags) dans une plate-forme collaborative comme delicious.com
-(ce type d’application peut aussi donner lieu à des graphes tripartites, si l’on considère les
-relations utilisateurs-étiquettes-produits).
-FIG. 1 – Un graphe bipartite.
-Un découpage bipartite C = {Ck}k ∪ {Ck}l partitionne les nœuds gauche et droits en
-deux sous-ensembles disjoints : ∪{Ck}k = VX et ∪ {Cl}l = VY (figure 2).
-Détection de communautés dans les graphes bipartites
-FIG. 2 – Communautés dans un graphe bipartite : on a ici 4 communautés, chacune est consti-
-tuées d’un ensemble de nœuds de même type.
-Dans une première partie, nous rappelons la définition du critère de modularité qui per-
-met de quantifier simplement la qualité d’une partition d’un graphe. Nous indiquons comment
-étendre ce critère au cas des graphes bipartites. Nous présentons ensuite un algorithme heuris-
-tique d’optimisation permetant de calculer un partition quasi-optimale, puis concluons par des
-expérimentations sur de nombreux types de graphes qui permettent de mettre en évidence les
-qualités des mesures et algorithmes présentés.
-2 Modularité bipartite
-La modularité est une mesure simple de la qualité de la partition d’un graphe introduite par
-Newman (2006) dans le cas unipartite. Les partitions avec une grande valeur de la modularité
-ont une modularité élevée.
-Nous présentons différents définitions proposées pour mesurer simplement la qualité d’une
-partition dans les graphes bipartites. Les partitions considérées ici distinguent toujours les
-nœuds « droits » et les nœuds « gauches ». Dans un graphe client/produits, on aura donc des
-communautés (sous-ensembles) de clients et des communautés de produits (figure 2).
-2.1 Modularité de Newman-Girvan
-La modularité de Newman Q compare le nombre d’arêtes connectant des nœuds apparte-
-nant à la même communauté avec celui que l’ont aurait mesuré sur un graphe aléatoire ayant
-la même taille :
-Q =
-∑
-Ci∈C
-(‖ Ci → Ci ‖
-|E| −
-‖ Ci → V ‖2
-|E|2
-)
-(1)
-où ‖ V1 → V2 ‖ dénote le nombre d’arêtes connectant des nœuds de l’ensemble V1 à des
-nœuds de l’ensemble V2.
-Dang et Viennet
-Dans un graphe bipartite, on n’a par définition aucune arête entre deux nœuds de la même
-communauté. L’équation (1) s’écrit donc :
-Q = −
-∑
-Ci∈C
-(‖ Ci → V ‖2
-|E|2
-)
-Q perd alors son sens et est maximisée en plaçant chaque nœuds dans une communauté diffé-
-rente : la modularité de Newman n’a pas de sens pour les graphes bipartites.
-2.2 Modularité de Murata
-Murata (2009) étend la notion de modularité pour les graphes bipartites. Au lieu de consi-
-dérer la densité des liens intra-communautaires, il compare le nombre de liens entre chaque
-paire de communautés (droite, gauche) à sa valeur attendue dans un modèle aléatoire. Si deux
-communautés sont très liées, elles forment probablement partie d’une bonne partition. Avec
-les notations précédentes, la modularité de Murata s’écrit :
-Q¯ =
-∑
-Ck,Cl∈C
-δ(l, argmax
-Cm∈C
-(‖ Ck → Cm ‖)) ·
-(‖ Ck → Cl ‖
-|E| −
-‖ Ck → V ‖‖ Cl → V ‖
-|E|2
-)
-où δ est le symbole de Kronecker :
-δ(i, j) =
-{
-0 si i = j
-1 si i 6= j
-2.3 Modularité de Suzuki-Wakita
-Dans la définition de Q¯, l’utilisation de argmax peut poser un problème de stabilité car une
-communauté d’un côté peut être liée à plusieurs communautés du côté opposé par un nombre
-très voisin d’arêtes ; il suffit alors de changer quelques liens pour modifier sensiblement la
-solution.
-Suzuki et Wakita (2009) proposèrent d’éviter ce problème en remplaçant le argmax par
-une pondération, définie par la proportion d’arêtes de Ck à Cl (‖ Ck → Cl ‖) par rapport au
-degré de Ck (‖ Ck → V ‖). La modularité est alors une somme des modularités des paires de
-communautés :
-Qˆ =
-1
-2
-∑
-Ck,Cl∈C
-‖ Ck → Cl ‖
-‖ Ck → V ‖ ·
-(‖ Ck → Cl ‖
-|E|/2 −
-‖ Ck → V ‖‖ Cl → V ‖
-(|E|/2)2
-)
-Cette approche est en principe plus adaptée aux réseaux bipartites dans lesquels les com-
-munautés sont connectés à plusieurs communautés de l’autre côté (multi-facet).
-Détection de communautés dans les graphes bipartites
-FIG. 3 – Un exemple de réseau multi-facet (image extraite de Suzuki et Wakita (2009)). Dans
-ce réseau, des chercheurs (en haut) s’intéressent à des champs disciplinaires (en bas). Cer-
-tains d’entre eux sont pluridisciplinaires sont associés à plusieurs champs. Les communautés
-correspondantes d’un type sont donc liées à plusieurs de l’autre type.
-3 Algorithmes d’optimisation
-3.1 Algorithme de Louvain pour les graphes bipartites
-L’optimisation de la modularité Q est un problème difficile pour lequel il n’existe pas de
-méthode exacte en temps raisonnable. Plusieurs approches heuristiques ont été proposées ces
-dernières années, l’une des meilleures étant celle dite de Louvain proposée par Blondel et al.
-(2008). Il s’agit d’un algorithme de partition de graphe en communautés basé sur une optimisa-
-tion gloutonne de la modularité de Newman. L’algorithme part d’une situation où chaque nœud
-est placé dans une communauté séparée (autant de communautés que de nœuds). Ces commu-
-nautés sont regroupées de manière progressive, il s’agit d’une méthode agglomérative. L’al-
-gorithme procède en deux phases. Durant la première, on balaye chaque nœud dans un ordre
-aléatoire et l’on essaie de l’associer à chaque communauté des nœuds voisins : la communauté
-voisine permettant plus grand gain de modularité absorbe le nœud inspecté. Lorsqu’on n’ar-
-rive plus à obtenir de gain de cette façon, on regroupe les nœuds de chaque communauté pour
-former un nouveau graphe dans lequel chaque nœud est une communauté du graphe initial. Ce
-processus est itéré jusqu’à stabilisation.
-La convergence de ces heuristiques n’est pas théoriquement démontrée, mais elles fonc-
-tionnent assez bien en pratique, ont une complexité quasi-linéaire (en fonction du nombre de
-nœuds du graphe), et permettent typiquement le traitement d’un graphe de 100 millions de
-nœuds en moins d’une heure sur un PC.
-Pour appliquer directement cette méthode aux graphes bipartites, il est nécessaire de cal-
-culer les projections pour construire deux graphes unipartites. Partant d’un graphe bipartite
-G = (VX , VY , E), on obtient deux graphes G1(VX , E1) et G2(VY , E2), où (u, v) ∈ E1 ou
-E2 si u et v sont connectés au même nœud dans G. On peut aussi introduire des seuils Kc
-andKp sur le nombre de connexions communes. On reliera dans le graphe projeté deux nœuds
-(u, v) ∈ E1 (resp. E2) s’ils sont tous deux connectés à au moins Kc (resp. Kp) nœuds com-
-muns dans G (figures 4 et 5).
-En pratique, l’opération de projection est problématique car elle demande un temps de cal-
-cul importants pour les très grands graphes et que les valeurs des seuilsKc andKp dépendent
-de l’application visée et doivent être fixés empiriquement.
-Dang et Viennet
-FIG. 4 – Projection d’un graphe bipartite (exemple 1,Kc = Kp = 1).
-FIG. 5 – Projection d’un graphe bipartite (exemple 2,Kc = Kp = 2).
-Dans la plupart des applications réelles, on observe certains nœuds avec un très fort degré,
-comme par exemple un produit que de très nombreux consommateurs achètent. On peut réduire
-l’impact de ces nœuds (dits «méga-hubs ») en filtrant ceux qui ont un degré supérieur à un seuil
-Wc (resp.Wp).
-Après ces étapes de projection et filtrage, on peut appliquer l’algorithme de Louvain sur les
-deux graphes projetés pour obtenir les communautés de G. Notons que l’opération de projec-
-tion entraine une parte importante d’informations sur le graphe (en particulier, elle empêche
-évidemment de découvrir des communautés impliquant simultanément des nœuds des deux
-types).
-3.2 Algorithme proposé
-Nous proposons d’optimiser directement la modularité de Suzuki-Wakita ou celle de Mu-
-rata, en suivant une approche semblable à celle de Louvain. A chaque étape de notre algo-
-rithme, un nœud est choisi au hasard. On essaie de placer ce nœud dans la communauté de
-l’un de ses voisins, et on calcule à chaque fois la variation de modularité. Si un gain positif
-est trouvé, le nœud est associé à la communauté donnant le gain maximum. Cette phase conti-
-nue jusqu’à ce que l’on ne trouve plus de gains. On peut ensuite, suivant l’idée de Louvain,
-regrouper les nœuds de chaque communauté pour former un nouveau graphe de communauté
-et reprendre l’optimisation locale.
-Si on part d’une situation où chaque nœud est seul dans sa communauté, l’algorithme est
-relativement lent, et la solution obtenue comporte souvent un nombre élevé de communautés.
-Détection de communautés dans les graphes bipartites
-Il est souvent plus efficace de l’initialiser avec les communautés trouvées par Louvain dans les
-graphes projetés. L’optimisation de la modularité bipartite intervient alors comme une phase
-de raffinement permettant d’améliorer la partition en prenant en compte les connections bila-
-térales.
-L’efficacité de l’algorithme repose sur l’expression de l’incrément ∆Qˆ(i, k, k′) lorsque le
-noeud i est passé de la communauté k à la communauté k′, qui s’exprime assez facilement
-car la modularité se décompose en somme des modularités calculées sur les paires de com-
-munautés. Ainsi, le gain de la modularité de Suzuki-Wakita quand on passe le nœud i de la
-communauté k à la communauté k′ peut s’exprimer comme :
-∆Qˆ(i, k, k′) =
-∑
-l∈V
-l dans l’autre
-côté de k
+Analyse multigraduelle OLAP 
+Gilles Hubert, Olivier Teste 
+Université de Toulouse – IRIT (UMR 5505) 
+118, Route de Narbonne – 31062 Toulouse cedex 9 (France) 
+{Gilles.Hubert, Olivier.Teste}@irit.fr 
+Résumé. Les systèmes décisionnels reposent sur des bases de données multi-
+dimensionnelles qui offrent un cadre adéquat aux analyses OLAP. L’article 
+présente un nouvel opérateur OLAP nommé « BLEND » rendant possible des 
+analyses multigraduelles. Il s'agit de transformer la structuration multidimen-
+sionnelle lors des interrogations pour analyser les mesures selon des niveaux 
+de granularité différents recombinées comme un même paramètre. Nous me-
+nons une étude des combinaisons valides de l'opération dans le contexte des 
+hiérarchies strictes. Enfin, une première série d’expérimentations implante 
+l’opération dans le contexte R-OLAP en montrant le faible coût de l’opération. 
+1 Introduction 
+Les systèmes d’aide à la prise de décision connaissent un essor important en raison de 
+leur capacité à supporter efficacement les analyses sur les données disponibles dans les orga-
+nisations. Ces systèmes décisionnels sont élaborés à partir du système opérationnel d’une 
+organisation : les données identifiées comme pertinentes pour les décideurs sont extraites, 
+transformées, puis chargées (Vassiliadis, et al., 2002) dans un espace de stockage appelé 
+entrepôt de données (« data warehouse »). Afin d’améliorer l’interrogation et l’analyse de 
+ces données entreposées, des techniques d’organisation des données spécifiques ont été déve-
+loppées (Kimball, 1996) reposant sur des bases de données multidimensionnelles (BDM). Ce 
+type de modélisation considère la donnée à analyser comme un point dans un espace à plu-
+sieurs dimensions, formant ainsi un cube de données (Gray, et al., 1996). Les décideurs qui 
+utilisent ces systèmes visualisent un extrait des cubes de données, généralement une tranche 
+à deux dimensions d’un cube. A partir de cette structure, appelée table multidimensionnelle 
+(TM) (Gyssens et Lakshmanan, 1997), le décideur peut interagir au travers d’opérations de 
+manipulation. Les opérations les plus emblématiques sont les forages qui consistent à modi-
+fier la graduation d’un axe d’analyse (niveaux de granularité) et les opérations de rotation qui 
+consistent à changer de tranche de cube. On parle d’analyse en ligne ou encore de processus 
+OLAP (« On-Line Analytic Processing ») (Ravat, et al., 2008). 
+Cet environnement offre un cadre adéquat aux analyses des décideurs, cependant la struc-
+ture imposée peut s’avérer imparfaite ou devenir obsolète. Considérons des montants de 
+ventes analysés en fonction de clients français et de clients américains. Dans ce cadre, un 
+décideur peut vouloir utiliser la graduation en fonction du pays pour les clients français tan-
+dis qu’il souhaite utiliser simultanément une graduation différente, par exemple les états 
+américains pour les clients des États-Unis. En effet, pour certaines analyses, il est nécessaire 
+Analyse multigraduelle OLAP 
+de comparer un pays tel que la France avec des entités géographiques différentes comme les 
+états américains afin de comparer des informations équivalentes en superficie, en taille de 
+population, etc. Ce type de manipulation est difficile à mettre en œuvre voire impossible 
+avec les systèmes actuels. L’objectif de cet article est de proposer une solution permettant 
+ces manipulations qualifiées de multigraduelles. 
+1.1 État de l’art 
+Il existe principalement deux approches pour la modélisation des BDM : une approche 
+reposant sur la métaphore du cube de données suivant laquelle la BDM est représentée par 
+des cubes, et une approche dite de modélisation multidimensionnelle où la BDM est décrite 
+par un schéma en étoile ou en constellation (Kimball 1996). Plusieurs travaux de synthèses 
+du domaine (Chaudhuri et Dayal, 1997), (Vassiliadis et Sellis, 1999) et études comparatives 
+(Abelló, et al., 2006), (Ravat, et al., 2008) sont disponibles. 
+Lors de manipulation OLAP, un des premiers travaux étend l’opération d’agrégation dans 
+le contexte des manipulations OLAP (Gray, et al., 1996). Un grand nombre d’opérations ont 
+été définies, cependant par manque de consensus sur un modèle de référence, les proposi-
+tions d’opérations OLAP n’ont toujours pas été clairement identifiées et définies au sein 
+d’une algèbre à l’instar de l’approche relationnelle. Une étude comparative des nombreuses 
+propositions existantes est disponible dans (Romero et Abelló, 2007). 
+A notre connaissance aucune proposition ne permet de répondre à notre problématique. 
+Les solutions les plus proches proposent des mécanismes visant à personnaliser une BDM en 
+transformant ses valeurs et ses structures. Dans (Espil et Vaisman, 2001) le langage à base de 
+règles IRAH est introduit pour permettre aux décideurs de réorganiser les regroupements des 
+valeurs entre deux graduations. Cette approche ne permet pas de transformer les structures 
+hiérarchiques des graduations initialement mises en place dans la BDM. Plus récemment, 
+(Favre, et al., 2007) ont introduit un mécanisme à base de règles « Si-Alors » afin d’intégrer 
+des connaissances utilisateurs pour faire évoluer le schéma de la BDM. Ce mécanisme per-
+met de manière personnalisée d’ajouter de nouvelles graduations. Bien que ces solutions 
+permettent une certaine adaptation de la BDM, elles se heurtent à deux problèmes : premiè-
+rement, le processus de transformation est délicat et fastidieux car reposant sur des défini-
+tions de règles exprimées par le décideur, et deuxièmement, la cohérence et la confiance aux 
+données décisionnelles entreposées ne sont plus garanties. Le fait d’introduire des moyens 
+directs d’accès en modification des valeurs rend inopérant les processus de nettoyage et de 
+consolidation habituels. 
+D’autres travaux dans le contexte de l’évolution des BDM ont proposé des opérations de 
+transformation des hiérarchies initialement modélisées (Blaschka, et al., 1999) (Hurtado, et 
+al., 1999) (Eder, et al., 2003). Dans (Blaschka, et al., 1999), une opération d’insertion d’un 
+nouveau paramètre est présentée. L’opération « Relate Levels », définie dans (Hurtado, et 
+al., 1999), permet de transformer l’organisation des paramètres des hiérarchies. D’autres 
+opérations de transformation (« Split », …) portant sur les valeurs contenues dans les para-
+mètres sont décrites dans (Eder, et al., 2003). Ces travaux offrent un cadre permettant 
+l’évolution des hiérarchies, mais ne correspond pas réellement à des transformations multi-
+graduelles. Ces opérations peuvent être détournées pour transformer la BDM. Cependant, 
+notre objectif est différent puisqu’il vise à permettre de réorganiser les regroupements des 
+valeurs entre deux graduations, et ceci, lors du processus d’analyse, sans impacter physique-
+ment les données stockées dans la BDM. 
+G. Hubert et O. Teste 
+   
+1.2 Contributions et organisation 
+La contribution essentielle de cet article est la proposition d’une nouvelle manipulation 
+dans les BDM facilitant les analyses multigraduelles. Une analyse multigraduelle combine 
+une même mesure analysée en fonction de données issues de plusieurs paramètres : par 
+exemple, nous rendons possibles l’analyse de superficies agricoles en fonction de valeurs 
+géographiques de niveaux différents telles que les superficies des États-Unis et de l’Europe. 
+Nous étendons l’algèbre OLAP que nous avons définie dans le laboratoire (Ravat, et al., 
+2008) par l’opérateur d’analyse multigraduelle « BLEND ». Nous effectuons une étude des 
+différents cas possibles de fonctionnement de l’opérateur dans le contexte des hiérarchies 
+strictes (Malinowski et Zimanyi, 2006). Nous proposons un fonctionnement par transforma-
+tion de la hiérarchie courante et nous établissons les contours de l’opérateur en identifiant ses 
+limites. Enfin, nous expérimentons l’opération dans le contexte de mise en œuvre R-OLAP. 
+Un avantage de la solution proposée, est de rendre possible ce type d’analyse au moment 
+de la manipulation des données alors qu’elle nécessite dans un contexte classique la réorga-
+nisation complète des données et des processus ETL d’alimentation associés. La phase de 
+construction d’une BDM est une tâche lourde difficilement réitérable en fonction de chaque 
+besoin d’analyse. L’application de ces transformations au niveau des analyses sans impacter 
+l’organisation réelle des données, facilite le partage de la BDM. 
+La section 2 présente le modèle de représentation conceptuelle d’une BDM que nous 
+adoptons. Nous définissons un nouvel opérateur, appelé « BLEND » dans la section 3. Nous 
+montrons les différents cas possibles de manipulations multigraduelles qu’il autorise dans le 
+contexte de hiérarchisation stricte des dimensions (Malinowski et Zimanyi, 2006). La sec-
+tion 4 décrit la mise en œuvre de l’opérateur dans le contexte R-OLAP. 
+2 Modélisation et manipulation OLAP 
+Cette section introduit les différentes définitions des concepts permettant de représenter 
+les éléments d’une BDM (Ravat, et al., 2008). Notre modèle repose sur une représentation 
+des données par une constellation (Kimball 1996) regroupant un ensemble de faits associés à 
+des dimensions partagées ou spécifiques. 
+Définition 1. Une constellation C est définie par (NC, FC, DC, StarC) où NC est le nom de 
+la constellation, FC = {F1,…, Fp} est un ensemble de faits, D
+C = {D1,…, Dq} est un ensemble 
+de dimensions, et StarC : FC2DC 1 est une fonction associant les faits aux dimensions. 
+Définition 2. Une dimension D modélise un axe d’analyse et se définit par (ND, AD, HD, 
+ID) où ND est le nom de la dimension, AD = {a1,…, au} ∪ {All, Id} est un ensemble d'attri-
+buts, HD = {hD1,…, h
+D
+v} est un ensemble de hiérarchies, et I
+D = {ID1, I
+D
+2,…} est l'ensemble 
+des instances de D. Les hiérarchies organisent les attributs d’une dimension, appelés paramè-
+tres, de la graduation la plus fine jusqu’à la graduation la plus générale. Ainsi une hiérarchie 
+définit les chemins de navigation valides sur un axe d’analyse.  
+Définition 3. Une hiérarchie hDi est un chemin élémentaire acyclique partant du paramè-
+tre racine, noté Id, jusqu’au paramètre extrémité, noté All. Elle est définie par (NhDi, Param
+h-
+D
+i, Suppl
+hD
+i) où N
+hD
+i est le nom de la hiérarchie, Param
+hD
+i : PP (P⊆A
+D) est une fonction 
+décrivant la hiérarchie des attributs, appelés paramètres de la hiérarchie, SupplhDi : P2(AD-P)
+                                                
+1 La notation 2E représente l’ensemble des parties d’un ensemble E.
+Analyse multigraduelle OLAP 
+est une fonction spécifiant les attributs faibles qui complètent la sémantique des paramètres 
+(un ensemble, éventuellement vide, d'attributs faibles est associé à un paramètre). 
+Définition 4. Un fait F représente un ensemble d’indicateurs relatifs à un sujet d’analyse 
+et se définit par le quadruplet (NF, MF, IF, IStarF) où NF est le nom du fait, MF = {f1(m1),…, 
+fw(mw)} est un ensemble de mesures (ou indicateurs) agrégées selon une fonction fi∈{AVG, 
+SUM, MAX, MIN, COUNT,…}, IF = {IF1, I
+F
+2,…} est l'ensemble des instances de F, et IStar
+F
+est une fonction associant les instances de IF aux instances des dimensions liées au fait.  
+Adossés au modèle de représentation, nous définissons, d’une part, une structure de vi-
+sualisation appelée TM qui centre l'analyse sur un fait en fonction de deux dimensions sélec-
+tionnées. D’autre part, un opérateur de construction et un ensemble d’opérateurs de manipu-
+lation sont disponibles. Nous ne détaillons pas dans cet article ces opérations ; une étude 
+exhaustive est disponible dans (Ravat, et al., 2008). 
+FIG. 1 –  Exemple d’étoile (constellation à un seul fait) et de TM obtenues par manipulations. 
+Exemple 1. Une BDM supportant des analyses sur la répartition de parcelles OGM dans 
+le monde est définie au travers d’une constellation formée d’un fait et de trois dimensions 
+(cf. figure 1) ; nous adoptons un formalisme graphique proche de celui proposé par (Golfarel-
+li, et al., 1998). Un décideur peut alors visualiser le contenu du fait et des dimensions au 
+travers d’une TM ; la table T1 présentée affiche la répartition des superficies par continent et 
+par type d’organisme. Par une combinaison d’opérations, le décideur transforme cette T1 
+pour visualiser dans T2 les superficies par état des pays en fonction des différentes variétés 
+afin de comparer les variétés OGM (GTS-Soja, Maïs BT176 et Mon 810) aux variétés « clas-
+siques ». 
+3 L’opérateur « BLEND » 
+Afin de répondre à notre problématique d’analyse multigraduelle, nous définissons une 
+opération permettant de transformer les paramètres des dimensions. Cette opération baptisée 
+« BLEND » s’applique sur les TM de sorte à modifier les entêtes des lignes ou des colonnes. 
+G. Hubert et O. Teste 
+   
+3.1 Opérateur algébrique 
+Définition 5. L'opération de transformation multigraduelle d’une TM est définie par : 
+BLEND(TSRC, D, Psup(ssup), Pinf(sinf), pred ) = TRES
+- TSRC = (SSRC, LSRC, CSRC, RSRC) est la TM source à transformer, 
+- D∈{DLSRC, DCSRC} est l’une des dimensions de la TM TSRC, 
+- Psup et Pinf sont des paramètres consécutifs affichés de la dimension D tels que Psup
+est le paramètre hiérarchiquement supérieur à Pinf, 
+- ssup∈{+,-} et sinf∈{+,-} sont des estampilles indiquant la conservation (+) ou non (-) 
+du paramètre associé dans TRES ; l’utilisation des estampilles et leurs différentes 
+combinaisons sont étudiées de manière exhaustive dans la section suivante (3.2), 
+- pred est un prédicat de sélection permettant de déterminer les valeurs issues des pa-
+ramètres Psup et Pinf pour construire le domaine de définition du nouveau paramètre 
+noté Psup_Pinf dans TRES, 
+- TRES est la TM résultat. 
+Le prédicat pred sert à calculer les ensembles Esup et Einf, qui regroupent les valeurs issues 
+des paramètres Psup et Pinf participant à la construction du domaine du nouveau paramètre : 
+- Esup contient les valeurs de Psup sélectionnées par pred, 
+- Einf contient les valeurs de Pinf sélectionnées par ¬pred. 
+Contrainte 1. Le prédicat noté pred dans la définition de l'opérateur « BLEND » est va-
+lide si et seulement si Esup ∩ parent(Einf) = ∅ avec : 
+- parent(Einf) désigne les valeurs de dom(Psup) liées à Einf, 
+- dom(Psup) désigne le domaine de définition de Psup. 
+Par abus de langage, nous dirons que pred doit définir deux ensembles de valeurs « dis-
+joints » au regard de l’organisation hiérarchique. 
+Contrainte 2. La composition d’opérateurs « BLEND » n’est pas commutative. 
+L’utilisateur doit construire ses manipulations en tenant compte de l’ordre des paramètres 
+Psup et Pinf, mais également de l’ordre des combinaisons des transformations multigraduelles. 
+3.2 Cas de transformation 
+L’opérateur « BLEND » modifie la hiérarchie existante en substituant un nouveau para-
+mètre à l’un des paramètres existants (ou les deux) ou en intégrant un nouveau paramètre en 
+plus des paramètres existants. L’intérêt de l’opération réside dans la transformation de la 
+hiérarchie existante remplaçant la hiérarchie initiale considérée obsolète directement dans la 
+TM par l’utilisateur sans imposer une reconstruction de la BDM. 
+L’intégration du nouveau paramètre peut s’effectuer selon quatre scenarii : 
+- soit le paramètre remplace les deux existants Psup et Pinf (TAB. 1 - a), 
+- soit le paramètre remplace le paramètre Pinf (TAB. 1 - b), 
+- soit le paramètre remplace le paramètre Psup (TAB. 1 - c), 
+- soit le paramètre s’intercale entre les paramètres Psup et Pinf (TAB. 1 - d). 
+Les estampilles ajoutées aux deux paramètres Psup et Pinf indiquent le scénario choisi. 
+L’estampille (-) indique que le paramètre ne doit pas apparaître dans le résultat tandis que 
+l’estampille (+) indique le contraire. Ceci permet de transformer deux paramètres en créant 
+un nouveau paramètre multigraduel, tout en choisissant de maintenir tout ou partie des possi-
+bilités de navigations initiales (avec les opérations de forages). Dans le tableau 1, le scenario 
+Analyse multigraduelle OLAP 
+(a) fait disparaître les possibilités de forer sur les pays et les états (seul le paramètre multi-
+graduel reste disponible) tandis que le scénario (d) maintient les deux paramètres initiaux. 
+Il est important de noter que nous ne présentons ici que les possibilités qui maintiennent 
+des hiérarchies strictes (Malinowski et Zimanyi, 2006) dans lesquelles toute valeur du para-
+mètre inférieur ne peut être liée qu’à une seule valeur du paramètre supérieur. 
+TAB. 1 – Quatre possibilités de modification de la hiérarchie. 
+Parcelle
+Pays-Etat
+Continent Amérique
+BrésilIowaMinnesota
+Asie
+Inde
+… … … … … …
+Esup Einf∪
+(a) BLEND(TSRC, Geographies, Pays(-), Etat(-), Pays <> ’Etats-Unis’) 
+Amérique
+Etats-Unis Brésil
+IowaMinnesota
+Asie
+Inde
+… … … … … …
+Brésil IndePays-Etat
+Parcelle
+Pays
+Continent
+Esup Einf∪
+(b) BLEND(TSRC, Geographies, Pays(+), Etat(-),Pays <> ’Etats-Unis’) 
+Etat
+Parcelle
+Pays-Etat
+Continent Amérique
+IowaMinnesota Goias
+Asie
+PenjabMaharashtra Rajasthan
+… … … … … …
+IowaMinnesota Brésil Inde
+Esup Einf∪
+(c) BLEND(TSRC, Geographies, Pays(-), Etat(+),Pays <> ’Etats-Unis’) 
+Etat
+Parcelle
+Pays
+Pays-Etat
+Continent Amérique
+Etats-Unis Brésil
+IowaMinnesota Goias
+Asie
+Inde
+PenjabMaharashtra Rajasthan
+… … … … … …
+IowaMinnesota Brésil Inde
+Esup Einf∪
+(d) BLEND(TSRC, Geographies, Pays(+), Etat(+),Pays <> ’Etats-Unis’) 
+G. Hubert et O. Teste 
+   
+3.3 Propriété de fermeture de l’opérateur 
+La définition de l’opérateur « BLEND » respecte la propriété de fermeture : il s’applique 
+sur une TM et produit une nouvelle TM. Cette propriété permet l’enchaînement de plusieurs 
+opérations afin d’opérer des transformations complexes à partir de l’opération élémentaire. 
+Exemple 2. Considérons une analyse complexe dans laquelle un décideur souhaite com-
+parer les superficies de céréales entre les états américains, un pays tel que le Brésil et le 
+continent asiatique. Cette analyse est multigraduelle sur trois niveaux puisqu’elle fait inter-
+venir, un continent, un pays, et des états américains (subdivisions d’un pays). A partir de la 
+TM T2, nous enchaînons les deux opérations de transformation multigraduelle suivantes : 
+BLEND(BLEND(T2, Geographies, Pays(-), Etat(-), Pays <> ’Etats-Unis’), Geographies, 
+Continent(-), Pays-Etat(-),Continent = ’Asie’) = T3 
+Les figures suivantes illustrent l’enchaînement des deux opérations avec les transforma-
+tions multigraduelles induites. 
+FIG. 2 –  Structuration initiale de Geographies dans T2. 
+FIG. 3 –  Structuration intermédiaire de Geographies après le premier « BLEND » figure 2. 
+FIG. 4 –  Structuration finale de Geographies dans T3 après le second « BLEND » figure 3. 
+L’enchaînement des deux BLEND donne lieu à une transformation multigraduelle des 
+données de T2. La table résultat T3 est présentée à la figure 5. 
+Analyse multigraduelle OLAP 
+FIG. 5 –  Principe de transformations multigraduelles. 
+3.4 Cas particuliers de l’opérateur 
+3.4.1 Sélection vide 
+L’expression du prédicat pred dans l’opérateur « BLEND » peut conduire à une sélection 
+vide de valeurs sur Psup ou Pinf. Si l’ensemble Esup, respectivement Einf, est vide, alors 
+l’opération reste valide. Ce cas particulier consiste à supprimer le paramètre Psup, respecti-
+vement Pinf. Notons que ce résultat peut s’obtenir par combinaison d’autres opérateurs de 
+l’algèbre (Ravat, et al., 2008). Par définition, le cas où Esup et Einf seraient simultanément 
+vides ne peut survenir. 
+Exemple 3. Considérons une nouvelle opération « BLEND » qui cherche à combiner les 
+pays ayant une forte densité de population (Densité > 20) avec les états de pays dont la densi-
+té est moindre. L’opération suivante est exprimée. 
+BLEND(T3, Geographies, Pays(ssup), Etat(sinf), Densité>20) avec ssup∈{+,-} et sinf∈{+,-}.
+Sachant que les États-Unis, le Brésil et l’Inde ont respectivement les densités de 31.15, 
+21.60 et 300.24 hab/km2, le prédicat Densité > 20 aboutit au calcul des ensembles de valeurs 
+suivants : Esup = {‘Etats-Unis’, ‘Brésil’, ‘Inde’} et Einf = ∅. Ce cas particulier où Einf est vide 
+revient à conserver tous les pays tout en faisant disparaître de l’analyse les états associés. 
+3.4.2 Paramètre racine 
+L’opération « BLEND » appliquée à la racine de la dimension, induit la transformation 
+multigraduelle de la dimension et le recalcul des valeurs des mesures associées. En effet, la 
+suppression des valeurs du paramètre racine nécessite l’agrégation des valeurs des mesures 
+associées. Chaque valeur agrégée est reliée à la valeur du paramètre supérieur. 
+Exemple 4. Considérons l’opération « BLEND » faisant intervenir le paramètre racine 
+Parcelle suivant laquelle un décideur souhaite comparer les superficies entre les états améri-
+cains et toutes les parcelles d’autres pays. L’opération suivante est exprimée. 
+G. Hubert et O. Teste 
+   
+BLEND(T3, Geographies, Etat(ssup), Parcelle(sinf), Pays = ’Etats-Unis’).
+Les ensembles Esup={‘Minnesota’, ‘Iowa’} et Einf={‘P3’, ‘P4’, ‘P5’, ‘P6’} sont calculés. 
+Dans la TM résultat, les valeurs des mesures initialement associées aux parcelles des 
+États-Unis (‘P1’, ‘P2’ et ‘P7’) sont agrégées pour être reliées aux valeurs des états sélection-
+nés dans Esup. La fonction utilisée est celle spécifiée lors de la construction de la TM initiale 
+par le constructeur DISPLAY (figure 1). Dans cet exemple, la fonction SUM est utilisée. Ce 
+principe d’utilisation, lors des manipulations suivantes, de la même fonction d’agrégat que 
+celle utilisée initialement est identique aux opérations de forage. Il peut être envisagé 
+d’étendre l’opérateur pour permettre à l’utilisateur de spécifier une fonction d’agrégation 
+différente de celle utilisée pour construire la table source. 
+4 Expérimentation en environnement R-OLAP 
+L’opération « BLEND » est implantée au sein de l’outil Graphic-OLAP que nous déve-
+loppons dans notre laboratoire avec le langage Java au dessus du SGBD Oracle. Les princi-
+pes de modélisation et de manipulation des BDM que nous définissons sont mis en œuvre 
+dans un contexte R-OLAP. L’architecture repose sur un stockage relationnel de données et 
+de métadonnées tout en présentant diverses interfaces à l’utilisateur. 
+La constellation de faits et de dimensions est implantée sous forme de tables : un ensem-
+ble de métatables décrit la structure multidimensionnelle et un ensemble de tables stocke les 
+données décisionnelles disponibles pour l’analyse. Pour simplifier, notre présentation est 
+limitée aux tables de stockage des données détaillées ; nous n’abordons pas la problématique 
+d’optimisation par des vues matérialisées (Zhuge, et al., 1998) (Kotidis et Roussopoulos, 
+1999). Dans ce cadre simplifié, les interrogations effectuées par l’utilisateur sont traduites 
+par une requête SQL d’extraction sur les tables stockant les données décisionnelles. 
+Exemple 5. Le schéma en étoile de la figure 1 est stocké en R-OLAP comme suit : 
+DATES(id_dates, moisn, moisl, trimestre, annee, quadriennal) 
+ORGANISMES(id_organismes, variete, categorie, typeorganisme) 
+GEOGRAPHIES(id_geographies, parcelle, etat, region, pays, densite, continent)
+REPARTITION(id_repartition, id_dates#,id_organismes#,id_geographies#, superficie) 
+Reconsidérons les deux opérations « BLEND » illustrées figures 2, 3 et 4. La TM T3 de 
+la figure 5 est obtenue à partir du résultat de requêtes d’extraction générées par Graphic-
+OLAP. Le tableau suivant montre les requêtes SQL générées pour chaque opération : 
+TAB. 2 – Traduction SQL de l’opération BLEND. 
+	
+	
+	
+	
+
+
+
+
+
+
+
+	
+	
+
+ 	
+
+	
+ 
+
+!
+
+"
+
+#$%
+&'
 (
-∆Qˆ(k, l) + ∆Qˆ(k′, l) + ∆Qˆ(l, k) + ∆Qˆ(l, k′)
-)
-où
-Qˆ(k, l) =
-‖ Ck → Cl ‖
-‖ Ck → V ‖ ·
-(‖ Ck → Cl ‖
-|E|/2 −
-‖ Ck → V ‖‖ Cl → V ‖
-(|E|/2)2
-)
-∆Qˆ(k, l) =
-‖ Ck → Cl ‖ − ‖ i→ Cl ‖
-‖ Ck → V ‖ − ‖ i→ V ‖
-×
-(‖ Ck → Cl ‖ − ‖ i→ Cl ‖
-|E|/2 −
-(‖ Ck → V ‖ − ‖ i→ V ‖) ‖ Cl → V ‖
-(|E|/2)2
-)
-− Qˆ(k, l)
-∆Qˆ(k′, l) =
-‖ C ′k → Cl ‖ + ‖ i→ Cl ‖
-‖ C ′k → V ‖ + ‖ i→ V ‖
-×
-(‖ C ′k → Cl ‖ + ‖ i→ Cl ‖
-|E|/2 −
-(‖ C ′k → V ‖ + ‖ i→ V ‖) ‖ Cl → V ‖
-(|E|/2)2
-)
-− Qˆ(k′, l)
-∆Qˆ(l, k) =
-‖ Cl → Ck ‖ − ‖ i→ Cl ‖
-‖ Cl → V ‖
-×
-(‖ Cl → Ck ‖ − ‖ i→ Cl ‖
-|E|/2 −
-‖ Cl → V ‖ (‖ Ck → V ‖ − ‖ i→ V ‖)
-(|E|/2)2
-)
-− Qˆ(l, k)
-∆Qˆ(l, k′) =
-‖ Cl → C ′k ‖ + ‖ i→ Cl ‖
-‖ Cl → V ‖
-×
-(‖ Cl → C ′k ‖ + ‖ i→ Cl ‖
-|E|/2 −
-‖ Cl → V ‖ (‖ C ′k → V ‖ + ‖ i→ V ‖)
-(|E|/2)2
-)
-− Qˆ(l, k′)
-Dang et Viennet
-Dans le cas de Murata, nous avons des formules assez similaires pour la modularité Q¯ :
-∆Q¯(i, k, k′) = ∆Q¯(k) + ∆Q¯(k′) +
-∑
-l∈V
-l dans l’autre
-côté de k
-∆Q¯(l)
-où :
-Q¯(k) =
-‖ Ck → Cl ‖
-|E| −
-‖ Ck → V ‖‖ Cl → V ‖
-|E|2 où l = argmaxCm∈C
-(‖ Ck → Cm ‖)
-∆Q¯(k) =
-‖ Ck → Cl− ‖
-|E| −
-‖ Ck → V ‖‖ Cl− → V ‖
-|E|2 − Q¯(k)
-∆Q¯(k′) =
-‖ Ck → Cl+ ‖
-|E| −
-‖ Ck → V ‖‖ Cl+ → V ‖
-|E|2 − Q¯(k
-′)
-∆Q¯(l) =
-‖ Cl → Ck∗ ‖
-|E| −
-‖ Cl → V ‖‖ Ck∗ → V ‖
-|E|2 − Q¯(l)
-l− = argmax
-Cm∈C
-(‖ Ck → Cm ‖) (après que i soit enlevé de k)
-l+ = argmax
-Cm∈C
-(‖ C ′k → Cm ‖) (après que i soit ajouté à k′)
-l+ = argmax
-Cm∈C
-(‖ C ′k → Cm ‖) (après que i soit ajouté à k′)
-k∗ = argmax
-Cm∈C
-(‖ Cl → Cm ‖)
-4 Données utilisées
-Les différentes approches décrites dans ce travail ont été testées sur plusieurs jeux de don-
-nées synthétiques ou naturels.
-4.1 Graphes synthétiques
-– Modèle de Barabási-Albert
-Réseaux construits selon le modèle d’attachement préférentiel classique Barabasi (2003),
-dans lequel la probabilité de créer un lien vers un nouveau nœud est proportionnelle au
-degré.
-– Modèle de Suzuki-Wakita
-Petit réseau imaginaire décrivant les abonnements de scientifiques Suzuki et Wakita
-(2009) :
-– il y a n nœuds dans trois champs disciplinaires et n pour chaque groupe de revues
-(voir figure 2.3).
-– chaque paire de nœuds des groupes connectés est relié par une arête avec la probabilité
-p.
-Détection de communautés dans les graphes bipartites
-– Modèles de Guillaume
-Ces réseaux sont générés par deux modèles introduits par Guillaume et Latapy (2004) :
-modèle bipartite aléatoire et avec attachement préférentiel.
-4.2 Réseaux naturels
-– Davis Southern Club Woman 1
-Jeux de données collecté par Davis et al. dans les années 1930, concernant l’assistance
-de 18 femmes à 14 événements sociaux.
-– Réseau de collaboration scientifique de Newman 2
-Réseau de co-auteurs, basé sur les prépublicatiions de arXiv (section « matière conden-
-sée ») entre 1995 et 1999. Contient 16726 auteurs (nœuds du graphe et 22015 articles
-(liens).
-– Jeux de données Del.icio.us 3
-Extrait du réseau du site collaboratif Del.icio.us, avec 2000 utilisateurs et 2000 étiquettes
-(tags) et adresses (URLs), à partir duquel on génère deux réseaux bipartites : URL-TAG
-(67 URLs, 1542 tags) and USER-TAG (2135 utilisateurs, 1291 tags).
-– Réseau BAO
-Le groupe SAMSE 4 est l’un des principaux acteurs de la vente de produits de brico-
-lage et de matériaux de construction en France. Il compte des points de vente dans 23
-départements du quart sud-est du pays, région dans laquelle il est numéro 1. La Boîte à
-Outils (BAO) est une filiale spécialisée dans le bricolage qui compte 27 magasins. Nous
-avons utilisé les historiques d’achats des clients fidèles (titulaires d’une carte de fidélité)
-récoltés entre 2005 et 2008, qui comptent 43.779 clients et 3.425.048 transactions sur la
-période 2005-2007, plus 30.784 clients et 1.140.510 transactions en 2008. Les produits
-achetés sont répartis dans 484 catégories (sous-familles).
-# nœuds droits # nœuds gauches
-Davis Southern Club Woman 14 18
-Newman’s scientific collaboration network 16726 22015
-Delicious URL TAG 67 1542
-Delicious USER TAG 2135 1291
-BAO network 42146 484
-TAB. 1 – Jeux de données réels utilisés pour cette étude.
-5 Résultats expérimentaux
-Nous avons testé différentes approches : Louvain sur les graphes projetés (optimisation de
-Q unipartite), notre algorithme optimisant Qˆ ou Q¯ sur les données décrites ci-dessus.
-1. http ://toreopsahl.com/datasets/#southernwomen
-2. http ://toreopsahl.com/datasets/#newman2001
-3. http ://www.public.asu.edu/ mdechoud/datasets.html
-4. http ://www.groupe-samse.fr/, http ://www.laboiteaoutils.fr/
-Dang et Viennet
-5.1 Optimisation avec l’algorithme de Louvain
-La table 2 donne les résultats obtenus par l’algorithme de Louvain sur les différents jeux
-de données.
-Network Q_left Q_right Qˆ Q¯
-Barabási-Albert model
-(500, 50) 0,68/13 0,42/5 0,42 0,58
-(1000,100) 0,86/26 0,58/8 0,55 0,68
-(3000, 150) 0,86/78 0,63/7 0,47 0,6
-(5000, 300) 0,82/80 0,72/13 0,5 0,61
-Guillaume Model
-Model 1 (1000,2000) 0,31/34 0,3/41 0,005 0,07
-Model 2 (1000,3511,p=0,6) 0,56/23 0,65/46 0,01 0,08
-Real networks
-Davis Southern Club Woman 0,01/2 0,13/2 0,01 0,33
-Newman’s scientific collaboration network 0,84/1258 0,87/1274 0,31 0,46
-Delicious URL TAG 0,06/3 0,53/14 0,09 0,32
-Delicious USER TAG 0,38/14 0,34/35 0,03 0,18
-BAO network 0,21/6 0,14/10 0,07 0,29
-TAB. 2 – Modularités obtenues par l’algorithme d’optimisation de Louvain travaillant sur les
-graphes projetés, pour les jeux de données étudiés. Q_left (resp. Q_right) est la modularité de
-Newman obtenue par Louvain sur le graphe projeté gauche (resp. droit). On indique à chaque
-fois le nombre de communautés obtenues (0,68/13 indique que l’on a trouvé 13 communautés
-et une modularité de 0,68). Qˆ est la modularité de Suzuki et Q¯ celle de Murata, mesurées sur
-les partitions obtenues par Louvain.
-Observations :
-– les valeurs des modularités bipartites Qˆ et Q¯ sont plus faibles avec cette méthodes
-qu’avec les approches directes présentées dans la suite de l’article, ce qui est attendu
-car nous n’optimisions ici que la modularité unipartite sur les graphes projetés.
-– Sur les graphes de Barabási-Albert, on obtient un découpage qui semble acceptable, la
-valeur moyenne de Qˆ et Q¯ dépassant 0, 5.
-– En revanche, les graphes générés par le modèle de Guillaume ne se découpent pas :
-Qˆ ' Q¯ ' 0.
-– Sur le réseau « Davis Southern Club Woman », les modularités sont très faibles, sauf Q¯
-(0, 33).
-– Les réseaux ubnipartites projetés de Newman se découpent bien (Q > 0,84) mais les
-modularités bipartites Qˆ et Q¯ sont inférieures à 0,5.
-– Les réseaux BAO et Delicious ne se découpent pas bien (faibles valeurs de Q, Qˆ et Q¯).
-– Pour tous les réseaux, le temps de calcul ne dépasse pas une minute sur un PC de bureau.
-Détection de communautés dans les graphes bipartites
-5.2 Optimisation de Suzuki-Wakita (Qˆ)
-Les résultats obtenus lorsqu’on optimise directement la modularité de Suzuki-Wakita avec
-l’algorithme proposé en section 3.2 sont détaillés en table 3.
-Comme indiqué plus haut, il y a deux façons de procéder : soit partir des nœuds isolés
-(comme Louvain), soit partir des communautés trouvées par Louvain et raffiner en optimisant
-Qˆ.
-Observations :
-– Les valeurs des modularités bipartites Qˆ et Q¯ sont nettement supérieures à celles trouvées
-en exploitant les graphes projetés (voir table 2).
-– Comme précédement, les graphes de Barabási-Albert se découpent bien (Qˆ and Q¯ supé-
-rieures à 0, 8).
-– Le réseau BAO se découpe un peu mieux mais les valeurs de modularité obtenues restent
-faibles.
-– En partant du résultat de Louvain (« Start with LV »), on obtient de moins bonnes valeurs
-des modularités bipartites qu’en partant de rien. En revanche, cela permet d’arriver à
-une solurtion comportant beaucoup moins de communautés et réduit considérablement
-le temps de calcul.
-5.3 Optimisation de Murata (Q¯)
-L’optimisation directe de la modularité bipartite de Murata (Q¯) est plus coûteuse en calculs
-que celle de (Qˆ) car il faut recalculer plus de termes pour trouver le maximum (utilisation
-de argmax). Les résultats sur quelques petits réseaux sont présentés dans la table 4 ; ils ne
-semblent pas meilleurs que ceux obtenus en optimisant Qˆ.
-6 Discussion
-Nos principales conclusions sont :
-– l’algorithme d’optimisation converge rapidement, toujours en une ou deux phases.
-– les découpages trouvés par Louvain sur graphes projetés ont des modularités bipartites
-(Qˆ et Q¯) plus faibles que celles obtenues par notre algorithme.
-– si notre algorithme est initialisé à partir du résultat de Louvain, Qˆ et Q¯ sont légèrement
-moins bons qu’à partir une initialisation standard, mais avec un nombre bien plus faible
-de communautés et gain de temps de calcul.
-– sur les grands graphes (plus de 105 nœuds), notre algorithme est plus lent que Louvain,
-car les incréments de Qˆ et Q¯ sont plus complexes. Les complexités des deux algorithmes
-sont en O(n), où n est le nombre de nœuds, mais le calcul de ∆Qˆ demande beaucoup
-plus d’opérations (et chaque modification demande des mises à jour plus coûteuses).
-– pour les graphes à appartenance multiples (multi-facets), on vérifie bien que la modula-
-rité de Murata Q¯ est la plus adaptée.
-Les techniques décrites dans cet article pourraient en particulier s’appliquer aux systèmes
-de filtrage collaboratif, utilisés dans les moteurs de recommendation pour effectuer des prévi-
-sions sur les intérêts des utilisateurs (clients) sur la base du comportement de clients similaires.
-La plupart des méthodes actuelles de filtrage collaboratif, qui ont fait l’objet d’une abondante
-Dang et Viennet
-Network Qˆ Q¯ Q_left Q_right
-Barabási-Albert model
-(500,50) 0,82/87 0,89 0,86/44 0,001/43
-Start with LV 0,68/11 0,83 0,96/6 0,5/5
-(1000, 100) 0,85/179 0,9 0,84/91 0,01/88
-Start with LV 0,82/16 0,91 0,97/8 0,80/8
-(3000, 150) 0,9/294 0,94 0,91/151 -0,001/143
-Start with LV 0,8/14 0,9 0,98/7 0,82/7
-(5000, 300) 0,9/570 0,94 0,91/290 0,007/280
-Start with LV 0,86/26 0,93 0,96/13 0,73/13
-Suzuki-Wakita model
-(n = 200, p = 0, 1)
-Amalgamative clustering 0,32 0,66 0,56 0,42
-Symmetric clustering 0,37 0,70 0,56 0,42
-Shared clustering 0,38/7 0,54 0,56/3 0,42/4
-Guillaume model
-Model 1 (1000,2000) 0,28/1878 0,34 0,003 0,08
-Start with LV 0,28/29 0,54 0,06/11 0,21/18
-Model 2 (1000,3511,p=0,6) 0,49/796 0,61 0,02/143 0,4/653
-Start with LV 0,54/31 0,75 0,6/12 0,6/19
-Real networks
-Davis Southern Club Woman 0,21/13 0,41 0,08/7 0,17/6
-Start with LV 0,04/4 0,38 0,38/2 0,44/2
-Newman’s scientific collab. network 0,7/6813 0,8 0,55/3523 0,47/3290
-Start with LV 0,83/1339 0,91 0,85/787 0,8/552
-Delicious URL TAG 0,46/259 0,59 -0,01/66 0,36/193
-Start with LV 0,32/11 0,62 0,37/3 0,64/8
-Delicious USER TAG 0,47/553 0,65 0,29/287 0,26/266
-Start with LV 0,33/90 0,58 0,32/42 0,31/48
-BAO network 0,08/173 0,16 -2.8e-05/156 0,2/17
-Start with LV 0,09/6 0,35 0,37/10 0,25/235
-TAB. 3 – Résultats de l’optimisation de la modularité de Suzuki-Wakita Qˆ. On indique la
-modularité obtenue (Qˆ est optimisée, les autres sont mesuré sur la solution) et le nombre de
-communautés (seules celles comportant plus d’un nœud sont prises en compte).
-Détection de communautés dans les graphes bipartites
-Network Qˆ Q¯ Q_left Q_right
-(500,50) 0,83 0,9/74 0,86/37 0,06/37
-(1000,100) 0,85 0,91/160 0,85 0,05
-(3000,150) 0,9 0,94/270 0,91 /135 0,01/135
-(5000,300) 0,90 0,94/510 0,91/255 0,05/255
-Delicious URL TAG 0,48 0,7/60 0,05/30 0,58/30
-Delicious USER TAG 0,45 0,67/503 0,46/259 0,37/244
-TAB. 4 – Résultats obtenus en optimisant la modularité bipartite de Murata (Q¯).
-littérature, construisent des modèles prédictifs à partir de l’ensemble des données (transac-
-tions) clients/produits. Si on construit le graphe bipartite clients/produits, on peut le découper
-en communautés d’utilisateurs et de produits et construire un modèle de recommandation dans
-chaque segment. Nous cherchons actuellement à combiner ces modèles locaux pour construire
-un système de recommendation plus performant.
-Ce travail a été partiellement financé par les projets ANR Ex DEUSS et DGCIS CEDRES.
-Références
-Barabasi, A.-L. (2003). How Everything Is Connected to Everything Else and What It Means.
-Plume.
-Blondel, V. D., J.-L. Guillaume, R. Lambiotte, et E. Lefebvre (2008). Fast unfolding of
-communities in large networks. Journal of Statistical Mechanics : Theory and Expe-
-riment 2008(10), P10008 (12pp).
-Guillaume, J.-L. et M. Latapy (2004). Modularities for bipartite networks. Information Pro-
-cessing Letters 90(6), 215–221.
-Murata, T. (2009). Modularities for bipartite networks. In HT ’09 : Proceedings of the Twen-
-tieth ACM Conference on Hypertext and Hypermedia, New York, NY, USA. ACM.
-Newman, M. E. J. (2006). Modularity and community structure in networks. Proceedings of
-the National Academy of Sciences 103(23), 8577–8582.
-Suzuki, K. et K. Wakita (2009). Extracting multi-facet community structure from bipartite
-networks. In CSE ’09 : Proceedings of the 2009 International Conference on Computational
-Science and Engineering, Washington, DC, USA, pp. 312–319. IEEE Computer Society.
+
+
+$)%
+
+$)%	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%	
+
+
+*	
++
+
+	
+
+
+$)%	
+%	
+	
++
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+,,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$)%	
+%	
+	
++
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+,,
+
+
+
+%	
+	
++-
+
+#$%
+&'
+(
+
+
+$)%
+
+$)%	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%
+
+%**	
++
+
+	
+
+
+
+
+$)%	
+%	
+	
++
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+%
+
+,!,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$)%	
+%	
+	
++
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+%
+
+,!,
+
+
+
+%	
++-
+
+Analyse multigraduelle OLAP 
+Nous avons mené des expérimentations afin d’évaluer le coût de l’opération. Notre objec-
+tif est d’analyser le coût que représente cette opération calculée dynamiquement lorsque 
+l’utilisateur en exprime le besoin. La comparaison a consisté à observer le coût théorique du 
+calcul de requêtes portant sur ces relations de base. Nous avons comparé deux requêtes : 
+- une requête effectuant dynamiquement la transformation multigraduelle (série 1), 
+- une requête utilisant un attribut stockant le résultat de la transformation multigra-
+duelle simulant l’utilisation d’une BDM modélisée en fonction du besoin équivalent 
+à la transformation multigraduelle (série 2). 
+Nous avons généré des enregistrements dans les relations de notre BDM, complétées par 
+des index multiples sur les clés étrangères : |ORGANISMES| = 250, 10 ≤ |GEOGRAPHIES| 
+≤ 100, |REPARTITION| = |ORGANISMES| x |GEOGRAPHIES|. Les valeurs des enregis-
+trements ont été générées aléatoirement en veillant à ce que les deux sous-ensembles Esup et 
+Einf soient de tailles homogènes. 
+0
+10
+20
+30
+40
+10 20 30 40 50 60 70 80 90 100
+Taille
+C
+o
+û
+t
+Série1 Série2
+0
+5
+10
+15
+20
+10 20 30 40 50 60 70 80 90 100
+Taille
+P
+o
+u
+rc
+en
+t
+ (a) (b) 
+FIG. 6 –  Résultat d’expérimentation sur le coût de l’opérateur BLEND. 
+Les valeurs du coût correspondent au coût théorique calculé par le SGBD (coût fourni par 
+le « explain plan » d’Oracle Server Application 11g). En effet, notre expérimentation vise 
+simplement à étudier le surcoût engendré par un calcul du BLEND. La taille correspond aux 
+variations du nombre de n-uplets dans GEOGRAPHIES (10 à 100) et REPARTITION 
+(250x10 à 250x100) ; la taille de la relation ORGANISMES reste constante à 250 n-uplets. 
+La figure 6(a) compare les deux requêtes. Le calcul dynamique (série 1) est évidemment 
+plus couteux que l’utilisation de la transformation préalablement stockée (série 2), cepen-
+dant, ce coût n’est pas très important (entre 18% et 2%). Ce résultat est d’autant plus encou-
+rageant que nous montrons sur la figure 6(b) que ce surcoût tend à diminuer avec 
+l’accroissement du nombre d’enregistrements dans la relation transformée. 
+Néanmoins, il convient de poursuivre nos expérimentations, pour consolider ces premiers 
+résultats. Nous envisageons plusieurs voies :  
+- tester notre opérateur sur une dimension plus volumineuse en augmentant significa-
+tivement les tailles des relations GEOGRAPHIES et REPARTITION, 
+- observer si le comportement de l’opérateur reste stable avec des prédicats de calcul 
+à la marge (lors de cette première expérimentation, nous avons utilisé un prédicat 
+aboutissant à une partition de taille homogène entre Esup et Einf) de manière à obtenir 
+un Esup disproportionné par rapport à Einf, ou encore Esup ou Einf vide, 
+G. Hubert et O. Teste 
+   
+- intégrer dans nos scénarii de tests des vues matérialisées optimisant le temps de cal-
+cul des requêtes afin de s’assurer que le coût de l’opérateur reste supportable par 
+comparaison à un stockage pré-calculé. 
+5 Conclusion 
+Cet article traite d’un type d’analyses complexes consistant à combiner des paramètres de 
+niveaux de granularité différents. Ce type d’analyses dites multigraduelles est difficilement 
+réalisable avec les systèmes traditionnels puisqu’elles nécessitent d’organiser les données en 
+fonction de chaque analyse. Nous introduisons un nouvel opérateur algébrique pour les ma-
+nipulations OLAP, appelé « BLEND ». Nous étudions les contours de son utilisation sur des 
+hiérarchies strictes. L’approche permet de transformer une hiérarchie en maintenant les au-
+tres possibilités de navigation sur celle-ci. L’opérateur proposé est mis en œuvre dans le 
+contexte R-OLAP au sein du SGBD Oracle, afin d’établir la faisabilité de la proposition. 
+A court terme, une première perspective est de mener une étude sur les techniques 
+d’optimisation possibles de l’opérateur, notamment en exploitant les treillis de vues matéria-
+lisées mis en place au sein des BDM. L’expression de l’opération dans notre langage graphi-
+que (Ravat, et al., 2007) constitue également une extension directe de ces travaux. Nous 
+projetons également d’étudier d’autres principes de transformations multigraduelles dans des 
+contextes plus complexes tels que celui des hiérarchies non strictes. 
+Références 
+Abelló, A., Samos, J., Saltor, F. (2006). YAM2: a multidimensional conceptual model ex-
+tending UML. Information Systems 31(6), pp. 541–567. 
+Blaschka, M., Sapia, C., Höfling, G. (1999). On Schema Evolution in Multidimensional 
+Databases. Intl. Conf. DaWaK’99, pp. 153-164. 
+Chaudhuri, S., Dayal, U.  (1997). An Overview of Data Warehousing and OLAP Technol-
+ogy. SIGMOD Record, 26(1), pp. 65-74. 
+Eder, J., Koncilia, C., Mitsche, D. (2003). Automatic Detection of Structural Changes in 
+Data Warehouses. Intl. Conf. DaWaK’03, pp. 119-128. 
+Espil, M. M., Vaisman, A. A. (2001) Efficient Intensional Redefinition of Aggregation Hier-
+archies in Multidimensional Databases. Intl. Workshop DOLAP’01. 
+Favre, C., Bentayeb, F. Boussaid, O. (2007). Evolution et personnalisation des analyses dans 
+les entrepôts de données : une approche orientée utilisateur. National Conf. 
+INFORSID’07, Perros-Guirec, France, pp. 308-323. 
+Golfarelli, M., Maio, D. Rizzi, S. (1998). Conceptual Design of Data Warehouses from E/R 
+Schemes. Intl. Conf. HICSS’98, Vol. 7, pp. 334-343. 
+Gray, J., Bosworth, A., Layman, A., Pirahesh, H. (1996). Data Cube: A Relational Aggrega-
+tion Operator Generalizing Group-By, Cross-Tab, and Sub-Total. Intl. Conf. ICDE’96, 
+pp. 152–159. 
+Analyse multigraduelle OLAP 
+Gyssens, M., Lakshmanan, L. V. S. (1997). A Foundation for Multi-Dimensional Databases. 
+Intl. Conf. VLDB’97, pp. 106-115. 
+Hurtado, C. A., Mendelzon, A. O., Vaisman A. A. (1999). Maintaining Data Cubes under 
+Dimension Updates. Intl. Conf. ICDE’99, pp. 346-355. 
+Kimball R. (1996). The Data Warehouse Toolkit: Practical Techniques for Building Dimen-
+sional Data Warehouses. John Wiley & Sons, USA (1996) 
+Kotidis Y., Roussopoulos, N. (1999). DynaMat: A Dynamic View Management System for 
+Data Warehouses. Intl. Conf. SIGMOD’99, pp. 371-382. 
+Malinowski, E., Zimanyi, E. (2006). Hierarchies in a multidimensional model: From concep-
+tual modeling to logical representation. Data and Knowledge Engineering, 59(2), pp. 
+348-377. 
+Ravat, F., Teste, O., Tournier, R., Zurfluh (2007). Graphical Querying of Multidimensional 
+Databases. Intl. Conf. ADBIS’07, pp. 298-313 
+Ravat, F., Teste, O., Tournier, R., Zurfluh (2008). G.: Algebraic and graphic languages for 
+OLAP manipulations. Intl. J. of Data Warehousing and Mining, 4(1), p. 17-46. 
+Romero, O., Abelló, A. (2007). On the Need of Reference Algebra for OLAP, Intl. Conf. 
+DaWaK’07, pp. 99-110. 
+Vassiliadis, P., Sellis, T. K. (1999). A Survey of Logical Models for OLAP Databases. 
+SIGMOD Record, 28(4), pp. 64-69. 
+Vassiliadis, P., Simitsis, A., Skiadopoulos, S. (2002). Modeling ETL activities as graphs. 
+Intl. Conf. DMDW’02, pp. 52-61. 
+Zhuge Y., Garcia-Molina, H., Wiener, J.L. (1998). Consistency Algorithms for Multi-Source 
+Warehouse View Maintenance. Distributed and Parallel Databases, 6(1), pp. 7-40. 
+Summary 
+Decisional systems are based on multidimensional databases improving OLAP analyses. 
+The paper describes a new OLAP operator named « BLEND » to perform multigradual 
+analyses. The operation transforms multidimensional structures during querying in order to 
+analyse measures according to various granularity levels, which are reorganised into a single 
+parameter. We study valid combinations of the operation in the context of strict hierarchies. 
+First experimentations implement the operation in an R-OLAP framework showing the slight 
+cost of this operation. 

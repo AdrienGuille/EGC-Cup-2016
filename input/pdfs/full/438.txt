@@ -1,539 +1,423 @@
-Analyse de gazouillis en ligne
-Sandra Bringay ∗,∗∗ , Nicolas Béchet ∗∗∗, Flavien Bouillot ∗, Pascal Poncelet ∗,
-Mathieu Roche ∗, Maguelonne Teisseire ∗∗∗∗
-∗LIRMM – CNRS, 161 rue Ada, 34095 Montpellier, France
-{bringay,bouillot,poncelet,mroche}@lirmm.fr
-∗∗Univ. Montpellier 3
-∗∗∗ INRIA Rocquencourt- Domaine de Voluceau, BP 105, 78153 Le Chesnay Cedex, France
-nicolas.bechet@inria.fr
-∗∗∗∗ Cemagref, UMR TETIS, 500 rue Jean-François Breton, 34093 Montpellier, France
-maguelonne.teisseire@cemagref.fr
-Résumé. Les tweets échangés sur Internet constituent une source d’information
-importante même si leurs caractéristiques les rendent difficiles à analyser (140
-caractères au maximum, notations abrégées, . . .). Dans cet article, nous définis-
-sons un modèle d’entrepôt de données permettant de valoriser et d’analyser de
-gros volumes de tweets en proposant des mesures pertinentes dans un contexte
-de découverte de connaissances. L’utilisation des entrepôts de données comme
-outil de stockage et d’analyse de documents textuels n’est pas nouvelle mais les
-mesures ne sont pas adaptées aux spécificités des données manipulées. Les ré-
-sultats des expérimentations sur des données réelles soulignent la pertinence de
-notre proposition.
-1 Introduction
-Ces dernières années, le développement du web social et collaboratif 2.0 a rendu les inter-
-nautes plus actifs au sein des réseaux participatifs. Les blogs pour diffuser son journal intime
-de manière massive, les dépêches RSS pour suivre les dernières informations sur un thème, les
-tweets pour publier ses faits et gestes, sont désormais extrêmement répandus. Simples à créer
-et gérer, ces outils sont utilisés par les internautes, les entreprises ou autres organisations pour
-communiquer à propos d’eux-mêmes ou des phénomènes qui les concernent. L’exploitation
-de ces nouvelles formes de publications s’inscrit dans une logique d’intelligence collective
-et suscite des applications inattendues en terme d’aide à la décision. En effet, les décideurs
-peuvent utiliser ces gros volumes d’information comme nouvelles ressources documentaires
-pour y puiser automatiquement de l’information.
-Depuis son apparition en 2006, le site Twitter 1 s’est développé de telle manière qu’il est
-actuellement le 10ie`me site le plus visité au monde 2. Twitter est une plate-forme de "micro-
-blogging". Il s’agit d’un système de partage d’informations via lequel les utilisateurs ont la
-1. http ://twitter.com
-2. http ://www.alexa.com/siteinfo/twitter.com
-Analyse de gazouillis en ligne
-possibilité de suivre d’autres utilisateurs qui postent des messages courts ou de diffuser ses
-messages à tous ses abonnés. En janvier 2010, le nombre de tweets échangés a atteint 1,2
-milliards et plus de 40 millions de tweets sont échangés par jour en moyenne 3. Lorsqu’un uti-
-lisateur "suit" une personne, il reçoit tous les messages qu’elle poste, et inversement, lorsque
-que cet utilisateur "tweete", tous ses "suiveurs" reçoivent ses messages. Les tweets sont as-
-sociés à des méta-informations qui peuvent être non-incluses dans les messages (la date, la
-géolocalisation...) ou bien incluses dans le message sous la forme de tags (balises) ayant une
-signification particulière : par exemple lorsque le tag @nomutilisateur apparait dans un tweet,
-cela signifie que l’on s’adresse à un utilisateur particulier ; #sujet (hastag) attribue un sujet
-au message ; RT signifie que le message a été re-tweeté, c’est-à-dire récupéré dans les mes-
-sages postés par un utilisateur que l’on suit pour qu’il soit visible par ses propres suiveurs. Les
-tweets peuvent donc être représentés de manière multidimensionnelle en prenant en compte
-l’ensemble des ces méta-informations et des relations temporelles associées.
-Des applications récentes ont été proposées pour analyser l’information à partir des gros
-volumes de tweets produits au cours du temps, comme par exemple, le suivi de tendances, le
-repérage de buzz... Toutefois, il n’existe pas à notre connaissance d’approche exploitant leurs
-caractéristiques multidimensionnelles. Dans cet article, nous nous intéressons plus précisément
-aux entrepôts de données, introduits au début des années 1990 (Codd et al. (1993)) comme ou-
-til de stockage et d’analyse de données multidimensionnelles et historisées. Il devient ainsi
-possible de manipuler un ensemble d’indicateurs (ou mesures) en fonction de différentes di-
-mensions éventuellement munies d’une ou plusieurs hiérarchies. Les opérateurs associés per-
-mettent une navigation intuitive selon différents niveaux de hiérarchies.
-Dans cet article, nous nous intéressons à définir différents opérateurs de manipulation afin
-d’identifier des tendances, rechercher les top-k mots (ou groupe de mots) les plus significatifs
-sur une période de temps, les plus représentatifs d’une ville ou d’un pays, d’un certain mois,
-d’une certaine année... et l’impact des hiérarchies sur ces opérateurs. Nous proposons ainsi une
-mesure adaptée, appelée "TF-IDF adaptatif", qui permet d’identifier les mots les plus signifi-
-catifs selon le niveau des hiérarchies du cube (e.g. via la dimension localisation). L’utilisation
-des hiérarchies est propagée aux mots des tweets eux-même nous permettant de proposer une
-contextualisation afin de mieux en appréhender le contenu. L’illustration proposée concerne
-les évolutions des maladies (e.g. en novembre et décembre, la plupart des tweets concernaient
-la grippe) en utilisant le thesaurus MeSH 4 (Medical Subject Headings) utilisé entre autre pour
-indexer les articles de PubMed 5.
-Dans la suite de cet article, la section 2 décrit un modèle de données adapté à la probléma-
-tique des cubes de tweets et détaille la mesure proposée. Dans la section 3, nous considérons
-une hiérarchie sur les mots des tweets et proposons une nouvelle approche pour contextualiser
-le tweet par rapport à cette hiérarchie. Les premières analyses et résultats sont décrits dans la
-section 4. Avant de conclure cet article en présentant les travaux futurs, nous proposons un état
-de l’art du domaine dans la section 5.
-3. http ://blog.twitter.com/2010/02/measuring-tweets.html
-4. http ://www.ncbi.nlm.nih.gov/mesh
-5. http ://www.ncbi.nlm.nih.gov/pubmed/
-Bringay et al.
-2 Quelle mesure d’agrégation pour les tweets ?
-Dans cette section, nous introduisons le modèle adopté pour spécifier un cube de tweets.
-Nous considérons, dans ce modèle, qu’il n’existe pas de hiérarchie prédéfinie sur les mots et
-nous nous focalisons sur la définition d’une nouvelle mesure associée aux différents mots d’un
-tweet. Notons en effet que la mesure proposée sera utilisée comme fonction d’agrégation. Nous
-utiliserons ainsi par la suite le terme de “mesure d’agrégation”.
-2.1 Définition préliminaire
-Selon Pérez-Martínez et al. (2008), une table de faits F est définie sur le schéma D =
-{T1, . . . , Tn,M} où Ti (i = 1, .., n) correspondent aux dimensions et M correspond à une
-mesure. Chaque dimension Ti est définie sur un domaine d = dom(Ti) partitionné en un
-ensemble de catégories (ou niveaux de granularité)Cj . On a doncD = ∪jCj .D doit être muni
-d’un ordre partiel vD permettant de comparer les valeurs du domaine d. Chaque catégorie
-représente les valeurs associées à un niveau de granularité. Nous notons e ∈ D pour préciser
-que e est une valeur de dimension de D, s’il existe une catégorie Cj ⊆ D telle que e ∈
-∪jCj . Notons que deux catégories particulières sont distinguées et sont présentes sur toutes
-les dimensions : ⊥D et >D ∈ CD correspondant respectivement au niveau de plus fine et de
-plus forte granularité. Dans le cadre de notre approche, l’ordre partiel défini sur les domaines
-des dimensions correspond à l’inclusion ensembliste des mots clés associés aux valeurs des
-dimensions considérées. Ainsi, soient deux valeurs e1, e2 ∈ ∪jCj , nous avons e1 vD e2 si e1
-est logiquement contenu dans e2.
-FIG. 1 – Une hiérarchie associée à la dimension localisation
-Exemple 1 La dimension Localisation de la figure 1 possède les catégories ⊥localisation =
-V ille ≤ Région ≤ Pays ≤ >localisation. Les valeurs de dimensions sont dom(Localisation)
-= {New Y ork,Albany, Los Angeles, Etat de New Y ork, Californie, Etats Unis, ...}
-réparties dans ces catégories (niveaux de granularité) de la manière suivante : V ille =
-{NewY ork, Albany, Los Angeles}, Région = {Etat de New Y ork, Californie}, Pays
-= {Etats Unis...}. L’ordre partiel vD sur les valeurs des dimensions peut bien entendu être
-généralisé aux catégories : pour C1, C2 ∈ CD, on a alors C1 ≤D C2 si ∃e1 ∈ C1, e2 ∈
-C2 tels que e1 vD e2. Par exemple, nous avons : LosAngeles vD Californie vD
-Analyse de gazouillis en ligne
-EtatsUnis vD >. La prise en compte de hiérarchie dynamique est telle que toutes les caté-
-gories de cette dimension doivent respecter l’ordre partiel défini.
-2.2 Le modèle de données
-Nous instancions le modèle de données de la section précédente afin de prendre en compte
-les différentes dimensions de description et bien entendu une dimension spécifique associée
-aux mots des tweets.
-Considérons, par exemple, l’analyse des tweets propres au régime Duncan (e.g. "The Du-
-kan diet is the best diet ever, FACT ! ! ! Its just meat for me for the next 5 day YEESSS") et les
-problématiques de la santé associées. Nous souhaitons, par exemple, suivre l’avis des diffé-
-rentes personnes sur l’efficacité d’un régime. De manière à extraire les tweets correspondant
-à ce sujet, nous interrogeons Twitter à l’aide d’un ensemble de mots germes associés aux ré-
-gimes : duncan, diet, slim, protein, .... Dans ce cas, à l’origine, les valeurs de la dimension mot
-sont dom(mot) ={duncan, diet, slim, protein, ...}.
-La figure 2 illustre le modèle de données utilisé. Nous retrouvons la dimension localisation
-présentée dans la section précédente et la dimension temps telle que : ⊥temps = jour ≤
-mois ≤ semestre ≤ année ≤ >temps. Le domaine de la dimension mot est celui des mots
-germes enrichi des mots apparaissant fréquemment avec ces derniers. Dans la table de faits,
-différentes mesures peuvent être utilisées. Traditionnellement celle-ci correspond au TF-IDF.
-Ce principe est détaillé dans la section suivante.
-FIG. 2 – Le schéma associé à l’application régime
-2.3 Vers une mesure adaptée
-Le fait de nous appuyer sur les seules connaissances de la hiérarchie dans un cube ne permet
-pas toujours une agrégation de qualité (i.e. représentant une situation réelle). Par exemple,
-dans le cadre d’une région, les mots caractéristiques d’un tweet ne sont pas nécessairement les
-mêmes que pour une ville.
-La mesure d’agrégation que nous proposons repose sur des approches issues de la Re-
-cherche d’Information (RI). La prise en compte des informations hiérarchiques dans les me-
-sures d’agrégation constitue une des contributions de notre approche.
-Bringay et al.
-Dans notre processus, la première étape consiste à fusionner le nombre d’occurrences des
-mots propres à un niveau. De manière concrète, nous listons tous les mots situés dans les tweets
-qui correspondent à un niveau donné (e.g. Ville, Région, Pays). Si l’utilisateur souhaite axer
-sa recherche au niveau de la ville V , les mots des tweets émis dans cette ville forment un
-vecteur. Nous pouvons appliquer ce même principe au niveau de la Région via une opération
-de Roll-up.
-Le but de nos travaux est de mettre en exergue les mots discriminants par niveau. Dans
-ce contexte, nous mettons en œuvre une mesure que nous appelons TF -IDF adaptatif qui
-consiste à ordonner les mots selon le niveau où l’utilisateur se situe. De manière identique aux
-travaux de Grabs et Schek (2002) qui proposent la mesure ief (inverted element frequency),
-nos travaux combinent les informations hiérarchiques avec des mesures statistiques issues du
-domaine de la Recherche d’Information. Une première version de notre mesure adaptative a
-été proposée dans (Bringay et al. (2010)).
-Traditionnellement, la mesure TF -IDF donne un poids plus important aux mots caractéris-
-tiques d’un document (Salton et al. (1975)). Dans, un premier temps, il est alors nécessaire de
-calculer la fréquence d’un terme (Term Frequency). Celle-ci correspond au nombre d’occur-
-rences de ce terme dans le document considéré. Ainsi, pour le document dj et le terme ti, la
-fréquence du terme dans le document est donnée par l’équation suivante :
-TFi,j =
-ni,j∑
-k nk,j
-où ni,j est le nombre d’occurrences du terme ti dans dj . Le dénominateur correspond au
-nombre d’occurrences de tous les mots dans le document dj .
-La fréquence inverse de document (Inverse Document Frequency) mesure l’importance
-du terme dans l’ensemble du corpus. Elle consiste à calculer le logarithme de l’inverse de la
-proportion de documents du corpus qui contiennent le terme. Elle est définie de la manière
-suivante :
-IDFi = log2
-|D|
-|{dj : ti ∈ dj}|
-où |D| représente le nombre total de documents dans le corpus et |{dj : ti ∈ dj}| est le
-nombre de documents dans lesquels le terme ti apparaît.
-Enfin, le poids s’obtient en multipliant les deux mesures :
-TF − IDFi,j = TFi,j × IDFi
-Notons que, dans cet article, notre approche adaptative s’appuie sur la mesure classique
-TF -IDF , mais elle peut être aisément associée à d’autres pondérations (par exemple, Okapi,
-LTU ou ATC, détaillées respectivement dans Buckley et al. (1995), Robertson et Walker (1999)
-et Jin et al. (2001)).
-Dans notre cas, nous ne calculons pas les mots représentatifs par rapport au nombre de
-documents mais par rapport au niveau de granularité souhaité. Ainsi, nous définissons le IDF
-adaptatif de la manière suivante :
-IDF ki = log2
-|Ek|
-|{ekj : ti ∈ ekj }|
+Comment valider automatiquement des relations syntaxiques
+induites
+Nicolas Béchet∗, Mathieu Roche∗, Jacques Chauché∗
+∗LIRMM - UMR 5506, CNRS - Univ. Montpellier 2 - 34392 Montpellier Cedex 5 - France
+{bechet,mroche,chauche}@lirmm.fr
+Résumé. Nous présentons dans cet article des approches visant à valider des
+relations syntaxiques induites de type Verbe-Objet. Ainsi, nous proposons d’u-
+tiliser dans un premier temps une approche s’appuyant sur des vecteurs séman-
+tiques déterminés à l’aide d’un thésaurus. La seconde approche emploie une
+validation Web. Nous effectuons des requêtes sur un moteur de recherche asso-
+ciées à des mesures statistiques afin de déterminer la pertinence d’une relation
+syntaxique. Nous proposons enfin de combiner ces deux méthodes. La qualité
+de nos approches de validation de relations syntaxiques a été évaluée en utilisant
+des courbes ROC.
+1 Introduction et contexte
+L’acquisition de connaissances sémantiques est une importante problématique en Traite-
+ment Automatique des Langues (TAL). Ces connaissances peuvent par exemple être utilisées
+pour extraire des informations dans les textes ou pour la classification de documents. Les
+connaissances sémantiques peuvent être obtenues par des informations syntaxiques (Fabre et
+Bourigault (2006)). Comme nous allons le montrer dans cet article, les connaissances séman-
+tiques acquises via la syntaxe permettent de constituer des classes conceptuelles (regroupement
+de mots ou termes sous forme de concepts). Par exemple, les mots hangar, maison et mas sont
+regroupés dans un concept bâtiment. De plus, ces concepts peuvent être organisés sous forme
+hiérarchique formant ainsi une classification conceptuelle.
+Deux types d’informations syntaxiques peuvent être utilisés pour construire les classes séman-
+tiques : les relations “classiques” issues d’une analyse syntaxique (Lin (1998), Wermter et
+Hahn (2004)) et les relations dites “induites” à partir des textes. Cet article s’intéresse plus
+particulièrement à ces dernières. La définition d’une relation induite est présentée ci-dessous.
+La méthode d’ASIUM consiste à regrouper les objets des verbes déterminés comme proches
+par une mesure de qualité (Faure (2000)). D’autres approches utilisent également ce principe,
+comme le système UPERY (Bourigault (2002)) qui regroupe les termes par des mesures de
+proximité distributionnelle. Par exemple, dans la figure 1, si les verbes consommer et manger
+sont jugés proches, des objets pouvant être obtenus par le biais d’informations syntaxiques sont
+regroupés (dans notre cas, les objets essence, légume, nourriture et fruit). Cependant, en con-
+sidérant ce groupe d’objets, nous pouvons intuitivement exclure le mot essence. Notons que
+les objets essence, légume et nourriture appartiennent à un même contexte en tant qu’objets
+Validation de relations syntaxiques induites
+du verbe consommer. De plus, les objets légume et nourriture sont également des objets du
+verbe manger sur la figure 1. Nous appelons dans ce cas l’objet essence du verbe consommer,
+un objet complémentaire du verbe manger. Par opposition, les objets légume et nourriture sont
+appelés des objets communs au verbe manger, car ils sont également objets du verbe consom-
+mer. La relation syntaxique formée par un verbe et son objet complémentaire est ainsi appelée
+relation syntaxique induite comme les relationsmanger essence et consommer fruit de la figure
+1. Notons que ces relations syntaxiques induites sont des connaissances nouvelles “apprisent”
+FIG. 1 – Objets communs et complémentaires des verbes “consommer” et “manger”.
+à partir des corpus car elles ne sont pas explicitement présentes dans les données textuelles.
+Notre objectif dans cet article est de déterminer quels objets complémentaires sont pertinents.
+Ainsi, nous limitons la tâche de l’expert en proposant de valider uniquement des termes jugés
+pertinents par nos approches, au lieu de faire valider toutes les relations induites possibles (et
+donc les éléments des concepts acquis) par un expert. Par exemple, nous souhaitons connaître
+la pertinence des objets induits de la figure 1 fruit et essence dans un concept automatiquement
+constitué des mots essence, légume, nourriture et fruit. L’évaluation de la qualité des relations
+syntaxiques induites consommer fruit et manger essence nous donnera un indice de qualité des
+objets complémentaires.
+Pour effectuer un telle évaluation, nous proposons de comparer deux approches pour finale-
+ment les combiner. La première approche représente une relation syntaxique induite comme
+une combinaison de concepts issus d’un thésaurus dans un espace vectoriel sémantique. La
+seconde approche consiste à utiliser la fréquence d’apparition d’une relation induite sur le
+Web par l’utilisation d’un moteur de recherche. Nous présentons dans la section suivante ces
+deux approches ainsi que les combinaisons effectuées entre elles. La section 3 présente les
+expérimentations que nous avons menées en évaluant ces approches.
+2 Différentes approches de validation
+Cette section résume les différentes approches utilisées pour valider les relations syntax-
+iques induites. Nous précisons dans un premier temps la manière dont les relations induites
+sont obtenues.
+2.1 Les relations induites
+Cette section présente une manière de déterminer les relations induites à partir de relations
+syntaxiques issues d’un corpus. Nous utilisons dans un premier temps l’analyseur morphosyn-
+taxique SYGFRAN pour extraire des relations syntaxiques d’un corpus. Nous calculons ensuite
+N. Béchet et al.
+la proximité sémantique des verbes issus des relations extraites, en nous appuyant sur la mesure
+d’ASIUM décrite dans (Faure (2000)). Notons que la mesure d’ASIUM considère comme sé-
+mantiquement proches deux verbes partageant un certain nombre d’objets en communs. Ainsi
+nous ne considérons que les couples de verbes jugés proches comme par exemple les verbes
+consommer etmanger de la figure 1. La suite de l’article s’intéresse plus particulièrement à l’é-
+valuation automatique des relations induites (par exemple consommer fruit etmanger essence).
+2.2 Les vecteurs sémantiques
+Nous présentons dans cette section notre approche utilisant les vecteurs sémantiques afin
+de mesurer la proximité sémantique entre le verbe et l’objet des relations syntaxiques. Nous
+indiquons dans un premier temps, comment sont utilisées des approches similaires dans la lit-
+térature. Wilks (1998) discute du fait que les différents descripteurs d’un thésaurus comme le
+Roget peuvent être bénéfiques pour des tâche relatives au TAL. Des approches dites à la Ro-
+get sont employées dans divers domaines du TAL comme la désambiguïsation sémantique, la
+recherche d’information, la cohésion textuelle, ou comme mesure de similarité entre termes.
+Jarmasz et Szpakowicz (2003) utilisent la taxonomie de la structure du thésaurus Roget pour
+déterminer la proximité sémantique entre deux termes. Ils obtiennent des résultats de bonne
+qualité pour les tests du TOEFL, ESL et Reader’s Digest. Notre approche utilise quant à elle
+une approche à la Roget dans un contexte différent. Nous proposons de mesurer la pertinence
+de l’association d’un verbe avec son objet complémentaire. Ainsi, nous allons valider la prox-
+imité sémantique entre le verbe et l’objet d’une relation induite avec le verbe et l’objet de la
+relation originale. Concrètement avec l’exemple de la figure 1, il s’agit de mesurer la proximité
+sémantique des relationsmanger fruit (relation originale) et consommer fruit (relation induite).
+L’objectif est d’attribuer un score à chaque relation induite, afin de les classer par pertinence.
+Nous avons choisi de représenter une relation induite par un vecteur sémantique. Il est construit
+en représentant un ou plusieurs termes en le(s) projetant sur un espace de dimension finie de
+873 concepts. Ces concepts sont organisés comme une ontologie de concepts définis dans le
+thésaurus Larousse (1992). Chaque mot est indexé par un ou plusieurs éléments. Par exemple,
+“consommer” est associé à “fin, nutrition, accomplissement, usage, dépense et repas” et “nour-
+riture” à “nutrition, éducation, repas et pain”, chaque élément se voyant attribuer un poids de
+1. La représentation vectorielle de la relation syntaxique consommer nourriture se traduit par
+un vecteur de dimension 873, illustrée par la figure 2. Ce vecteur résulte d’une combinaison
+linéaire de la représentation de consommer et de nourriture, dont les coefficients prennent en
+compte la structure syntaxique (dans notre cas, un verbe et son objet) (Chauché (1990)). Ainsi,
+les composantes du vecteur de la relation consommer nourriture sont toutes nulles sauf celles
+associées aux concepts 58, 337, 415, 538, 567, 835, 855 et 857. Afin de mesurer la pertinence
+FIG. 2 – Vecteur sémantique de “consommer nourriture”.
+Validation de relations syntaxiques induites
+d’une relation induite, nous évaluons si cette relation partage les mêmes concepts que la rela-
+tion syntaxique dont elle est issue. Pour mesurer une telle proximité, nous calculons le cosinus
+de l’angle formé par les deux vecteurs sémantiques, le cosinus étant défini comme la division
+du produit scalaire des vecteurs par le produit de leurs normes. Notre objectif est d’obtenir un
+classement des différentes relations syntaxiques par cette mesure de cosinus, afin de valider
+celles apparaissant en tête du classement. Un exemple de classement de relations induites avec
+la méthode des vecteurs sémantiques est présenté en section 2.5.
+Une autre manière d’attribuer un score aux relations induites qui sera décrite dans la section
+suivante, consiste à mesurer la dépendance entre le verbe et l’objet constituant la relation.
+2.3 La validation Web
+La validation Web utilisée pour mesurer la dépendance entre verbe et objet d’une relation
+induite, est proche de l’approche de Turney (2001), utilisant leWeb pour définir une fonction de
+rang. L’algorithme PMI-IR (Pointwise Mutual Information and Information Retrieval) décrit
+par Turney (2001) utilise le moteur de recherche AltaVista pour déterminer les synonymes ap-
+propriés à une requête donnée. D’autres approches utilisent le Web dans la littérature comme
+les travaux de Cilibrasi et Vitanyi (2007) qui proposent de mesurer la similarité de termes en
+utilisant, entre autres, le moteur de recherche Google.
+Dans notre cas, nous proposons de mesurer la dépendance entre un verbe et un objet d’une
+relation induite afin d’établir un classement par pertinence des relations. Pour cela, nous in-
+terrogeons le Web en fournissant à un moteur de recherche une requête, dans notre cas une
+relation syntaxique, sous forme de chaîne de caractères (par exemple, “consommer un fruit”).
+Cette approche présente la particularité de refléter la popularité d’une relation syntaxique sur
+le Web, s’adaptant ainsi à une époque ou une certaine mode d’écriture. La requête fournie au
+moteur de recherche est donnée par la fonction nb(x) qui représente le nombre de pages de ré-
+sultats retournés par la soumission d’une chaîne de caractères x au moteur de recherche de Ya-
+hoo en utilisant une API (http ://api.search.yahoo.com). En français, langue sur laquelle nous
+nous appuyons dans nos travaux, un verbe est couramment séparé d’un objet par un article.
+Ainsi, nous considérons cinq articles fréquents : un, une, le, la, l’ pour composer notre chaîne
+de caractères représentant notre relation induite. nb(v, o) est alors défini comme le nombre de
+pages retournées pour la relation syntaxique Verbe-Objet (v,o) avec respectivement v et o, le
+verbe et l’objet de cette relation. La formule suivante décrit le calcul effectué afin d’obtenir la
+fréquence d’apparition d’une relation syntaxique :
+nb(v, o) = nb(v un o) + nb(v une o) + nb(v le o) + nb(v la o) + nb(v l’ o)
+nb(v un o) est la valeur retournée par le moteur de recherche avec la chaîne de caractères
+v un o.
+Nous utilisons alors une mesure statistique afin d’évaluer la dépendance entre verbe v et objet
+o d’une relation induite. Des travaux dans la littérature comme (Vivaldi et al. (2001), Daille
+(1994)) utilisant des fonctions de rang obtiennent le plus souvent de meilleurs résultats avec
+l’Information Mutuelle au Cube (IM3). Nos travaux expérimentaux ont confirmé ces résultats
+(Roche et Prince (2007)). Nous n’utiliserons donc que la fonction de rang IM3.
+L’IM3 est une mesure empirique fondée sur l’InformationMutuelle (Church et Hanks (1990)).
+Elle permet de valoriser les co-occurrences fréquentes, ce qui n’est pas le cas avec l’IM (Daille
+(1994)). Adaptée à notre problématique de relations syntaxiques, pour un verbe v, un objet o
+et la fonction nb désignant le nombre de pages retournées par le moteur de recherche Yahoo,
+N. Béchet et al.
+nous définissons l’IM3 par la formule suivante :
+IM3(v, o) = log
+nb(v, o)3
+nb(v)nb(o)
 (1)
-Analyse de gazouillis en ligne
-où |Ek| représente le nombre total d’éléments de type k (dans notre exemple, k = { Ville,
-Région, Pays }) qui correspond au niveau de la hiérarchie que le décideur souhaite agréger.
-|{ej : ti ∈ ej}| est relatif au nombre d’éléments de type k dans lequel le terme ti apparaît.
-Cette mesure permet d’attribuer un poids adapté au niveau d’agrégation décidé par l’utili-
-sateur. Ainsi, nous calculons ce poids TF -IDF ki pour chacun des mots ti. Nous pouvons ainsi
-conserver les n mots ayant les poids les plus élevés.
-Les résultats obtenus selon ces différents paramètres seront discutés dans la section 4 de
-cet article.
-Exemple 2 Supposons que dans le contexte de la figure 1, nous ayons le mot "protein" présent
-une fois dans les tweets de New-York, zéro fois dans les tweets d’Albany et trois fois dans les
-tweets de Los Angeles.
-Dans cet exemple, le TF -IDF adaptatif de ce mot au niveau de la V ille (3 villes sont
-répertoriées) est 6 :
-– TF -IDFVilleNew−York = 1× log2 32 = 0.58
-– TF -IDFVilleAlbany = 0× log2 32 = 0
-– TF -IDFVilleLosAngeles = 3× log2 32 = 1.74
-Ceci met en relief que le mot "protein" est typique de la ville de Los Angeles et à moindre
-mesure de la ville de New-York. Par la suite, si le décideur effectue une opération de Roll-up
-pour se situer au niveau de la région, nous avons alors :
-– TF -IDFRegionEtatdeNew−York = 1× log2 22 = 0
-– TF -IDFRegionCalifornie = 3× log2 22 = 0
-Ce mot apparaissant dans les deux Régions (i.e. la valeur de l’IDF adaptatif est 0), il n’est
-donc pas caractéristique des deux régions répertoriées.
-Considérons à présent que le décideur souhaite se focaliser sur un pays. Dans la définition
-proposée de la mesure TF -IDF adaptatif, l’IDF considère l’ensemble des villes de tous les
-pays (i.e. Ek) et ne reflète donc pas tous les mots spécifiques à toutes les villes d’un pays. Pour
-cela, nous proposons une mesure spécifique appelée TF -IDF adaptatif-local pour laquelle le
-numérateur ne considère que le nombre de fils du niveau considéré.
-3 Une hiérarchie sur les mots comme outil de contextualisa-
-tion des tweets
-Dans cette section, nous adoptons une hiérarchie sur les mots pour permettre la contextua-
-lisation des tweets.
-3.1 Le modèle et les données
-Pour la hiérarchie sur les mots, nous utilisons le thesaurus MeSH (Medical Subject Hea-
-dings) 7 de la National Library of Medicine aux Etats Unis qui est composé d’un ensemble
-6. Dans cet exemple, pour plus de visibilité, le nombre d’occurrences n’a pas été normalisé contrairement aux
-expérimentations présentées en section 4
-7. http ://www.nlm.nih.gov/pubs/factsheets/mesh.html
-Bringay et al.
-de mots correspondant à des concepts du domaine. Ces derniers sont associés à une structure
-hiérarchique de 12 niveaux pour permettre la recherche à différents niveaux de la hiérarchie.
-En 2011, 26 142 concepts sont disponibles dans MeSH. Au niveau le plus général de la hiérar-
-chie se trouvent des concepts très généraux comme "Anatomie" ou "Troubles Mentaux". Aux
-niveaux les plus bas se trouvent des concepts tels que "cheville", "trouble de conduite". Plus
-de 177 000 mots sont associés aux concepts permettant par exemple de retrouver pour le terme
-"Vitamine C" le concept "acide ascorbique".
-FIG. 3 – Le schéma associé à l’application MeSH
-Le modèle de données est modifié afin de prendre en compte cette nouvelle dimension
-comme l’illustre la figure 3. Par rapport au modèle précédent (cf. figure 2) la dimension "Mot" a
-été remplacée par MotMeSH. MotMeSH est muni d’un ordre partiel,vmotMeSH , pour pouvoir
-comparer les différentes valeurs du domaine.
-Nous pouvons remarquer que ce modèle peut facilement être étendu (C.f. flèche en pointillé
-entre la dimension Mot et la table de faits) pour pouvoir prendre en compte les mots appris
-autour de ceux du MeSH de la même manière que dans la section 2.
-L’un des problèmes principaux avec l’utilisation de ce thesaurus est que différents mots
-peuvent apparaître à plusieurs niveaux de la hiérarchie. Cette ambiguité pose le problème de
-l’utilisation des opérateurs de type Roll-up ou Drill-down pour naviguer dans le cube. De
-manière à illustrer notre problématique considérons l’exemple suivant.
-Exemple 3 Considérons le tweet suivant : "pneumonia & serious nerve problems. can’t stand
-up. possible myasthenia gravis treatable with meds.". Si nous recherchons dans MeSH le
-concept associé à pneumonia, nous constatons que ce mot intervient à plusieurs endroits :
-dans la hiérarchie pneumonia ≤ respiratory tract infections ≤ respiratory tract diseases ≤
-diseases ou dans la hiérarchie pneumonia ≤ lung diseases ≤ respiratory tract diseases ≤ di-
-seases (C.f. Figure 4). En fonction de la position une opération de Roll-up sur pneumonia ne
-donnera pas le même résultat (i.e. "respiratory tract diseases" vs. "lung diseases").
-Analyse de gazouillis en ligne
-FIG. 4 – Un exemple du thesaurus MeSH
-3.2 Comment repérer le contexte d’un tweet ?
-Nous avons illustré, dans l’exemple 3, la difficulté de repérer le contexte d’un terme dans
-la hiérarchie. Cependant, si nous examinons le tweet associé, nous pouvons constater que les
-mots utilisés peuvent aider à déterminer le contexte. Il est ainsi évident que le sujet du tweet
-concerne davantage le concept "respiratory tract infections" que le concept "lung diseases".
-Aussi, par la suite, nous considérons l’hypothèse suivante : plus le mot d’un tweet apparaît
-fréquemment avec le parent d’un concept dans le même contexte du tweet, plus le mot appar-
-tient à ce concept.
-De manière à désambiguïser les mots polysémiques de la hiérarchie de MeSH, nous avons
-adapté la méthode AcroDefIM3 décrite dans (Roche et Prince (2008)) où les auteurs montre no-
-tamment l’efficacité de cette mesure dans un contexte biomédical de désambiguisation d’acro-
-nymes. Cette mesure qui est fondée sur l’Information Mutuelle au cube (Daille (1994)) cal-
-cule la dépendance de deux mots dans un contexte donné. Contrairement à l’Information Mu-
-tuelle, l’Information Mutuelle au cube privilégie les co-occurrences fréquentes. Par ailleurs,
-AcroDefIM3 prend en considération le contexte dans lequel les co-occurrences sont présentes.
-En appliquant un contexte C (mots illustrant un contexte), l’approche AcroDefIM3 est donnée
-par la formule ci-dessous.
-AcroDefIM3(m1,m2) =
-(nb(m1 and m2 and C))3
-nb(m1 and C)× nb(m2 and C) (2)
-Dans notre cas, nous souhaitons calculer la dépendance entre un mot m à désambiguïser et
-différents mots mt provenant des tweets, en utilisant le contexte de la hiérarchie (c’est-à-dire
-les parents p du motm). Notre approche consiste à calculer la dépendance entrem et les autres
-mots mt présents dans une fenêtre de cinq mots d’un tweet. Concrètement, nous considérons
-les deux mots précédant et suivant le mot m. Notons que nous ne prenons en compte dans
-ce processus que les noms, adjectifs et verbes qui ont été préalablement sélectionnés avec
-un étiqueteur grammatical. Ainsi, quatre requêtes du type ’m mt p’ sont nécessaires, où p
-désigne les mots du contexte C des tweets. Alors, le nombre de résultats retournés par les
-quatre requêtes, noté nb(m,mt, p), nous permet de calculer la dépendance entre les mots d’un
-tweet, tout en prenant en compte le contexte de la hiérarchie tel que présenté dans la formule
-2.
-Bringay et al.
-Exemple 4 Considérons le mot ’pneumonia’ à désambiguiser dans le tweet de l’exemple 3. Ici,
-nous calculons la dépendance entre ce motm et les autres mots suivant ’pneumonia’ : ’serious’
-et ’nerve’. Cette dépendance est calculée par rapport au contexte des deux pères possibles de
-la hiérarchie MeSH. Afin de prédire à quel élément du MeSH nous devons associer le mot
-’pneumonia’, nous effectuons les opérations suivantes :
-– nb(pneumonia,mt, “lung diseases′′) = 227 (nombre de pages retourné avec les re-
-quêtes ’pneumonia serious “lung diseases”’ et ’pneumonia nerve “lung diseases”’)
-– nb(pneumonia,mt, “respiratory tract infections′′) = 496
-La dépendance des mots est donnée par les formules ci-desous :
-AcroDef“lung diseases
-′′
-MI3 (pneumonia,mt)
-= (nb(pneumonia,mt,“lung diseases
-′′))3
-nb(pneumonia,“lung diseases′′)×nb(mt,“lung diseases′′)
-= 0.02
-AcroDef“respiratory tract infections
-′′
-MI3 (pneumonia,mt)
-= (nb(pneumonia,mt,“respiratory tract infections
-′′))3
-nb(pneumonia,“respiratory tract infections′′)×nb(mt,“respiratory tract infections′′)
-= 0.11
-Ainsi, dans le tweet de l’exemple 3, pour le mot ’pneumonia’, nous préférerons effectuer
-l’agrégation à partir du niveau du concept ’respiratory tract infections’ du MeSH.
-Notons que cette étape de désambiguisation qui se révèle indispensable pour les données
-de MeSH, est assez coûteuse en terme de nombre de requêtes à mener. Il semble donc plus
-pertinent d’appeler ces fonctions lors de la constitution de l’entrepôt plutôt qu’effectuer un tel
-traitement au moment de la navigation dans le cube.
-4 Analyses de la mesure sur les tweets et premiers résultats
-De manière à évaluer notre approche, différentes expérimentations ont été menées. Ces
-dernières ont été réalisées en utilisant Postgresql 8.4 via l’environnement Pentaho Mondrian
-3.20.
-Afin d’extraire les tweets utilisant les mots deMeSH, nous nous focalisons sur les messages
-associés à "virus diseases" (qui appartient à la hiérarchie "Disease"). Nous interrogeons Twitter
-à l’aide de tous les mots de la hiérarchie associée. Dans ce cadre, nous avons recueilli 1 801 310
-tweets en anglais obtenus de janvier 2010 à février 2011. La répartition du nombre de tweets
-est présentée Figure 5.
-Analyse de gazouillis en ligne
-FIG. 5 – Répartition du nombre de tweets de jan-
-vier 2010 à février 2011
-Les tweets récupérés sont pré-traités de la manière suivante. Tout d’abord, via l’API Twit-
-ter Stream 8, nous retenons la description time zone ou user location et complétons, via une
-base de localisations issues de Geoname 9, les informations relatives à la ville, à la région et
-au pays. Lorsque l’information est manquante dans la base, nous associons le tweet à la plus
-grande ville la plus proche. Les différents tags (i.e. RT, #, @) et liens sont ensuite extraits et
-la langue déterminée via TextCat 10. Enfin, nous appliquons l’étiqueteur grammatical TreeTag-
-ger 11 pour extraire le type grammatical et le lemme associé à chaque élément du tweet. La
-visualisation des résultats est faite via le service Google Public Data Explorer de Google.
-Etats Unis Illinois Chicago
-wart risk risk
-pneumonia vaccination wart
-vaccination wart pneumonia
-risk pneumonia wood
-lymphoma wood colonoscopy
-common cold colonoscopy x-ray
-disease x-ray death
-meningitis encephalitis school
-infection death vaccination
-vaccine school eye infection
-life eye infection patient
-hepatitis man russia
-TAB. 1 – Les 12 mots les plus fréquents en fonction du TF-IDF adaptatif au cours du mois de
-janvier 2011.
-Dans un premier temps, nous étudions l’impact de notre mesure sur les résultats puis nous
-8. http ://dev.twitter.com/pages/user_streams
-9. http ://www.geonames.org/
-10. http ://www.let.rug.nl/˜vannoord/TextCat/
-11. http ://www.ims.uni-stuttgart.de/projekte/corplex/TreeTagger/
-Bringay et al.
-montrons un exemple d’application.
-Ainsi, dans ces expérimentations, nous analysons les premiers mots retournés par le TF-
-IDF adaptatif (scores les plus élevés). Par exemple, le tableau 1 présente les 12 premiers mots
-(top-12) des tweets des Etats-Unis, pour l’Etat de l’Illinois et pour la ville de Chicago au cours
-du mois de janvier 2011. Le tableau 2 présente quant à lui les mots de tous les pays sur toute
-la période.
-pneumonia wart hepatitis
-die help rabies
-month son leukemia
-age smallpox awareness
-hope meningitis influenza
-disease cure virus
-common cold treatment sick
-TAB. 2 – Les 21 mots les plus fréquents en fonction du TF-IDF sur la période d’analyse
-Dans ce cadre, nous souhaitons identifier si les n mots retournés par le TF-IDF adaptatif
-sont les mêmes que ceux retournés par le TF-IDF classique. Le tableau 3 montre le pourcen-
-tage de mots exclusivement retournés par le TF-IDF adaptatif sur la base des niveaux "Pays"
-et "Villes" (moyenne des 30 villes les plus importantes en terme de nombre de mots). Par
-exemple, ce tableau met en relief que 12,22% des mots du top-3 obtenus par le TF-IDF adapta-
-tif ne sont pas présents dans le top-3 des mots retournés par le TF-IDF classique. Le nombre de
-mots retournés par notre mesure adaptative est légèrement plus important si nous considérons
-les dix premiers mots (top-1, top-3, top-5, top-10). Pour les pays, nous pouvons remarquer que
-les premiers mots retournés diffèrent globalement moins avec notre mesure.
-top-n Top 30 des villes Tous les pays
-top-1 16,67% 0,00%
-top-3 12,22% 0,00%
-top-5 13,33% 0,00%
-top-10 10,33% 10,00%
-top-50 6,27% 10,00%
-top-100 5,73% 4,00%
-top-150 5,42% 6,67%
-top-200 4,98% 5,50%
-top-250 4,79% 4,40%
-top-300 5,06% 5,67%
-top-350 5,24% 7,14%
-top-500 5,21% 6,00%
-TAB. 3 – Pourcentage de mots exclusivement retournés par le TF-IDF adaptatif.
-Nous pouvons noter que les mots retournés sont majoritairement identiques en utilisant
-les deux mesures. L’utilisateur peut alors accorder une confiance de pertinence élevée à de
-tels mots. Ceci est par exemple le cas pour les premiers mots retournés pour les villes de
-Londres (wart) et Boston (pneumonia). A contrario, les mots plus spécifiquement retournés
-Analyse de gazouillis en ligne
-par la mesure adaptative (par exemple, le mot leukemia propre à Atlanta) mettent davantage en
-relief la discriminance par rapport à l’ensemble des villes.
-FIG. 6 – Répartition de l’utilisation des mots pneumonia, leukemia et hepatitis sur la période
-considérée (haut) et détail sur les mois de janvier et février (bas)
-FIG. 7 – Répartition de l’utilisation du
-mot hepatitis
-FIG. 8 – Répartition de l’utilisation du
-mot leukomia
-Nous considérons à présent un exemple d’application de notre approche. La figure 6 pré-
-sente la répartition des mots hepatitis, leukomia et pneumonia au cours de la période considérée
-(hors Etats Unis 12). Les figures 7, 8 et 9 visualisent la couverture mondiale de ces mots ex-
-cluant les États-Unis, le Royaume-Uni et le Canada. Cette couverture est obtenue en fixant
-la dimension localisation et en examinant la fréquence du mot sur la période considérée. La
-12. Les expériences menées montrent qu’actuellement la plupart des tweets sont émis des Etats Unis.
-Bringay et al.
-FIG. 9 – Répartition de l’utilisation du
-mot pneumonia
-figure 10 montre un exemple de répartition des tweets en se focalisant sur l’utilisation du mot
-pneumania au Royaume-Uni.
-FIG. 10 – Répartition de l’utilisation du mot pneumonia dans les tweets au Royaume-Uni sur
-la période fin d’année 2010-début 2011
-5 Etat de l’art
-L’analyse des données textuelles issues des tweets est un domaine de recherche actuel
-et de nombreuses propositions existent. Par exemple, dans Sakaki et al. (2010), les auteurs
-Analyse de gazouillis en ligne
-proposent d’analyser le contenu des tweets pour détecter en temps réel des alarmes lors d’ap-
-paritions de tremblement de terre. Les auteurs de TwitterMonitor (Mathioudakis et Koudas
-(2010)) présentent un système pour extraire automatiquement les tendances dans le flot des
-streams. Une approche assez similaire est proposée dans Benhardus (2010). Cependant, à notre
-connaissance, la plupart des travaux existants proposent un traitement particulier des tweets et
-n’offrent pas d’outils généraux permettant au décideur, en fonction de ses besoins, de pouvoir
-manipuler l’information contenue dans les tweets. Ainsi, il n’existe que peu de travaux qui
-se soient intéressés à l’utilisation de cubes pour les tweets. Quelques travaux récents se sont
-par contre intéressés à intégrer les données textuelles dans un contexte d’entrepôt de données.
-Dans ce cadre, des méthodes d’agrégation adaptées aux données textuelles ont été proposées.
-Par exemple, les travaux de Keith et al. (2005) proposent d’utiliser des approches de TALN
-(Traitement Automatique du Langage Naturel) pour agréger les mots ayant la même racine ou
-les mêmes lemmes (connaissances morpho-syntaxiques). Les auteurs proposent également de
-rassembler les mots sur la base de classifications sémantiques généralistes existantes (WordNet
-et Roget). Outre l’utilisation de connaissances morpho-syntaxiques et sémantiques, d’autres
-travaux utilisent des approches numériques issues du domaine de la Recherche d’Information
-(RI) pour agréger les données textuelles (Pujolle et al. (2008); Lin et al. (2008); Pérez-Martínez
-et al. (2008)). Ainsi, Lin et al. (2008) agrègent les documents sur la base des mots-clés présents
-dans ces derniers en utilisant une hiérarchie sémantique des mots présents dans l’entrepôt et
-des mesures issues de la RI. De telles méthodes issues de la RI sont aussi utilisées dans les
-travaux de Pérez-Martínez et al. (2008) qui consistent à prendre en compte une dimension
-"contexte" et "pertinence" pour construire un entrepôt de données textuelles appelé R-Cube.
-Certaines approches proposent d’ajouter une nouvelle dimension spécifique. Par exemple, dans
-Zhang et al. (2009), les auteurs ajoutent une dimension ’topic’ et appliquent l’approche PLSA
-(Hofmann (1999)) pour extraire les thèmes représentatifs des documents dans cette nouvelle
-dimension. Enfin, Pujolle et al. (2008) proposent d’agréger des parties de documents afin d’of-
-frir au décideur des mots caractéristiques propres à cette agrégation. Dans ce cadre, les auteurs
-utilisent une première fonction pour sélectionner les mots les plus significatifs en utilisant la
-mesure TF -IDF classique issue du domaine de la RI. Une approche assez similaire est pro-
-posée dans Benhardus (2010). L’objectif de nos travaux est assez similaire à ces dernières
-approches. Toutefois, dans notre cas, nous souhaitons proposer une mesure qui tienne compte
-d’une hiérarchie existante (i.e. localisation) dans les mots pertinents restitués aux décideurs.
-En d’autres termes, nous souhaitons ne retourner que les mots significatifs (i.e. top-k) par rap-
-port à un niveau donné. Par exemple, dans le cas des mots significatifs, leur agrégation Avg-Kw
-qui utilise un TF -IDF ne permet de connaître que les mots significatifs à un niveau bas de la
-hiérarchie mais ne permet pas de prendre en compte une hiérarchie existante.
-De manière analogue aux travaux sur les messages issus de twitter proposés par Cheong et Lee
-(2009), notre système permet de détecter des tendances liées aux thèmes, lieux géographiques,
-etc. Notons que notre approche qui intègre les messages dans des entrepôts de données prend
-en compte des informations hiérarchiques propres aux tweets. Dans un tel contexte, le décideur
-peut mener une analyse plus fine des données.
-Bringay et al.
-6 Conclusion
-Dans cet article nous avons proposé une nouvelle approche pour analyser les tweets à partir
-de leurs caractéristiques multidimensionnelles. L’originalité de notre proposition est de pou-
-voir définir et manipuler des cubes de tweets. Nous avons ainsi montré au travers de deux
-modèles et applications différentes : sans hiérarchie prédéfinie sur les tweets (i.e. analyse des
-régimes) et avec hiérarchie existante (i.e. en utilisant le thesaurus MeSH), que l’analyse des
-tweets nécessitait la définition de nouvelles mesures et qu’une étape de contextualisation était
-pertinente. Les expérimentations menées ont souligné l’émergence de points nouveaux et inté-
-ressants pour le décideur qui n’auraient pas pu être découverts dans un autre cadre.
-Les perspectives associées à ce travail sont nombreuses. Tout d’abord nous souhaitons
-étendre l’approche proposée à la prise en compte des opinions exprimées dans les tweets. De
-récents travaux analysent l’humeur des personnes (e.g. http ://twittermood.org/). Nous souhai-
-tons enrichir ces approches en analysant le contenu des tweets et ainsi pouvoir automatique-
-ment extraire des connaissances du type : quelles sont les personnes ayant suivies un régime
-et qui n’en sont pas satisfaites ? Dans un second temps, nous souhaitons considérer les tweets
-comme étant disponibles sous la forme d’un flot.
+Finalement, nous obtenons un classement des relations syntaxiques induites en mesurant pour
+chacune leur IM3 ainsi définie. Les relations induites les plus pertinentes selon les deux ap-
+proches (vecteurs sémantiques et validation Web) doivent se retrouver en tête de liste. Notons
+que nos expérimentations effectuées sur un ensemble de 60000 relations syntaxiques (Cf sec-
+tion 3) nécessitent 420 000 requêtes en utilisant l’IM3 (1 requête pour le verbe, 1 pour l’objet
+et 5 pour les couples verbe-objet séparés par cinq articles : 60000 × 7 = 420000). Nous
+n’avons par conséquent pas pris en compte les différentes variantes morphologiques du au
+grand nombre de requêtes déjà nécessaires. Un exemple de classement de relations induites
+avec la méthode de la validation Web est présentée en section 2.5.
+2.4 L’hybridation
+Pour optimiser nos deux approches précédemment présentées, les vecteurs sémantiques
+(VS) et la validation Web (VW), nous proposons de combiner ces deux techniques.
+2.4.1 Combinaison 1 : Une combinaison pondérée par un scalaire
+La première combinaison entre ces approches consiste à introduire un paramètre k ∈ [0, 1]
+pour donner un poids supplémentaire à l’une ou l’autre des approches. Nous normalisons au
+préalable les résultats donnés par les deux approches à combiner. Alors, pour une relation
+syntaxique r, nous combinons les approches avec le calcul suivant :
+combine_scorer = k × V S + (1− k)× VW (2)
+2.4.2 Combinaison 2 : Un système hybride adaptatif
+Nous présentons une seconde approche combinant VS et VW, l’hybridation adaptative.
+Le principe de cette combinaison est de classer dans un premier temps la totalité des relations
+syntaxiques par l’approche VS. Nous retenons et plaçons en tête les n premières relations
+syntaxiques. Ensuite, l’approche VW effectue le classement des n relations retenues par la
+méthode VS. Ainsi avec notre approche adaptative, VS effectue une sélection globale sur la
+base des connaissances sémantiques et VW affine la sélection préalablement effectuée. Notons
+que si n correspond au nombre total de relations syntaxiques, ceci revient à appliquer une
+validation Web “classique”.
+2.5 Exemple de classement avec cinq relations induites
+Cette section présente un exemple de classements de relations syntaxiques induites avec
+les différentes approches présentées : les vecteurs sémantiques, la validation Web et les deux
+approches de combinaisons.
+Nous calculons tout d’abord les scores résultant de l’approche des vecteurs sémantiques. Les
+Validation de relations syntaxiques induites
+TAB. 1 – Résultats avec les vecteurs sémantiques.
+TAB. 2 – Résultats avec la validation Web.
+cinq relations syntaxiques induites et celles existantes sont présentées dans le tableau 1. Nous
+les représentons dans un premier temps sous forme de vecteurs sémantiques avec SYGFRAN.
+Nous pouvons alors calculer le cosinus entre les relations syntaxiques induites et celles exis-
+tantes (Cf section 2.2). Les résultats obtenus pour les cinq relations testées sont présentés dans
+le tableau 1.
+TAB. 3 – Relations syntaxiques triées avec l’ensemble des approches.
+Nous calculons ensuite les scores résultant de la validation Web. Nous effectuons pour cela
+des requêtes sur le Web avec les objets, verbes et relations syntaxiques induites afin de déter-
+miner le nombre de pages retournées par le moteur de recherche (fonction nb). Alors nous
+pouvons calculer l’IM3 pour les cinq relations induites. Les scores obtenus sont présentés
+dans le tableau 2. Nous appliquons alors la première méthode de combinaison présentée en
+section 2.4.1. Nous fixons à titre d’exemple le scalaire k à 0, 5 pour donner le même poids à
+chacune des approches (VS et VW). De plus, dans cet exemple, nous fixons la constante n de
+la mesure hybride adaptative à 3. Rappelons que la mesure adaptative consiste à classer dans
+un premier temps les relations syntaxiques induites avec les vecteurs sémantiques, pour ensuite
+classer dans notre cas les 3 meilleures avec la validation Web. Les résultats obtenus pour les
+N. Béchet et al.
+TAB. 4 – Classement obtenu des relations syntaxiques.
+deux combinaisons1 sont présentés dans le tableau 3. Une fois l’ensemble des scores obtenus
+pour chacune des approches, nous pouvons ordonner les relations syntaxiques. Le classement
+ainsi obtenu est donné dans le tableau 4.
+3 Expérimentations
+3.1 Protocole expérimental
+Nous extrayons d’un premier corpus les relations induites, que nous ordonnons qualitative-
+ment par nos différentes approches. Ce premier corpus écrit en français est extrait du site Web
+d’informations de Yahoo (http ://fr.news.yahoo.com/ ). Il contient 8 948 articles (16,5 Mo). Ce
+corpus est utilisé comme corpus de test, il sera nommé corpus T. Nous avons obtenu à partir
+de ce corpus, 60 000 relations syntaxiques induites. Afin de mesurer la qualité de nos relations
+induites, nous utilisons un second corpus (corpus V) écrit également en français, de taille plus
+conséquente (125 Mo). Celui-ci contient plus de 60 000 articles issus du corpus du quotidien
+Le Monde. Par ailleurs, les deux corpus sont du même domaine, actualités avec un style jour-
+nalistique. Nous jugeons comme pertinentes des relations induites créées à partir du corpus T
+si celles-ci sont présentes dans le corpus V. Concrètement, si une relation induite est retrouvée
+dans le corpus V, on la qualifiera de positive. Dans le cas contraire, elle sera jugée non perti-
+nente et sera donc qualifiée de négative. Nous avons opté pour cette validation afin de pouvoir
+mesurer la qualité de nos approches, sur un grand nombre de relations, de manière automa-
+tique (qu’un ou des expert(s) humain(s) ne pourrai(en)t évaluer, faute de temps). Notons que
+les relations jugées négatives peuvent être de faux négatifs. En effet, une relation qui n’a pas
+été retrouvée dans le corpus V n’est pas pour autant non pertinente. Nous proposons d’évaluer
+nos différentes approches en utilisant les courbes ROC.
+La méthode des courbes ROC (Receiver Operating Characteristic), détaillée par Ferri et al.
+(2002), fut utilisée à l’origine dans le domaine du traitement du signal. Cette méthode est
+fréquemment employée en médecine afin d’évaluer automatiquement la validité d’un diagnos-
+tique de tests. On trouve en abscisse des axes représentant une courbe ROC le taux de faux
+positifs (dans notre cas, le taux de relations syntaxiques induites non pertinentes, soit les rela-
+tions non retrouvées dans le corpus V) et l’on trouve en ordonnée le taux de vrais positifs (dans
+notre cas les relations pertinentes, soit celles existantes dans le corpus V). La surface sous la
+courbe ROC ainsi créée est appelée AUC (Area Under the Curve).
+1Afin de représenter sous forme de scores l’application de l’approche adaptative, pour les 3 meilleures relations
+classées par VS, nous reportons leurs scores respectifs obtenus avec VW, auxquelles nous ajoutons 1, ce qui place ces
+3 relations automatiquement en tête de liste (car les scores sont normalisés).
+Validation de relations syntaxiques induites
+TAB. 5 – AUC obtenues avec les approches Validation Web et Vecteurs Sémantiques.
+Considérons le cas d’une validation de relations syntaxiques induites. Si toutes les relations
+sont positives (ou pertinentes), l’AUC vaudrait 1, ce qui signifie avoir toutes les relations per-
+tinentes en début de liste, donc ordonnées de manière optimale.
+3.2 Résultats
+Nous présentons dans cette section, les résultats de l’évaluation de nos approches présen-
+tées en section 2, pour différents seuils donnés. Concrètement, nous avons produit 60 000 rela-
+tions syntaxiques induites avec le corpus de test ordonnées avec nos approches en appliquant
+un seuil. Ce dernier permet de mesurer l’impact de nos approches, en fonction du nombre de
+relations syntaxiques induites à considérer. Ainsi, un seuil fixé à 5 000 relations signifie que
+nous calculons l’AUC sur les 5 000 premières relations ainsi classées.
+Le tableau 5 présente les AUC obtenues avec l’utilisation des vecteurs sémantiques et la val-
+idation Web. Les AUC obtenues avec les vecteurs sémantiques ne sont pas très satisfaisantes
+TAB. 6 – AUC obtenues avec la première combinaison.
+avec des scores proches d’une distribution aléatoire (AUC = 0, 5). La structure des vecteurs
+sémantiques peut expliquer ces résultats. En effet, les 873 concepts définissant ces vecteurs
+ne sont pas assez discriminants, notre corpus utilisant un vocabulaire assez homogène (corpus
+d’actualités). Cette faible dimension des vecteurs sémantiques ne permet donc pas de classer
+assez finement nos relations syntaxiques induites. La validation Web donne quant à elle de
+meilleures AUC. Pour un seuil réduit, inférieur à 20 000, les résultats restent néanmoins assez
+faibles (moins de 0, 70). Cela signifie que pour l’ensemble des relations syntaxiques évaluées,
+N. Béchet et al.
+cette approche est meilleure (AUC de 0, 81) mais que le classement des premières relations
+reste difficile. Ceci peut s’expliquer par le fait que les relations syntaxiques les plus populaires
+ne sont pas nécessairement les plus pertinentes. Nous proposons alors d’appliquer la première
+approche (combinaison 1) effectuant une combinaison des vecteurs sémantiques et de la val-
+idation Web. Nous faisons varier le paramètre k de 0 à 1 par intervalle de 0, 1. Le tableau
+TAB. 7 – AUC obtenues avec la seconde combinaison.
+6 montre les résultats obtenus avec cette approche. Intuitivement, cette combinaison devrait
+donner des résultats pertinents pour des valeurs de k faibles, ce qui privilégie l’approche VW.
+Néanmoins, cette supposition ne se vérifie pas pour tous les seuils. En effet, nous obtenons,
+pour la première moitié des seuils considérés, de meilleures AUC que celles obtenues pour
+la validation Web, avec des valeurs de k autour de 0, 7. Ces améliorations sont cependant peu
+significatives, de l’ordre de 3%. Pour une valeur de k supérieure à 0, 5, nous obtenons des AUC
+assez proches de celles obtenues avec la validation Web. Ces résultats nous amènent à penser
+que l’approche utilisant les vecteurs sémantiques peut se révéler pertinente pour certaines rela-
+tions. Ainsi, nous allons évaluer la seconde approche qui selectionne dans un premier temps et
+de manière globale des relations retenues par les vecteurs sémantiques. Le tableau 7 présente
+la seconde combinaison aux meilleurs scores obtenus pour de faibles seuils (les plus difficiles à
+améliorer) pour les approches précédentes : la validation Web et la première combinaison avec
+k = 0, 7. La figure 3 présente quant à elle, les courbes ROC correspondantes au seuil 5000.
+Pour la seconde combinaison, nous allons classer les 60 000 relations avec les vecteurs séman-
+tiques. Puis, nous classons les n premières avec la validation Web (la valeur de n propre au
+paramètre de la seconde combinaison correspond ici au seuil). Nous obtenons avec la seconde
+combinaison de meilleures AUC que les approches précédentes, quelque soit le seuil testé. Les
+améliorations sont encore plus significatives pour les premiers seuils. En effet, pour un seuil
+de 5 000, l’AUC passe de 0, 61 avec la validation Web à 0, 83 avec la seconde combinaison.
+Cette combinaison est l’approche fournissant de meilleurs résultats afin de répondre à notre
+problématique, la validation automatique des relations syntaxiques induites. Notons également
+que le score obtenu par la seconde combinaison n’est pas dépendant du choix du seuil car les
+AUC restent relativement constantes (AUC variant de 0, 81 à 0, 83).
+3.3 Discussions
+L’aire sous la courbe ROC (AUC) est une bonne indication de la qualité d’une mesure en
+permettant une évaluation globale des fonctions de rang. Nous proposons d’étudier plus fine-
+ment la pertinence des premières relations en calculant la précision, car se sont les premières
+relations qui pourront être prises en compte par l’expert. Nous proposons alors de calculer pour
+un faible seuil, soit les 1 000 premières relations induites, la précision des approches VW et
+Validation de relations syntaxiques induites
+ 0
+ 0.1
+ 0.2
+ 0.3
+ 0.4
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+ 0.9
+ 1
+ 0  0.1  0.2  0.3  0.4  0.5  0.6  0.7  0.8  0.9  1
+p
+o
+s
+it
+if
+s
+negatifs
+VW
+Comb. 1
+Comb. 2
+FIG. 3 – Courbes ROC obtenues avec la validation Web (VW), la première combinaison
+(Comb. 1) et la seconde combinaison (Comb. 2) au seuil 5 000.
+FIG. 4 – Courbe lift comparant le classement de la VW et de la seconde combinaison.
+la seconde combinaison. La précision qui calcule la proportion de relations induites correctes
+est définie comme le nombre de relations syntaxiques induites positives divisé par le nombre
+de relations syntaxiques induites. La figure 4 montre les courbes d’élévation ou courbes lift
+(précision en fonction du nombre de relations syntaxiques) des 1 000 premières relations. Une
+telle courbe permet d’avoir une vue globale de la précision. La figure 4 montre que celle-ci est
+nettement meilleure avec la seconde combinaison pour les 300 premières relations. Ce résultat
+signifie que les relations pertinentes sont bien ordonnées en début de liste par cette combinai-
+son et confirme donc les résultats obtenus avec les courbes ROC. Nous avons alors cherché à
+savoir si les relations syntaxiques placées en tête de liste avec la seconde combinaison étaient
+les mêmes que celles classées en tête avec la validation Web. Autrement dit, est-ce que les
+relations privilégiées par la seconde combinaison sont les relations les plus populaires sur le
+Web ?
+Nos expérimentations ont montré que les relations en tête de liste avec la seconde combinaison
+N. Béchet et al.
+ne sont pas les mêmes que celles en tête du classement effectué avec la validation Web. Par
+exemple, sur les 300 meilleures relations issues de la combinaison 2, avec VW, 37 (12 %) sont
+placées entre [0, 300[, 39 (13 %) entre [300, 600[, 39 (13 %) entre [600, 900[ et 186 (62 %) au
+rang plus élevé. Citons par exemple la relation syntaxique détenir_arme, classée 150ieme avec
+la seconde combinaison qui est classée 1159ieme avec la validation Web. Cela nous indique
+que la seconde combinaison permet de déterminer des relations moins fréquentes sur le Web,
+n’étant pas en tête de liste du classement avec la validation Web. Ainsi, nous déterminons et
+validons des pépites de connaissances, pouvant être plus discriminantes et plus intéressantes
+que des relations fréquentes qui n’apportent pas d’informations nouvelles.
+4 Conclusion
+Nous présentons dans cet article des solutions permettant de réduire l’implication humaine
+dans la validation de relations syntaxiques, qui sont dans notre cas, des relations dites induites.
+Ces relations ne sont originalement pas présentes dans le corpus, et peuvent permettre par ex-
+emple d’enrichir des ontologies. Nous les déterminons en considérant la proximité des verbes
+et les objets respectifs de ces verbes. Dès lors, nous proposons plusieurs approches afin de
+proposer à l’expert les relations induites les plus pertinentes. La première approche mesure la
+proximité sémantique entre le verbe et l’objet de la relation induite en utilisant des vecteurs
+sémantiques (VS). De tels vecteurs représentent une relation syntaxique comme une combinai-
+son de concepts d’un thésaurus. Une mesure de cosinus est utilisée afin de mesurer la proximité
+sémantique entre une relation induite et la relation originale dont elle est issue, établissant un
+classement des relations. Une seconde approche, la validation Web (VW), consiste à interroger
+un moteur de recherche afin de mesurer la dépendance entre le verbe et l’objet d’une relation
+induite. Nous utilisons l’Information Mutuelle au Cube afin d’ordonner les relations par perti-
+nence. Enfin, nous proposons deux combinaisons entre les approches VS et VW.
+Nous avons évalué la qualité de nos méthodes de validation en utilisant des courbes ROC.
+Nous obtenons de meilleures AUC avec VW plutôt que VS. La seconde combinaison donne de
+meilleurs résultats que VW, quelque soit le seuil considéré. La mesure de la précision, effectuée
+pour cette approche, confirme nos AUC plaçant les relations syntaxiques les plus pertinentes
+en début de liste.
+Nous envisageons dans de futurs travaux d’étendre nos approches aux relations syntaxiques
+originales et d’appliquer d’autres mesures de proximité entre un verbe et son objet. Nous en-
+visageons également, afin de mesurer la qualité et la cohérence des concepts formés par nos
+approches, de les soumettre à un expert. Ces travaux vont de plus être utilisés afin d’améliorer
+la qualité de l’approche ExpLSA (Béchet et al. (2008)). Cette approche propose d’enrichir
+un corpus original en effectuant une expansion de contextes par des termes jugés proches sé-
+mantiquement. Cet enrichissement se fonde sur une analyse syntaxique préalable. Le fait d’or-
+donner qualitativement les relations syntaxiques extraites permettra d’améliorer l’approche
+ExpLSA.
 Références
-Benhardus, J. (2010). Streaming trend detection in twitter. In National Science Foundation
-REU for Artificial Intelligence, Natural Language Processing and Information Retrieval,
-University of Colarado.
-Bringay, S., A. Laurent, P. Poncelet, M. Roche, et M. Teisseire (2010). Bien cube, les données
-textuelles peuvent s’agréger ! In Actes de la conférence ’Extraction et gestion des connais-
-sances’ (EGC), pp. 585–596.
-Buckley, C., A. Singhal, et M. Mitra (1995). New retrieval approaches using smart : Trec 4. In
-TREC.
-Cheong, M. et V. Lee (2009). Integrating web-based intelligence retrieval and decision-making
-from the twitter trends knowledge base. In Proceeding of the 2nd ACM workshop on Social
-web search and mining, SWSM ’09, pp. 1–8.
-Codd, E., S. Codd, et C. Salley (1993). Providing OLAP (on-line analytical processing) to
-user-analysts : An IT mandate. In White Paper.
-Daille, B. (1994). Approche mixte pour l’extraction automatique de terminologie : statistique
-lexicale et filltres linguistiques. Technical report, Phd Thesis, University Paris VII, France.
-Grabs, T. et H.-J. Schek (2002). Eth zürich at inex : Flexible information retrieval from xml
-with powerdb-xml. In XML with PowerDB-XML. INEX Workshop, pp. 141–148. ERCIM
-Publications.
-Hofmann, T. (1999). Probabilistic latent semantic analysis. In In Proc. of Uncertainty in
-Artificial Intelligence, UAI’99, pp. 289–296.
-Jin, R., C. Falusos, et A. G. Hauptmann (2001). Meta-scoring : automatically evaluating term
-weighting schemes in ir without precision-recall. In SIGIR ’01 : Proceedings of the 24th
-Analyse de gazouillis en ligne
-annual international ACM SIGIR conference on Research and development in information
-retrieval, New York, NY, USA, pp. 83–89. ACM.
-Keith, S., O. Kaser, et D. Lemire (2005). Analyzing large collections of electronic text using
-OLAP. Technical Report TR-05-001, UNBSJ CSAS.
-Lin, C. X., B. Ding, J. Han, F. Zhu, et B. Zhao (2008). Text Cube : Computing IR Measures
-for Multidimensional Text Database Analysis. In In Proc. of Int. Conf. on Data Mining
-(ICDM’08), pp. 905–910.
-Mathioudakis, M. et N. Koudas (2010). Twittermonitor : trend detection over the twitter stream.
-In Proceedings of 2010 International Conference on Management of Data (SIGMOD 2010),
-DO˝mostration.
-Pérez-Martínez, J. M., R. B. Llavori, M. J. A. Cabo, et T. B. Pedersen (2008). Contextualizing
-data warehouses with documents. Decision Support Systems 45(1), 77–94.
-Pujolle, G., F. Ravat, O. Teste, et R. Tournier (2008). Fonctions d’agrégation pour l’analyse en
-ligne (OLAP) de données textuelles. fonctions top_kwk et avg_kw opérant sur des termes.
-Ingénierie des Systèmes d’Information 13(6), 61–84.
-Robertson, S. E. et S. Walker (1999). Okapi/keenbow at trec-8. In TREC.
-Roche, M. et V. Prince (2008). Managing the acronym/expansion identification process for
-text-mining applications. International Journal of Software and Informatics, Special issue
-on Data Mining 2(2), 163–179.
-Sakaki, T., M. Okazaki, et Y. Matsuo (2010). Earthquake Shakes Twitter Users : Real-time
-Event Detection by Social Sensors. In Proceedings of 19th World Wide Web Conference
-(WWW 2010).
-Salton, G., A. Wong, et C. S. Yang (1975). A vector space model for automatic indexing.
-Commun. ACM 18(11), 613–620.
-Zhang, D., C. Zhai, et J. Han (2009). Topic cube : Topic modeling for OLAP on multidi-
-mensional text databases. In In Proc. of the SIAM Int. Conference on Data Mining, pp.
-1123–1134.
+Béchet, N., M. Roche, et J. Chauché (2008). How the ExpLSA approach impacts the document
+classification tasks. In Proceedings of the International Conference on Digital Information
+Management, ICDIM’08, University of East London, London, United Kingdom,.
+Validation de relations syntaxiques induites
+Bourigault, D. (2002). UPERY : un outil d’analyse distributionnelle étendue pour la construc-
+tion d’ontologies à partir de corpus. In Actes de TALN, Nancy, pp. 75–84.
+Chauché, J. (1990). Détermination sémantique en analyse structurelle : une expérience basée
+sur une définition de distance. In TA Information, pp. 17–24.
+Church, K. W. et P. Hanks (1990). Word association norms, mutual information, and lexicog-
+raphy. In Computational Linguistics, Volume 16, pp. 22–29.
+Cilibrasi, R. et P. M. B. Vitanyi (2007). The google similarity distance. IEEE Transactions on
+Knowledge and Data Engineering 19, 370.
+Daille, B. (1994). Approche mixte pour l’extraction automatique de terminologie : statistiques
+lexicales et filtres linguistiques. Ph. D. thesis, Université Paris 7.
+Fabre, C. et D. Bourigault (2006). Extraction de relations sémantiques entre noms et verbes
+au-delà des liens morphologiques. In TALN’06, 10-13 avril 2006, pp. 121–129.
+Faure, D. (2000). Conception de méthode d’apprentissage symbolique et automatique pour
+l’acquisition de cadres de sous-catégorisation de verbes et de connaissances sémantiques à
+partir de textes : le système ASIUM. Ph. D. thesis, Université Paris-Sud.
+Ferri, C., P. Flach, et J. Hernandez-Orallo (2002). Learning decision trees using the area under
+the ROC curve. In Proceedings of ICML’02, pp. 139–146.
+Jarmasz, M. et S. Szpakowicz (2003). Roget’s thesaurus and semantic similarity. InConference
+on Recent Advances in Natural Language Processing, pp. 212–219.
+Larousse, T. (1992). Thésaurus Larousse - des idées aux mots, des mots aux idées.
+Ed.Larousse, Paris.
+Lin, D. (1998). Extracting collocations from text corpora. In In First Workshop on Computa-
+tional Terminology, pp. 57–63.
+Roche, M. et V. Prince (2007). AcroDef : A quality measure for discriminating expansions of
+ambiguous acronyms. In Proc of CONTEXT, LNCS, pp. 411–424.
+Turney, P. (2001). Mining the Web for synonyms : PMI–IR versus LSA on TOEFL. Proc of
+ECML, LNCS, 2167, 491–502.
+Vivaldi, J., L. Màrquez, et H. Rodríguez (2001). Improving term extraction by system combi-
+nation using boosting. Proc of ECML, LNCS, 2167, 515–526.
+Wermter, J. et U. Hahn (2004). Collocation extraction based on modifiability statistics. In
+COLING ’04, Morristown, NJ, USA, pp. 980. Association for Computational Linguistics.
+Wilks, Y. (1998). Language processing and the thesaurus. In National Language Research
+Institute.
 Summary
-Exchanged tweets on the Internet are an important information source, even if their char-
-acteristics make them difficult to analyze (a maximum of 140 characters, shorthand notations,
-...). In this paper, we define a model of data warehouse to develop and analyze large vol-
-umes of tweets by proposing relevant measures in a knowledge discovery context. Using data
-warehouses in order to store and analyze textual documents is not new. Traditionally they
-adapt classical measures which are not really adapted to the data specificities. Furthermore we
-propose that, if a hierarchy is available, we can automatically detect the context. Conducted
-experiments on real data show the relevance of our approach.
+We propose in this paper to use NLP approaches to extract and validate induced syntactical
+relations (Verb-Object). We first propose a Semantic Vector approach which is a Roget-based
+approach, computing a syntactic relation as a vector. The second approach is the Web Valida-
+tion which uses a search engine to determine the relevance of a syntactic relation. We finally
+propose to combine both methods. We evaluate these approaches by using ROC curves.

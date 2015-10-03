@@ -1,27 +1,633 @@
-PLS path modeling and regularized generalized canonical
-correlation analysis for multi-block data analysis
-Michel Tenenhaus∗
-∗HEC Paris
-tenenhaus@hec.fr,
-http://www.hec.edu/Faculty-and-Research/Faculty/TENENHAUS/
+Découverte des dépendances fonctionnelles conditionnelles
+fréquentes
+Thierno Diallo∗ et Noël Novelli∗∗
+∗Université de Lyon, LIRIS, CNRS-UMR5205
+7 av. Jean Capelle, 69621 Villeurbanne Cedex, France
+thierno.diallo@insa-lyon.fr
+∗∗Université de la Méditerranée, LIF, CNRS-UMR6166
+Fac. des Sc. de Luminy, 163 av. de Luminy, 13288 Marseille Cedex 9, France
+noel.novelli@lif.univ-mrs.fr
+Résumé. Les Dépendances Fonctionnelles Conditionnelles (DFC) ont été in-
+troduites en 2007 pour le nettoyage des données. Elles peuvent être considérées
+comme une unification de Dépendances Fonctionnelles (DF) classiques et de
+Règles d’Association (RA) puisqu’elles permettent de spécifier des dépendances
+mixant des attributs et des couples de la forme attribut/valeur.
+Dans cet article, nous traitons le problème de la découverte des DFC, i.e. déter-
+miner une couverture de l’ensemble des DFC satisfaites par une relation r. Nous
+montrons comment une technique connue pour la découverte des DF (exactes
+et approximatives) peut être étendue aux DFC. Cette technique a été implémen-
+tée et des expériences ont été menées pour montrer la faisabilité et le passage à
+l’échelle de notre proposition.
+Mots clés: Dépendances entre données, Fouille de données, Théorie des bases
+de données.
+1 Introduction
+Les précédents travaux sur l’amélioration de la qualité des données s’appuient principa-
+lement sur les classes de contraintes traditionnelles telles que les DF ou encore les DF Ap-
+proximatives (Kivinen et Mannila (1995)). Même si les mesures g1, g2, et g3 pour les DF Ap-
+proximatives capturent certaines erreurs, leur expression n’est pas assez forte ou pas assez fine
+pour capturer les données incohérentes de manière précise. En effet, ces mesures permettent de
+détecter des erreurs sur les DF et non au niveau des classes de valeurs. Récemment, Bohannon
+et al. (2007) ont étendu les DF aux DFC pour pallier ce problème.
+Dans cet article nous traitons le problème de l’inférence des DFC i.e. trouver une cou-
+verture de l’ensemble des DFC satisfaites dans une relation. Disposer de ces techniques de
+découverte permet entre autres d’améliorer la performance des outils de nettoyage de données
+basées sur les DFC. A notre connaissance deux contributions ont été faites sur la fouille de
+DFC (Chiang et Miller (2008); Fan et al. (2009)). Chiang et Miller (2008) présentent un outil
+RNTI-E-19- 315 -
+Découverte des DFC fréquentes
+de gestion de la qualité des données en proposant des règles et en identifiant des tuples incohé-
+rents. Ils présentent aussi des méthodes pour la découverte de DFC satisfaites, cependant des
+DFC redondantes sont aussi générées. Fan et al. (2009) adaptent les méthodes bien connues
+pour la découverte des DF (TANE Huhtala et al. (1999b), FastFD Wyss et al. (2001)) pour
+inférer sur les DFC.
+Contribution Dans cet article, nous introduisons nos travaux sur le problème de la décou-
+verte de DFC en utilisant la notion de partitions. Nous montrons que les techniques de fouilles
+de données proposées pour la découverte de dépendances fonctionnelles et de règles d’asso-
+ciations peuvent être réutilisées pour la découverte de DFC constantes et fréquentes. Nous
+montrons comment étendre une approche basée sur les notions d’ensembles libres, fermeture
+et quasi-fermeture pour l’inférence de DF à l’inférence de DFC. Nous avons implémenté cette
+approche et réalisé plusieurs expérimentations afin de prouver son efficacité lors du passage à
+l’échelle.
+Organisation de l’article Dans la section 2, les notions de base concernant les DFC sont
+données et nous introduisons une nouvelle notation pour les DFC. La section 3 est consacrée
+à la découverte de DFC en offrant un cadre théorique et applicatif. Les expérimentations de
+découverte de DFC fréquentes se trouvent à la section 4. La dernière section est consacrée à la
+conclusion de ce travail ainsi qu’à ses perspectives.
+2 Préliminaires
+Les notations utilisées sont celles empruntées à Bohannon et al. (2007). Chaque attribut A
+a un domaine noté DOM(A). Soit une relation r sur un schéma R avec A ∈ R, le domaine
+actif de A dans r est noté ADOM(A, r).
+Exemple 1 Nous empruntons l’exemple fourni dans Bohannon et al. (2007) pour illustrer le
+concept de DFC. Soit cust un schéma de relation décrivant un client avec : country code
+r0 CC AC PN NM STR CT ZIP
+t1 : 01 908 1111111 Mike Tree Ave. NYC 07974
+t2 : 01 908 1111111 Rick Tree Ave. NYC 07974
+t3 : 01 212 2222222 Joe Elm Str. NYC 01202
+t4 : 01 212 2222222 Jim Elm Str. NYC 01202
+t5 : 01 215 3333333 Ben Oak Av. PHI 01202
+t6 : 44 131 4444444 Ian High St. EDI 03560
+t7 : 44 140 5555555 Kim High St. PHI 03560
+FIG. 1 – Relation r0 sur le schéma cust(CC), area code (AC), phone number (PN), name (NM), street (STR), city (CT) and zip code
+(ZIP). La figure 1 illustre une relation, r0, sur ce schéma. Soient f1 = CC,AC,PN →
+STR,CT,ZIP , f2 = CC,AC → CT,ZIP et f3 = CC,ZIP → STR trois DF. r0 satisfait
+f1 et f2 mais viole f3 (e.g. tuples t4 et t5). L’intuition derrière les DFC est d’extraire à travers
+une formule de sélection (égalité) un sous ensemble de la relation sur lequel on peut définir
+des DF. Par exemple la DF f3 : CC,ZIP → STR pour σCC=44(r0) peut être exprimée à
+l’aide de la DFC φ0 = (CC,ZIP → STR, (44, _ ‖ _)) où ‘‖’ sépare la partie gauche de la
+partie droite et ‘_’ représente n’importe quelle valeur du domaine de l’attribut correspondant.
+RNTI-E-19 - 316 -
+T. Diallo et N. Novelli
+D’autres DFC comme φ1 = (CC,AC,PN → STR,CT,ZIP (01, 908, _ ‖ _, NY C, _)),
+φ2 = (CC,AC,PN → STR,CT,ZIP (01, 212, _ ‖ _, PHI, _)) ou φ3 = (CC,AC →
+CT (01, 215 ‖ PHI)) peuvent être définies sur r0.
+Soit R un schéma de relation. Une DFC ρ sur R est une paire (X → Y, Tp) où XY ⊆ R,
+X → Y une DF et Tp un pattern tableau d’attributs de R.
+Pour chaque A ∈ R et pour chaque pattern tuple tp ∈ Tp, tp[A] est soit une constante
+∈ DOM(A), soit la “variable sans nom” notée ’_’ si A ∈ XY , soit la “variable vide” notée
+’∗’ qui indique que l’attribut correspondant ne contribue pas au pattern (i.e. A ∈ R−XY ).
+Soit r une relation sur R, X ⊆ R et Tp un pattern tableau sur R. Un tuple t ∈ r matche
+un tuple tp ∈ Tp sur X , noté t[X]  tp[X], ssi ∀A ∈ X , t[A] = tp[A], ou tp[A] =’_’, ou
+tp[A] =’∗’.
+Soit r une relation sur R et ρ = (X → Y, T ) une DFC avec XY ⊆ R :
+– r satisfait ρ, noté r |= ρ, ssi ∀ti, tj ∈ r et ∀tp ∈ T , si ti[X] = tj [X]  tp[X] alors
+ti[Y ] = tj [Y ]  tp[Y ].
+– r viole la DFC ρ = (X → Y, T ), notée r |= ρ, ssi
+– il existe un tuple t ∈ r et un pattern tuple tp ∈ T tel que t[X]  tp[X] et t[Y ]  tp[Y ]
+ou
+– il existe ti, tj ∈ r et un pattern tuple tp ∈ T tel que ti[X] = tj [X]  tp[X] et
+ti[Y ] = tj [Y ].
+Exemple 2 La relation r0 (cf. figure 1) satisfait les DFC φ0, φ1 et φ3 alors qu’elle ne satisfait
+pas les deux DFC φ2 et φ4 suivantes :
+– φ2 = (CC,AC,PN → STR,CT,ZIP (01, 212, _ ‖ _, PHI, _)) car le tuple t3 viole
+φ2 : t3 [CC,AC,PN ]  (01, 212, _) mais t3 [STR,CT,ZIP ]  (_, PHI, _).
+– φ4 = ([CC,CT ] → ZIP, (01, _ ‖ _)) car t2 et t3 violent φ4 puisque t2 [CC,CT ] =
+t3 [CC,CT ]  (01, _), mais t2 [ZIP ] = t3 [ZIP ].
+Une DFC (X → Y, Tp) est dite à la forme normale (Fan et al. (2008)), lorsque |Y | = 1 et
+|Tp| = 1. Par la suite nous n’étudions que les DFC à la forme normale.
+Une DFC (X → A, tp) est dite :
+– constante si tp [XA] n’est constitué que de constantes.
+– variable si la partie droite de son pattern tuple est une variable sans nom.
+3 Découverte des DFC constantes et fréquentes
+Nous souhaitons découvrir les DFC constantes et fréquentes présentes dans une relation,
+i.e. les DFC pour lesquelles le nombre de tuples de la relation les satisfaisant est supérieur à
+un seuil de fréquence donné.
+Pour cela, nous établissons un cadre théorique offrant une caractérisation simple et solide
+sur laquelle s’appuie une implémentation efficace utilisant la notion de partition.
+3.1 Cadre théorique
+Nous commençons par définir les notations nécessaires pour caractériser l’espace de re-
+cherche et l’expression de DFC puis nous poursuivons par une caractérisation permettant la
+découverte de DFC dans une relation existante.
+RNTI-E-19- 317 -
+Découverte des DFC fréquentes
+Définition 1 Soit R un schéma de relation. L’espace de recherche des DFC constantes sur R,
+noté SPCFD(R), est défini comme suit :
+SPCFD(R) = {(A, a) | A ∈ R, a ∈ DOM(A)}
+Ainsi toute DFC constante peut être représentée à l’aide des éléments de cet espace. Soit ρ =
+(A1 . . . An → A, tp[A1 . . . AnA]) une DFC constante sur R. ρ est équivalent à X → A, avec
+X = {(A1, tp[A1]), . . . , (An, tp[An])} ⊆ SPCFD(R) et A = (A, tp[A]) ∈ SPCFD(R).
+Soit X ⊆ SPCFD(R), X.att représente l’union de tous les attributs appartenant à X .
+Définition 2 Soit R un schéma de relation et r une relation sur R. L’espace de recherche des
+DFC constantes pour r, noté ASPCFD(R, r), est défini comme suit :
+ASPCFD(R, r) = {(A, a) | A ∈ R, a ∈ ADOM(A, r)}
+Les éléments de ASPCFD(R, r) sont appelés des ensembles d’attributs conditionnels.
+Exemple 3 Soit r la relation de la figure 2. Nous notons le couple (Ai, v) par Aiv.
+ASPCFD(ABCD, r) = {A0, A2, B0, B1, B2, C0, C3, D1, D2}
+r A B C D
+t1 : 0 1 0 2
+t2 : 0 1 3 2
+t3 : 0 0 0 1
+t4 : 2 2 0 1
+t5 : 2 1 0 1
+FIG. 2 – Une relation r sur R = ABCD
+Une DFC X → A sur R est dite triviale si A.att ∈ X.att. Dans notre étude nous ne
+considérons que les DFC non triviales. Une DFC constante X → A est réduite à gauche sur
+r si ∀ X ′.att ⊂ X.att, r |= X ′ → A. Une DFC minimale (Fan et al. (2008)) ρ sur r est non
+triviale, réduite à gauche et telle que r |= ρ. Une couverture canonique d’un ensemble Σr de
+DFC est un ensemble Σcc de DFC minimales tel que Σr est équivalent à Σcc.
+Etant donné une relation r notre problème est d’énumérer la couverture canonique des DFC
+satisfaites par r.
+La propriété suivante montre la monotonie des DFC ce qui correspond à un ordre partiel.
+Propriété 1 Soit r une relation sur R,X, Y ⊆ ASPCFD(R, r) tel que X ⊆ Y et A ∈
+ASPCFD(R, r). Nous avons : r |= X → A⇒ r |= Y → A.
+A l’aide de ces nouvelles notations, la fermeture d’un ensemble d’attributs conditionnels
+définie dans Fan et al. (2008) peut être facilement ré-écrite.
+Définition 3 Soit Σ une DFC constante et X ⊆ SPCFD(R). La fermeture de X sur Σ, notée
+X
+∗
+Σ, est définie comme suit : X
+∗
+Σ = {A ∈ SPCFD(R) | Σ |= X → A}.
+RNTI-E-19 - 318 -
+T. Diallo et N. Novelli
+L’opérateur .∗Σ défini sur l’ensemble des parties de SPCFD(R) est un opérateur de fermeture,
+i.e. extensible, monotone et idempotent.
+Intuitivement, la fréquence d’une DFC dans une relation est le nombre de tuples qui satis-
+font le pattern tuple, i.e. la taille de la requête de sélection correspondante.
+Définition 4 Soit θ = (X → Y ) une DFC constante sur R et r une relation sur R. La fréquence
+de θ dans r, notée freq(θ, r), est définie comme suit :
+freq(θ, r) = |σ∧(A,v)∈X∪Y (A=v)(r)|
+Soit  un entier représentant la valeur d’un seuil. Une DFC θ est dite fréquente dans r, si
+freq(θ, r) ≥ .
+Cette définition est importante pour éliminer ou réduire l’impact des données impropres
+contenues dans une relation. En effet, seules les données suffisamment présentes sont prises en
+compte ce qui gomme par exemple les erreurs de saisie ce qui correspond à la même philoso-
+phie que la mesure g3 introduite dans Kivinen et Mannila (1995).
+Bien évidemment, ce prédicat est monotone ce qui entraine la propriété suivante.
+Propriété 2 Soit r une relation sur R,X, Y ⊆ ASPCFD(R, r) tels que X ⊆ Y et  un seuil.
+Nous avons : freq(Y , r) ≥ ⇒ freq(X, r) ≥  (ou freq(X, r) < ⇒ freq(Y , r) < )
+Nous avons besoin de définir un test afin de décider si une DFC est valide ou non dans une
+relation. Depuis longtemps, nous savons qu’une telle propriété existe pour tester la satisfaction
+d’une DF dans une relation. La propriété suivante est souvent utilisée : r |= X → Y ssi
+|X|r = |XY |r.
+Pour les DFC, une propriété similaire peut être obtenue. C’est ce que nous montrons ci-
+après en utilisant l’opérateur de sélection de l’algèbre relationnelle.
+Propriété 3 Soit R un symbole de relation, r une relation sur R, X,Y ⊆ ASPCFD(R, r) et
+CX , CY deux formules de sélection sur X et Y respectivement.
+r |= X → Y ssi |σC
+X
+(r)| = |σC
+X
+∧C
+Y
+(r)| où CX = ∧(A,v)∈X(A = v) et CY =
+∧(A,v)∈Y (A = v)
+Nous pouvons maintenant introduire les définitions qui nous permettront d’établir une ca-
+ractérisation solide permettant la découverte de DFC.
+Définition 5 Ensembles conditionnels libres
+Soit X ⊆ ASPCFD(R, r) un ensemble d’attributs conditionnels.
+X est un ensemble conditionnel libre dans r ssi  ∃X ′ ⊂ X tel que |σC
+X′
+(r)| = |σC
+X
+(r)|.
+L’ensemble des ensembles conditionnels libres dans r est noté CFSr. Tout ensemble d’at-
+tributs conditionnels qui n’est pas inclus dans CFSr est appelé un ensemble conditionnel non
+libre.
+Propriété 4 Soit r une relation sur R,X, Y ⊆ ASPCFD(R, r) tel que X ⊆ Y . Nous avons :
+Y ∈ CFSr ⇒ X ∈ CFSr (ou de façon équivalente X ∈ CFSr ⇒ Y ∈ CFSr)
+RNTI-E-19- 319 -
+Découverte des DFC fréquentes
+A partir des propriétés et des définitions introduites dans cette section, il est évident que
+les algorithmes par niveau (comme Apriori) peuvent être utilisés pour découvrir les ensembles
+conditionnels libres (conjonction de deux prédicats monotones). A partir des ensembles condi-
+tionnels libres, nous étendons les résultats donnés dans Novelli et Cicchetti (2001a,b) (pour
+l’inférence de DF) pour proposer une nouvelle caractérisation de la couverture canonique des
+DFC qui tient compte d’un seuil de fréquence. Elle est basée sur les ensembles conditionnels
+libres, leur fermeture et leur quasi-fermeture.
+Définition 6 Fermeture d’un ensemble d’attributs conditionnels dans une relation
+Soit X un ensemble d’attributs conditionnels, X ⊆ ASPCFD(R, r). Sa fermeture dans r est
+définie comme suit : X
+∗
+Σr = X ∪ {A | A.att ∈ R−X.att ∧ |σCX (r)| = |σCX∧CA(r)|}.
+Définition 7 Quasi-fermeture d’un ensemble d’attributs conditionnels dans une relation
+La quasi-fermeture d’un ensemble d’attributs conditionnels X ⊆ ASPCFD(R, r), noté XΣr ,
+est définie par :
+X
+
+Σr = X ∪
+⋃
+A∈X
+(X −A)∗Σr
+Grâce à la propriété de monotonie de l’opérateur de fermeture, nous avons :X ⊆ XΣr ⊆ X
+∗
+Σr
+ce qui nous permet de réécrire la définition 6 de la façon suivante.
+Définition 8 Fermeture d’un ensemble d’attributs conditionnels dans une relation
+Soit X un ensemble d’attributs conditionnels, X ⊆ ASPCFD(R, r). Sa fermeture dans r est
+redéfinie comme suit :X
+∗
+Σr = X
+
+Σr ∪{A | A.att ∈ R−X
+
+.att∧ |σC
+X
+(r)| = |σC
+X
+∧C
+A
+(r)|}.
+La notion de quasi-fermeture est utilisée pour accumuler les fermetures des sous ensembles
+propres de l’attribut conditionnel considéré. Ceci nous permet dans le théorème suivant de ga-
+rantir la minimalité des DFC extraites.
+Le théorème suivant prouve que l’ensemble de DFC constantes caractérisé à l’aide des concepts
+introduits est la couverture canonique des DFC constantes pour la relation r.
+Théorème 1 Σcc(r, ) = {X → A | X ∈ CFSr, freq(X, r) ≥  et A ∈ X∗Σr −X
+
+Σr}
+La fréquence freq(X, r) étant utilisée pour filtrer les DFC fréquentes, elle n’a pas à inter-
+venir dans la démonstration.
+Preuve 1 Supposons tout d’abord que la DFC X → A ∈ CC(r, ) (DFC minimale et non
+triviale). Nous avons donc ∀ X ′ ⊂ X , |X ′|r = |X|r donc X ∈ CFSr (conformément à la
+définition 5). De plus, A ∈ X∗Σr puisque la DFC est valide. Elle est minimale donc A ∈ X
+
+Σr
+(cf. Définition 8). Donc si la DFC X → A ∈ CC(r, ) alors X ∈ CFSr et A ∈ X∗Σr −X
+
+Σr .
+Supposons maintenant que X ∈ CFSr et A ∈ X∗Σr − X
+
+Σr . Puisque A ∈ X
+∗
+Σr , A est
+déterminée parX , donc r |= X → A. Elle est minimale puisqueX ∈ CFSr donc ∀X ′ ⊂ X ,
+|X ′|r = |X|r et non triviale puisque A ∈ XΣr . Donc X → A ∈ CC(r, ).
+Exemple 4 Pour illustrer cette section (cf. figure 3), nous utilisons la relation déjà décrite (cf.
+figure 2). La première colonne du tableau suivant représente le candidat X qui peut être un
+ensemble conditionnel libre ou non libre. Les candidats précédés d’un ’*’ sont des ensembles
+conditionnels non libres. La deuxième colonne correspond à la cardinalité de X et pour finir,
+les deux dernières colonnes représentent la quasi-fermeture conditionnelle (X
+
+Σ) et la ferme-
+ture conditionnelle (X
+∗
+Σ) de X . A droite, les DFC découvertes sont affichées.
+RNTI-E-19 - 320 -
+T. Diallo et N. Novelli
+X |X| XΣ X
+∗
+Σ
+A0 3 A0 A0
+A2 2 A2 A2 C0 D1 A→ CD (2 || 0, 1)
+B1 3 B1 B1
+B0 1 B0 A0 B0 C0 D1 B→ ACD (0 || 0, 0, 1)
+B2 1 B2 A2 B2 C0 D1 B→ ACD (2 || 2, 0, 1)
+C0 4 C0 C0
+C3 1 C3 A0 B1 C3 D2 C→ ABD (3 || 0, 1, 2)
+D2 2 D2 A0 B1 D2 D→ AB (2 || 0, 1)
+D1 3 D1 C0 D1 D→ C (1 || 0)
+A0 B1 2 A0 B1 A0 B1 D2 AB→ D (0, 1 || 2)
+*A0 B0 1 A0 B0 C0 D1 A0 B0 C0 D1
+A2 B1 1 A2 B1 C0 D1 A2 B1 C0 D1
+*A2 B2 1 A2 B2 C0 D1 A2 B2 C0 D1
+A0 C0 2 A0 C0 A0 C0
+*A0 C3 1 A0 B1 C3 D2 AO B1 C3 D2
+*A2 C0 2 A2 C0 D1 A2 C0 D1
+*A0 D2 2 A0 B1 D2 A0 B1 D2
+A0 D1 1 A0 C0 D1 A0 B0 C0 D1 AD→ B (0, 1 || 0)
+A2 D1 2 A2 C0 D1 A2 C0 D1
+... ... ... ...
+FIG. 3 – Illustration de la caractérisation proposée
+3.2 Implémentation de l’approche
+Le cadre théorique proposé est très bien adapté à une approche par niveau pour l’implé-
+mentation de la découverte de DFC. Notre algorithme, appelé CFUN, est donc basé sur les
+concepts d’Apriori afin de découvrir l’ensemble des ensembles conditionnels libres. Une fois
+ces derniers découverts pour chaque niveau ainsi que les valeurs correspondantes de fréquence
+(comptage), quasi-fermeture et fermeture, la découverte des DFC est triviale suivant le théo-
+rème 1.
+Cette philosophie est la même que celle utilisée pour l’extraction de DF de l’approche FUN de
+Novelli et Cicchetti (2001a,b).
+Algorithme CFUN L’algorithme général, donné ci-après, initialise les niveaux L0 (ligne 1)
+et L1 (ligne 2) avant de commencer à proprement dit la boucle de calcul niveau par niveau
+(lignes 3-8). Cette dernière calcule tout d’abord la fermeture (ligne 4) de tous les attributs
+conditionnels du niveau Lk−1 à l’aide du niveau Lk (comparaison de fréquences) puis cal-
+cule les quasi-fermetures (ligne 5) du niveau Lk à partir des fermetures obtenues au niveau
+précédant Lk−1 (Définition 6). Une fois les fermetures et quasi-fermetures du niveau Lk−1
+calculées il est trivial d’afficher les DFC fréquentes obtenues à ce niveau (Théorème 1). Une
+phase d’élagage élimine les éléments du niveau courant qui n’appartiennent pas à CFSr (ligne
+7). Ceci permet lors de la génération des candidats du niveau suivant (ligne 8) que seuls les
+sur-ensembles des ensembles conditionnels libres soient considérés. L’algorithme se termine
+RNTI-E-19- 321 -
+Découverte des DFC fréquentes
+en affichant les DFC découvertes au dernier niveau (ligne 9).
+Chaque niveau contient des quadruplets < X , |X|, XΣ, X
+∗
+Σ > comme le montre la figure 3.
+Algorithm CFUN
+1 L0 := < ∅, 1, ∅, ∅ >
+2 L1 := { < A, |A|, A, A > | A ∈ ASPCFD(R, r) ∧ |A.att| = 1 }
+3 for ( k := 1 ; Lk = ∅ ; k := k + 1 ) do
+4 ComputeClosure( Lk−1, Lk )
+5 ComputeQuasiClosure( Lk , Lk−1 )
+6 DisplayCFD( Lk−1 )
+7 PruneNonFreeSets( Lk , Lk−1 )
+8 Lk+1 := GenerateCandidate( Lk )
+9 DisplayCFD( Lk−1 )
+end CFUN
+La phase de génération de candidats requiert une attention toute particulière. En effet, il
+ne faut pas générer de combinaison d’attributs conditionnels qui n’existe pas dans la relation
+considérée (par exemple, la combinaison AA). Pour éviter ces erreurs de génération de candi-
+dats, nous avons utilisé la notion de partition.
+Optimisation et ressource mémoire nécessaire Afin de pallier le problème de génération
+et d’optimiser les calculs, nous avons opté pour une structure interne de représentation de
+l’information basée sur la notion de partitions introduite par Cosmadakis et al. (1986); Spy-
+ratos (1987). L’opération de partitionnement d’une relation r selon un ensemble d’attributs
+X consiste à regrouper en classes d’équivalence, les tuples ayant même valeur pour X . L’en-
+semble des classes d’équivalence constitue une partition de r selon X . Les partitions peuvent
+être représentées de deux manières efficaces d’après Novelli et Maabout (2003) : soit on utilise
+un vecteur de numéros de classe d’équivalence dont l’indexation se fait par le numéro du tuple ;
+soit on utilise un vecteur d’identifiants de tuples rangés dans l’ordre des classes d’équivalence
+ce qui est très bien adapté aux calculs de DF (cf. Huhtala et al. (1998, 1999a); Lopes et al.
+(2000); Novelli et Cicchetti (2001a,b)) et donc pour les DFC. De plus, le produit de partitions
+proposé dans Novelli et Maabout (2003) nous permet aussi de calculer très rapidement les
+fréquences de chaque attributs conditionnels en ne générant pas les combinaisons inexistantes
+dans la relation.
+Exemple 5 Pour illustrer l’utilisation des partitions, nous reprenons la relation de la figure 2.
+Le seuil est fixé à 1. Les partitions suivant les attributs A et C sont πA = {(1, 2, 3), (4, 5)} et
+πC = {(1, 3, 4, 5), (2)}. Les valeurs correspondantes aux classes d’équivalence sont 0, 2 pour
+A et 0, 3 pour C. Le produit de πA et πC est πAC = {(1, 3), (2), (4, 5)}. Les valeurs corres-
+pondantes sont (0, 0), (0, 3) et (2, 0). Ceci nous fournit directement les attributs conditionnels
+avec leur fréquence : freq(< A0 >) = 3, freq(< A2 >) = 2, freq(< C0 >) = 4, freq(<
+C3 >) = 1, freq(< A0, C0 >) = 2, freq(< A0, C3 >) = 1, freq(< A2, C0 >) = 2.
+D’où la DFC A → C(2||0) est valide puisque freq(< A2 >) = freq(< A2, C0) >) = 2.
+De plus, aucune combinaison impossible n’a été générée.
+Pour une relation à n tuples et k attributs, le nombre correspondant de combinaisons d’attributs
+est de 2k (ensemble des parties). Dans le pire des cas, chaque combinaison d’attributs engendre
+n combinaisons d’attributs conditionnels (toutes les valeurs de cette combinaison d’attributs
+sont distinctes). Cela implique que dans le pire des cas le nombre total d’attributs conditionnels
+est de n × 2k. Chaque attribut conditionnel est représenté par un quadruplet d’entier (4 ×
+RNTI-E-19 - 322 -
+T. Diallo et N. Novelli
+4 octets) ce qui signifie que la quantité maximale de mémoire pour conserver la totalité des
+niveaux de notre approche est de 16n× 2k octets.
+L’algorithme proposé étant par niveau, seuls deux niveaux sont obligatoirement conservés en
+mémoire. De fait, les besoins mémoire sont très facilement réduits à 16n × 2( kk/2) octets soit
+à la partie la plus large du treillis de combinaisons d’attributs (les deux niveaux centraux).
+4 Expérimentations
+Afin d’évaluer les performances, l’approche décrite dans la section 3.1 a été implémentée
+en C++. L’exécutable peut être obtenu à l’aide des compilateurs MS Visual C++ 9.0 ou GNU
+g++. Différentes expérimentations ont été réalisées sur un ordinateur équipé d’un processeur
+Pentium Centrino 2 GHz avec 2 Go de RAM avec un système Linux.
+Au moment de la rédaction de l’article, les auteurs des approches existantes (Chiang et
+Miller (2008); Fan et al. (2009)) n’ont pas encore pu nous faire parvenir un exécutable ou le
+code source de leurs approches. De fait, nous n’avons pas pu comparer notre proposition avec
+les leurs. Toutefois, nous avons utilisé les mêmes jeux de données réelles ce qui nous permet
+d’effectuer une comparaison approximative grossière des résultats. Pour les expérimentations
+sur des données réelles, nous avons utilisé Winsconsin breast cancer (WBC) et Chess datasets
+(comme les approches citées) issues du UCI machine learning repository1.
+Le tableau suivant résume les caractéristiques des jeux de données réelles.
+Datasets #Attributs #Tuples Taille (Ko)
+Wirsconsin Breast Cancer 11 699 19 917
+Chess 7 28 056 531 820
+La figure 4 montre le comportement de notre approche sur les données réelles décrites pré-
+cédemment lorsque le seuil de fréquence des DFC varie. La courbe de gauche représente les
+temps d’exécution en seconde alors que celle de droite illustre les consommations mémoire en
+Mo. Comme attendu, quand le support minimal augmente, le temps d’exécution et la consom-
+mation mémoire diminuent.
+Nous avons aussi généré des données synthétiques avec notre propre générateur de don-
+nées : c’est un générateur uniforme de données pour chaque colonne indépendamment des
+autres colonnes de la relation. Les jeux de données synthétiques sont automatiquement géné-
+rés à l’aide des paramètres suivants : |r| représente la cardinalité de la relation, |R| correspond
+au degré de la relation et c fixe le taux de corrélation entre les valeurs d’un attribut. Plus ce
+taux est grand, plus le nombre de DFC satisfaites dans la relation augmente.
+La figure 5 illustre le comportement lorsque le nombre de tuples augmente de 5 000 à
+50 000 pour différents jeux de données synthétiques. Le taux de corrélation de données est
+fixé à 30% pour montrer le passage à l’échelle de notre proposition en fonction du nombre de
+tuples. En effet, cela permet de fixer le nombre de DFC satisfaites indépendamment du nombre
+de tuples. Le support est fixé à 1 afin qu’aucune technique d’élagage ne soit appliquée ce qui
+correspond au pire cas d’extraction de DFC. Les besoins mémoire et le temps d’exécution sont
+linéaires au nombre de tuples de la relation considérée.
+La figure 6 illustre le comportement de notre approche lorsque le taux de corrélation de
+données varie de 30% à 70% sur différents jeux de données synthétiques avec un nombre fixe
+1http ://archive.ics.uci.edu/ml
+RNTI-E-19- 323 -
+Découverte des DFC fréquentes
+ 0
+ 0.1
+ 0.2
+ 0.3
+ 0.4
+ 0.5
+ 0  10  20  30  40  50  60  70  80  90 100
+E
+xe
+cu
+tio
+n 
+T
+im
+e 
+(s
+)
+Minimal support of frequent CFD
+WBC
+Chess
+ 0
+ 2
+ 4
+ 6
+ 8
+ 10
+ 12
+ 14
+ 16
+ 18
+ 0  10  20  30  40  50  60  70  80  90 100
+M
+em
+or
+y 
+us
+ag
+e 
+(M
+o)
+Minimal support of frequent CFD
+WBC
+Chess
+FIG. 4 – Temps d’exécution et consommation mémoire pour les jeux de données réellesWis-
+concin Breast Cancer et chess
+ 0
+ 0.1
+ 0.2
+ 0.3
+ 0.4
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+ 0  10  20  30  40  50  60  70  80  90 100
+E
+xe
+cu
+tio
+n 
+tim
+e 
+(s
+)
+Number of tuples (x1000)
+ 0
+ 10
+ 20
+ 30
+ 40
+ 50
+ 60
+ 70
+ 80
+ 0  10  20  30  40  50  60  70  80  90 100
+M
+em
+or
+y 
+us
+ag
+e 
+(M
+o)
+Number of tuples (x1000)
+FIG. 5 – Temps d’exécution et consommation mémoire pour différentes cardinalités
+ 0
+ 0.005
+ 0.01
+ 0.015
+ 0.02
+ 30  35  40  45  50  55  60  65  70
+E
+xe
+cu
+tio
+n 
+T
+im
+e 
+(s
+)
+Data correlation rates
+ 0
+ 0.5
+ 1
+ 1.5
+ 2
+ 2.5
+ 3
+ 3.5
+ 4
+ 30  35  40  45  50  55  60  65  70
+M
+em
+or
+y 
+us
+ag
+e
+Data correlation rates
+FIG. 6 – Temps d’exécution et besoin mémoire pour différents taux de corrélation
+de tuples (5 000) et d’attributs (7). L’idée est d’étudier le comportement de notre algorithme
+lorsque la taille de l’espace de recherche des attributs conditionnels croît.
+Le temps d’exécution et les besoins mémoire augmentent légèrement en fonction du taux
+de corrélation ce qui est un résultat surprenant en raison de la complexité exponentielle inhé-
+rente. La principale raison est due à l’efficacité de notre implémentation basée sur les partitions
+RNTI-E-19 - 324 -
+T. Diallo et N. Novelli
+de valeurs des attributs et leur produit (Novelli et Maabout (2003)).
+En outre, il est intéressant de noter que notre mise en œuvre ne consomme que peu de
+mémoire. Par exemple, pour un ensemble de données synthétiques avec 1 000 000 de tuples
+et 9 attributs, le temps d’exécution approche 31 secondes en n’utilisant que 1 Go de mémoire
+principale.
+5 Conclusion
+Dans cet article, nous introduisons une nouvelle notation pour les dépendances fonction-
+nelles conditionnelles rendant leur découverte à partir d’une relation existante plus facile. Nous
+avons proposé l’adaptation d’une approche bien connue dans le contexte de l’inférence de dé-
+pendances fonctionnelles à la découverte de DFC constantes fréquentes. Elle est basée sur
+l’approche FUN (Novelli et Cicchetti (2001a,b)) et peut être utilisée pour l’extraction de DFC
+constantes fréquentes. Cette approche a été implémentée et testée sur différents jeux de don-
+nées synthétiques et réelles.
+Par souci de clarté, nous mettons l’accent dans cet article sur la découverte de DFC constan-
+tes. Dans l’avenir, nous envisageons de traiter le problème de la découverte de DFC variables.
+Deux approches sont en effet possibles : la première consiste à réduire l’ensemble des DFC
+constantes (si toutes les valeurs de ADOM(X, r) sont présentes alors nous pouvons les sub-
+stituer par ’_’) pour obtenir un ensemble équivalent restreint de DFC variables. La seconde
+consiste à enrichir l’approche actuelle pour obtenir des algorithmes dédiés.
+Une campagne approfondie d’expérimentations reste à faire pour évaluer en profondeur
+nos résultats actuels.
+Il est à noter que l’extraction de DFC fréquentes partage certaines caractéristiques avec
+le problème d’extraction de requêtes conjonctives fréquentes de projection-sélection (voir par
+exemple Jen et al. (2008)). Nous avons l’intention d’approfondir ces deux domaines afin d’en
+extraire de nouvelles techniques bénéfiques à leurs problèmes.
+Références
+Bohannon, P., W. Fan, F. Geerts, X. Jia, et A. Kementsietsidis (2007). Conditional functional
+dependencies for data cleaning. In Proceedings of ICDE’07, April 15-20, Istanbul, Turkey,
+pp. 746–755.
+Chiang, F. et R. J. Miller (2008). Discovering data quality rules. VLDB 1(1), 1166–1177.
+Cosmadakis, S., P. Kanellakis, et N. Spyratos (1986). Partition Semantics for Relations. Jour-
+nal of Computer and System Sciences 33(2), 203–233.
+Fan, W., F. Geerts, X. Jia, et A. Kementsietsidis (2008). Conditional functional dependencies
+for capturing data inconsistencies. ACM Trans. Database Syst. 33(2).
+Fan, W., F. Geerts, L. V. S. Lakshmanan, et M. Xiong (2009). Discovering conditional func-
+tional dependencies. In Proceedings of the 25th International Conference on Data Enginee-
+ring, ICDE 2009, March 29 2009 - April 2 2009, Shanghai, China, pp. 1231–1234.
+RNTI-E-19- 325 -
+Découverte des DFC fréquentes
+Huhtala, Y., J. Kärkkäinen, P. Porkka, et H. Toivonen (1998). Efficient Discovery of Functional
+and Approximate Dependencies Using Partitions. In ICDE’98, Orlando, Florida, USA, pp.
+392–401.
+Huhtala, Y., J. Karkkainen, P. Porkka, et H. Toivonen (1999a). TANE : An Efficient Algorithm
+for Discovering Functional and Approximate Dependencies. The Computer Journal 42(2),
+100–111.
+Huhtala, Y., J. Kärkkäinen, P. Porkka, et H. Toivonen (1999b). Tane : An efficient algorithm
+for discovering functional and approximate dependencies. The Computer Journal 42(3),
+100–111.
+Jen, T.-Y., D. Laurent, et N. Spyratos (2008). Mining all frequent projection-selection que-
+ries from a relational table. In EDBT 2008, 11th International Conference on Extending
+Database Technology, Nantes, France, March 25-29, 2008, Proceedings, pp. 368–379.
+Kivinen, J. et H. Mannila (1995). Approximate inference of functional dependencies from
+relations. Theor. Comput. Sci. 149(1), 129–149.
+Lopes, S., J. Petit, et L. Lakhal (2000). Efficient Discovery of Functional Dependencies and
+Armstrong Relations. In Proc. EDBT’00, pp. 350–364.
+Novelli, N. et R. Cicchetti (2001a). Fun : An efficient algorithm for mining functional and
+embeddeddependencies. In Proceedings of the 8th International Conference on Database-
+Theory (ICDT’01), Volume 1973 of Lecture Notes in Computer Science, pp. 189–203.
+Novelli, N. et R. Cicchetti (2001b). Functional and embedded dependency inference : a data
+mining point of view. Information Systems (IS) 26(7), 477–506.
+Novelli, N. et S. Maabout (2003). Algorithme efficace de calcul du produit de partitions et ses
+applications. In 19ème conférence Bases de Données Avancées (BDA’03), pp. 343–362.
+Spyratos, N. (1987). The partition model : A deductive database model. ACM TODS 12(1),
+1–37.
+Wyss, C., C. Giannella, et E. Robertson (2001). Fastfds : A heuristic-driven, depth-first algo-
+rithm for mining functional dependencies from relation instances extended abstract. Data
+Warehousing and Knowledge Discovery, 101–110.
 Summary
-Regularized generalized canonical correlation analysis (RGCCA) is a generalization of reg-
-ularized canonical correlation analysis to three or more sets of variables. It constitutes a general
-framework for many multi-block data analysis methods. It combines the power of multi-block
-data analysis methods (maximization of well identified criteria) and the flexibility of PLS path
-modeling (the researcher decides which blocks are connected and which are not). Searching
-for a fixed point of the stationary equations related to RGCCA, a new monotone convergent
-algorithm, very similar to the PLS algorithm proposed by Herman Wold, is obtained. Finally,
-a practical example is discussed.
-Bibliography
-Michel Tenenhaus is Professor emeritus of Statistics at HEC Paris. His main researches are
-concerned with multivariate data analysis: optimal scaling methods for categorical variables,
-PLS regression, PLS path modelling and regularized generalized canonical correlation analy-
-sis. He has published many papers in scientific journals and three books: Méthodes Statistiques
-en Gestion (Dunod, 1994), La régression PLS : théorie et applications (Technip, 1998) and
-Statistique: Méthodes pour décrire, expliquer et prévoir (Dunod, 2007). Michel Tenenhaus is
-also consultant for industrial companies. He has been chairman of PLS’99 at Jouy-en-Josas and
-PLS’09 in Beijing, and co-chairman of the following symposia PLS’01 at Anacapri, PLS’03
-at Lisbon, and PLS’05 at Barcelona.
-- 9 -
-
+Conditional Functional Dependencies (CFDs) have been recently introduced in the context
+of data cleaning. They can be seen as an unification of Functional Dependencies (FD) and As-
+sociation Rules (AR) since they allow to mix attributes and attribute/values in dependencies.
+In this paper, we introduce our ongoing work on CFD inference which can be seen as a clarifi-
+cation of some simple and basic notions underlying CFDs. Not surprisingly, we point out how
+data mining techniques developed for functional dependencies and association rules can be
+reused for constant CFD mining. We focus on how to extent a know technique for discovering
+exacts and approximates FDs to discovering CFDs. We have implemented the technique on
+which experiments have been carried out showing both the feasibility and the scalability of our
+proposition.
+Keywords: Data dependencies, Data mining, Databases theory.
+RNTI-E-19 - 326 -

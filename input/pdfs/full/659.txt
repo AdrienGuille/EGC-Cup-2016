@@ -1,296 +1,792 @@
-Découverte d’itemsets fréquents fermés sur architectures
-multicœurs
-Benjamin Négrevergne∗, Alexandre Termier∗, Jean-François Méhaut∗, Takeaki Uno∗∗
-∗LIG - UJF-CNRS UMR 5217 - 681 rue de la Passerelle, B.P. 72, 38402 Saint Martin d’Hères, France
-{Benjamin.Negrevergne, Jean-Francois.Mehaut, Alexandre.Termier}@imag.fr, http://www.liglab.fr
-∗∗National Institute of Informatics, 2-1-2, Hitotsubashi, Chiyoda-ku, 101-8430 Tokyo, Japan
-uno@nii.jp, http://research.nii.ac.jp/∼uno/
-Résumé. Dans ce papier nous proposons PLCM, un algorithme parallèle de
-découverte d’itemsets fréquents fermés basé sur l’algorithme LCM, reconnu
-comme l’algorithme séquentiel le plus efficace pour cette tâche. Nous présen-
-tons aussi une interface de parallélisme à la fois simple et puissante basée sur la
-notion de Tuple Space, qui permet d’avoir une bonne répartition dynamique du
-travail.
-Grâce à une étude expérimentale détaillée, nous montrons que PLCM est le seul
-algorithme qui soit suffisamment générique pour calculer efficacement des item-
-sets fréquents fermés à la fois sur des bases creuses et sur des bases denses,
-améliorant ainsi l’état de l’art.
+Recherche de sous-structures fréquentes pour l’intégration
+de schémas XML
+Federico Del Razo López, Anne Laurent
+Pascal Poncelet; Maguelonne Teisseire
+ LIRMM - Université Montpellier II, 161 rue Ada 34392 Montpellier cedex 5
+{delrazo,laurent,teisseire}@lirmm.fr
+EMA - LGI2P/Site EERIE, Parc Georges Besse 30035 Nîmes cedex 1
+Pascal.Poncelet@ema.fr
+Résumé. La recherche d’un schéma médiateur à partir d’un ensemble de sché-
+mas XML est une problématique actuelle où les résultats de recherche issus
+de la fouille de données arborescentes peuvent être adoptés. Dans ce contexte,
+plusieurs propositions ont été réalisées mais les méthodes de représentation des
+arborescences sont souvent trop coûteuses pour permettre un véritable passage
+à l’échelle. Dans cet article, nous proposons des algorithmes de recherche de
+sous-schémas fréquents basés sur une méthode originale de représentation de
+schémas XML. Nous décrivons brièvement la structure adoptée pour ensuite
+détailler les algorithmes de recherche de sous-arbres fréquents s’appuyant sur
+une telle structure. La représentation proposée et les algorithmes associés ont
+été évalués sur différentes bases synthétiques de schémas XML montrant ainsi
+l’intérêt de l’approche proposée.
 1 Introduction
-La découverte de motifs fréquents est l’un des domaines majeurs de la fouille de données.
-A l’origine de ce domaine se trouvent les travaux d’Agrawal et Srikant (1994) sur la découverte
-d’itemsets fréquents. Le problème de la découverte d’itemsets fréquents consiste, étant donné
-une base de données où les transactions sont des listes d’items et un seuil de support minimal
-minsup, à découvrir tous les itemsets qui apparaissent plus de minsup fois dans la base de
-de données. Ce problème est le plus simple du domaine de la découverte de motifs fréquents,
-comparativement à la recherche de séquences, d’arbres ou de graphes fréquents. Toutefois, il
-se retrouve dans de nombreuses applications, en particulier dans l’analyse de données de vente
-d’organisations commerciales. De plus, de part sa relative simplicité, toutes les améliorations
-algorithmiques significatives en découverte de motifs fréquents ont d’abord été réalisées dans
-le cas des itemsets fréquents avant d’être adaptées à des motifs plus complexes. C’est en par-
-ticulier le cas pour la fermeture (Pasquier et al. (1999)) ou les méthodes sans génération de
-candidats (Han et al. (2000)).
-En 2003 et 2004, le workshop FIMI (Goethals (2004)) a confronté les algorithmes de re-
-cherche d’itemsets fréquents afin de déterminer les meilleures solutions. Le gagnant de FIMI
-2004, LCM2 de Uno et al. (2004b), combine des améliorations de haut niveau issues de la
-théorie de l’énumération, et des optimisations de bas niveau optimisant la répartition entre
-RNTI-E-19- 465 -
-Découverte d’itemsets fréquents fermés sur multicœurs
-temps de calcul et mémoire utilisée. Depuis 2004, aucun algorithme séquentiel n’a présenté de
-meilleures performances.
-Toutefois les algorithmes séquentiels présentés à FIMI en 2004 ne sont pas capables d’ex-
-ploiter le potentiel de parallélisme des processeurs modernes. En effet depuis 2005, la concep-
-tion des processeurs d’ordinateurs a radicalement changé. Des limites physiques ont été at-
-teintes, ne permettant plus d’augmenter la fréquence d’horloge et donc les performances. Par
-contre la loi de Moore est toujours valable, ce qui implique que tous les 18 mois le nombre
-de transistors que l’on peut graver sur un die double. Afin de permettre une augmentation des
-performances, les chercheurs et constructeurs ont donc proposé la solution de mettre plusieurs
-cœurs de calcul sur un même composant physique (Chip). Pour exploiter au mieux ces pro-
-cesseurs multicœurs, il est impératif de concevoir des algorithmes parallèles, pour lesquels les
-choix algorithmiques faits pour des algorithmes séquentiels ne sont plus nécessairement les
-mieux adaptés.
-L’objectif de cet article est de présenter un algorithme parallèle d’extraction d’itemsets
-fréquents fermés basé sur LCM et capable d’exploiter efficacement les processeurs multicœurs
-des ordinateurs actuels, que l’on retrouve sur les bureaux de la majorité des chercheurs et des
-analystes de données. Nos expériences se focaliseront donc sur des machines mono-processeur
-multicœurs. Nous présentons une nouvelle interface de parallélisation basée sur la notion de
-Tuple Space. Cette interface expose deux primitives à l’implémenteur de l’algorithme, mais
-permet d’utiliser en internes des modèles efficaces de distribution du calcul. Nous présentons
-ensuite l’algorithme PLCM, qui utilise cette interface pour paralléliser LCM.
-Le plan de l’article est le suivant : Dans la section 2, nous définissons brièvement le pro-
-blème de l’extraction d’itemsets fréquents fermés et présentons l’état de l’art en extraction
-parallèle de motifs fréquents sur multicœurs. Nous décrivons dans la section 3 la méthode des
-Tuple Spaces et l’algorithme parallèle PLCM. La section 4 présente une étude expérimentale
-détaillée comparant PLCM à l’état de l’art. Enfin, dans la section 5, nous concluons et dressons
-quelques perpectives pour des travaux futurs.
-2 Les principes de l’extraction d’itemsets fréquents fermés
-Dans cette section, nous introduisons les principales notations utilisées dans l’article, et
-nous définissons le problème de l’extraction d’itemsets fréquents fermés. Nous présentons
-ensuite l’état de l’art.
-2.1 Position du problème
-Soit I = {1, ..., n} un ensemble d’items. Une base de données transactionnelle sur I est un
-ensemble T = {t1, ..., tm} tel que chaque ti est inclus dans I. Un ti est appelé transaction. Un
-sous-ensemble P de I est appelé un itemset. Pour un itemset P , une transaction contenant P est
-appelée une occurrence deP . La tid-list deP , notée tidlist(P ), est l’ensemble des occurrences
-de P . |tidlist(P )| est appelé le support de P , ou encore la fréquence de P , également noté
-support(P ).
-Pour un seuil minimal de support donnéminsup, un itemsetP est fréquent si support(P ) ≥
-minsup. On notera F l’ensemble des itemsets fréquents.
-RNTI-E-19 - 466 -
-B. Négrevergne et al.
-Pour toute paire d’itemsets P et Q, on dira que P et Q sont équivalents si tidlist(P ) =
-tidlist(Q). Cette relation partitionne les itemsets en classes d’équivalences. Les itemsets maxi-
-maux au sens de l’inclusion de chaque classe d’équivalence sont appellés itemsets fermés. On
-notera C l’ensemble des itemsets fréquents fermés.
-Le problème qui nous intéresse est, étant donné une base de donnée transactionnelle T et
-un seuil de support minimalminsup, d’extraire tous les itemsets fréquents fermés de T .
-2.2 État de l’art
-De nombreux travaux ont été menés à la fin des années 1990 sur l’extraction parallèle de
-motifs fréquents sur des clusters (Agrawal et Shafer (1996); Zaki et al. (1997)). Ces travaux
-se concentrent à la fois sur la capacité d’augmenter la taille des bases de données traitées que
-sur l’amélioration des performances. Nous ne faisons que les mentionner, et nous focaliserons
-cet état de l’art sur l’extraction parallèle de motifs fréquents sur des architectures multicœurs,
-donc les problématiques sont sensiblement différentes.
-Le seul algorithme existant dans la littérature pour l’extraction d’itemsets fréquents fermés
-a été proposé par Lucchese et al. (2007). Leur stratégie de parallélisme se base sur une tech-
-nique de vol de travail (Blumofe et Leiserson (1999)) : lorsqu’un thread a beaucoup de travail
-et qu’un autre n’en a pas, ce dernier peut “voler” une partie du travail du premier thread, rédui-
-sant ainsi le déséquilibre de charge. Leur solution contient des optimisations pour améliorer
-l’utilisation du cache lors de la création de bases de données conditionnelles (appellées projec-
-tions dans leur article), une technique couramment utilisée en extraction d’itemsets fréquents.
-3 PLCM : LCM en parallèle
-Dans cette section, nous expliquons le modèle de parallélisation que nous avons adopté
-et nous présentons l’algorithme PLCM. Faute de place, nous invitons le lecteur intéressé à se
-référer à l’article de Uno et al. (2004a) pour l’explication de l’algorithme séquentiel LCM.
-3.1 Modèle de distribution du calcul
-LCM est un algorithme récursif dont les appels ont une structure d’arbre. Ce type d’algo-
-rithme présente des qualités intéressantes pour la parallélisation. En effet, les nœuds de même
-niveau peuvent être calculés de manière indépendante, sans besoin de synchronisation com-
-plexe. Le problème est que dans l’extraction de motifs fréquents en général et pour LCM en
-particulier, les itérations récursives ont des temps de calcul très variables. Une distribution sta-
-tique du travail engendrerait un très fort déséquilibre de charge, comme cela a été montré dans
-Lucchese et al. (2007).
-Comme les autres travaux de l’état de l’art, nous proposons donc une approche de réparti-
-tion dynamique du travail. Notre interface est basée sur le modèle Linda proposé par Gelernter
-(1989). Dans ce modèle les threads communiquent par le biais d’un espace de mémoire parta-
-gée appelé Tuple Space auquel ils peuvent ajouter ou retirer des tuples. Les deux primitives de
-notre interface de parallélisation sont donc simplement : put(tuple) et get(tuple). Ces deux
-primitives assurent à elles seules une répartition dynamique du travail. Tant qu’il y a des tuples
-et donc du travail les threads les récupèrent avec la primitive get. Une itération qui génère du
-RNTI-E-19- 467 -
-Découverte d’itemsets fréquents fermés sur multicœurs
-travail peut le distribuer en insérant des tuples dans le tuple space. Le modèle de distribution du
-calcul depend de la manière dont sont organisés les tuples au sein du tuple space. Les capacités
-de passage à l’échelle d’un programme utilisant le tuple space dépendront donc du coût de la
-gestion du tuple space.
-Notre implémentation du tuple space stoque les tuples dansN “bancs de travail”, oùN est
-le nombre de threads utilisés. Le fait d’avoir un banc de travail assigné à chaque thread permet
-de limiter la contention au moment des appels aux primitives put et get. Chaque thread ajoute
-et consomme des tuples dans un banc qui lui est propre. Lorsque le banc d’un thread est vide,
-le tuple space lui donne des tuples d’un autre banc. Il s’agit d’une forme de vol de travail,
-qui est directement gérée par le tuple space et est transparente pour l’algorithme. Bien que des
-opérations de synchronisation soient nécessaire sur cette architecture de tuple space, il n’y a
-généralement pas de contention. Dans la plupart des cas, les threads calculent les tuples qu’ils
-ont eux même engendrés, ce qui améliore l’utilisation du cache.
-3.2 Parallélisation de LCM
-Dans le cas de PLCM un tuple contient les paramètres d’un appel récursif. La parallélisa-
-tion se fait donc sur l’arbre des appels récursif : chaque appel récursif est remplacé par une
-opération put qui dépose dans le tuple space un tuple avec les paramètres de cet appel. Le
-programme principal ne fait qu’initialiser le tuple space avec un tuple contenant les paramètres
-correspondant à la racine de l’arbre des appels récursifs, puis il démarre N threads de traite-
-ment. Chaque thread fait une boucle qui récupère un tuple avec la procédure get, et effectue
-l’appel de la fonction de traitement avec les paramètres correspondants.
-Afin de limiter le nombre de tuple et donc les surcoûts liés à leur gestion, à partir d’une
-certaine profondeur dans l’arbre de recherche les appels récursifs sont traités directement, sans
-créer de nouveaux tuples.
-4 Expériences
-Nous comparons dans cette section PLCM avec MT_Closed (Lucchese et al. (2007)), qui
-est la seule autre approche parallèle d’extraction d’itemsets fréquents fermés. L’implémenta-
-tion de PLCM est notre implémentation en C++ . Cette implémentation ne partage pas de code
-avec l’implémentation originale de LCM en C, elle a été entièrement réécrite en utilisant des
-Tuple Spaces. L’API des Tuple Spaces est écrite en C++ et Posix Threads. L’implémentation
-de MT_Closed est l’implémentation originale de ses auteurs en C++. A titre de référence,
-nous avons également comparé nos temps de calcul avec l’implémentation séquentielle en C
-de LCM. Les expériences sont menées sur un Intel Xeon 7460 à 2.66 GHz avec 12 Go de
-RAM. Ce processeur a 6 cœurs. Les bases de données utilisées sont les bases fournies par le
-workshop FIMI, disponibles sur le site web du workshop (Goethals (2004)). Nous avons ef-
-fectués des tests sur toutes les bases du site FIMI, mais par manque de place nous ne reportons
-ici dque les résultats pour la base de données dense accidents, et la base de données creuse
-T10I4D100K. Ces résultats sont présentés dans les Figures 1 et 2 en terme de temps de calcul
-et de speedup.
-Nous pouvons remarquer que pour la base de données dense, MT_closed présente de
-meilleurs temps d’exécution que PLCM. Ceci s’explique par le fait que MT_closed utilise
-RNTI-E-19 - 468 -
-B. Négrevergne et al.
- 0
+Étant donné l’explosion du volume de données disponibles sur Internet, il devient indispen-
+sable de proposer de nouvelles approches pour faciliter l’interrogation de ces grandes masses
+d’information afin de retrouver les informations souhaitées. L’une des conditions sine qua non
+pour permettre d’interroger des données hétérogènes est de disposer d’un (ou de plusieurs)
+“schéma général” que l’utilisateur pourra interroger et à partir duquel les données sources pour-
+ront être directement accédées. Malheureusement les utilisateurs ne disposent pas de moyen de
+connaître les modèles sous-jacents des données qu’ils souhaitent accéder et l’un des challenges
+dans ce contexte est donc de fournir des outils pour extraire, de manière automatique, ces sché-
+mas médiateurs. Un schéma médiateur est alors considéré comme une interface permettant à
+l’utilisateur l’interrogation des sources de données : l’utilisateur pose ses requêtes de manière
+transparente et n’a pas à tenir compte de l’hétérogénéité et de la répartition des données.
+XML étant maintenant prépondérant sur Internet, la recherche de moyens d’intégration
+de tels schémas est un domaine de recherche actif. Si les recherches permettant l’accès aux
+données, quand un schéma d’interrogation est connu, sont maintenant bien avancées (Xylème,
+2001), les recherches concernant la définition automatique d’un schéma médiateur restent in-
+complètes et non satisfaisantes (Tranier et al., 2004). Il est alors intéressant de considérer les
+- 487 - RNTI-E-6
+Recherche de sous-structures fréquentes pour l’intégration de schémas XML
+travaux réalisés dans le contexte de la fouille de données afin d’obtenir un schéma fréquent ou
+un ensemble de sous-schémas fréquents. Ces derniers offrent alors des éléments pertinents pour
+la construction du schéma médiateur. Dans le but de proposer une approche permettant de ré-
+pondre à cette dernière problématique, nous nous focalisons sur la recherche de sous-structures
+fréquentes au sein d’une base de données de schémas XML. Une sous-structure fréquente est
+un sous-arbre se trouvant dans “la plupart” des schémas XML considérés. Cette proportion
+est examinée au sens d’un support qui correspond à un nombre minimal d’arbres de la base
+dans lesquels le sous-arbre doit se retrouver pour être considéré comme fréquent. Une telle
+recherche est complexe dans la mesure où il est nécessaire de traduire l’ensemble des sché-
+mas en une structure aisément manipulable. Cette transformation des données conduit parfois
+à doubler ou tripler la taille de la base initiale dès lors que l’on souhaite utiliser des propriétés
+spécifiques permettant d’améliorer le processus de fouille. Il n’existe pas de solution efficace
+à ce problème alliant une représentation compacte à des propriétés intéressantes. L’objet de
+cet article est la définition d’une approche de fouille de données de type XML répondant à cet
+objectif.
+Cet article est structuré de la manière suivante : la section 2 introduit les définitions des
+différentes inclusions dans le contexte des structures hiérarchiques et propose un aperçu des
+principales approches existantes de fouille de données arborescente. Nous présentons égale-
+ment en détail la problématique étudiée. La section 3 présente notre proposition : une méthode
+de recherche de sous-schémas fréquents utilisant les propriétés d’une structure de données
+arborescentes compacte et originale. Les différentes expérimentations menées sur des bases
+de schémas XML sont décrites dans la section 4. Enfin, la section 5 conclut et présente les
+principales perspectives associées à nos travaux.
+2 Définitions, problématique et travaux connexes
+2.1 Définitions préliminaires
+Un arbre est un graphe orienté, connexe sans cycle. Il est composé d’un ensemble de nœuds
+reliés par des arcs et il existe un nœud particulier nommé racine. Il s’agit d’un arbre ordonné
+s’il existe un ordre entre les fils d’un nœud et d’un arbre non ordonné sinon.
+Définition 1 Un arbre enraciné, étiqueté et ordonné T = (N;B;;L; r;) est tel que : N
+est un ensemble fini de nœuds ; B est un ensemble de branches (B  N 2). Chaque branche
+b 2 B est un couple ordonné (u; v) de nœuds où u est le père de v ;  est un ensemble fini
+d’étiquettes ; L est une fonction L : N ! , L(u) = l, fu 2 N; l 2 g ; r est la racine de
+T , r 2 N ; et  est une relation d’ordre entre les fils de chaque nœud interne. La taille de T ,
+notée jT j, est le nombre de nœuds de T .
+Lorsque nous manipulerons plusieurs arbres, nous noterons, pour un arbre T ,NT ,BT , LT ,
+et T pour N;B;L; r et . De plus, dans la suite de cet article, nous utilisons le mot arbre
+pour un un arbre enraciné, étiqueté et ordonné.
+Définition 2 (inclusion) Soient S et T deux arbres, nous disons que S est inclu dans un arbre
+T noté par S v T , s’il existe une fonction injective :NS ! NT des nœuds de S aux nœuds
+de T ,qui vérifie les conditions suivantes pour tout nœud u; v 2 NS :
+- 488 -RNTI-E-6
+Del Razo et al.
+1.  préserve les étiquettes, LS(u) = LT ((u))
+2.  préserve la relation d’ordre entre frères, si u S v alors (u) T (v)
+3.  préserve les relations :
+(a) de parenté tel que 8u; v 2 NS , si (u; v) 2 BS alors ((u); (v)) 2 BT , ou
+(b) d’ancestralité tel que 8u; v 2 NS , si (u; v) 2 BS alors ((u); (v)) 2 B+T .
+Une inclusion est dite induite si les relations de parenté sont préservées. Par ailleurs, si les
+relations d’ancestralité sont respectées, il s’agit d’une inclusion incrustée.
+a
+b c
+a a aT3S T1 T2
+b c c b b
+c
+FIG. 1 – Exemple d’arbres pour l’inclusion induite et incrustée.
+Par exemple, considérons les arbres S, T1, T2, et T3 représentés dans la figure 1. Si les
+relations de parenté sont respectées, il s’agit d’une inclusion induite, donc S est inclus de
+manière induite dans l’arbre T1 (S v T1). Si les relations d’ancestralité sont conservées, alors
+on trouve une inclusion incrustée avec S v T1 et S v T3. S n’est pas inclu dans T2 car  ne
+préserve pas l’ordre entre les frères.
+Dans la suite de cet article, nous considérons une inclusion de type induite car nous sou-
+haitons traiter l’ordre existant entre les nœuds dans la hiérarchie de façon directe et l’ordre
+entre les nœuds de même niveau de façon indirecte. Nous pouvons donc définir le support d’un
+sous-arbre selon cette inclusion de la manière suivante :
+Définition 3 (support) Soit D une forêt d’arbres. Soit S un arbre de D. Soit  un support
+minimal spécifié par l’utilisateur.
+Le support de S est défini par Support(S) = P (S)
+N
+où
+P (S) est le nombre d’arbres dansD incluant S (inclusion induite) ;
+N est le nombre d’arbres dansD.
+Si Support(S)   alors l’arbre S est dit fréquent dansD.
+2.2 Problématique
+La problématique étudiée au sein de cet article est la recherche de sous-structures fré-
+quentes, i.e. de sous arbres qui apparaissent suffisamment fréquemment dans des documents
+XML. Nous considérons, par la suite, qu’une étape initiale de pré-traitement est réalisée sur
+les documents XML de manière à ne retenir que leur structure sous forme d’arbre. Nous consi-
+dérons également qu’à l’issue de cette phase, l’étiquetage des nœuds est homogène, i.e deux
+nœuds de même étiquette dans deux arbres différents partagent non seulement la même syntaxe
+mais également la même sémantique.
+L’objectif consiste alors à rechercher, à partir de la forêt d’arbres obtenueD et en fonction
+d’un support minimal spécifié par l’utilisateur, les sous arbres qui apparaissent suffisamment
+fréquemment, i.e. dont leur nombre d’occurrences dans D est supérieur ou égal au support
+- 489 - RNTI-E-6
+Recherche de sous-structures fréquentes pour l’intégration de schémas XML
+minimal. Pour répondre à cette problématique, nous nous trouvons donc confrontés aux deux
+problèmes suivants :
+1. Quelle structure de représentation efficace utiliser ? Idéalement, étant donné que nous
+considérons de grandes quantités d’arbres, nous souhaitons avoir une structure qui non
+seulement soit efficace en mémoire mais également adaptée aux traitements que nous
+souhaitons faire.
+2. Comment tester efficacement l’inclusion d’un arbre dans un sous arbre ? Rechercher
+l’ensemble des sous arbres fréquents nécessite de parcourir tous les arbres et d’effectuer
+de très nombreuses comparaisons pour réussir à extraire des sous parties communes. Il
+est donc indispensable de pouvoir trouver rapidement à partir de quel nœud la compa-
+raison peut être effectuée si nous souhaitons améliorer l’efficacité de la recherche.
+2.3 Les travaux existants
+Dans cette partie, nous nous intéressons non seulement aux approches de recherche mais
+nous examinons également les méthodes de représentation des arbres. Les travaux dans le
+domaine de la fouille de données arborescentes peuvent être distingués selon qu’ils traitent les
+arbres ordonnés ou non. Nous situant dans le contexte de schémas XML, il s’avère nécessaire
+de traiter l’ordre des éléments si celui-ci est spécifié. Nous nous focaliserons donc sur des
+propositions prenant en charge les arbres ordonnés.
+A notre connaissance, il existe très peu de travaux proposant des méthodes d’extraction
+pour les arbres ordonnés (Zaki, 2002; Asai et al., 2002). Ainsi Zaki (2002) propose l’algo-
+rithme TreeMiner pour extraire des sous-arbres fréquents selon une inclusion incrustée. Une
+représentation originale des arbres facilite la gestion des candidats et offre des performances
+intéressantes. (Asai et al., 2002) traitent également de la problématique des arbres ordonnés
+selon la définition de l’inclusion induite. L’approche proposée, FREQT, adopte une structure
+de représentation du type «first-child/next-sibling» comme illustrée figure 2. Lors du proces-
+sus de fouille, pour chaque structure fréquente, FREQT conserve la liste des nœuds les plus
+à droite dans les arbres de la base de données supportant cette structure. Nous illustrons ceci
+figure 3 où pour le fréquent a, les 6 positions dans la base de données sont stockées, et pour le
+fréquent c   a les 3 positions les plus à droite sont stockées. Cette information représente les
+positions où cette structure est supportée dans la base.
+Si nous examinons plus attentivement la représentation verticale adoptée dans TreeMiner,
+elle aboutit en fait à stocker trois fois la taille d’un arbre, i.e. 3jT j. De la même manière la
+structure utilisée dans FREQT offre des performances attractives, mais cette représentation
+conduit également à tripler la taille de la base afin de stocker les informations nécessaires.
+Même si elles n’abordent pas la même problématique, des approches de représentation
+efficaces des arbres en 2jT j ont été récemment proposées (Wang et al., 2004; Chi et al., 2004,
+2003). Cependant, outre le fait qu’elles ne considèrent pas la notion d’ordre, elles n’utilisent
+pas des propriétés aussi intéressantes que les travaux précédents afin d’améliorer le processus
+d’extraction.
+Notre objectif est donc de permettre une recherche de sous-arbres ordonnés mais, contrai-
+rement aux approches existantes dans ce contexte, d’utiliser une représentation peu coûteuse
+en mémoire, i.e. en 2jT j. Cette structure doit en outre posséder des propriétés intéressantes
+- 490 -RNTI-E-6
+Del Razo et al.
+Représentation "first child − next sibling" de  T
+b a c aa
+2 3 410
+1 2 3
+4next
+first
+lb
+T
+a
+b a
+c
+a
+T
+0
+1
+2
+3
+4
+FIG. 2 – FREQT : représentation d’un arbre.
+b
+c
+a
+c b b
+c
+c
+a
+c
+b
+7
+8
+9
+10
+11
+12
+b
+c a b
+a
+14
+15
+16 17
+13
+a
+c
+a c
+c
+22
+2120
+19
+18
+4T3T1T
+a
+F1
+b
+c
+(p=0, l=a)
+c
+a
+F2
+...
+...
+{4, 11, 20}
+c
+a
+c {5, 12}
+F3
+...
+...
+{4, 11, 13, 16, 18, 20}
+{3, 6, 7, 9, 15, 17}
+{2, 5, 8 ,10, 12, 14, 19, 21, 22}
+(p=0, l=c)
+min_supp = 0.5
+2
+3 4
+5 6
+D
+2T
+FIG. 3 – FREQT : stockage de la liste des positions des fréquents.
+pour améliorer le processus d’extraction. C’est dans ce contexte que se situe notre proposition
+RSF décrite à la section 3.
+3 Proposition
+Dans cette section, nous proposons de nouveaux algorithmes permettant l’extraction effi-
+cace de sous-arbres fréquents ordonnés au sein d’une base de données arborescentes. Dans un
+premier temps, nous décrivons la structure adoptée et nous en soulignons ses intérêts. Dans
+un second temps, nous proposons un survol de notre approche d’extraction et nous montrons
+comment les propriétés de la structure sont utilisées pour améliorer le processus de fouille.
+Finalement, nous décrivons plus formellement les algorithmes proposés.
+Pour illustrer nos propos, nous utiliserons la base d’arbres de la figure 4.
+3.1 Représentation des arbres
+Pour représenter les différents arbres manipulés au sein de notre approche, nous adoptons
+la représentation proposée dans (Del Razo et al., 2005). Un arbre est ainsi décrit à l’aide de
+deux vecteurs comme proposé dans Weiss (1998). Le premier, nommé st, conserve la position
+du père de chaque nœud. Les nœuds de l’arbre sont numérotés en profondeur d’abord. La
+racine de T correspond à l’index 0 et a pour valeur s[0] =  1 pour indiquer que la racine n’a
+- 491 - RNTI-E-6
+Recherche de sous-structures fréquentes pour l’intégration de schémas XML
+c
+e
+c
+b
+b
+b e
+d
+T2 T3T1
+a
+4
+0
+1
+2
+3
+5
+7
+6
+a
+b a
+c
+a
+0
+1
+2
+3
+4
+4
+1 4 5
+a
+0
+1 4 5
+b b c
+a
+bc
+FIG. 4 – La forêt d’arbres exemple.
+1
+a c aa
+2 3 410
+−1 0 1 2 0
+racine
+plus à droite
+structure (st)
+étiquettes (lb)
+feuille la
+(−1)
+a
+b a
+c
+a
+0
+1
+2
+3
+4
+T
+b
+FIG. 5 – RFS : représentation d’un arbre.
+pas de père. Les valeurs st[i]; i = 0; 2; :::; k 1 correspondent aux positions du père des nœuds
+i, comme illustré figure 5.
+Cette représentation permet de retrouver en temps constant le père d’un nœud. De plus,
+elle permet la localisation directe de la feuille la plus à droite par rapport à l’index k. En
+parcourant l’arbre, il est ainsi possible d’obtenir toutes les relations directes père-fils entre
+nœuds. Le deuxième vecteur, nommé lb, est utilisé pour enregistrer les étiquettes de l’arbre
+avec lb[i]; i = 0; 2; :::; k   1 représentant l’étiquette de chaque nœud ni 2 T .
+La structure adoptée permet une représentation des arbres peu coûteuse puisqu’elle se ré-
+duit à 2jT j. De plus elle possède des propriétés intéressantes, évoquées au paragraphe suivant,
+pouvant être utilisées lors de la recherche de sous-structures fréquentes.
+3.2 Aperçu général
+Notre proposition est basée sur une approche classique de type «générer-élaguer», i.e. à
+chaque étape, nous générons différents candidats et nous testons si ceux-ci sont inclus dans
+la bases d’arbres. L’inclusion dans notre cas est bien entendu définie comme étant de type
+«induit».
+La méthode de représentation des arbres que nous proposons permet de générer de manière
+efficace les sous-arbres candidats puis d’élaguer les sous-arbres non fréquents (après calcul du
+support).
+st
+lb
+0 1 2 3 4 5 6 7
+c b a b d
+−1−1 −1 1 −1 3 4 4
+b
+6
+7
+d
+F1={a, b, c ,d}
+T2
+a
+3
+4
+5
+0
+c
+b
+b
+b
+(−1)
+(−1)
+a
+1 3
+2
+5 6
+7
+0
+e
+c
+b
+b
+b e
+d
+T2
+4
+FIG. 6 – Transformation d’un arbre de la base après génération de F1.
+Considérons à présent comment les candidats sont générés. Les candidats de taille 1 sont
+tout d’abord obtenus en parcourant tous les nœuds des arbres de la base de données. Chaque
+nœud voit son support incrémenté lors de ce parcours et seuls sont conservés les nœuds dont le
+- 492 -RNTI-E-6
+Del Razo et al.
+support est supérieur au support minimal défini par l’utilisateur. La base de données est alors
+transformée pour ne conserver que les nœuds fréquents, comme illustré par la figure 6.
+0
+1
+2 3
+−1 0 1 1
+0 1 2 3
+ 
+ 
+
+0
+1
+2
+4
+3
+a) b)
+
+
+
+0
+1
+2
+3 4
+
+
+0
+1
+2
+4
+3
+c)
+−1 0 1 1
+0 1 2 3
+3
+4
+−1 0 1 1
+0 1 2 3
+1
+4
+−1 0 1 1
+0 1 2 3
+0
+4
+branche la 
+plus à droite
+FIG. 7 – Génération des candidats.
+Les candidats de taille 2 sont générés en combinant deux à deux tous les fréquents de taille
+1. La génération des candidats de taille k  3 s’effectue de la même manière que dans les ap-
+proches classiques de type Apriori (Agrawal et Srikant, 1994), par combinaison des fréquents
+de taille k 1. Nous adoptons la stratégie de génération de candidats selon la branche la plus à
+droite comme proposée dans (Asai et al., 2002; Zaki, 2002) et illustrée figure 7. Nous pouvons
+ainsi constater l’intérêt de notre structure de représentation puisque, naturellement, il suffit
+d’ajouter un nouvel élément dans la représentation de l’arbre en spécifiant le père du nouveau
+nœud.
+Le calcul du support de chaque candidat consiste à compter le nombre d’arbres de la base
+qui contiennent ce sous-arbre candidat. Ainsi pour chaque arbre de la base, nous recherchons
+les points d’ancrage sur lesquels la racine du sous-arbre à tester peut s’instancier. Ces points
+correspondent en fait aux nœuds dans l’arbre qui correspondent à la racine de l’arbre à tester.
+Pour chaque point d’ancrage trouvé, on cherche alors à instancier l’ensemble des nœuds de
+l’arbre candidat au sein de l’arbre courant testé, i.e. les fils du nœud à tester. Notons que dans
+le cas d’une inclusion induite, nous recherchons une instanciation exacte du candidat au sein
+des arbres de la base. Si tous les nœuds du candidat ont été trouvés, l’arbre supporte le candidat
+et le support de la structure candidate est alors incrémenté.
+3.3 Les algorithmes
+L’algorithme RFS (Algorithme 1) fonctionne de la manière suivante : un premier parcours
+sur la base est réalisé pour extraire les items dont le nombre d’occurrences est supérieur au sup-
+port minimal. Ces items constituent des arbres résumés à une seule racine, l’item considéré.
+Nous obtenons ainsi l’ensemble F1 des arbres fréquents de taille 1. Ces derniers sont combinés
+entre eux pour former des candidats de taille 2 et un parcours sur la base permet d’obtenir l’en-
+semble F2 constitué des arbres de taille 2. L’algorithme se poursuit en générant des candidats
+de taille k+1 et en effectuant un parcours sur la base pour compter le nombre d’occurrences de
+chaque candidats. Lorsque plus aucun candidat ne peut être généré l’algorithme se termine.
+L’algorithme GenCandidats(Fk 1) (Algorithme 2) décrit la génération des candidats qui
+utilise la branche la plus à droite des sous-arbres fréquents de taille k   1 afin de proposer
+des candidats de taille k. Pour chaque arbre fréquent de taille k   1, il génère un nouveau
+candidat en étendant l’arbre par la branche la plus à droite. Cette génération est obtenue par
+l’intermédiaire de la fonction Bpd. Ainsi, pour chaque nœud, nous lui ajoutons les seules
+extensions possibles, i.e. celles qui s’avèrent fréquentes dans F2.
+- 493 - RNTI-E-6
+Recherche de sous-structures fréquentes pour l’intégration de schémas XML
+Entrée : D = {T1,T2,..,Tn} base de
+données d’arbres ;  le sup-
+port minimal.
+Sortie : F sous-arbres fréquents.
+F1  arbres fréquents de taille 1;
+F2  arbres fréquents de taille 2;
+F  F1 [ F2;
+pour (k = 3;Fk 1 6= ;; k++) faire
+Ck  GenCandidats(Fk 1);
+pour chaque C 2 Ck faire
+si Support(C)   alors
+Fk  Fk [ C;
+F  F [ Fk;
+retourner F ;
+Algorithme 1: RSF(D, ).
+Entrée : Fk 1 des (k 1)-sous-arbres
+fréquents.
+Sortie : Ck des (k)-sous-arbres candi-
+dats.
+Ck  0;
+pour chaque f 2 Fk 1 faire
+pour chaque nœud n 2 Bpd(f)
+faire
+pour chaque < x; y >2 F2
+faire
+si L(n) = L(x) alors
+tmp f+ < n; y >;
+Ck = Ck + tmp;
+retourner Ck;
+Algorithme 2: GenCandidats(Fk 1).
+Entrée : C candidat.
+Sortie : Support du candidat C.
+cnt 0;
+pour chaque T 2 D faire
+trv  faux;
+pour (i = 0; i < (jT j   jCj) &&
+:trv; + + i) faire
+si (L(rc) = L(T [i])) alors
+trv  Ancre(C; T; i);
+si trv alors
+++ cnt;
+sup = cnt
+jDj
+;
+retourner sup
+Algorithme 3: Support(C).
+Entrée : C candidat , T un arbre, i in-
+dex de la racine de l’ancrage.
+Sortie : vrai si T supporte C.
+nbnœuds 1 ;
+Nniv_act  NœudsNivSuiv(C; ;);
+while (jNniv_actj! = ; &&
+:Poursuit(Nniv_act; T; nbnœuds))
+do
+Nniv_act  
+NœudsNivSuiv(C;Nniv_act);
+si (nbnœuds = jCj) alors retourner
+vrai;
+sinon retourner faux;
+Algorithme 4: Ancre(C; T; i).
+Le calcul du support de chaque candidat consiste à compter le nombre d’arbres de la base
+qui contiennent ce sous-arbre candidat.
+Pour chaque arbre de la base, une recherche est effectuée pour voir s’il existe des points
+d’ancrage sur lesquels la racine du sous-arbre à tester peut s’instancier (appel à l’algorithme
+Ancre). Si un sous-arbre existe son nombre d’occurrences est alors incrémenté et son support
+est retourné.
+Considérons l’algorithme de gestion des points d’ancrage (Algorithme 4). Pour chaque
+point d’ancrage trouvé, i.e. pour chaque nœud du sous arbre candidat c qui possède le même
+- 494 -RNTI-E-6
+Del Razo et al.
+label dans l’arbre T , on cherche à instancier l’ensemble des nœuds de l’arbre candidat au
+sein de l’arbre couramment testé T . En d’autres termes, nous souhaitons projeter le sous-arbre
+candidat c dans l’arbre T . Ceci est réalisé par l’intermédiaire des algorithmes Ancre et Poursuit
+(cf. algorithmes 4 et 5).
+L’algorithme Poursuit est utilisé pour chercher une instanciation exacte du candidat au sein
+des arbres de la base. Si tous les nœuds du candidat ont été trouvés, l’algorithme retourne alors
+la valeur V RAI (l’arbre supporte le candidat). Il retourne la valeur FAUX si tous les nœuds
+de l’arbre ont été parcourus sans trouver l’ensemble des nœuds du candidat.
+Algorithme : Poursuit(Nniv_act; T; nbnœuds))
+Entrée : Nniv_act ensemble de nœuds à trouver ; T l’arbre ; nbnœuds le nombre de
+nœuds vérifiés.
+Sortie : vrai si tous les nœuds deNniv_act ont été trouvés.
+pour chaque n 2 Nniv_act faire
+si (L(n) = L((n)) && Pere(n) = Pere((n))) alors
+++nbnœuds;
+si (nbnœuds= jNniv_actj) alors retourner vrai;
+sinon retourner faux;
+Algorithme 5: Poursuite de la recherche.
+4 Expérimentations
+Nos expérimentations ont été réalisées avec un PC Pentium ayant 512 Mo RAM sous le
+système Linux 2.4. Les programmes ont été développés en C++ et compilés avec gcc 3.2.2.
+Nous avons utilisé 6 bases de données construites en employant le programme de généra-
+tion d’arbres XML proposé par (Termier et al., 2002). Ce programme propose différents pa-
+ramètres pour spécifier le nombre d’arbres à générer, leur profondeur, le nombre d’étiquettes
+maximales. Les différentes valeurs utilisées pour les générations lors de nos expérimentations
+sont indiquées dans le tableau 1.
+Paramètres Valeurs
+Nombre d’arbres à générer (x 1000) 10, 40, 70, 100, 130, 150
+Profondeur maximal d’un arbre 5
+Nombre maximal de branches par nœud 5
+Nombre maximal d’étiquettes 50
+Arbres fréquents semés dans la base générée 10
+Probabilité qu’un nœud soit père 0.4
+TAB. 1 – Paramètres pour la construction de la base de données synthétiques.
+- 495 - RNTI-E-6
+Recherche de sous-structures fréquentes pour l’intégration de schémas XML
+Nous avons souhaité évaluer notre proposition selon deux aspects : temps de réponse et
+occupation mémoire. En effet, nous argumentons notre proposition comme étant plus efficace
+pour un réel passage à l’échelle mais ceci n’est pas toujours synonyme d’efficacité en temps
+de réponse. En fait, les expérimentations réalisées prouvent que notre proposition répond aux
+deux critères.
+Pour évaluer les performances sur les temps d’exécution, nous nous sommes comparés à
+l’algorithme FREQT-nodd sans détection des duplicats de (Asai et al., 2002) permettant de
+rechercher des inclusions induites puis à une optimisation de celui-ci FREQT-dd limitant le
+parcours dans les arbres lors de la vérification des candidats.
+La figure 8-(a) représente l’occupationmémoire utilisée pour la représentation de la base de
+schémas XML. Comme nous nous y attendions RSF occupemoins d’espace mémoire puisqu’il
+adopte une structure de représentation plus réduite que FREQT-nodd et FREQT-dd. Ces deux
+derniers adoptent la même structure.
+Les figures 8-(b,c,d) indiquent les temps d’exécution obtenus par FREQT-nodd et RSF
+pour différents supports et différentes tailles de la base de schémas. Nous pouvons constater
+que RSF obtient dans tous les cas de meilleurs résultats.
+ 1
  10
- 20
- 30
- 40
- 50
- 60
- 70
- 80
- 90
- 1  2  3  4  5  6
-te
+ 100
+ 0  20  40  60  80  100  120  140  160
+M
+ém
+oi
+re
+ e
 m
-ps
- (
-s)
-nombre de threads
-accidents@8.8% temps
-lcm (sequentiel)
-MT-Closed
-plcm
-(a) Execution time
+pl
+oy
+ée
+ (M
+o)
+Taille de la base de données (x1000)
+FREQT−dd
+RSF
+(a)min_sup = 0:1
  1
- 2
- 3
- 4
- 5
- 6
- 1  2  3  4  5  6
-sp
-ee
-du
-p
-nombre de threads
-accidents@8.8, speedups
-y=x
-MT-Closed
-plcm
-(b) Speedup
-FIG. 1 – Résultats pour accidents à 8.8% (dense)
- 0
- 200
- 400
- 600
- 800
+ 10
+ 100
  1000
- 1  2  3  4  5  6
-te
+ 10000
+ 100000
+ 0  20  40  60  80  100  120  140  160
+Te
 m
 ps
- (
-s)
-nombre de threads
-T40I10D100K@0.08% temps
-lcm (sequentiel)
-MT-Closed
-plcm
-(a) Execution time
+ d
+’e
+xé
+cu
+tio
+n 
+(se
+cs
+)
+Taille de la base de données (x1000)
+FREQT−nodd
+RSF
+(b)min_sup = 0:05
  1
- 2
- 3
- 4
- 5
- 6
- 1  2  3  4  5  6
-sp
-ee
-du
-p
-nombre de threads
-T40I10D100K@0.08%, speedups
-y=x
-MT-Closed
-plcm
-(b) Speedup
-FIG. 2 – Résultats pour T10I4D100K à 0.08% (creux)
-une représentation bitmap des transactions, très efficace sur les bases de données denses. Pour
-améliorer encore cette efficacité, MT_Closed utilise les instructions SIMD du processeur pour
-faire les calculs sur les bitmaps, ce qui d’après les expériences de Lucchese et al. (2007) peut
-amener un speedup de 50%. Par contre, PLCM présente d’aussi bonnes capacité de passage à
-l’échelle que MT_Closed sur ce type de bases de données.
-En revanche, sur la bases de données creuse, PLCM est au minimum deux ordres de gran-
-deur plus rapide que MT_Closed. Cette différence est dûe aux différences algorithmiques entre
-MT_Closed et PLCM : il y a peu d’itemsets fréquents fermés dans ce jeu de données, donc
-comme PLCM est linéaire en fonction du nombre d’itemsets fréquents fermés, son temps
-d’exécution est faible.
-Notre stratégie de parallélisation permet donc de profiter pleinement de l’avantage en terme
-de complexité théorique qu’a LCM sur MT_Closed, tout en exploitant les performances d’un
-processeur multicœur.
+ 10
+ 100
+ 1000
+ 10000
+ 100000
+ 0  20  40  60  80  100  120  140  160
+Te
+m
+ps
+ d
+’e
+xé
+cu
+tio
+n 
+(se
+cs
+)
+Taille de la base de données (x1000)
+FREQT−nodd
+RSF
+(c)min_sup = 0:1
+ 0.1
+ 1
+ 10
+ 100
+ 1000
+ 10000
+ 0  20  40  60  80  100  120  140  160
+Te
+m
+ps
+ d
+’e
+xé
+cu
+tio
+n 
+(se
+cs
+)
+Taille de la base de données (x1000)
+FREQT−nodd
+RSF
+(d)min_sup = 0:5
+FIG. 8 – Temps d’exécution par rapport à la taille de la base, FREQT-nodd et RSF.
+En analysant les résultats indiqués par la figure 9 comparant FREQT-nodd, FREQT-dd et
+RSF, il s’avère que les temps d’exécution sont nettement améliorés pour FREQT-dd. Le gain
+obtenu en terme d’espace mémoire de RSF est donc à comparer avec les temps d’exécution ob-
+- 496 -RNTI-E-6
+Del Razo et al.
+tenus à l’aide d’une optimisation basée sur le stockage d’informations supplémentaires comme
+indiqué au paragraphe 2.3.
+Nous souhaitons à présent mettre en œuvre une optimisation de parcours de la structure
+proposée afin d’améliorer les performances en terme de temps d’exécution. Une telle optimi-
+sation est tout à fait réalisable et constitue l’une de nos perspectives principales. Nous devrions
+alors obtenir des performances supérieures à celles obtenues pour FREQT-dd tout en conser-
+vant une structure en 2jT j.
+ 0.1
+ 1
+ 10
+ 100
+ 1000
+ 10000
+ 100000
+ 0  20  40  60  80  100  120  140  160
+Te
+m
+ps
+ d
+’e
+xé
+cu
+tio
+n 
+(se
+cs
+)
+Taille de la base de données (x1000)
+FREQT−nodd
+RSF
+FREQT−dd
+(a)min_sup = 0:05
+ 0.1
+ 1
+ 10
+ 100
+ 1000
+ 10000
+ 0  20  40  60  80  100  120  140  160
+Te
+m
+ps
+ d
+’e
+xé
+cu
+tio
+n 
+(se
+cs
+)
+Taille de la base de données (x1000)
+FREQT−nodd
+RSF
+FREQT−dd
+(b)min_sup = 0:5
+FIG. 9 – Mémoire et Temps d’exécution FREQT-nodd, RSF, et FREQT-dd.
 5 Conclusion et perspectives
-Nous avons présenté dans cet article une interface simple de parallélisation d’algorithmes,
-et l’algorithme PLCM, qui utilise cette interface pour paralléliser l’algorithme LCM. L’intérêt
-de la méthode de parallélisation que nous présentons et qu’elle est très générale, et peut donc
-être appliquée à d’autres algorithmes d’extraction de motifs fréquents.
-RNTI-E-19- 469 -
-Découverte d’itemsets fréquents fermés sur multicœurs
-Les expériences sur les bases de données de référence du domaine ont montré que notre
-algorithme donnait de bons résultats aussi bien sur les bases de données creuses que sur les
-bases de données denses, améliorant ainsi l’état de l’art.
-Nous prévoyons de nous intéresser aux machines multi-processeurs multicœurs afin de
-passer à l’échelle sur plus de cœurs. Dans le cas de ces machines, de nouveaux problèmes
-apparaissent, en particulier la saturation du bus entre la mémoire et les cœurs.
+Dans cet article, nous proposons une approche efficace d’extraction de sous-arbres fré-
+quents. RSF est la première proposition de recherche de sous-arbres fréquents selon une in-
+clusion induite à l’aide d’une représentation de la base de schémas en 2jT j. Les premières
+expérimentations réalisées sur des données synthétiques soulignent l’intérêt de notre propo-
+sition par rapport aux approches de référence. Les perspectives immédiates concernant RSF
+suivent deux axes :
+– Tout d’abord, il est possible d’améliorer l’algorithme en optimisant les parcours réalisés
+lors de la vérification des candidats comme proposé dans l’optimisation de FREQT (Asai
+et al., 2002). Toutefois, nous souhaitons mettre en place un procédé moins coûteux en
+terme d’espace mémoire.
+– Ensuite, nous souhaitons utiliser la même structure de représentation des arbres pour
+réaliser une recherche de sous-arbres fréquents en se basant sur une inclusion incrustée.
+Ces travaux ont pour objectif d’être utilisés dans le cadre de la médiation de données, les
+sous-arbres fréquents extraits servant de support à la construction automatique d’un schéma
+médiateur. Une telle solution peut également être adoptée dans le cadre de la fouille de don-
+nées en ligne (data streams) pour le traitement à la volée de données XML. Cette perspective
+permettra de traiter les gros volumes de données transitant sur Internet de manière efficace et
+rapide.
+- 497 - RNTI-E-6
+Recherche de sous-structures fréquentes pour l’intégration de schémas XML
 Références
-Agrawal, R. et J. C. Shafer (1996). Parallel mining of association rules. IEEE Trans. Knowl.
-Data Eng. 8(6), 962–969.
-Agrawal, R. et R. Srikant (1994). Fast algorithms for mining association rules. In Proceedings
-of the 20th VLDB Conference, pp. 487–499.
-Blumofe, R. D. et C. E. Leiserson (1999). Scheduling multithreaded computations by work
-stealing. J. ACM 46(5), 720–748.
-Gelernter, D. (1989). Multiple tuple spaces in linda. pp. 20–27.
-Goethals, B. (2003-2004). Fimi repository website. http://fimi.cs.helsinki.fi/.
-Han, J., J. Pei, et Y. Yin (2000). Mining frequent patterns without candidate generation. In
-SIGMOD’00 : Proceedings of the International Conference on Management of Data, pp.
-1–12.
-Lucchese, C., S. Orlando, et R. Perego (2007). Parallel mining of frequent closed patterns :
-Harnessing modern computer architectures. In ICDM, pp. 242–251.
-Pasquier, N., Yves, Y. Bastide, R. Taouil, et L. Lakhal (1999). Efficient mining of association
-rules using closed itemset lattices. Information Systems 24, 25–46.
-Uno, T., T. Asai, Y. Uchida, et H. Arimura (2004a). An efficient algorithm for enumerating
-closed patterns in transaction databases. In Discovery Science, pp. 16–31.
-Uno, T., M. Kiyomi, et H. Arimura (2004b). Lcm ver. 2 : Efficient mining algorithms for
-frequent/closed/maximal itemsets. In FIMI.
-Zaki, M. J., S. Parthasarathy, M. Ogihara, et W. Li (1997). Parallel algorithms for discovery of
-association rules. Data Min. Knowl. Discov. 1(4), 343–373.
+Agrawal, R. et R. Srikant (septembre 1994). Fast algorithms for mining association rules in
+large databases. In Proceedings of the 20th VLDB Conference (VLDB 02), Santiago, Chile,
+pp. 487–499.
+Asai, T., K. Abe, S. Kawasoe, H. Arimura, et H. Sakamoto (2002). Efficient substructure dis-
+covery from large semi-structured data. In Proceedings of the 2nd Annual SIAM Symposium
+on Data Mining, (SDM 02), Arlington, VA, USA, pp. 158–174.
+Chi, Y., Y. Yang, et R. Muntz (2003). Indexing and mining free trees. In Proceedings of the
+International Conference on Data Mining (ICDM 2003), Florida, USA, pp. 509–512.
+Chi, Y., Y. Yang, et R. Muntz (2004). CMTreeMiner : Mining both closed and maximal
+frequent subtrees. In Proceedings of the Eighth Pacific-Asia Conference on Knowledge
+Discovery and Data Mining (PAKDD 04), Sydney, Australia, pp. 63–73.
+Del Razo, F., A. Laurent, et M. Teisseire (2005). Représentation efficace des arborescences
+pour la recherche des sous-structures fréquentes. In Actes de l’atelier Fouille de données
+complexes, Conférence Extraction et Gestion des Connaissances (EGC 2005), pp. 113–120.
+Termier, A., M.-C. Rousset, et M. Sebag (2002). TreeFinder, a first step towards xml data
+mining. In Proceedings of the IEEE Conference on Data Mining (ICDM 02), pp. 450–457.
+Tranier, J., R. Baraer, Z. Bellahsene, et M. Teisseire (July, 7th - 9th 2004). Where’s Char-
+lie : family based heuristics for peer-to-peer schema integration. In Proceedings of the 8th
+International Database Engineering and Applications Symposium (IDEAS 04), Coimbra,
+Portugal, pp. 227–235.
+Wang, C., Q. Yuan, H. Zhou,W. Wang, et B. Shi (May 2004). Chopper : An efficient algorithm
+for tree mining. Journal of Computer Science and Technology 19, 309–319.
+Weiss, M. A. (1998). Data Structures And Algorithm Analysis In C.
+Xylème, L. (2001). A dynamic warehouse for XML data of the Web. IEEE Data Engineering
+Bulletin 24(2), 40–47.
+Zaki, M. (2002). Efficiently mining frequent trees in a forest. In Proceedings of the
+SIGKDD’02 Conference, Edmonton, Alberta, Canada, pp. 71–80.
 Summary
-In this paper we present PLCM, a parallel algorithm for discovering closed frequent item-
-sets, based on the LCM algorithm, recognized as the most efficient serial algorithm for this
-task. We also present a simple yet powerfull parallelism interface based on the concept of
-Tuple Space, which allows an efficient dynamic sharing of the work.
-Thanks to a detailed experimental study, we show that PLCM is the only algorithm which
-is generic enough to compute efficiently closed frequent itemsets both on sparse and dense
-databases, thus improving the state of the art.
-RNTI-E-19 - 470 -
+The research of a mediator schema from XML schemas is a current problem where the
+results stemming from the mining of tree databases can be adopted. In this context, several
+propositions were proposed but the methods of representation of tree databases are often very
+memory-consuming when querying huge volumes of data. In this paper, we propose an algo-
+rithm of research of frequent sub-structures based on an original method of representation of
+XML schemas. We describe the structure adopted and the algorithms of research for frequent
+sub-trees leaning on such structure.
+- 498 -RNTI-E-6

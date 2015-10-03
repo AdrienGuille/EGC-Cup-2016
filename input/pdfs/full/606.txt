@@ -1,506 +1,541 @@
-Intégration des Tableaux Multidimensionnels en Pig pour
-l’Entreposage de Données sur les Nuages
-Laurent d’Orazio∗, Sandro Bimonte∗∗
-∗Université Blaise Pascal - LIMOS
-Campus des Cézeaux
-63173 Aubière Cedex, France
-dorazio@isima.fr
-http://www.isima.fr/ dorazio/
-∗∗Cemagref
-Campus des Cézeaux
-63173 Aubière Cedex, France
-sandro.bimonte@cemagref.fr
-http://eric.univ-lyon2.fr/ sbimonte/
-Résumé. Les entrepôts de données et les systèmes OLAP correspondent à des
-technologies d’aide à la décision. Ils permettent d’analyser à la volée de gros vo-
-lumes de données représentés en fonction d’un modèle multidimensionnel. L’in-
-formatique dans les nuages, sous l’impulsion des grandes compagnies telles que
-Google, Microsoft ou encore Amazon, a récemment suscité une attention par-
-ticulière. Considérer l’interrogation OLAP et les entrepôts de données au sein
-de telles infrastructures devient alors un enjeu majeur. Les problèmes devant
-être considérés sont ceux classiques des systèmes largement distribués (inter-
-rogation de gros volumes de données, hétérogénéité sémantique et structurelle
-ou encore variabilité), mais d’un nouveau point de vue devant considérer les
-spécificités de ces architectures (facturation à l’utilisation, élasticité et facilité
-d’utilisation). Dans ce papier nous abordons dans un premier temps les règles
-de facturation à l’utilisation pour le stockage des entrepôts de données. Nous
-proposons d’utiliser des techniques de stockage pour nuages à base de tableaux
-multidimensionnels. De premières expérimentations montrent l’intérêt de notre
-proposition. Ensuite, nous listons des perspectives de recherche.
+Choix du taux d’élagage pour l’extraction de la terminologie.
+Une approche fondée sur les courbes ROC
+Mathieu Roche∗, Yves Kodratoff∗∗
+∗LIRMM - UMR 5506, Université Montpellier 2,
+34392 Montpellier Cedex 5 - France
+mathieu.roche@lirmm.fr
+∗∗LRI - UMR 8623, Université Paris-Sud,
+91405 Orsay Cedex - France
+yk@lri.fr
+Résumé. Le choix du taux d’élagage est crucial dans le but d’acquérir une ter-
+minologie de qualité à partir de corpus de spécialité. Cet article présente une
+étude expérimentale consistant à déterminer le taux d’élagage le plus adapté.
+Plusieurs mesures d’évaluation peuvent être utilisées pour déterminer ce taux
+tels que la précision, le rappel et le Fscore. Cette étude s’appuie sur une autre
+mesure d’évaluation qui semble particulièrement bien adaptée pour l’extraction
+de la terminologie : les courbes ROC (Receiver Operating Characteristics).
 1 Introduction
-Les entrepôts de données et les systèmes OLAP (On-Line Analytical Processing) repré-
-sentent des technologies d’aide à la décision qui permettent l’analyse en ligne de gros volumes
-de données [17]. Dans une architecture Relational OLAP (ROLAP), les systèmes OLAP sont
-déployés en utilisant des Systèmes de Gestion de Bases de Données relationnels pour stocker et
-analyser les données. Cette approche est pertinente pour les entrepôts de données peu denses.
-Quand les données sont denses, l’approche Multidimensional OLAP (MOLAP) peut être utili-
-sée [34]. L’architectureMOLAP stocke les données à l’aide de structures multidimensionnelles
-Tableaux Multidimensionnels pour l’Entreposage de Données dans les Nuages
-ad-hoc, tels que des tableaux multidimensionnels, afin de réduire la taille des données stockées.
-Enfin, il existe une autre typologie qui combine les deux technologies : Hybrid OLAP (HO-
-LAP). Selon cette approche, une partie des données sont stockées en relationnel et lŠautre en
-utilisant des techniques multidimensionnelles.
-Les Architectures Hautes Performances visent à faire face aux besoins croissants en terme
-de calcul et de stockage des applications scientifiques et industrielles [8]. Parmi ces architec-
-tures, les nuages informatiques (cloud computing) sous l’impulsion d’entreprises telles que
-Google, Microsoft et Amazon suscitent actuellement une attention particulière.
-Les entrepôts de données et les systèmes OLAP dans les nuages soulèvent différents pro-
-blèmes liés à la performance du stockage et de l’interrogation. Les problèmes à aborder sont
-ceux classiques des systèmes distribués à grande échelle (interrogation de gros volumes de
-données, hétérogénéité sémantique et structurelle, variabilité, etc.), notamment abordés par les
-travaux autour des entrepôts de données sur grilles [24, 15, 21], mais qui doivent être consi-
-dérés d’un nouveau point de vue qui prend en compte les caractéristiques particulières de ces
-architectures : facturation à l’utilisation, élasticité et facilité d’utilisation [8].
-Certains travaux récents abordent les requêtes complexes, telles que les requêtes spatiales
-ou OLAP, dans les nuages [23, 31, 33]. Néanmoins, à notre connaissance, aucun travail ne dé-
-finit un modèle de données pour le stockage de données multidimensionnelles dans les nuages
-considérant la facturation à la demande, les approches existantes étant basés sur de simples
-fichiers textes.
-Ce papier présente une première avancée vers l’implémentation d’une architecture MO-
-LAP dans les nuages afin de réduire les coûts de stockage des données. En particulier, nous
-présentons un algorithme qui transforme les données stockées sous forme de tableaux multidi-
-mensionnels suivant le modèle de données Pig [23]. Ceci permet d’exécuter les requêtes OLAP
-en utilisant le paradigme MapReduce [11] et de réduire de manière significative les coûts de
-stockage. Cet article liste ensuite des perspectives de recherche pour l’analyse de données sur
-nuages informatiques.
-Ce papier est organisé de la manière suivante. La section 2 présente le contexte de ce travail.
-La section 3 introduit la proposition de stockage de tableaux multidimensionnels pour nuages.
-La section 4 présente les expérimentations qui valident notre approche. La section 5 liste des
-pistes de recherche. Enfin, la section 6 conclut ce papier.
-2 Contexte et motivation
-Cette section présente brièvement les entrepôts de données et OLAP en sous-section 2.1, la
-gestion de données dans les nuages en sous-section 2.2, puis introduit les motivations de notre
-travail en sous-section 2.3
-2.1 Entrepôts de données et OLAP
-Les entrepôts de données représentent les données selon le modèle multidimensionnel.
-Celui-ci définit les concepts de dimension et mesure. Une dimension est composée de hié-
-rarchies et représente l’axe d’analyse. Une hiérarchie organise les données (membres) dans
-une structure hiérarchique permettant aux décisionnaires d’analyser les mesures à différentes
-granularités.
-Laurent d’Orazio et Sandro Bimonte
-Les mesures correspondent à des indicateurs numériques décrivant le sujet d’analyse (fait).
-Les opérateurs OLAP tels que roll-up et drill-down permettent de naviguer au sein des hiérar-
-chies synthétisant les données à l’aide des fonctions d’agrégation SQL [17]. D’autres opéra-
-teurs ont été définis pour la sélection d’une partie de l’entrepôt de données et la permutation
-des dimensions [27].
-Les architectures MOLAP utilisent des structures de données multidimensionnelles telles
-que les tableaux multidimensionnels construits à partir des données originales, qui sont en gé-
-néral stockées dans des bases de données relationnelles. Les architectures MOLAP permettent
-d’optimiser le stockage pour les entrepôts de données denses à l’aide de ce modèle de stockage
-de données particulier [34].
-Les tableaux multidimensionnels permettent de stocker uniquement les mesures car elles
-sont indexées à l’aide des positions des membres des dimensions. Par exemple, la valeur de la
-mesure à la position tab[2] [3] [4] est associée au second membre de la première dimension,
-au troisième membre de la deuxième dimension et au quatrième membre de la troisième di-
-mension. Il est important de noter qu’il est possible de passer d’un tableau multidimensionnel
-à un tableau uni-dimensionnel avec la formule suivante :
-Soient d dimensions,Nk les membres de la keme dimension, alors la position de la valeur
-mesurée dans un tableau à une dimension est :
-p(i1, ..., id) =
-∑d
-j=1(ijx
-∏
-k = j + 1dNk)
-2.2 Gestion de données dans les nuages
-FIG. 1 – Architecture de la gestion de données sur nuages
-La gestion de données sur nuages se base généralement sur une architecture en couches,
-comme illustré par la figure 1.
-Le premier niveau correspond à l’infrastructure. En général, ce niveau est composé d’un
-ou plusieurs centres de données, utilisé(s) pour l’analyse de gros volumes de données et mis
-à disposition par les fournisseurs de nuages. Microsoft Azure [5] et Amazon EC2 [1] sont des
-exemples de telles infrastructures. La principale caractéristique de ce niveau est son association
-au modèle de facturation à l’utilisation, où les utilisateurs ne payent que pour les ressources
-utilisées.
-Tableaux Multidimensionnels pour l’Entreposage de Données dans les Nuages
-Le deuxième niveau est dédié au stockage des données. Son objectif principal est de pro-
-poser un système qui permet le passage à l’échelle et qui soit tolérant aux fautes. Google File
-System [14], Amazon Simple Storage Service (S3) [2] et Dynamo [12] sont des exemples ty-
-piques de ce niveau d’architecture. Au sein des nuages, les données sont stockées sous forme
-de fichiers gérés par de tels systèmes.
-Le troisième niveau représente l’environnement d’exécution. L’exemple probablement le
-plus connu dans l’informatique dans les nuages est MapReduce [11] de Google et son im-
-plémentation de sources libres Hadoop [4], Microsoft proposant un outil similaire appelé
-Dryad [18]. L’objectif de ce niveau est de fournir la propriété d’élasticité permettant d’ajuster
-les ressources en fonction des applications, augmentant les capacités de calcul et de stockage
-en cas de pics d’utilisation, les diminuant lors de périodes creuses. Cette propriété évite d’une
-part des investissements lourds permettant à des applications de résister à des pics d’utilisation,
-mais pouvant conduire à une sous-utilisation globale de l’infrastructure. Elle permet d’assurer
-d’autre part le bon fonctionnement d’une application dont le passage à l’échelle n’aurait pas
-été prévu correctement, en augmentant les ressources si nécessaire.
-La dernière couche offre un langage d’interrogation à haut niveau. Une telle couche a pour
-objectif de proposer une certaine facilité d’utilisation et une totale transparence des autres
-couches de l’architecture, tout en autorisant le parallélisme. Différents langages d’interroga-
-tion ont été proposés, tels que Hive de Facebook [31], Scope de Microsoft [9], Sawzall [26]
-de Google ou encore Map-Reduce-Merge [32], qui sont basés sur des modèles de données
-particuliers comme le modèle orienté colonne [29] ou des modèles étendant le modèle rela-
-tionnel [23]. Le modèle de données Pig et son langage Pig Latin en particulier ont été proposés
-pour offrir un compromis entre un langage déclaratif de type SQL et le style procédural bas
-niveau de MapReduce. Un système basé sur Pig a été implémenté, permettant la compilation
-d’instructions Pig Latin et leur exécution dans des environnements parallèles.
-2.3 Motivation
-Conformément au principe de facturation à l’utilisation, les utilisateurs ne paient que pour
-les ressources (cycle processeur consommation de bande passante et stockage) qu’ils utilisent.
-Par exemple, sur Microsoft Azure [5] le coût CPU pour une heure d’exécution est 0,12 $, le
-stockage revient à 0,15 $ par Go et par mois, alors que la consommation de bande passante est
-facturée par Go 0,10 $ en chargement et 0,15 $ en téléchargement.
-D’une part des langages d’interrogation de données sur nuages ne permettent qu’indirecte-
-ment la formulation de requêtes OLAP (puisqu’aucun opérateur [16] ad-hoc n’a été proposé) et
-d’autre part aucun modèle de données associé ne fournit un stockage ad-hoc pour les données
-multidimensionnelles.
-C’est pourquoi notre travail vise à proposer une organisation spécifique des données multi-
-dimensionnelles pour les nuages informatiques afin de réduire les coûts de stockage et de calcul
-pour les requêtes OLAP en accord avec la contrainte des nuages informatiques de facturation
-à l’utilisation.
-De plus, l’analyse en ligne dans les nuages est un domaine de recherche vraiment nouveau.
-En effet, si d’un côté l’Université de Californie [8] a identifié des axes de recherches pour
-nuages (disponibilité et qualité de service, sécurité, etc.), de l’autre côté, personne à notre
-connaissance n’a exploré les différentes pistes de recherche pour l’OLAP dans les nuages,
-si l’on excepte quelques produits commerciaux [3] [6] ayant fait leur apparition rapidement et
-Laurent d’Orazio et Sandro Bimonte
-Year Month Day Country Region Department Profit
-2010 04 01 France Auvergne Puy-de-Dôme 2000
-2010 04 01 France Auvergne Allier 500
-2010 04 01 France Auvergne Haute-Loire 400
-... ... ... ... ...
-2005 11 29 France Rhône-Alpes Isère 2500
-TAB. 1 – Exemple de données multidimensionnelles représentées à l’aide du modèle Pig
-s9091 = FILTER sales BY years = 1990 or years = 1991;
-groups = GROUP s9091 BY year, region;
-results = FOREACH groups
-GENERATE s9091.region, s9091.month, SUM(profit);
-FIG. 2 – Requête OLAP avec Pig : FILTER et (GROUP, Aggrégation)
-récemment, ne fournissant que peu d’informations à leur sujet. Dans ce papier nous détaillerons
-des perspectives portant sur les performances et la modélisation multidimensionnelle sur les
-nuages.
-3 Tableaux multidimensionnels dans les nuages
-Dans cette section, nous introduisons un cas d’étude et le stockage à l’aide de tableaux
-multidimensionnels (sous-section 3.1). Puis nous présentons un algorithme pour la transfor-
-mation de tableaux multidimensionnels en données Pig et notre proposition d’optimisation des
-requêtes OLAP en Pig (sous-section 3.2).
-3.1 Cas d’étude
-Afin de présenter notre travail, nous nous basons sur un cas d’étude simulé portant sur
-l’analyse OLAP des ventes de magasins d’une chaîne d’approvisionnement, situés dans chaque
-département français. Dans ce contexte, deux dimensions sont considérées, une dimension spa-
-tiale regroupant les départements en régions et une dimension temporelle avec une hiérarchie
-jour, mois et année, tandis que la mesure est le profit. Le tableau 1 propose un exemple de
-données, représentées à l’aide du modèle Pig. Dans ce papier pour simplifier la présentation
-de notre contribution, nous considérons une requête OLAP comme une requête qui porte sur
-un seul niveau d’agrégation. En effet, une requête OLAP classique [16] est composée par un
-ensemble de requêtes sur différents niveaux d’agrégation unis par une "union", opérateur qui
-est également implémenté en Pig Latin.
-Une requête OLAP classique sur ces données est : "quel est le profit total pour chaque
-région entre 1990 et 1991 ?". Une telle requête peut facilement être exprimée à l’aide d’ins-
-tructions Pig sur le modèle de données présenté par le tableau 1, comme l’illustre la figure 2.
-Tableaux Multidimensionnels pour l’Entreposage de Données dans les Nuages
-Dimensions
-Temps
-Time_Dim[0]=2010-04-01
-Time_Dim[1]=2010-03-31
-Time_Dim[2]=2010-03-30
-Time_Dim[3]=2010-03-29
-...
-Time_Dim[1826]=2005-11-29
-Localisation
-Location_Dim[0]=France,Auvergne,Puy-de-Dôme
-Location_Dim[1]=France,Auvergne,Allier
-Location_Dim[2]=France,Auvergne,Haute-Loire
-Location_Dim[3]=France,Auvergne,Cantal
-...
-Location_Dim[99]=France,Rhône-Alpes,Isère
-Mesures
-Facts Profit_Fact[0]=2000
-Facts Profit_Fact[1]=500
-Facts Profit_Fact[2]=400
-...
-FIG. 3 – Exemple de tableaux multidimensionnels
-Le modèle de données Pig est une extension du modèle relationnel avec les concepts ato-
-miques de Bag (ensemble de valeurs), de Map (fonctions de hachage), des tableaux imbriqués
-et des UDF (User Defined Functions ou fonctions définies par l’utilisateur). Ainsi, une requête
-OLAP en Pig peut facilement être définie en utilisant trois instructions. La première sélectionne
-les membres des dimensions (1990 et 1991 sur notre exemple). Une autre permet de regrouper
-les données (regroupement par année et région pour cet exemple), alors qu’une dernière réalise
-la tâche d’agrégation (une somme dans notre cas particulier). Il est à noter que contrairement à
-celles écrites en SQL pour lesquelles un optimiseur est utilisé afin de choisir un plan d’exécu-
-tion à partir d’éléments d’optimisation, les requêtes en langage Pig Latin correspondent à un
-ensemble d’instructions dont l’ordre est laissé à la responsabilité de l’utilisateur, ce qui peut
-conditionner le temps de calcul et par conséquent le prix à payer.
-La figure 3 présente les données de la table 1 stockées sous la forme de tableaux mul-
-tidimensionnels. Un tableau à une dimension est fourni pour chaque dimension et pour les
-mesures. Les mesures sont alors associées aux membres des dimensions en utilisant leur in-
-dice et la formule présentée précédemment en section 2.1. Par exemple, Profit_Fact[0] est la
-mesure associée aux membres 01/04/2010 (Time_Dim[0]) et France, Auvergne, Puy-de-Dôme
-(Location_Dim[0]).
-Laurent d’Orazio et Sandro Bimonte
-3.2 Pig et tableaux muldimensionnels pour requêtes OLAP
-Cette section présente comment les tableauxmultidimensionnels peuvent être utilisés comme
-structure de stockage pour Pig et l’optimisation de requêtes OLAP écrites en langage Pig Latin.
-FIG. 4 – Aperçu du processus d’interrogation
-Le processus d’interrogation, illustré par la figure 4 peut être décomposé en deux étapes :
-1. Les données stockées dans des fichiers textes sous forme de tableaux multidimension-
-nels sont traduites en données Pig via un fichier temporaire. Ceci permet de réduire la
-taille des fichiers stockés et, par conséquent, le prix à payer par les clients. De plus, ces
-données peuvent ensuite être manipulées dans un environnement parallèle, à l’aide du
-paradigme MapReduce, respectant ainsi la propriété d’élasticité.
-2. Les requêtes OLAP formulées en Pig Latin sont optimisées.
-La conversion des tableaux multidimensionnels en données Pig est faite via l’algorithme 1
-Les entrées de cet algorithme sont les fichiers stockant les tableaux des dimensions et les
-mesures (voir figure 3). La sortie correspond à un fichier représentant l’entrepôt de données
-basé sur le modèle de donnée Pig (cf. table 1). Le principe de cet algorithme est de construire le
-produit cartésien de n− 1 dimensions. Un produit cartésien est alors réalisé entre ces données,
-la dimension n et les valeurs mesurées sont ajoutées pour générer les n-uplets de la manière
-suivante : le ieme n-uplet avec la ieme valeur du tableau.
-Nous proposons une optimisation simple mais efficace des requêtes OLAP en réécrivant
-les requêtes Pig. Les requêtes exprimées dans le langage Pig Latin correspondent à un en-
-semble d’instructions. Le paradigmeMapReduce ne fournit pas de moteur d’exécution de plan
-de requête. Ainsi, les requêtes OLAP peuvent être formulées de deux manières différentes : (i)
-FILTER et (GROUP et Agrégation) (comme illustré par la figure 2), (ii) (GROUP et Agréga-
-tion) et FILTER (comme illustré par la figure 5).
-Tableaux Multidimensionnels pour l’Entreposage de Données dans les Nuages
-Algorithme 1 Conversion de tableaux multidimensionnels en données Pig
-ENTRÉES : Fichiers de tableaux
-SORTIES : Fichier Pig
-int i← 1 ;
-int n ;
-file cartProdFile ; {initialisé par le produit cartésien des deux dernières dimensions}
-file pigFile ;
-file mAFile ;
-array dimensions ; {ensemble des dimensions}
-tantque i<=n-1 faire
-cartProdFile← produitCartesien(dimensions[i],cartProdFile) ;
-i← i + 1 ;
-fintantque
-i← 0 ;
-tantque non fin de mAFile faire
-rolapFile.insert← (produitcartesien(dimension(N),cartProdFile )+’,’+mAFile(i)) ;
-i← i + 1 ;
-fintantque
-retourner pigFile ;
-groups = GROUP sales BY years;
-avgprof = FOREACH groups GENERATE region, SUM(profits);
-results = FILTER avgprof BY years = 1990 or years = 1991;
-FIG. 5 – Requête OLAP avec Pig : (GROUP, Aggrégation) et FILTER
-Evidemment, une telle séquence influe grandement sur les temps de réponse. Sur un tel
-exemple, si la taille de la source de données est très grande, agréger tous les résultats et ensuite
-sélectionner les membres des dimensions peut être très coûteux. C’est pourquoi, une optimi-
-sation intuitive des requêtes OLAP en Pig Latin consiste à utiliser le patron d’interrogation
-"FILTER, GROUPE, Agrégation".
-4 Validation
-Notre proposition a été validée à l’aide de données simulées. Toutes les expérimentations
-ont été réalisées sur un ordinateur possédant un processeur Intel Core 2 duo à 2,2 GHz dis-
-posant de 4Go de RAM. L’objectif principal de ces expériences était d’illustrer la réduction
-des coûts de stockage obtenue à l’aide de notre approche, sans détériorer les performances, en
-particulier en terme de temps de réponse. La sous-section 4.1 s’intéresse ainsi au stockage, la
-sous-section 4.2 à la conversion de données, alors que la sous-section 4.3 étudie l’impact de
-notre optimisation sur le temps de réponse.
-Laurent d’Orazio et Sandro Bimonte
-4.1 Espace de stockage
-La figure 6 présente la consommation d’espace de stockage en Go en fonction du modèle
-de données, les modèles étudiés étant Pig et les tableaux multidimensionnels. Les résultats
-montrent très clairement que les tableaux multidimensionnels permettent une réduction dras-
-tique (environ 90%) du volume de stockage nécessaire pour la gestion des sources de données
-denses. Nous pouvons ainsi conclure que notre système est moins coûteux en terme de sto-
-ckage. Par exemple, avec la tarification de l’infrastructure Amazon EC2 (0,15$ par Go et par
-mois) et pour une source de données d’un To basée sur le modèle de données relationnel,
-les coûts seraient d’environ 1850 $ par an, alors qu’avec notre approche, la facturation serait
-d’environ 230 $.
-FIG. 6 – Consommation d’espace de stockage
-4.2 Conversion de données
-La figure 7 présente le temps de réponse moyen du processus de conversion de tableaux
-multidimensionnels en données représentées selon le modèle Pig en fonction de la taille de la
-source de données exprimée en nombre de n-uplets. Une telle expérimentation vise à illustrer
-les coûts supplémentaires, en particulier en utilisation processeur, induits par notre proposition.
-Les résultats montrent que l’exécution d’un tel processus est inférieure à une minute pour une
-source de données contenant jusqu’à dix millions de n-uplets. Par conséquent, ce coût addi-
-tionnel peut être considéré comme négligeable. En effet, avec la tarification de l’infrastructure
-Amazon EC2 (0,12 $ par heure d’utilisation d’une instance standard), un tel processus coûte-
-rait au pro rata temporis approximativement 0,001 $ pour une source de données contenant dix
-millions de n-uplets.
-4.3 Optimisation de requête
-Enfin, le tableau 2 illustre l’impact de l’optimisation des instructions Pig pour les requêtes
-OLAP. Il présente le temps de réponse pour l’évaluation d’une requête naïve et d’une re-
-quête optimisée, sur une source de données contenant environ 500 000 n-uplets. Les résultats
-Tableaux Multidimensionnels pour l’Entreposage de Données dans les Nuages
-FIG. 7 – Consommation d’espace de stockage
-montrent clairement que l’optimisation proposée accélère le processus d’évaluation (dans le
-contexte d’expérimentation étudié, une réduction d’environ 30 %).
-Temps de réponse moyen (secondes)
-Requête optimisée FILTER, GROUP et Agrégation) 130
-Requête naïve GROUP, Agrégation, et FILTER 190
-TAB. 2 – Influence de l’optimisation d’une requête Pig sur le temps de réponse
-5 Perspectives de recherche
-Cette section dresse une liste de perspectives de recherche que nous considérons comme
-particulièrement cruciales à aborder afin de fournir des requêtes OLAP et des entrepôts de
-données performants sur nuages. Nous décomposons ces pistes selon deux axes : optimisation
-des performances (sous-section 5.1), puis modélisation et interrogation (sous-section 5.2).
-5.1 Optimisation des performances
-Afin de fournir une amélioration des performances des requêtes OLAP, notamment afin de
-considérer les problèmes liés à la navigation dans des cubes de données volumineux, les pistes
-suivantes devraient être abordées :
-1. Introduction d’optimiseurs de plan d’exécution pour les requêtes OLAP écrites en Pig
-Latin. En effet, comme surligné dans l’article, Pig ne définit aucun plan d’exécution des
-requêtes. Nous pensons que des fortes possibilités d’amélioration sont possibles grâce à
-l’adaptation des optimiseurs des SGDB classiques au modèle de données de Pig. De tels
-optimiseurs pourraient alors être intégrés au niveau du client de manière transparente
-pour les utilisateurs, afin de respecter la propriété de facilité d’utilisation des nuages
-informatiques.
-2. Implémentation d’index pour les entrepôts de données en utilisant le paradigme Ma-
-pReduce. Les index tels que bitmap, etc. sont utilisés dans les entrepôts de données
-Laurent d’Orazio et Sandro Bimonte
-pour optimiser les opérations coûteuses comme la jointure [20] ou l’agrégation [30]. Par
-conséquent, la parallélisation de ces index à travers le paradigme de MapReduce, nous
-semble être pertinente afin d’exploiter toute la puissance des nuages. Pour cela, nous
-considérons comme fondamentales lŠextension et/ou lŠadaptation de l’implémentation
-de ces indexes dans les architectures OLAP distribuées [24, 15, 21] en prenant en compte
-le paradigmeMapReduce et les particularités des architectures sur nuages : la facturation
-à l’utilisation, la facilité d’utilisation et l’élasticité.
-3. Définition d’algorithmes de sélection de vues matérialisées basés sur le modèle de fac-
-turation à l’utilisation. Les vues matérialisées représentent une technique fondamentale
-pour l’optimisation des requêtes OLAP dans les architectures ROLAP. Plusieurs travaux
-ont été proposés pour la sélection "intelligente" des vues matérialisées à calculer [7]. Ces
-approches ne tiennent pas compte du modèle de facturation à l’utilisation. Nous pensons
-donc à définir des techniques de matérialisation et de "dématérialisation" qui s’adaptent
-aux changements des requêtes des utilisateurs et des coûts de stockage et calcul des
-fournisseurs des nuages.
-4. Intégration de caches pour l’amélioration de la qualité de service et la réduction des
-coûts d’utilisation. L’utilisation de cache est cruciale pour améliorer les performances
-de nombreux systèmes informatiques et plus particulièrement des systèmes décision-
-nels [28]. Notre objectif est de proposer des techniques de caches sophistiquées et plus
-précisément des caches sémantiques [19, 10] afin d’améliorer la qualité de service (ré-
-duction des temps de réponse, augmentation de la disponibilité) et de réduire les coûts.
-De tels mécanismes seraient utilisés pour copier les requêtes fréquemment posées (et
-ainsi économiser les cycles de calcul et la consommation de bande passante).
-5.2 Modélisation et interrogation
-D’un point de vue modélisation et interrogation des entrepôts de données dans les nuages,
-d’autres pistes de recherche restent à explorer :
-1. Intégration des opérateurs SQL pour OLAP comme opérateurs natifs de Pig Latin. En
-effet, une des caractéristiques les plus importantes des nuages est la facilité d’utilisa-
-tion. Donc, puisque, comme montré dans ce papier, la définition des requêtes OLAP sur
-Pig Latin n’est pas immédiate, nous pensons à intégrer l’opérateur Cube [16] dans Pig
-Latin. Cela nous permettra d’introduire des fonctionnalités typiques du serveur OLAP
-directement dans le gestionnaire de données sur nuages [13] en facilitant l’utilisation et
-la définition des systèmes pour l’analyse en ligne dans les nuages.
-2. Implantation des propriétés avancées de modélisation multidimensionnelle grâce à Pig.
-Les applications multidimensionnelles peuvent présenter des caractéristiques de modéli-
-sation avancée, comme les relations n-n entre faits et dimensions, les mesures complexes,
-etc. [25] qui sont difficiles à implémenter dans les SGBD relationnels [22]. L’exploration
-de la puissance du modèle de données de Pig (en ce qui concerne les concepts de bag,
-map, et nested query) pour la modélisation avancée des entrepôts de données reste une
-piste importante.
-Tableaux Multidimensionnels pour l’Entreposage de Données dans les Nuages
-6 Conclusion
-Ce papier présente l’intégration des tableaux multidimensionnels dans Pig pour l’entrepo-
-sage de données sur nuages afin de réduire les coûts de stockage. En particulier, nous avons
-présenté un algorithme qui permet de convertir les données stockées dans les tableaux multi-
-dimensionnels en données basées sur le modèle Pig. Ainsi, les requêtes OLAP peuvent faci-
-lement être exécutées en utilisant le langage Pig Latin. Enfin, nous avons proposé une opti-
-misation simple et intuitive des requêtes OLAP en ordonnant les instructions Pig Latin. Les
-premières expérimentations en local sur des données simulées illustrent la pertinence d’une
-telle solution. Les résultats montrent clairement que notre proposition permet de réduire la
-consommation d’espace de stockage et permet ainsi aux utilisateurs des nuages de diminuer
-les coûts, en utilisant un algorithme de conversion dont le coût est négligeable par rapport
-aux coûts de l’analyse décisionnelle. Nous avons ensuite listé des perspectives de recherche
-devant être considérées afin d’intégrer efficacement au sein des nuages informatiques les re-
-quêtes OLAP et des entrepôts de données. Actuellement, nous travaillons sur la parallélisation
-de la conversion à l’aide du paradigme MapReduce afin d’exploiter la puissance de calcul des
-infrastructures, ainsi que sur l’évaluation de performance de notre proposition sur des centres
-de données mis à disposition par les fournisseurs de nuages.
-Remerciements
-Merci à Boussad Mebarki, Ilyas Brahmia, Abdelaziz Merabet, ainsi qu’aux équipes APIS
-du LIMOS et COPAIN du cemagref pour les discussions sur les entrepôts de données et les
-nuages informatiques.
+Cet article présente une étude expérimentale consistant à évaluer le taux d’élagage le plus
+adapté pour l’extraction de la terminologie. Nous allons décrire ci-dessous notre méthode glo-
+bale d’extraction de la terminologie et rigoureusement définir l’élagage.
+La première phase de notre travail d’extraction de la terminologie à partir de corpus spé-
+cialisés consiste à normaliser les textes en utilisant des règles de nettoyage décrites par Roche
+(2004). Les corpus que nous utilisons sont décrits dans la section 3 de cet article. L’étape sui-
+vante consiste à apposer des étiquettes grammaticales à chacun des mots du corpus en utilisant
+l’étiqueteur ETIQ développé par Amrani et al. (2004). ETIQ est un système interactif s’ap-
+puyant sur l’étiqueteur de Brill (1994) qui améliore la qualité de l’étiquetage de corpus spé-
+cialisés. Nous pouvons alors extraire l’ensemble des collocations Nom-Nom, Adjectif-Nom,
+Nom-Adjectif1, Nom-Préposition-Nom d’un corpus spécialisé. L’étape suivante consiste à sé-
+lectionner les collocations les plus pertinentes selon des mesures statistiques décrites par Roche
+et al. (2004c); Roche (2004). Les collocations sont des groupes de mots définis par Halliday
+(1976); Smadja (1993). Nous appelons termes, les collocations pertinentes.
+Les termes binaires (ou ternaires pour les termes prépositionnels) extraits à chaque itération
+sont réintroduits dans le corpus avec des traits d’union afin qu’ils soient reconnus comme
+des mots à part entière. Nous pouvons ainsi effectuer une nouvelle recherche terminologique
+à partir du corpus avec prise en compte de la terminologie du domaine acquise aux étapes
+précédentes. Notre méthode itérative, proche des travaux de Evans et Zhai (1996), est décrite
+1Corpus en français uniquement
+- 205 - RNTI-E-6
+Choix du taux d’élagage pour l’extraction de la terminologie
+par Roche et al. (2004b); Roche (2004). Cette approche permet de détecter des termes très
+spécifiques (composés de plusieurs mots). Ceci est essentiel, par exemple dans le domaine de
+la biologie, où les termes les plus pertinents sont les termes composés de nombreux mots.
+Le choix du taux d’élagage consiste à établir le nombre de fois minimal où les collocations
+doivent être présentes dans le corpus afin que ces dernières soient extraites en étant jugées
+comme significatives. Ainsi, pour ne pas surcharger le travail de l’expert, ce dernier peut choisir
+de ne pas extraire les collocations rares.
+Cet article présente, dans un premier temps, un état de l’art des méthodes d’extraction de
+la terminologie (section 2). Puis une description succincte des corpus utilisés est donnée en
+section 3 suivie de la présentation de l’application de différents taux d’élagages effectués sur
+ces corpus (section 4). La section 5 présente de quelle manière les collocations sont experti-
+sées. La section 6 décrit différentes mesures d’évaluation de la terminologie centrées sur la
+problématique du choix du taux d’élagage. La section 7 propose enfin quelques perspectives.
+2 État de l’art des méthodes d’extraction de la terminologie
+De multiples approches de recherche terminologique ont été développées afin d’extraire
+les termes pertinents à partir d’un corpus. Nous ne traiterons pas ici les approches d’aide à la
+structuration et au regroupement conceptuel des termes qui sont détaillés dans les travaux de
+Aussenac-Gilles et Bourigault (2003).
+Les méthodes d’extraction de la terminologie sont fondées sur des méthodes statistiques
+ou syntaxiques. Le système TERMINO de David et Plante (1990) est un outil précurseur qui
+s’appuie sur une analyse syntaxique afin d’extraire les termes nominaux. Cet outil effectue
+une analyse morphologique à base de règles, suivie de l’analyse des collocations nominales à
+l’aide d’une grammaire. Les travaux de Smadja (1993) (XTRACT) s’appuient sur une méthode
+statistique. XTRACT extrait, dans un premier temps, les collocations binaires situées dans une
+fenêtre de dix mots. Les collocations binaires sélectionnées sont celles qui dépassent d’une
+manière statistiquement significative la fréquence due au hasard. L’étape suivante consiste à
+extraire les collocations plus générales (collocations de plus de deux mots) contenant les col-
+locations binaires trouvées à la précédente étape. ACABIT de Daille (1994) effectue une ana-
+lyse linguistique afin de transformer les collocations nominales en termes binaires. Ces der-
+niers sont ensuite triés selon des mesures statistiques. Contrairement à ACABIT qui est fondé
+sur une méthode statistique, LEXTER de Bourigault (1993) et SYNTEX de Bourigault et Fabre
+(2000) s’appuient essentiellement sur une analyse syntaxique afin d’extraire la terminologie du
+domaine. La méthode consiste à extraire les syntagmes nominaux maximaux. Ces syntagmes
+sont alors décomposés en termes de “têtes” et d’“expansions” à l’aide de règles grammati-
+cales. Les termes sont alors proposés sous forme de réseau organisé en fonction de critères
+syntaxiques.
+Pour discuter le choix du taux d’élagage selon le nombre d’occurrences, nous allons classer
+les collocations en utilisant la mesure OccRV décrite dans les travaux de Roche (2004). Cette
+mesure qui a le meilleur comportement comme précisé par Roche et al. (2004a,c) classe les
+collocations selon leur nombre d’occurrences et les collocations ayant le même nombre d’oc-
+currences sont classées en utilisant le Rapport de Vraisemblance de Dunning (1993). Cette
+mesure est parfaitement bien adaptée à cette étude car le classement effectué selon le nombre
+d’occurrences permet de discuter le choix du taux d’élagage.
+- 206 -RNTI-E-6
+M. Roche et Y. Kodratoff
+3 Description des corpus
+Au cours de ces travaux, nous avons travaillé à partir de quatre corpus de spécialité, de
+langues et de tailles différentes.
+– Le premier corpus étudié est composé de 100 introductions d’articles scientifiques (369
+Ko) traitant de la Fouille de Données écrits en langue anglaise par des auteurs anglo-
+phones.
+– Le deuxième corpus en langue anglaise traité est un corpus de Biologie Moléculaire
+(9424 Ko). Il a été obtenu par une requête au NIH sur Medline (PubMed)2 avec les
+mots-clés DNA-binding, proteins, yeast obtenant de ce fait un corpus de 6119 résumés
+d’articles scientifiques. Outre sa taille conséquente, une des caractéristiques de ce cor-
+pus tient dans l’utilisation d’un vocabulaire très spécialisé. Une partie de ce corpus est
+disponible à l’adresse suivante : http ://www.lri.fr/ia/Genomics/.
+– Le troisième corpus est composé de 1144 Curriculum Vitæ fournis par la société Ve-
+diorBis. Ce corpus écrit en français a une taille de 2470 Ko. Une des particularités de
+ce corpus tient au fait qu’il est composé de phrases très courtes avec de nombreuses
+énumérations.
+– Enfin, le dernier corpus de spécialité étudié dans cet article est composé d’un ensemble
+de textes écrits en français qui sont issus du domaine des Ressources Humaines (société
+PerformanSe). Les textes écrits correspondent à des commentaires de tests de psycholo-
+gie de 378 individus. Les textes sont écrits par un seul auteur qui emploie un vocabulaire
+spécifique avec l’utilisation de tournures souvent littéraires. Une partie de ce corpus est
+disponible à l’adresse suivante : http ://www.lri.fr/∼roche/Recherche/corpusPsy.html
+4 Taux d’élagage de la terminologie
+Le principe de l’élagage des collocations consiste à exploiter seulement les collocations
+présentes un nombre de fois minimum dans le corpus. L’élagage permet d’exclure les colloca-
+tions trop rares qui peuvent se révéler comme non significatives pour le domaine. Sur chacun
+des corpus expérimentés, le tableau 1 présente différents élagages appliqués.
+La première observation à relever dans le tableau 1 tient dans le nombre d’occurrences des
+collocations qui diffère selon les langues. Par exemple, les collocations de type Nom-Nom sont
+beaucoup moins fréquentes sur les corpus en français par rapport aux corpus en anglais.
+Suivant les domaines de spécialité écrits dans une même langue, les résultats peuvent éga-
+lement différer de manière importante. Par exemple, sur le corpus de CVs, le nombre de col-
+locations de type Nom-Nom est beaucoup plus important que celui du corpus des Ressources
+Humaines également écrit en français. Le corpus des Ressources Humaines a pourtant une
+taille plus grande que le corpus de CVs. Ceci est dû au fait que les CVs sont écrits de manière
+condensée en employant un vocabulaire très spécifique : “emploi solidarité”, “action commu-
+nication”, “fichier client”, “service achat”, etc.
+Le tableau 1 montre qu’en éliminant simplement les collocations présentes une seule fois
+dans le corpus, plus de la moitié des collocations sont supprimées dans tous les cas, excepté
+la relation Adjectif-Nom du corpus des Ressources Humaines. Ce corpus a un comportement
+2http ://www.ncbi.nlm.nih.gov/entrez/query.fcgi
+- 207 - RNTI-E-6
+Choix du taux d’élagage pour l’extraction de la terminologie
+nb total élagage 2 élagage 3 élagage 4 élagage 5 élagage 6
+CORPUS DE CVS (français)
+Nom-Nom 1781 353 (80%) 162 (91%) 100 (94%) 69 (96%) 56 (97%)
+Nom-Prép-Nom 3634 662 (82%) 307 (91%) 178 (95%) 113 (97%) 80 (98%)
+Adjectif-Nom 1291 259 (80%) 103 (92%) 63 (95%) 44 (97%) 34 (97%)
+Nom-Adjectif 3455 864 (75%) 448 (87%) 307 (91%) 222 (94%) 181 (95%)
+CORPUS DES RESSOURCES HUMAINES (français)
+Nom-Nom 98 34 (65%) 11 (89%) 5 (95%) 2 (98%) 0 (100%)
+Nom-Prép-Nom 4703 2281 (51%) 1268 (73%) 787 (83%) 566 (88%) 417 (91%)
+Adjectif-Nom 1290 739 (42%) 476 (63%) 326 (75%) 254 (80%) 210 (84%)
+Nom-Adjectif 5768 2809 (51%) 1628 (72%) 1038 (82%) 748 (87%) 578 (90%)
+CORPUS DE FOUILLE DE DONNÉES (anglais)
+Nom-Nom 2070 475 (77%) 223 (89%) 134 (93%) 96 (95%) 70 (97%)
+Nom-Prép-Nom 1170 93 (92%) 20 (98%) 8 (99%) 3 (100%) 0 (100%)
+Adjectif-Nom 2411 451 (81%) 176 (93%) 96 (96%) 64 (97%) 39 (98%)
+CORPUS DE BIOLOGIE MOLÉCULAIRE (anglais)
+Nom-Nom 22241 7668 (65%) 4600 (79%) 3332 (85%) 2549 (88%) 2081 (90%)
+Nom-Prép-Nom 28613 4192 (85%) 1674 (94%) 927 (97%) 617 (98%) 467 (98%)
+Adjectif-Nom 23284 6816 (71%) 3781 (84%) 2547 (89%) 1951 (92%) 1545 (93%)
+TAB. 1 – Élagages des différents corpus étudiés. Les pourcentages représentent les propor-
+tions d’élagage effectuées.
+particulier. En effet, en moyenne chaque taux d’élagage à partir du corpus des Ressources
+Humaines supprime une proportion plus faible de collocations contrairement aux trois autres
+corpus. Deux raisons peuvent expliquer cette situation. Premièrement, le corpus a été écrit par
+un seul auteur issu de la société PerformanSe. Ainsi, le vocabulaire employé est moins varié
+que les trois autres corpus. Deuxièmement, les tests de psychologie décrivent des comporte-
+ments et des observations qui se répètent souvent. Ainsi, de nombreuses tournures de phrases
+sont identiques, les collocations sont donc globalement plus fréquentes.
+5 Acquisition des termes pour la classification conceptuelle
+Pour construire une classification conceptuelle, les collocations évoquant des concepts du
+domaine sont extraites. Le tableau 2 présente des exemples de collocations associées à des
+concepts à partir des deux corpus en français étudiés.
+Afin de valider les collocations extraites, plusieurs catégories de pertinence (ou de non
+pertinence) ont été identifiées :
+– 1ère catégorie : La collocation est pertinente pour la classification conceptuelle (exemple
+du corpus de CVs : “ baccalauréat littéraire”)
+– 2ème catégorie : La collocation est pertinente mais très spécifique et pas nécessairement
+adaptée au domaine (exemple du corpus de CVs : “écosystème marin”)
+- 208 -RNTI-E-6
+M. Roche et Y. Kodratoff
+CORPUS DES RESSOURCES HUMAINES CORPUS DE CVS
+Collocations Concepts associés Collocations Concepts associés
+besoin d’information Communication aide comptable Activité Gestion
+capacité d’écoute Communication gestion administrative Activité Gestion
+contexte professionnel Environnement employé libre service Activité Commerce
+lieu de travail Environnement assistant marketing Activité Commerce
+responsabilité de gestion Rôle chef de service Activité Encadrement
+rôle hiérarchique Rôle direction générale Activité Encadrement
+sentiment de malaise Stress BEP secrétariat Compétence Secrétariat
+tension permanente Stress BTS assistante de direction Compétence Secrétariat
+besoin de point de repère Vous-Même baccalauréat professionnel vente Compétence Commerce
+haute ambition Vous-Même BTS commerce international Compétence Commerce
+TAB. 2 – Extrait de la classification conceptuelle construite à partir d’un corpus des Res-
+sources Humaines et de CVs.
+– 3ème catégorie : La collocation est pertinente mais très générale et pas nécessairement
+adaptée au domaine (exemple du corpus de CVs : “situation actuelle”)
+– 4ème catégorie : La collocation est non pertinente (exemple du corpus de CVs : “jour
+quotidienne”)
+– 5ème catégorie : L’expert ne peut pas juger si la collocation est pertinente (exemple du
+corpus de CVs : “master franchisé”).
+Par exemple, les collocations qui sont des instances de concepts peuvent être utilisées pour
+découvrir des règles d’association entre concepts présents dans les textes. Les concepts peuvent
+également être utilisés pour construire des patrons d’extraction utiles pour la recherche d’in-
+formations.
+Par exemple, pour découvrir des règles d’association, les concepts utilisés doivent être
+précis afin de déterminer des associations éventuelles. Ce travail a des similarités avec les ap-
+proches de Srikant et Agrawal (1997) qui consistent à utiliser une taxonomie pour généraliser
+des règles d’association extraites. Dans nos travaux précédents (Azé et Roche (2003); Kodra-
+toff et al. (2003)) et dans la thèse de Azé (2003), les règles d’associations découvertes sont de
+la forme concept1...conceptn−1 → conceptn où n est le nombre de concepts impliqués dans
+les règles d’association extraites. Le détail de l’algorithme est présenté dans les travaux de Azé
+(2003).
+À titre d’exemple, nous donnons deux règles d’association extraites à partir du corpus des
+Ressources Humaines :
+“Stress”→ “Environnement”
+Cette règle signifie que le stress s’exerce par l’intermédiaire de l’environnement. Cette
+règle d’association, bien que correcte, n’a pas été jugée comme particulièrement intéressante
+(n’apportant pas d’informations nouvelles) lors de la phase de validation.
+Un autre exemple de règle qui a été extraite est donné ci-dessous.
+“Implication dans l’entreprise”→ “Environnement”.
+Une telle règle exprimant des informations liées à l’implication dans l’entreprise a été jugée
+comme intéressante mais qui demande une expertise plus approfondie.
+- 209 - RNTI-E-6
+Choix du taux d’élagage pour l’extraction de la terminologie
+L’extraction des règles d’association s’effectue avec des concepts très précis qui intéressent
+l’expert. Ainsi, en reprenant les différentes catégories évoquées au début de cette section, les
+collocations pertinentes afin de découvrir des règles d’association entre concepts sont les col-
+locations de la catégorie 1. Les collocations issues des catégories 2, 3 et 4 sont jugées comme
+non pertinentes. Enfin, les collocations de la catégorie 5 ne sont pas prises en considération car
+l’expert n’a pas été apte à les valider. Cette dernière catégorie correspond en fait à des collo-
+cations qui sont ambiguës ou qui n’ont pas pu être évaluées par méconnaissance partielle du
+domaine.
+6 Évaluation de la terminologie et taux d’élagage
+Nous allons évaluer les résultats sur le seul corpus de CVs. En effet, pour ce seul corpus,
+toutes les collocations Nom-Adjectif quel que soit le taux d’élagage établi ont été évaluées par
+un expert.
+6.1 Expertise de la terminologie
+Le tableau 3 donne le nombre de collocations de type Nom-Adjectif associées à chaque
+catégorie d’expertise. Nous rappelons que chacune des catégories a été décrite dans la section
+5 de cet article.
+Le tableau 3 présente les résultats des expertises effectuées selon différents taux d’élagage.
+Plus les collocations fréquentes sont privilégiées en appliquant un taux d’élagage important et
+plus la proportion de collocations de la catégorie 1 correspondant aux collocations pertinentes
+est élevée. À titre d’exemple, si toutes les collocations sont conservées (élagage à un), la pro-
+portion de collocations pertinentes est de 56.3% contre plus de 80% en faisant un élagage de
+quatre, cinq ou six.
+Élagage catégorie 1 catégories 2 et 3 catégorie 4 catégorie 5 Total
+1 1946 (56.3%) 919 (26.6%) 395 (11.4%) 195 (5.6%) 3455
+2 631 (73.0%) 151 (17.5%) 58 (6.7%) 24 (2.8%) 864
+3 348 (77.7%) 73 (16.3%) 17 (3.8%) 10 (2.2%) 448
+4 256 (83.4%) 36 (11.7%) 8 (2.6%) 7 (2.3%) 307
+5 185 (83.3%) 29 (13.1%) 3 (1.3%) 5 (2.2%) 222
+6 152 (84.0%) 23 (12.7%) 2 (1.1%) 4 (2.2%) 181
+TAB. 3 – Nombre de collocations dans chacune des catégories.
+6.2 Les mesures de précision, de rappel et de Fscore
+La précision est un critère d’évaluation parfaitement adapté à un cadre de travail non super-
+visé. La précision permet de calculer la proportion de collocations pertinentes extraites parmi
+les collocations extraites. En utilisant les notations du tableau 4, la précision est donnée par la
+formule V PV P+FP . Une précision de 100% signifie que toutes les collocations extraites par le
+système sont pertinentes.
+- 210 -RNTI-E-6
+M. Roche et Y. Kodratoff
+Une autre mesure typique du domaine de l’apprentissage est le rappel qui calcule la propor-
+tion de collocations pertinentes extraites parmi les collocations pertinentes. Le rappel est donné
+par la formule V PV P+FN . Un rappel de 100% signifie que toutes les collocations pertinentes sont
+extraites. Ce critère d’évaluation est adapté aux méthodes d’apprentissage supervisées pour
+lesquelles l’ensemble des exemples positifs (collocations pertinentes) est connu.
+Collocations Collocations
+pertinentes non pertinentes
+Collocations évaluées comme pertinentes par le système VP (vrais positifs) FP (faux positifs)
+Collocations évaluées comme non pertinentes par le système FN (faux négatifs) VN (vrais négatifs)
+TAB. 4 – Table de contingence à la base des mesures d’évaluation.
+En règle générale, il est important de déterminer un compromis entre le rappel et la préci-
+sion. Pour cela, nous pouvons utiliser une mesure prenant en compte ces deux critères d’éva-
+luation en calculant le Fscore (Van-Risbergen (1979)) :
+Fscore(β) =
+(β2 + 1)× Pre´cision×Rappel
+(β2 × Pre´cision) +Rappel (1)
+Le paramètre β de la formule (1) permet de régler les influences respectives de la précision
+et du rappel. Il est très souvent fixé à 1 pour accorder le même poids à ces deux mesures
+d’évaluation.
+Le tableau 5 montre que la précision la plus élevée est établie après un élagage important
+(un élagage supérieur à quatre fournit une précision supérieure à 85%). Cependant, avec une
+telle précision assez élevée le rappel est souvent très faible, c’est-à-dire que relativement peu
+de collocations pertinentes sont extraites. Avec β = 1, nous pouvons relever dans le tableau
+5 que le Fscore est le plus élevé sans appliquer d’élagage. Ceci est dû au fait que le rappel
+est peu important dès qu’un élagage même faible est effectué. En effet, comme précisé dans
+le tableau 1, un seul élagage de deux permet d’empêcher l’extraction de 75% des collocations
+Nom-Adjectif du corpus de CVs.
+Le tableau 6 montre que le fait de faire varier β afin de donner un poids plus important à
+la précision donne un Fscore logiquement plus élevé dans le cas d’élagages importants. Ceci
+montre les limites d’un tel critère d’évaluation car les résultats du Fscore peuvent singulière-
+ment différer selon la valeur de β. Ainsi, la section suivante présente un autre critère d’évalua-
+tion global fondé sur les courbes ROC.
+Élagage Précision Rappel Fscore
+1 59.7% 100% 74.8%
+2 75.1% 32.4% 45.3%
+3 79.4% 17.9% 29.2%
+4 85.3% 13.1% 22.8%
+5 85.2% 9.5% 17.1%
+6 85.9% 7.8% 14.3%
+TAB. 5 – Précision, Rappel et Fscore avec β = 1.
+- 211 - RNTI-E-6
+Choix du taux d’élagage pour l’extraction de la terminologie
+β 1 1/2 1/3 1/4 1/5 1/6 1/7 1/8 1/9 1/10
+1 74.8% 64.9% 62.2% 61.1% 60.6% 60.4% 60.2% 60.1% 60.0% 59.9%
+2 45.3% 59.5% 66.4% 69.7% 71.5% 72.5% 73.2% 73.6% 73.9% 74.1%
+3 29.2% 47.0% 59.1% 66.1% 70.2% 72.7% 74.3% 75.4% 76.2% 76.8%
+4 22.8% 40.7% 55.1% 64.5% 70.5% 74.3% 76.9% 78.7% 80.0% 80.9%
+5 17.1% 32.9% 47.4% 58.0% 65.2% 70.1% 73.5% 75.9% 77.7% 79.0%
+6 14.3% 28.6% 42.9% 54.1% 62.0% 67.6% 71.6% 74.4% 76.5% 78.1%
+TAB. 6 – Fscore selon différentes valeurs de β et divers taux d’élagage.
+6.3 Les courbes ROC
+Dans cette section et dans les travaux de Ferri et al. (2002), les courbes ROC (Receiver
+Operating Characteristics) sont présentées. La notion de courbe ROC est initialement issue du
+traitement du signal. Les courbes ROC sont couramment utilisées dans le domaine de la méde-
+cine pour évaluer la validité des tests diagnostiques. Les courbes ROC présentent en abscisse
+le taux de faux positifs (dans notre cas, taux de collocations non pertinentes) et en ordonnée
+le taux de vrais positifs (taux de collocations pertinentes). Les courbes ROC sont adaptées aux
+approches supervisées. Par ailleurs, l’aire sous la courbe ROC (AUC - Area Under the Curve),
+peut être vue comme la mesure globale de l’efficacité d’une mesure d’intérêt. Précisons que
+le critère relatif à l’aire sous la courbe est équivalent au test statistique de Wilcoxon-Mann-
+Whitney (voir les travaux de Yan et al. (2003)).
+Dans le cas correspondant au classement des collocations en utilisant des mesures statis-
+tiques, une courbe ROC idéale correspond au fait d’obtenir toutes les collocations pertinentes
+en début de liste et toutes les collocations non pertinentes en fin de liste. Cette situation cor-
+respond à une AUC de 1. La diagonale correspond aux performances d’un système aléatoire,
+progrès du taux de vrais positifs s’accompagnant d’une dégradation équivalente du taux de
+faux positifs. Une telle situation correspond à AUC = 0.5. Enfin, si les collocations triées par
+intérêt décroissant sont telles que toutes les collocations pertinentes sont précédées par les
+non pertinentes, alors AUC = 0. Une mesure d’intérêt efficace pour ordonner les collocations
+consiste donc à obtenir une aire sous la courbe ROC la plus importante possible ce qui est
+strictement équivalent à minimiser la somme des rangs des exemples positifs.
+L’avantage des courbes ROC provient de l’absence de sensibilité dans certains cas où un
+déséquilibre entre le nombre d’exemples positifs et d’exemples négatifs est rencontré. Illus-
+trons ce fait avec l’exemple suivant. Supposons que nous ayons 100 exemples (collocations).
+Dans le premier cas, nous avons un déséquilibre entre les exemples positifs et négatifs avec 1
+seul exemple positif et 99 exemples négatifs. Dans le second cas, nous avons 50 exemples posi-
+tifs et 50 exemples négatifs. Supposons que pour ces deux cas, les exemples positifs soient tous
+placés en tête de listes établies par des mesures statistiques, c’est-à-dire que les collocations
+pertinentes sont toutes situées en début de liste.
+Dans les deux cas, les courbes ROC sont strictement identiques avec une AUC égale à 1
+(voir figure 1, (a) et (b)). Ainsi, le fait d’avoir les collocations pertinentes en début de listes est
+mis en valeur par les courbes ROC et les AUC. L’intérêt principal des courbes ROC est le fait
+de ne pas tenir compte d’un éventuel déséquilibre entre le nombre de collocations pertinentes et
+non pertinentes. Dans le cas du calcul du Fscore (avec β = 1) qui prend en compte les mesures
+- 212 -RNTI-E-6
+M. Roche et Y. Kodratoff
+0
+0.2
+0.4
+0.6
+0.8
+1
+0 0.2 0.4 0.6 0.8 1
+ta
+ux
+ d
+e 
+po
+sit
+ifs
+taux de negatifs
+1 positif et 99 negatifs
+0
+0.2
+0.4
+0.6
+0.8
+1
+0 0.2 0.4 0.6 0.8 1
+ta
+ux
+ d
+e 
+po
+sit
+ifs
+taux de negatifs
+50 positifs et 50 negatifs
+(a) (b)
+0
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+0.8
+0.9
+1
+10 20 30 40 50 60 70 80 90 100
+F 
+sc
+or
+e
+% collocations extraites
+1 positif et 99 negatifs
+0
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+0.8
+0.9
+1
+10 20 30 40 50 60 70 80 90 100
+F 
+sc
+or
+e
+% collocations extraites
+50 positifs et 50 negatifs
+(c) (d)
+FIG. 1 – Courbe ROC (a) et Fscore (c) avec 1 exemple positif placé en tête de liste et 99
+exemples négatifs placés en fin de liste. Courbe ROC (b) et Fscore (d) avec 50 exemples positifs
+en tête de liste et 50 exemples négatifs en fin de liste. Pour le calcul du Fscore, le paramètre β
+est fixé à 1.
+de rappel et de précision, avec ces deux mêmes situations, nous obtenons deux courbes extrê-
+mement différentes (voir figure 1, (c) et (d)). Ainsi, les déséquilibres entre exemples positifs et
+négatifs influencent fortement le Fscore contrairement aux courbes ROC.
+D’un élagage à l’autre, le taux de collocations pertinentes et non pertinentes peut se révéler
+fort différent, ce qui signifie que nous sommes en présence d’un déséquilibre entre les classes.
+Par exemple, en appliquant un élagage de six, 84% des collocations sont pertinentes contre
+56% si aucun élagage n’est effectué (voir tableau 3). Le tableau 7 calcule les différentes AUC
+en choisissant différents taux d’élagage. Dans ce cas, l’utilisation du critère d’évaluation fondé
+sur les courbes ROC et les AUC qui ne sont pas sensibles au déséquilibre entre les classes et
+qui prennent explicitement en compte le rang des collocations extraites est particulièrement
+bien adapté.
+- 213 - RNTI-E-6
+Choix du taux d’élagage pour l’extraction de la terminologie
+0
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+0.8
+0.9
+1
+0 0.2 0.4 0.6 0.8 1
+Ta
+ux
+ d
+e 
+Vr
+ai
+s 
+Po
+sit
+ifs
+Taux de Faux Positifs
+courbe ROC (elagage a 3)
+FIG. 2 – Courbe ROC avec un élagage à 3.
+Le tableau 7 montre que l’élagage le plus adapté en terme d’AUC correspond à un élagage à
+trois pour les collocations Nom-Adjectif du corpus de CVs. La figure 2 montre la courbe ROC
+relative à un élagage à trois. Ce critère objectif fondé sur l’AUC correspond au choix souvent
+empirique d’élagage à trois appliqué dans les travaux de Jacquemin (1997); Thanopoulos et al.
+(2002).
+Élagage AUC
+1 0.4538
+2 0.5324
+3 0.5905
+4 0.5012
+5 0.5432
+6 0.5447
+TAB. 7 – AUC selon le nombre d’occurrences.
+- 214 -RNTI-E-6
+M. Roche et Y. Kodratoff
+7 Conclusion et perspectives
+L’étude expérimentale menée dans cet article permet de discuter le choix du taux d’élagage
+pour la terminologie. Différents critères d’évaluation existent tels que la précision, le rappel et
+bien entendu le Fscore qui permet de prendre en compte ces deux critères. Le défaut de ce
+dernier critère réside dans le choix pas toujours évident du paramètre le plus adapté pour privi-
+légier la précision ou le rappel dans le calcul du Fscore. Ainsi, dans cet article, nous proposons
+d’utiliser les courbes ROC et l’aire sous celles-ci afin d’évaluer au mieux le choix de l’élagage
+à effectuer. Ce critère permettant d’estimer rigoureusement l’élagage le plus adapté n’est pas
+sensible au déséquilibre entre les classes. Ceci est important car selon l’élagage effectué la
+proportion de collocations pertinentes et non pertinentes peut être très différente.
+Nos expérimentations ont alors montré sur un corpus de CVs, qu’un élagage de trois semble
+bien adapté. Dans nos prochains travaux, nous proposons de comparer ce résultat à partir des
+autres corpus étudiés. Pour cela, il sera nécessaire d’effectuer une expertise complète des col-
+locations d’autres domaines, ce qui demandera un travail conséquent aux experts.
 Références
-[1] Amazon ec2. web page. http ://aws.amazon.com/ec2/.
-[2] Amazon s3. web page. http ://aws.amazon.com/s3/.
-[3] Gooddata. web page. http ://www.gooddata.com/products/technology/cloud-bi-
-platform/.
-[4] Hadoop. web page. http ://hadoop.apache.org/.
-[5] Microsoft azure. web page. http ://www.microsoft.com/windowsazure/.
-[6] Pentaho. web page. http ://www.pentaho.com/cloud_bi/.
-[7] K. Aouiche and J. Darmont. Data mining-based materialized view and index selection in
-data warehouses. Journal of Intelligent Information Systems, 33(1) :65–93, 2009.
-[8] M. Armbrust, A. Fox, R. Griffith, A. D. J. R. H. Katz, A. Konwinski, G. Lee, D. A.
-Patterson, A. Rabkin, I. Stoica, and M. Zaharia. Above the clouds : A berkeley view of
-cloud computing. Technical Report UCB/EECS-2009-28, Berkeley, 2009.
-[9] R. Chaiken, B. Jenkins, P.-Å. Larson, B. Ramsey, D. Shakib, S. Weaver, and J. Zhou.
-Scope : easy and efficient parallel processing of massive data sets. PVLDB, 1(2) :1265–
-1276, 2008.
-Laurent d’Orazio et Sandro Bimonte
-[10] S. Dar, M. J. Franklin, B. T. Jonsson, D. Srivastava, and M. Tan. Semantic data caching
-and replacement. In Proceedings of the international conference on Very Large Data
-Bases, pages 330–341, Bombay, India, 1996.
-[11] J. Dean and S. Ghemawat. Mapreduce : simplified data processing on large clusters.
-Communications of the ACM, 51(1) :107–113, 2008.
-[12] G. DeCandia, D. Hastorun,M. Jampani, G. Kakulapati, A. Lakshman, A. Pilchin, S. Siva-
-subramanian, P. Vosshall, and W. Vogels. Dynamo : amazon’s highly available key-value
-store. In Proceedings of the ACM Symposium on Operating Systems Principles, pages
-205–220, Stevenson, USA, 2007.
-[13] J.-P. Dittrich, D. Kossmann, and A. Kreutz. Bridging the gap between olap and sql. In
-Proceedings of the International Conference on Very Large Data Bases, pages 1031–
-1042, 2005.
-[14] S. Ghemawat, H. Gobioff, and S.-T. Leung. The google file system. In Proceedings of the
-ACM Symposium on Operating Systems Principles, pages 29–43, Bolton Landing, USA,
-2003.
-[15] M. Gorawski and R. Malczok. Materialized ar-tree in distributed spatial data warehouse.
-Intelligent Data Analysis, 10(4) :361–377, 2006.
-[16] J. Gray, A. Bosworth, A. Layman, and H. Pirahesh. Data cube : A relational aggregation
-operator generalizing group-by, cross-tab, and sub-total. In Proceedings of the Interna-
-tional Conference on Data Engineering, pages 152–159, New Orleans, USA, 1996.
-[17] W. Inmon. Building the Data Warehouse. Wiley, New York, 1996.
-[18] M. Isard, M. Budiu, Y. Yu, A. Birrell, and D. Fetterly. Dryad : distributed data-parallel
-programs from sequential building blocks. In Proceedings of the EuroSys Conference,
-pages 59–72, Lisbon, Portugal, 2007.
-[19] A. M. Keller and J. Basu. A predicate-based caching scheme for client-server database
-architectures. The Very Large Data Bases Journal, 5(1) :35–47, 1996.
-[20] R. Kimball. The data warehouse toolkit : practical techniques for building dimensional
-data warehouses. John Wiley & Sons, Inc., 1996.
-[21] H. Mahboubi and J. Darmont. Enhancing xml data warehouse query performance by
-fragmentation. In Proceedings of the ACM Symposium on Applied Computing, pages
-1555–1562, Honolulu, USA, 2009.
-[22] E. Malinowski and E. Zimnyi. Advanced Data Warehouse Design : From Conventional
-to Spatial and Temporal Applications (Data-Centric Systems and Applications). Springer
-Publishing Company, Incorporated, 2008.
-[23] C. Olston, B. Reed, U. Srivastava, R. Kumar, and A. Tomkins. Pig latin : a not-so-
-foreign language for data processing. In Proceedings of the ACM SIGMOD International
-Conference on Management of Data, pages 1099–1110, 2008.
-[24] D. Papadias, P. Kalnis, J. Zhang, and Y. Tao. Efficient olap operations in spatial data
-warehouses. In Proceedings of the International Symposium on Advances in Spatial and
-Temporal Databases, pages 443–459, 2001.
-[25] T. B. Pedersen, C. S. Jensen, and C. E. Dyreson. A foundation for capturing and querying
-complex multidimensional data. Information Systems, 26(5) :383–423, 2001.
-Tableaux Multidimensionnels pour l’Entreposage de Données dans les Nuages
-[26] R. Pike, S. Dorward, R. Griesemer, and S. Quinlan. Interpreting the data : Parallel analy-
-sis with sawzall. Scientific Programming, 13(4) :277–298, 2005.
-[27] M. Rafanelli. Operators for multidimensional aggregate data. In Multidimensional Da-
-tabases : problems and solutions, pages 116–165. 2003.
-[28] L. Savary, G. Gardarin, and K. Zeitouni. Geocache : A cache for gml geographical data.
-IJDWM, 3(1) :67–88, 2007.
-[29] M. Stonebraker, D. J. Abadi, A. Batkin, X. Chen, M. Cherniack, M. Ferreira, E. Lau,
-A. Lin, S. Madden, E. J. O’Neil, P. E. O’Neil, A. Rasin, N. Tran, and S. B. Zdonik. C-
-store : A column-oriented dbms. In Proceedings of the International Conference on Very
-Large Data Bases, pages 553–564, 2008.
-[30] Y. Tao and D. Papadias. Historical spatio-temporal aggregation. ACM Transaction Infor-
-mation Systems, 23(1) :61–102, 2005.
-[31] A. Thusoo, J. S. Sarma, N. Jain, Z. Shao, P. Chakka, S. Anthony, H. Liu, P. Wyckoff,
-and R. Murthy. Hive - a warehousing solution over a map-reduce framework. PVLDB,
-2(2) :1626–1629, 2009.
-[32] H.-c. Yang, A. Dasdan, R.-L. Hsiao, and D. S. Parker. Map-reduce-merge : simplified re-
-lational data processing on large clusters. In Proceedings of the international conference
-on Management of data, pages 1029–1040, Beijing, China, 2007.
-[33] S. Zhang, J. Han, Z. Liu, K. Wang, and S. Feng. Spatial queries evaluation with mapre-
-duce. In Proceedings of the International Conference on Grid and Cooperative Compu-
-ting, pages 287–292, 2009.
-[34] Y. Zhao, P. Deshpande, and J. F. Naughton. An array-based algorithm for simultaneous
-multidimensional aggregates. In J. Peckham, editor, Proceedings of the International
-Conference on Management of Data, pages 159–170, Tucson, USA, 1997.
+Amrani, A., Y. Kodratoff, et O. Matte-Tailliez (2004). A semi-automatic system for tagging
+specialized corpora. In Proceedings of PAKDD’04, pp. 670–681.
+Aussenac-Gilles, N. et D. Bourigault (2003). Construction d’ontologies à partir de textes. In
+Actes de TALN03, Volume 2, pp. 27–47.
+Azé, J. et M. Roche (2003). Une application de la fouille de textes : l’extraction des règles
+d’association à partir d’un corpus spécialisé. Revue RIA-ECA numéro spécial EGC03 17,
+283–294.
+Azé, J. (2003). Extraction de Connaissances dans des Données Numériques et Textuelles. Ph.
+D. thesis, Université de Paris 11.
+Bourigault, D. (1993). Analyse syntaxique locale pour le repérage de termes complexes dans
+un texte. T.A.L. 34(2), 105–118.
+Bourigault, D. et C. Fabre (2000). Approche linguistique pour l’analyse syntaxique de corpus.
+Cahiers de Grammaires 25, 131–151.
+Brill, E. (1994). Some advances in transformation-based part of speech tagging. In AAAI, Vol.
+1, pp. 722–727.
+Daille, B. (1994). Approche mixte pour l’extraction automatique de terminologie : statistiques
+lexicales et filtres linguistiques. Ph. D. thesis, Université Paris 7.
+David, S. et P. Plante (1990). De la nécéssité d’une approche morpho syntaxique dans l’analyse
+de textes. In Intelligence Artificielle et Sciences Cognitives au Quebec, Volume 3, pp. 140–
+154.
+Dunning, T. E. (1993). Accurate methods for the statistics of surprise and coincidence. Com-
+putational Linguistics 19(1), 61–74.
+Evans, D. et C. Zhai (1996). Noun-phrase analysis in unrestricted text for information retrieval.
+In Proceedings of the ACL, Santa Cruz, US, pp. 17–24.
+- 215 - RNTI-E-6
+Choix du taux d’élagage pour l’extraction de la terminologie
+Ferri, C., P. Flach, et J. Hernandez-Orallo (2002). Learning decision trees using the area under
+the ROC curve. In Proceedings of ICML’02, pp. 139–146.
+Halliday, M. A. K. (1976). System and Function in Language. London : Oxford University
+Press.
+Jacquemin, C. (1997). Variation terminologique : Reconnaissance et acquisition automatiques
+de termes et de leurs variantes en corpus. In Mémoire d’Habilitation à Diriger des Re-
+cherches en informatique fondamentale, Université de Nantes.
+Kodratoff, Y., J. Azé, M. Roche, et O. Matte-Tailliez (2003). Des textes aux associations
+entre les concepts qu’ils contiennent. Dans les actes des XXXVièmes Journées de Statistique
+(résumé) Volume 2, p599-602 et dans le numéro spécial de la revue RNTI "Entreposage et
+Fouille de données" 1, 171–182.
+Roche, M. (2004). Intégration de la construction de la terminologie de domaines spécialisés
+dans un processus global de fouille de textes. Ph. D. thesis, Université de Paris 11.
+Roche, M., J. Azé, Y. Kodratoff, et M. Sebag (2004a). Learning interestingness measures in
+terminology extraction. A ROC-based approach. In Proceedings of "ROC Analysis in AI"
+Workshop (ECAI 2004), Valencia, Spain, pp. 81–88.
+Roche, M., T. Heitz, O. Matte-Tailliez, et Y. Kodratoff (2004b). EXIT : Un système itératif pour
+l’extraction de la terminologie du domaine à partir de corpus spécialisés. In Proceedings of
+JADT’04, Volume 2, pp. 946–956.
+Roche, M., O. Matte-Tailliez, et Y. Kodratoff (2004c). Étude de Mesures de Qualité pour
+Classer les Termes Extraits de Corpus Spécialisés. In Actes de INFORSID’04, pp. 371–386.
+Smadja, F. (1993). Retrieving collocations from text : Xtract. Computational Linguistics 19(1),
+143–177.
+Srikant, R. et R. Agrawal (1997). Mining generalized association rules. Future Generation
+Computer Systems 13(2–3), 161–180.
+Thanopoulos, A., N. Fakotakis, et G. Kokkianakis (2002). Comparative Evaluation of Collo-
+cation Extraction Metrics. In Proceedings of LREC’02, Volume 2, pp. 620–625.
+Van-Risbergen, C. (1979). Information Retrieval. 2nd edition, London, Butterworths.
+Yan, L., R. Dodier, M. Mozer, et R. Wolniewicz (2003). Optimizing classifier performance via
+an approximation to the Wilcoxon-Mann-Whitney statistic. In Proceedings of ICML’03, pp.
+848–855.
 Summary
-Data warehouses and OLAP systems are business intelligence technologies. They allow
-decision-makers to analyze on the fly huge volume of data represented according to the mul-
-tidimensional model. Cloud computing on the impulse of ICT majors like Google, Microsoft
-and Amazon, has recently focused the attention. OLAP querying and data warehousing in
-such a context consists in a major issue. Indeed, problems to be tackled are basic ones for
-large scale distributed OLAP systems (large amount of data querying, semantic and structural
-heterogeneity) from a new point of view, considering specificities from these architectures
-(pay-as-you-go rule, elasticity, and user-friendliness). In this paper we address the pay-as-
-you-go rules for warehousing data storage. We propose to use the multidimensional arrays
-storage techniques for clouds. First experiments validate our proposal. Then we list research
-perspectives.
+The choice of the pruning rate is crucial for acquisition of a good terminology of a spe-
+cialized corpus. This paper presents an experimental study to determinate the pruning rate
+well adapted. Several evaluation measures can be used such as the precision, the recall and
+Fscore. This study is based on another evaluation measure which seems well adapted for the
+terminology extraction : the ROC curves (Receiver Operating Characteristics).
+- 216 -RNTI-E-6

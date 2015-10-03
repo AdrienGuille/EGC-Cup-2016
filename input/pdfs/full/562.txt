@@ -1,1079 +1,579 @@
-Une famille de matrices sparses pour une modélisation
-multi-échelle par blocs
-Camille Brunet∗, Thomas Villman∗∗
-Vincent Vigneron∗
-∗IBISC, Université d’Evry Val d’Essonnes
-40 rue du Pelvoux - 91020 Evry Courcouronne - France
-camille.brunet@ibisc.univ-evry.fr
-∗∗University of applied sciences Mittweida
-Technikumplatz 17 - 09648 Mittweida - Germany
-Résumé. La sériation est une technique d’analyse de données qui ordonne les
-observations directement à partir de leur tableau de valeurs afin de révéler une
-structure intrinsèque à ces données. Une telle approche présente de nombreux
-avantages de visualisation mais dès lors que les données sont bruitées ou que les
-groupes se superposent, la visualisation de toute structure devient difficile. Pour
-faire face à ces problèmes, nous introduisons de la parcimonie dans les données
-à travers une famille de matrices indicatrices de voisins communs. Celles-ci sont
-ordonnées selon un algorithme de type branch and bound et la matrice révélant
-la meilleure structure au sens de "diagonale par blocs" est sélectionnée au moyen
-d’un critère dérivé des problématiques de compression de données. Cet outil de
-partitionnement identifie des sous-ensembles de données relatifs aux clusters
-tout en écartant celles qui sont bruitées ou extrêmes ce qui permet de visualiser
-la structure globale intrinsèque aux données. Cependant, une trop grande spar-
-sité des données amène parfois à l’éviction de données sous-représentées; nous
-proposons à cet effet, une approche multi-échelle combinant différents niveaux
-de sparsité dans une même visualisation.
+SPoID : Extraction de motifs séquentiels pour
+les bases de données incomplètes
+Céline Fiot, Anne Laurent, Maguelonne Teisseire
+Laboratoire d’Informatique de Robotique et de Microélectronique de Montpellier
+{fiot, laurent, teisseire}@lirmm.fr
+Résumé. Les bases de données issues du monde réel contiennent souvent de
+nombreuses informations non renseignées. Durant le processus d’extraction de
+connaissances dans les bases de données, une phase de traitement spécifique de
+ces données est souvent nécessaire, permettant de les supprimer ou de les com-
+pléter. Lors de l’extraction de séquences fréquentes, ces données incomplètes
+sont la plupart du temps occultées. Ceci conduit parfois à l’élimination de plus
+de la moitié de la base et l’information extraite n’est plus représentative. Nous
+proposons donc de ne plus éliminer les enregistrements incomplets, mais d’utili-
+ser l’information partielle qu’ils contiennent. La méthode proposée ignore en fait
+temporairement certaines données incomplètes pour les séquences recherchées.
+Les expérimentations sur jeux de données synthétiques montrent la validité de
+notre proposition aussi bien en terme de qualité des motifs extraits que de robus-
+tesse aux valeurs manquantes.
 1 Introduction
-La notion de complexité des données peut s’appréhender de différentes manières dans la
-littérature. Elle peut en effet être liée à la nature et à l’hétérogénéité des données, à leur di-
-mension plus ou moins grande, à leur qualité (données très bruitées ou non) ou encore à leur
-structure globale qui peut être telle que la distinction de groupes dans les données est rendue
-difficile. Les outils statistiques d’analyse de données ont pour objectif d’extraire de l’infor-
-mation. Ils cherchent à explorer des données multidimensionnelles pour les synthétiser d’une
-part et permettre de structurer l’information contenue dans ces données d’autre part. Dans la
-littérature, il existe plusieurs approches associées à cette démarche telles les méthodes fac-
-torielles (Pearson (1901); Jolliffe (1986)), les approches par classification non supervisée –
-Sparsité et sériation
-ou clustering – ou encore les méthodes de visualisation. Ces dernières peuvent être globales
-puisqu’elles se basent sur les proximités entre les différents groupes telles les cartes de Koho-
-nen (Kohonen (1995)) ou les méthodes de graphes ; locales puisqu’elles évaluent la proximité
-entre les individus, comme les méthodes hiérarchiques ; ou encore elles peuvent combiner les
-relations locales et globales, comme dans le cas de la sériation. Cette dernière approche a la
-particularité de travailler directement sur le tableau de valeurs que ce soit sur des matrices
-symétriques pour lesquelles les éléments en lignes et en colonnes se réfèrent à la même en-
-tité, comme les tableaux de données relationnelles ou de dissimilarités ; ou que ce soit sur des
-matrices de type rectangulaire pour lesquelles les éléments en lignes diffèrent de ceux en co-
-lonnes ; par exemple, les individus sont représentés en lignes tandis que les attributs le sont
-sur les colonnes. Bien que la sériation soit un champ de la statistique très vaste du fait de ses
-multiples origines (cf. I.Liiv (2010)) et de ses diverses évolutions (cf. Marcotorchino (1987);
-Mechelen et al. (2004)), une taxonomie des méthodes a été proposée par Carroll et Arabie
-(1980) et associe à chaque type de tableau un mode de sériation particulier. L’objectif de la
-sériation est de réordonner les lignes et les colonnes d’un tableau de valeurs par des permu-
-tations successives de sorte que les lignes adjacentes (respectivement les colonnes) soient les
-plus semblables. Cette situation est illustrée par la figure 1 où, à partir d’un tableau de données
-relationnelles présenté par la figure 1 de gauche, les lignes et les colonnes ont permuté pour
-former une partition dans laquelle les éléments similaires ont été rassemblés entre eux, formant
-ainsi des groupes (figure 1 du milieu), et afin de mieux apprécier la présence de la structure
-diagonale par blocs, cette matrice ordonnée est pixellisée (figure 1 de droite). Une telle ap-
-proche pourrait s’apparenter à une technique locale de clustering ordonné dans la mesure où
-une information est apportée d’une part sur les relations locales entre individus du fait d’un
-ordre dans les données et d’autre part sur la structure globale des données. Cependant, la sé-
-riation présente d’autres avantages mis en avant par plusieurs auteurs tels Arabie et al. (1996),
-comme l’absence de connaissance a priori sur le nombre de clusters et la visualisation directe
-de la structure sur le tableau de valeurs.
-FIG. 1 – Effets d’un algorithme de rangement sur un jeu de données : matrice de relations
-initiale (à gauche), matrice ordonnée (au milieu) et représentation pixellisée de la matrice
-ordonnée (à droite).
-Ces avantages se voient annulés dès lors que les données sont bruitées ou que les
-groupes de données se superposent. En effet, la présence de données bruitées empêche une
-visualisation claire des différents blocs et distinguer des clusters devient alors une tâche
-difficile. Dans ce travail nous appréhenderons la complexité des données à travers la notion
-C. Brunet et al.
-de structure : des données seront complexes dès lors que leur structuration, leur agencement
-en groupes sera difficilement appréhendable. Cette complexité se traduira par des données
-fortement bruitées ou par des recouvrements de classes rendant difficile la visualisation d’une
-structure. Dans ce contexte, notre travail tente d’améliorer les procédures traditionnelles de
-sériation dans la recherche de sous-ensembles de données caractéristiques de la structure.
-Pour ce faire, nous introduisons une famille de matrices parcimonieuses relatives à différents
-niveaux de parcimonie des données, lesquelles sont ordonnées selon un algorithme de type
-branch and bound pour faire émerger une structure compacte par blocs. Un critère dérivé
-de la problématique de compression des données sélectionne la matrice ordonnée la plus
-compacte –au sens de diagonale par blocs– afin d’obtenir la visualisation la plus informative
-de la structure intrinsèque des données. Cependant, dans certaines situations, une trop grande
-parcimonie engendre l’éviction de données sous-représentées formant de très petits clusters.
-Pour pallier cette non-détection, nous proposons une approche multi-échelle combinant
-différents niveaux de sparsité des données.
-Cet article est organisé de la manière suivante : dans la Section 2, un état de l’art de la
-sériation sera présenté selon deux points de vue différents, l’un basé sur les fondements
-mathématiques du problème de la sériation et l’autre sur ses fondements algorithmiques.
-La Section 3 détaillera notre approche parcimonieuse ainsi que l’algorithme de rangement
-Parcimonious Block-Clustering multi-échelle proposé. Des expériences sur simulations et sur
-des données de référence seront présentées dans la Section 4.
-2 La sériation
-Liiv (I.Liiv (2010)) propose une définition informelle de la sériation : [Seriation] is an
-exploratory data analysis technique to reorder objects into a sequence along one dimensional
-continuum so that it best reveals regularity and patterning among the whole series. Autrement
-dit, la sériation cherche un ordre dans les données de sorte à exprimer une localité/proximité
-entre lignes ou colonnes adjacentes et faire ainsi émerger une structure. Cet ordre est obtenu
-par permutations successives des lignes et des colonnes ce qui permet d’aborder le problème
-de la sériation à travers deux angles différents : l’un étant de fondement mathématique puisque
-l’enjeu est de déterminer l’ensemble des meilleures permutations possibles, l’autre étant de
-fondement algorithmique du fait de la complexité de la solution (problème np-complet).
-2.1 Problème d’optimisation
-La problématique de la sériation se pose dans la définition et l’évaluation de la meilleure
-permutation possible, ce qui permet de la formuler comme un problème d’optimisation. L’ap-
-proche par sériation s’applique à tout type de matrices, cependant, dans notre travail, nous
-nous focaliserons sur des matrices de dissimilarités. Considérons alors un ensemble de N élé-
-ments (x1, . . . , xN ) décrits par une matrice symétrique de dissimilarité D = (dij)i,j∈(1,...,N)
-de tailleN×N où chaque élément dij rend compte de la dissimilarité entre la paire d’observa-
-tions (xi, xj). On définit Ψ une fonction de permutation qui ordonne, selon un certain critère
-C, les éléments de la matrice D. L’objectif de la sériation est donc de trouver la fonction de
-permutation optimale Ψ∗ qui optimise le critère C de rangement, telle que :
-Sparsité et sériation
-Ψ∗ = argmax
-Ψ
-C(Ψ(D)). (1)
-Ces critères prennent différentes formes dans la littérature mais une grande partie d’entre eux
-se base sur une mesure de similarité s(.) entre les éléments successifs de la matrice D et qui
-vérifie
-max
-n−1∑
-i=1
-s(i, i+ 1).
-Cette mesure de similarité se décline de manière différente selon les auteurs comme on peut
-l’observer dans la table 1. McCormick et al. (1972) et Arabie et Hubert (1990) par exemple
-cherchent à maximiser une mesure d’efficacité (measure of effectiveness) (cf. critère C6 dans
-la table 1) basée sur la somme des produits scalaires en lignes et en colonnes de la matrice
-des données ; mesure qui a été par la suite généralisée par Climer et Zhang (2006). D’autres
-auteurs, tels que Hubert et al. (2001) ou Chen (2002) se sont basés sur l’optimisation d’une
-mesure de divergence entre la matrice de dissimilarité et une structure anti-Robinson cherchant
-à regrouper les valeurs de dissimilarités les plus petites autour de la diagonale (cf. critère C4).
-A l’inverse, certains auteurs tels Caraux et Pinloche (2005) (cf. critères C1 et C2) ou Brusco et
-Steinley (2006) (cf. critère C3) cherchent plutôt à placer les plus petites dissimilarités hors de
-la diagonale (structure Robinson). Enfin, dans le cadre du problème de compression de don-
-nées, Johnson et al. (2004) ont proposé de minimiser un critère basé sur le nombre de séquences
-d’éléments consécutifs (en ligne) différents de 0 (cf. critère C5). Nombre d’auteurs ont travaillé
-sur la proposition de nouveaux critères de rangement comme Niermann (2005) qui cherche à
-comparer chaque observation à ses voisins adjacents à travers des critères relatifs au voisinage
-(cf. critère C7) ou Batagelj (1997) et Doreian et al. (2004) qui proposent des critères d’équiva-
-lence structurelle ou encore Dhillon et al. (2003) qui utilise l’information mutuelle et un critère
-d’entropie. Il existe une grande littérature sur ce sujet et une taxonomie de ces techniques est
-disponible dans Hahsler et al. (2009). De plus, cette approche par sériation peut s’inscrire dans
-un domaine plus étendu qu’est la classification croisée, appelée aussi biclustering et une vue
-d’ensemble de ces différentes approches est détaillée dans l’article de Mechelen et al. (2004).
-En particulier, des auteurs tels Long et al. (2005) se sont orientés vers une décomposition en
-valeurs blocs de la matrice pour traiter des données de grandes dimensions ou encore Govaert
-et Nadif (2008, 2010) ont abordé de manière stochastique cette problématique de permutations
-dans un modèle probabiliste en réduisant le rangement de la matrice à un biclustering guidé
-par un modèle binomial. Cependant ces approches récentes nécessitent une connaissance a
-priori du nombre de clusters formés par les individus et par les variables dont leur détermina-
-tion n’est pas toujours chose facile. Enfin, notons que la sériation vue comme un problème de
-maximisation est comparée par certains auteurs, tels Applegate et al. (2007), au problème du
-voyageur de commerce (TSP). En effet, une matrice de dissimilarités peut être perçue comme
-un graphe pondéré que l’on parcourt. Ainsi, ordonner des lignes et colonnes de sorte que les
-lignes (respectivement les colonnes) adjacentes soient les plus similaires possibles revient à
-chercher le parcours minimal pour “visiter” chaque observation une seule fois.
-C. Brunet et al.
-type Critères à optimiser selon la matrice de dissimilarité D = {dij}i,j∈{1,...,n}
-critères C1 =
-n∑
-i=1
-n∑
-j=1
-dij |i− j|2
-structurels
-C2 =
-n∑
-i=1
-n∑
-i=1
-(dij − α|i− j|2)
-C3 =
-n−2∑
-i=1
-n−1∑
-j=i+1
-n∑
-k=j+1
-sign(dij − dik) + sign(djk − dik)
-C4 =
-∑
-16i<j<k6n
-f(dik, dij) +
-∑
-16i<j<k6n
-f(dkj , dij) avec
-————- f(x, y) = sign(x− y)
-f(x, y) = |x− y|sign(x− y)
-f(x, y) = I{x>y}
-f(x, y) = |x− y|I{x>y}
-C5 =
-n∑
-i=1
-n−1∑
-j 6=i,j=1
-|dij − di,j+1|
-critères de C6 = 12
-n∑
-i,j=1
-dij(di,j−1 + di,j+1 + di−1,j + di+1,j)
-similarités
-C7 =
-n∑
-i,j=1
-fij avec
-————- fij =
-∑min(n,i+1)
-k=max(1,i−1)
-∑min(n,j+1)
-`=max(i,j−1)(dij − dk`)2
-fij =
-∑min(n,i+1)
-k=max(1,i−1)(dij − dkj)2 +
-∑min(n,j+1)
-`=max(i,j−1)(dij − di`)2
-1TAB. 1 – Table des critères de rangement utilisés dans le cadre du one-mode clustering.
-Sparsité et sériation
-2.2 Principe algorithmique et coût calculatoire
-Trouver la permutation optimale est un problème np-complet. Il suppose le calcul de
-toutes les combinaisons de permutations possibles de lignes et de colonnes, soit n!p! pour un
-tableau rectangulaire ou n! dans le cas d’une matrice de dissimilarité symétrique. Le calcul
-de toutes ces permutations possibles peut être envisagé lorsque le jeu de données est de petite
-taille mais cette tâche devient difficile dès lors que n > 30 (plus de 232 possibilités). La
-littérature propose un certain nombre d’algorithmes de sériation. Un des algorithmes les plus
-connus nommé branch and bound suggère de faire une recherche exhaustive des permutations
-non pas sur l’ensemble des données mais sur plusieurs sous-ensembles. Dans les années
-cinquantes, plusieurs auteurs tels Croes (1958) Eastman (1958) et Rossman et al. (1958) ont
-proposé de telles méthodes ; celles-ci ont été réexploitées plus récemment par Chen (2002)
-ou par Brusco et Stahl (2005). Un autre type de méthodes algorithmiques se base sur des
-recherches heuristiques ; celles-ci ont été exploitées initialement par McCormick et al. (1972),
-puis par Arabie et Hubert (1990) qui utilisent la notion de voisinage pour définir une liste de
-candidats potentiels considérés à une itération donnée. La colonne (ou la ligne) sélectionnée
-est celle qui permet la plus grande augmentation de la mesure d’efficacité. Dans cette même
-optique, Kirkpatrick et al. (1983) ont introduit la notion, anglaise, du simulated annealing
-paradigm dans la sériation qui permet à l’algorithme d’accepter, avec une certaine probabilité,
-un candidat pouvant être pire que la solution courante. Ainsi, au début de l’algorithme, la
-probabilité d’acceptation d’un candidat est élevé, mais décroit graduellement à mesure du
-déroulement de l’algorithme. Enfin, comme la sériation est perçue comme un TSP, bon nombre
-de chercheurs ont travaillé sur des approches heuristiques qui sont résumées dans Gutin et
-Punnen (2002). La plupart de ces méthodes sont exposées dans Applegate et al. (2007) ou
-dans Hahsler et al. (2009).
-3 Sériation par famille
-Dans cette Section, nous proposons une nouvelle méthode de sériation pour faire face aux
-problèmes relatifs aux données bruitées, au recouvrement de clusters ou à la présence de pe-
-tits clusters. Celle-ci se base sur la recherche de sous-ensembles d’individus caractérisant la
-structure sous-jacente de l’ensemble des données. Pour cela, nous introduisons de la parcimo-
-nie dans les données par l’intermédiaire d’une famille de matrices binaires à degrés de voisi-
-nage commun différents, lesquelles sont ordonnées selon un algorithme nommé Parsimonious
-Block-Clustering. Cet algorithme ordonne la famille de matrices parcimonieuses et sélectionne
-le niveau de parcimonie permettant de faire émerger de la matrice une structure compacte par
-blocs.
-3.1 Une famille de matrices binaires imbriquées
-Dans notre approche, le degré de voisinage est défini comme une “valeur-seuil“ du nombre
-de voisins communs entre paires d’observations en deçà de laquelle les paires d’observations
-sont éliminées. Plus le nombre de voisins communs imposé est important et plus la matrice
-sera parcimonieuse (remplie de zéros). Par conséquent, nous associerons au degré de voisinage
-C. Brunet et al.
-commun, le degré de parcimonie. Considérons une matrice de données Y de dimension n× p.
-Soit Y d = (ydij)i,j∈{1,...,n} la matrice de distances associée à Y , la nature de la fonction
-de distance dépendant du type de données : elle peut être une distance euclidienne entre les
-individus i et j (et plus généralement des normes p), une corrélation, ou toute autre fonction
-caractérisant la notion de proximité entre des paires d’observations. Soit A = (aij)i,j∈{1,...,n}
-la matrice binaire de similarité contruite à partir de Y d qui vérifie :
-aij =
+Les données issues du monde réel sont souvent entâchées d’imperfections. En particulier,
+il est très courant de disposer de nombreuses données incomplètes (pannes, erreur de format,
+oubli humain, ...). Or la présence de valeurs manquantes induit de très sérieux problèmes, les
+données contenant des valeurs manquantes étant souvent éliminées lors du processus de fouille
+de données. C’est notamment le cas pour l’extraction de motifs séquentiels. Cette technique de
+fouille de données, présentée comme une extension des règles d’association prenant en compte
+l’information temporelle des bases de données historisées, ne permet en effet que l’analyse des
+données complètes, sans tenir compte des enregistrements incomplets, ce qui constitue une
+grande perte d’information. Par ailleurs, les solutions de remplacement des valeurs manquantes
+sont souvent soit trop simplistes pour produire des résultats intéressants, soit trop coûteuses
+pour être mises en oeuvre sur de gros volumes de données.
+Or, s’il existe à ce jour des techniques robustes aux valeurs manquantes pour l’extrac-
+tion de règles d’association, il n’existe aucune méthode générique pour l’extraction de motifs
+séquentiels. En effet, dans le contexte de la recherche de motifs séquentiels, les valeurs man-
+quantes n’ont pas été considérées jusqu’ici, l’application principale, les bases de données de
+supermarchés, n’en comportant quasiment jamais. Désormais, les motifs séquentiels sont uti-
+lisés afin d’extraire des connaissances d’applications industrielles (analyse de processus, web
+access logs, ...) qui contiennent inévitablement des données incomplètes.
+SPoID : Motifs séquentiels et données incomplètes
+Nous proposons donc ici une extension des principes décrits dans (Agrawal et Srikant,
+1995) afin d’extraire des séquences fréquentes en présence de valeurs manquantes réparties
+aléatoirement dans une base de données. Cette approche a été inspirée par une méthode d’ex-
+traction de règles d’association sur des bases de données incomplètes (Ragel et Cremilleux,
+1998) et sur une technique couramment utilisée en apprentissage (Liu et al., 1997) : ignorer
+les valeurs manquantes sans ignorer tout l’enregistrement associé. Le principe consiste à uti-
+liser seulement l’information disponible (i.e. les attributs renseignés) et à ignorer les informa-
+tions manquantes. Ainsi, seules des bases partielles complètes servent à l’extraction de chaque
+schéma fréquent et l’ensemble de la base est utilisée pour trouver tous les schémas. Nous
+transposons ici ce principe afin d’extraire des motifs séquentiels, des séquences fréquentes
+maximales sur des bases de données historisées incomplètes. Pour cela, nous avons adapté les
+notions utilisées pour l’extraction de séquences fréquentes. Puis, nous avons implémenté l’al-
+gorithme SPoID (Sequential Patterns over Incomplete Database) sur la base d’un algorithme
+d’extraction de motifs séquentiels, PSP (Masseglia et al., 1998). Cet algorithme a été testé sur
+des jeux de données synthétiques afin de montrer la validité de notre approche.
+Dans la suite de cet article, section 2, nous présentons les méthodes qui permettent d’ex-
+traire des règles d’association en présence de valeurs manquantes, ainsi que les concepts liés
+à la découverte de motifs séquentiels. Dans la section 3, nous développons notre approche
+pour l’extraction de ces motifs à partir de bases de données incomplètes, puis nous présentons
+notre algorithme dans la section 4. La section 5 est ensuite consacrée aux expérimentations qui
+montrent la validité de notre approche. Enfin, nous concluons dans la section 6 par les pers-
+pectives qu’ouvrent ce travail.
+2 Des données incomplètes aux motifs séquentiels
+Les motifs séquentiels sont souvent présentés comme une extension des règles d’associa-
+tion, initialement proposées dans (Agrawal et al., 1993). Ils mettent en évidence des corré-
+lations entre des enregistrements d’une base de données, ainsi que la relation temporelle qui
+existe entre eux. Toutefois ces algorithmes ne prennent pas en compte les enregistrements
+incomplets contenus dans une base de données. Afin de diminuer le prétraitement lié à la pré-
+sence de valeurs manquantes et d’améliorer la qualité des motifs séquentiels extraits, nous
+proposons une technique d’extraction de motifs séquentiels dans des bases de données incom-
+plètes, inspirées des méthodes existantes pour les règles d’association. Nous présentons dans
+cette section les méthodes qui permettent d’extraire des règles d’association en présence de
+valeurs manquantes ainsi que les notions liées à la découverte de motifs séquentiels.
+2.1 Règles d’association et valeurs manquantes
+Des travaux ont été proposés pour la recherche de règles d’association dans des bases de
+données incomplètes. Notamment, (Nayak et Cook, 2001; Ng et Lee, 1998), mettent en œuvre
+un système d’approximation probabiliste dans lequel une valeur manquante peut prendre plu-
+sieurs valeurs lors de la découverte des règles. Ces méthodes sont particulièrement adaptées
+aux bases de données relationnelles, mais ne sont pas facilement transposables au format spé-
+cifique des données dont on extrait les motifs séquentiels, détaillé section 3.
+C. Fiot et al.
+Nous avons donc choisi de nous inspirer de l’algorithme RAR (Robust Association Rules),
+proposé dans (Ragel et Cremilleux, 1998). Cette méthode, complètement compatible avec la
+méthode originelle (Agrawal et al., 1993), permet la prise en compte des données incomplètes
+lors de l’extraction de règles dans des bases de données relationnelles incomplètes, par omis-
+sion partielle et temporaire de ces enregistrements. Le principe consiste à ne prendre en compte
+que les attributs renseignés pour les enregistrements incomplets. La base de données entière
+n’est pas utilisée pour chaque règle mais pour générer l’ensemble des règles. Cette technique
+repose sur la définition de bases de données valides, complètes pour un ensemble d’items don-
+nées, le reste de la base étant momentanément ignoré.
+Afin de prendre en compte ce partitionnement de la base, les concepts de support (pourcentage
+des enregistrements de la base qui contiennent tous les items de la règle) et de confiance (la
+probabilité qu’un enregistrement qui contient la partie gauche de la règle contienne également
+la partie droite) ont été redéfinis. Par ailleurs, une nouvelle notion est introduite afin de tenir
+compte de la taille de l’échantillon complet considéré pour déterminer le support de la règle.
+Cette mesure de représentativité permet ainsi d’éliminer de la liste des règles celles trouvées
+sur une base peu significative par rapport à la base initiale.
+La recherche de motifs séquentiels consiste à extraire des ensembles d’items couramment
+associés sur une période de temps bien spécifiée. Elle permet de mettre en évidence des asso-
+ciations inter-enregistrement, par rapport à celle de règles d’association qui extrait des com-
+binaisons intra-enregistrement. L’identification des individus ou objets est alors indispensable
+afin de pouvoir suivre leur comportement au cours du temps.
+2.2 Motifs séquentiels
+Les motifs séquentiels ont initialement été proposés par (Agrawal et Srikant, 1995) et re-
+posent sur la notion de séquence fréquente maximale.
+Considérons une base de données DB d’achats pour un ensemble O d’objets o. Chaque
+enregistrement R correspond à un triplet (id-objet, id-date, itemset) qui caractérise l’objet au-
+quel est rattaché l’enregistrement, ainsi que la date et les items correspondants.
+Soit I = {i1, i2, · · · , im} l’ensemble des items de la base. Un itemset est un ensemble non
+vide et non ordonné d’items, noté (i1, i2, . . . , ik), où ij est un item. Une séquence s se définit
+alors comme une liste ordonnée non vide d’itemsets qui sera notée < s1s2 · · · sp >, où sj est
+un itemset. Une n-séquence est une séquence de taille n, c’est-à-dire composée de n items.
+Exemple 1. Si un client achète les produits a, b, c, d et e selon la séquenceS=<(a)(b c)(d)(e)>,
+cela signifie qu’il a d’abord acheté le produit a, puis les produits b et c ensemble, ensuite seule-
+ment le produit d et finalement le produit e. S est une 5-séquence.
+Une séquence S′ =< s′1s′2· · · s′m > est une sous-séquence de S =< s1s2· · · sp > s’il existe
+des entiers a1 < a2 <· · ·< am tels que s′1 ⊆ sa1 , s′2 ⊆ sa2 , · · · , s′m ⊆ sam , S′ est incluse dans S.
+Exemple 2. La séquence S′ =< (b)(e) > est une sous-séquence de S car (b) ⊆ (b c) et
+(e) ⊆ (e). Par contre< (b)(c) > n’est pas une sous-séquence de < (b c) >, ni l’inverse.
+Les enregistrements de la base sont regroupés par objet et ordonnés chronologiquement,
+définissant ainsi des séquences de données. Un objet o supporte une séquence S si elle est in-
+cluse dans la séquence de données o. Le support (ou fréquence) d’une séquence est alors défini
+SPoID : Motifs séquentiels et données incomplètes
+comme le pourcentage d’objets de la baseDB qui supporte S. Une séquence est dite fréquente
+si son support est au moins égal à une valeur minimaleminSup spécifiée par l’utilisateur. Une
+séquence candidate est une séquence potentiellement fréquente.
+La recherche de motifs séquentiels dans une base de séquences telle que DB consiste
+alors à trouver toutes les séquences maximales (non incluses dans d’autres) dont le support est
+supérieur àminSup. Chacune de ces séquences fréquentes maximales est un motif séquentiel.
+Des extensions ont été proposées pour prendre en compte la recherche incrémentale de mo-
+tifs séquentiels (Masseglia et al., 2000), la gestion de valeurs numériques associées aux items
+(Hong et al., 2001; Chen et al., 2001; Fiot et al., 2005) ou encore la généralisation des motifs
+séquentiels pour différents paramètres temporels (espacement des différents évènements d’une
+séquence, rapprochement d’évènements proches en une même date...) (Srikant et Agrawal,
+1996; Masseglia et al., 1999; Fiot et al., 2006). Toutefois, il n’existe pas, à notre connaissance,
+de techniques permettant de gérer les valeurs manquantes lors de la découverte de motifs sé-
+quentiels. C’est pourquoi nous proposons ici une approche permettant d’extraire des séquences
+fréquentes maximales dans une base de séquences incomplètes.
+3 SPoID : une nouvelle approche du traitement des données
+incomplètes
+3.1 Motivations
+Nous souhaitons extraire les motifs séquentiels contenus dans la base de données TAB. 1.
+Obj. Séquence
+O1 (a b) (b c d) (b c e)
+O2 (a) (b c) (b d)
+O3 (a b) (b c) (b c d)
+TAB. 1 – Base de données
+complète.
+Obj. Séquence
+O1 (a b) (? ? c) (? b c)
+O2 (a) (? c) (b d)
+O3 (a b) (? c) (? ? c)
+TAB. 2 – Base de données
+incomplète.
+Obj. Séquence
+O1 (a b) (c) (b c)
+O2 (a) (c) (b d)
+O3 (a b) (c) (c)
+TAB. 3 – Après suppression
+des valeurs manquantes.
+Avec un support de 50%, les motifs obtenus sont : <(a b)(b c)(b c)>, <(a b)(b c d)> et
+<(a)(b c)(b d)>.
+Considérons maintenant la même base, mais incomplète, TAB. 2. Pour certaines séquences
+de données, les informations n’ont pas été transmises et des valeurs sont manquantes. On consi-
+dère que ces valeurs sont identifiées comme des attributs de valeur indéterminée, contrairement
+à des attributs inexistants où la valeur sera identifiée comme non-renseignée. Afin de pouvoir
+extraire les motifs, les méthodes classiques requièrent une élimination des valeurs manquantes.
+La base sur laquelle s’effectue la fouille de données est alors la base TAB. 3 et les motifs obte-
+nus pourminSup = 50% sont : <(a b)(c)(c)> et <(a)(c)(b)>.
+On constate que seule une petite partie de la base est utilisée pour extraire l’information
+et on ne retrouve qu’une partie des schémas fréquents extraits de la base complète : des sous-
+séquences des motifs que l’on devrait extraire. C’est pourquoi il paraît nécessaire d’utiliser
+l’intégralité de la base lors de la fouille et non pas d’en supprimer une partie.
+C. Fiot et al.
+3.2 Sequential Patterns over Incomplete Database (SPoID)
+L’élimination des enregistrements incomplets conduisant à une perte d’information, nous
+avons donc envisagé d’adapter une méthode d’extraction de règles d’association robuste aux
+valeurs manquantes pour extraire des motifs séquentiels. Nous présentons ici la méthode SPoID
+(Sequential Patterns over Incomplete Database), inspirée de l’algorithme RAR présenté dans
+(Ragel et Cremilleux, 1998).
+Le principe général de notre méthode, comme de la méthode RAR, repose sur la désacti-
+vation des éléments incomplets, dans notre cas, des séquences. Alors que pour les règles d’as-
+sociation, l’algorithme RAR ne considère que les enregistrements complets, nous proposons
+ici de ne prendre en compte que les séquences de données complètes pour la séquence can-
+didate recherchée. Autrement dit, on ne considèrera que les dates et attributs renseignés pour
+les séquences incomplètes. Ainsi pour chaque séquence on déterminera si elle est fréquente
+sur une base partielle, mais la totalité de la base sera utilisée pour l’ensemble des séquences
+fréquentes.
+Considérant une séquence candidate S, l’ensembleO des objets de la base peut être divisé
+en trois sous-ensembles disjoints (FIG. 1) :
+– l’ensemble des séquences de données qui supportent S, noté OS ,
+– l’ensemble des séquences de données qui ne supportent pas S, noté OS ,
+– l’ensemble des séquences de données pour lesquelles on ne sait pas si elles supportent S
+ou non, notéO∗S .
+OS
 {
-1 si ydij ≤ 
-0 si ydij > .
-(2)
-où  est un seuil de distance caractérisant la proximité des paires d’observations. Sa valeur peut
-être déterminée arbitrairement ; nous proposons de la fixer au premier quartile de la distribution
-des distances entre paires d’observations. Par ailleurs, la matrice de similarité est symétrique
-d’où aij = aji. Soit la matrice de Gram B = ATA où chaque élément bij est le nombre de
-voisins aux deux points i et j. Cette matrice correspond à une matrice de voisinage commun.
-Définition 1
-Une matrice binaire Bλm = (b
-λm
-ij )i,j∈{1,...,n} parcimonieuse de degré λm (avec m ∈ {1 ≤
-m ≤M}) se caractérise par :
-bλmij =
+Séquences de données supportant S
+O∗S
 {
-1 si bij ≥ λm
-0 si bij < λm.
-. (3)
-où bij représente les éléments de la matrice de Gram, B, définie précédemment.
-(Bλ1 , . . . , BλM ) forme une famille de matrices binaires parcimonieuses dont le degré de par-
-cimonie est lié au nombre de voisins communs.
-Au regard de cette définition, plus le seuil de voisinage imposé λm est élevé, moins il y a
-de paires d’observations qui satisfont cette condition. La matrice associée contiendra un plus
-grand nombre de zéros et sera donc plus parcimonieuse. La suite des degrés de parcimonie
-(λm)m∈{1,...,M} qui vérifie λ1 < · · · < λM permet d’établir une relation d’ordre ⊂ entre les
-M éléments de la famille (Bλm)m∈{1,...,M} :
-BλM ⊂ BλM−1 ⊂ . . . ⊂ Bλ1 , (4)
-dans laquelle la matrice la plus parcimonieuse est contenue dans toutes les autres matrices de
-sa famille. L’un des avantages d’une telle matrice est la disparition des valeurs extrêmes et du
-bruit lorsque le seuil de parcimonie augmente ce qui facilite le rangement de la matrice ainsi
-que l’apparition d’une structure diagonale par blocs. Cependant, au regard de cette famille de
-matrices, se pose la question de la sélection du "meilleur" niveau de parcimonie c’est-à-dire
-celui qui permettra d’obtenir une visualisation claire de la structure des données. Nous intro-
-duisons pour ce faire un critère de sélection Cλm de la matrice centrale B∗λ, tel que :
-Définition 2
-La matrice centrale ordonnée (B∗λ)ord contenue dans une famille de matrices ordonnées
-(Bλm)ord = ((b
-λm
-i,j )ord)i,j∈{1,...,n},m ∈ I et I ∈ {1, . . . ,M}, vérifie :
-Sparsité et sériation
-(B∗λ)ord = argmin
-m∈I
-Cλm = argmin
-m∈I
-n∑
-i=1
-n−1∑
-j=1
-|(bλmi,j )ord − (bλmi,j+1)ord|
-|bλmi,j − bλmi,j+1|
-,
-où Bλm = (b
-λm
-i,j )i,j∈{1,...,n} est la matrice binaire non ordonnée de degré λm.
-Matrice
-de voisins
-communs
-B =
-2 0 0 3 0 0
-0 1 0 0 0 0
-0 0 3 0 3 3
-2 0 0 3 0 0
-0 0 3 0 3 3
-0 0 3 0 3 3
-Degré de
-parcimonie
-λ ≥ 1 λ ≥ 2 λ ≥ 3
-Matrices binaires
-de voisins
-communs
-B1 =
-1 0 0 1 0 0
-0 1 0 0 0 0
-0 0 1 0 1 1
-1 0 0 1 0 0
-0 0 1 0 1 1
-0 0 1 0 1 1
-B2 =
-1 0 0 1 0 0
-0 0 0 0 0 0
-0 0 1 0 1 1
-1 0 0 1 0 0
-0 0 1 0 1 1
-0 0 1 0 1 1
-B3 =
-0 0 0 0 0 0
-0 0 0 0 0 0
-0 0 1 0 1 1
-0 0 0 0 0 0
-0 0 1 0 1 1
-0 0 1 0 1 1
-6X
-i=1
-5X
-j=1
-˛˛˛
-bλmi,j − bλmi,j+1
-˛˛˛
-(calcul par ligne)
-17
-(3+2+3+3+3+3)
-15
-(3+0+3+3+3+3)
-9
-(0+0+3+0+3+3)
-Matrices binaires
-ordonnées
-de voisins
-communs
-Bord1 =
-1 1 0 0 0 0
-1 1 0 0 0 0
-0 0 1 1 1 0
-0 0 1 1 1 0
-0 0 1 1 1 0
-0 0 0 0 0 1
-Bord2 =
-1 1 0 0 0 0
-1 1 0 0 0 0
-0 0 1 1 1 0
-0 0 1 1 1 0
-0 0 1 1 1 0
-0 0 0 0 0 0
-Bord3 =
-1 1 1 0 0 0
-1 1 1 0 0 0
-1 1 1 0 0 0
-0 0 0 0 0 0
-0 0 0 0 0 0
-0 0 0 0 0 0
-6X
-i=1
-5X
-j=1
-˛˛˛“
-bλmi,j
-”
-ord
-−
-“
-bλmi,j+1
-”
-ord
-˛˛˛
-(calcul par ligne)
-9
-(1+1+2+2+2+1)
-8
-(1+1+2+2+2+0)
-3
-(1+1+1+0+0+0)
-critère
-Cλm
-Cλ≥1 = 917 = 1.89 Cλ≥2 =
-8
-15
-= 1.88 Cλ≥3 = 39 = 3.03
-1TAB. 2 – Un exemple de calcul du critère Cλm calculé à partir de la matrice de l’exemple
-introductif (cf. Figure 1 de gauche).
-Ce critère se base sur l’idée que moins il y a d’alternances entre les 0 et les 1 sur les
-lignes de la matrice considérée plus celle-ci présentera une structure compacte. En effet, dans
-la table 2, si l’on considère la quantité
-∑n
-i=1
-∑n−1
-j=1 |(bλmi,j )ord − (bλmi,j+1)ord| représentant le
-nombre de changements entre les 0 et les 1 d’une matrice ordonnée de degré λm et la quantité∑n
-i=1
-∑n−1
-j=1 |bλmi,j − bλmi,j+1| associée à la matrice non rangée de même degré, il est notable que
-le nombre de changements entre les 0 et les 1 demeure toujours plus petit dans le cas des ma-
-trices ordonnées. Cependant, à mesure que le degré de parcimonie augmente, le nombre d’al-
-ternances entre les 0 et les 1 diminue : dans l’exemple, le numérateur
-∑n
-i=1
-∑n−1
-j=1 |(bλmi,j )ord−
-(bλmi,j+1)ord| est égal à 9 pour un niveau λ = 1 et à 3 lorsque le degré de parcimonie est de
-3. Afin que le critère de sélection ne soit pas biaisé en faveur d’une sparsité infinie, Cλm est
-normalisé par le nombre d’alternances entre les 0 et les 1 de la matrice binaire non ordonnée
-C. Brunet et al.
-associée au même degré de parcimonie. Ainsi, d’après l’exemple de la table 2, le niveau de
-parcimonie retenu est λ ≥ 2. Notons que ce niveau, une structure à deux groupes est sélec-
-tionnée et une donnée isolée pouvant être considérée comme une donnée extrême est exclue.
-Ce critère dérive de la notion de run utilisé dans des problèmes de compression de données
-(Johnson et al. (2004); Apaydin et al. (2008)) ; ce dernier caractérisant une séquence maximale
-de 1 consécutifs sur une ligne d’une matrice booléenne. Le critère que nous présentons Cλm
-est relatif au nombre total de changements présents dans la matrice binaire non ordonnée de
-même degré de parcimonie afin qu’il ne soit pas biaisé en faveur d’une parcimonie infinie ou
-inversement, d’une parcimonie trop faible.
-3.2 L’algorithme PB-Clus basé sur un critère géométrique
-Il existe un grand nombre de critères pour réaliser la sériation d’une matrice (Mechelen
-et al. (2004)). Nous proposons d’utiliser le produit scalaire comme critère de rangement ; un
-critère déjà emprunté par McCormick et al. (1972) et par Arabie et Hubert (1990). Dans notre
-approche cependant, l’utilisation du produit scalaire normé est appliquée uniquement en ligne,
-du fait de la symétrie de la matrice. Soit x
-T
-i xj
-||xi||.||xj || le produit scalaire normé entre le i
-ème et le
-jème vecteur colonne d’une matrice X . Dans le cadre de notre étude, le produit scalaire normé
-est calculé sur les matrices binaires Bλm de degrés de parcimonie λm (∀m ∈ {1, . . . ,M})
-définies dans la Section 3.1. La fonction de permutation Ψ qui cherche à optimiser la somme
-des scalaires consécutifs peut s’écrire telle que :
-Ψ∗ = argmax
-Ψ
-n−1∑
-i=1
-(bλmΨ(i))
-T bλmΨ(i+1)
-||bλmΨ(i)||.||bλmΨ(i+1)||
-. (5)
-Un tel critère possède des propriétés géométriques intéressantes pour définir la notion de
-groupe (ou de cluster) et pour interpréter sa formation.
-Définition 3
-Un groupe de points G se définit comme l’ensemble des observations dont les vecteurs de voi-
-sinage commun sont corrélés entre eux.
-Ainsi, si les groupes de données sont bien séparés, les vecteurs de voisinage de chacun de
-ces groupes seront orthogonaux deux à deux et les observations d’un même groupe auront des
-vecteurs de voisinage commun corrélés. En revanche, si les groupes ne sont pas suffisamment
-séparés, aucune composante orthogonale ne sera détectée et les groupes ne pourront appa-
-raître distinctement, d’où l’intérêt d’une approche parcimonieuse des données. L’algorithme
-que nous proposons, Parcimonious Block Clustering (PB-Clus), exploite donc cette définition
-à travers une approche de type branch and bound où une recherche exhaustive du meilleur can-
-didat potentiel dans chaque sous-ensemble de vecteurs sera faite. Initialement, une observation
-i est choisie sur l’ensemble des données. A partir du vecteur de voisinage commun associé à
-i, l’algorithme recherche d’abord une liste de vecteurs indépendants entre eux, puis leurs com-
-posantes connexes. Chaque sous-ensemble de la liste est réordonné de sorte que la somme des
-produits scalaires adjacents soit maximale par bloc. La forme générale de l’algorithme PB-Clus
-est présentée ci-dessous et une implémentation plus détaillée est proposée dans la table 3 :
-Sparsité et sériation
-1. Une matrice de produits scalaires est calculée à partir de Bλm .
-2. Une observation est sélectionnée et la composante connexe est recherchée i.e. l’ensemble
-des vecteurs corrélés. Puis un vecteur orthogonal à ces premiers éléments est sélectionné
-et ses vecteurs corrélés sont récupérés à leur tour. Cette étape est réitérée jusqu’à ce qu’il
-n’y ait plus de vecteurs à classer ou que les vecteurs restants soient nuls.
-3. Dans chaque sous-groupe, les vecteurs sont rangés selon leur corrélation par rapport au
-dernier élément rangé.
-4. L’ordre obtenu dans chaque sous-matrice est appliqué à la matrice initiale Bλ.
-PB-Clus est appliqué pour différentes valeurs de λ et la "matrice centrale" est sélectionnée
-parmi la famille de matrices parcimonieuses ordonnées selon par le critère Cλm défini dans la
-section 3.1. Cependant, une trop grande sparsité peut impliquer l’évincement de petits clus-
-ters initialement présents dans la matrice des données. Comme nous disposons de plusieurs
-matrices ordonnées avec différents seuils de parcimonie, une combinaison de ces derniers per-
-mettrait de visualiser sur une même matrice la structure globale des données. Par ailleurs,
-l’algorithme de sériation PB-Clus traite les données, dans sa globalité, à travers une approche
-branch and bound. Cependant, localement, le rangement des vecteurs dans chacun des sous-
-ensembles suit une procédure de type forward, ce qui implique que la place des vecteurs déjà
-ordonnés reste inchangée pour une permutation courante. Aussi, l’algorithme propose une so-
-lution approchée pour le réagencement d’une matrice et ne prétend pas être optimal compara-
-tivement aux autres approches suggérées dans la littérature. Enfin, l’algorithme PB-Clus a un
-coût de calcul plus important que les autres méthodes de sériation dès lors que le rangement est
-effectué non pas sur une seule matrice mais surM matrices relatives à des degrés de parcimo-
-nie différents. Dans le cas d’une matrice de taille n× n ayantK groupes de même taille nK , il
-y a au plus,K( nK !) calculs. Cependant à mesure que le degré de parcimonie augmente, la ma-
-trice se remplit de colonnes (lignes) de 0 ce qui diminue le nombre d’éléments à ranger, et par
-conséquent le temps de calcul. Aussi, le coût calculatoire resterait bien inférieur àM.K( nK !).
-4 Expériences sur données simulées
-Nous proposons dans cette section d’évaluer notre méthode sur des simulations afin de
-souligner ses principales caractéristiques face à des données bruitées ou à des groupes super-
-posés. Pour ce faire, nous allons considérer dans une première expérience le cas de groupes
-de données superposés et déséquilibrés afin de caractériser le comportement de la famille
-de matrices parcimonieuses selon le degré de superposition des clusters ; dans une seconde
-expérience, nous analyserons l’influence des données bruitées sur la visualisation des sous-
-ensembles structurels d’un jeu de données. L’ensemble des simulations évaluant le comporte-
-ment de PB-Clus en face de données fortement bruitées et aléatoirement chevauchées se sont
-inspirées des travaux de Prelic et al. (2006). Dans chacune des expériences proposées, la fa-
-mille de matrices binaires de voisinage commun est construite par seuillage de la matrice des
-distances calculée pour toutes les paires d’observations, le seuil étant fixé au premier quartile
-de la distribution de ces distances.
-C. Brunet et al.
-———————————————-Algorithme PB-Clus
-→Initialisation de l’algorithme PB-Clus:
-—-seq = liste des niveaux de voisins communs désirée
-—-listeC = NA : intialisation de la liste contenant les critères des matrices binaires ordonnées.
-→Boucle principale de PB-Clus:
-Pour i=1 à taille (seq){
-—-calculer Bλla matrice binaire de voisins communs de niveau λ = seq (i)
-—-calculer Sλla matrice de produits scalaires de Bλ
-—-Oλ= ordre (Sλ) , calcule le rangement des individus
-—-Cλ= crit (Bλ, Oλ) , calcule le critère de la définition 2 de la section 3.1
-—-listeC = merge (listeC, Cλ)}
-→Résultat de PB-Clus:
-B∗λ = min (listeC) , retourne le critère minimale et le nombre de voisins communs associés.
-Oλ= ordre (S∗λ) , établit le rangement des individus pour le niveau optimal de voisins communs.
-Fonction ordre (Sλ) :
-initialisation:
-—-V = colinear (i.obs, Sλ)
-—-liste = liste des individus où le nombre de voisins communs est non nul (vc 6= 0).
-—-i.max = l’observation ayant vc maximum.
-—-i.perm= 0 (liste qui donnera l’ordre des individus selon leur scalaire ordonné.)
-boucle principale:
-—-tant que (taille (liste) > 1) {
-—-si (taille (V.cor) ≥ 1) { i.perm =merge (i.perm,liste[V.col])
-Sj = Sj [c(V.cor,V.ind),c(V.cor,V.ind)]
-liste = liste[c(V.cor,V.ind)]
-si (taille (V.cor) > 1) { V =colinear (1, Bλ)} }
-else { i.perm =merge (i.perm,liste[V.col])
-Sj = Sj [V.ind,V.ind]
-liste = liste[V.ind]
-si (taille (V.cor) > 1) {
-——–i.max =observation ayant vc maximum dans Sj
-——–Bλ = Bλ [V.ind,V.ind]
-——–V =colinear (i.max, Bλ)}}
-Fonction colinear (i, S) retourne 3 listes différentes:
-Soit si le vecteur de la ligne i de S, alors:
-- V.col = liste des individus colinéaires à si.
-- V.cor = liste des individus corrélés mais non colinéaires à si.
-- V.ind = liste des individus indépendants à si.
-1TAB. 3 – Implémentation de l’algorithme PB-Clus.
-Sparsité et sériation
-4.1 Sériation dans le cas de groupes superposés
-Sériation de groupes superposés et déséquilibrés : Dans cette expérience, les données sont
-simulées à partir d’un mélange de trois lois gaussiennes de dimensions 2 dans lequel deux
-groupes se superposent. Ces derniers sont de proportions différentes : le premier cluster est
-formé de 5% des données, soit 15 observations tandis que les deux autres représentent 32%
-et 63% des données, soit respectivement 100 et 200 observations. Cette situation est illustrée
-par la figure 2(a) dans laquelle les données sont représentées dans l’espace des variables. La
-partition centrale obtenue par notre méthode de sériation est illustrée par la Figure 2(b) et ce,
-avec un seuil de sparsité de 16 voisins communs. Pour ce niveau de parcimonie, plus de 6% des
-données ont été évincées ce qui a pour conséquence l’absence du troisième cluster, le plus petit,
-qui de part sa taille (15 observations) au regard du seuil de parcimonie (16 voisins communs)
-a été automatiquement évincé des sous-ensembles de données qui forment la matrice centrale.
-Afin d’intégrer la visualisation de ce cluster dans la matrice centrale, un seuil plus faible de
-sparsité (8 voisins communs) a été appliqué sur le sous-ensemble des données évincées dans le
-but d’en faire émerger une sous-structure. La combinaison de la visualisation centrale obtenue
-pour un niveau de parcimonie de 16 voisins communs avec celle du sous-ensemble de données
-évalué pour un seuil de 8 voisins communs, nous permet d’afficher sur une même matrice les 3
-groupes de données. La figure 2(c) rend compte de cette approche multi-échelle de l’algorithme
-PB-Clus. Enfin, parmi les données sériées, i.e. celles non évincées, 98% d’entre elles ont été
-bien classées.
-a)
-−10 −5 0 5 10 15
-−
-10
-−
-5
-0
-5
-10
-15
-x
-y
-b) c)
-1
-FIG. 2 – Projection des données dans leur espace (à gauche), visualisations de la matrice
-centrale ordonnée par PB-Clus avec un seuil de sparsité de 16 voisins communs (milieu) et de
-la matrice ordonnée multi-échelle (à droite).
-Influence du niveau de superposition de clusters : Dans cette deuxième expérience, nous
-cherchons à évaluer l’influence du niveau de recouvrement de clusters dans la recherche d’une
-structuration des données. Pour ce faire, nous avons simulé 3 gaussiennes dans un espace de di-
-mension 2 telles que leurs moyennes respectives vérifient :m1 = (x, y),m2 = (x,−y),m3 =
-(0,−y) avec x ∈ [0, 0.3] et y ∈ [0, 0.225]. Par conséquent, la position relative des moyennes
-varie et cette variation détermine le niveau de superposition des groupes. Ainsi, lorsque x = 0
-et y = 0, les 3 groupes sont confondus et cela correspond à un taux de recouvrement de 100%.
-C. Brunet et al.
-Dans le cas opposé des groupes bien séparés où le taux de recouvrement est égale à 0, les
-moyennes des clusters vérifient :m1 = (0.3, 0.225),m2 = (0.3,−0.225),m3 = (0,−0.225).
-La table 4 présente l’évolution du niveau des voisins communs et son taux d’éviction associé,
-en fonction du recouvrement des groupes. Tout d’abord, on remarque que plus les clusters se
-superposent, plus le critère Cλ sélectionne une représentation parcimonieuse des données. En
-effet, lorsque la structure visible des données devient moins prononcée, cet effet est contre-
-balancé par une plus importante sparsité dans les données avec l’imposition d’un voisinage
-commun plus élevé. De même, à mesure que la structure des données devient de plus en plus
-complexe, le taux de classification relatif aux sous-ensembles de données sériées diminue ainsi
-que la qualité de la visualisation. Dans notre exemple, au-delà d’un taux de recouvrement des
-données de 40%, le taux de classification devient faible (< 0.6) puisque l’algorithme PB-Clus
-ne détecte plus de structure dans les données et ceci, quel que soit le niveau de parcimonie
-imposé.
-taux (en %) de
-recouvrement 0 6.7 13.3 20.0 26.6 33.3 40.0 46.6 53.30 73.3 100
-x 0.30 0.28 0.26 0.24 0.22 0.20 0.18 0.16 0.14 0.08 0
-y 0.225 0.21 0.195 0.18 0.165 0.15 0.135 0.120 0.09 0.06 0
-degré de
-parcimonie 5 6 9 35 33 34 35 35 35 35 34
-pourcentage
-de données
-évincées
-0.00 0.00 0.00 0.26 0.23 0.34 0.37 0.35 0.39 0.35 0.43
-valeur de Cλ 1.95 2.01 2.42 2.64 2.90 2.82 3.34 3.29 3.32 3.54 3.65
-taux de
-classification 0.99 0.99 0.99 0.99 0.95 0.90 0.86 0.60 0.49 0.44 0.39
-1
-TAB. 4 – Influence du degré de recouvrement des clusters sur la détection de structure.
-4.2 Données bruitées
-Comparaison entre des méthodes de sériation : Dans cette expérience, 30% des données
-ont été remplacées par du bruit uniforme sur un hypercube [−1, 1] de dimension 4 et l’autre
-moitié a été simulée à partir d’un mélange de trois gaussiennes de dimension 4 ; elles sont
-représentées sur leurs deux premières dimensions par la figure 3(a). La figure 3(b) présente
-l’évolution du critère de compacité Sλ en fonction des différents degrés de parcimonie, à sa-
-voir le nombre de voisins communs. La partition centrale (fig. 3(c)) sélectionnée est celle qui
-a le critère Cλ minimal, ce qui correspond à un voisinage commun de 59. Cette sparsité a
-pour conséquence une éviction de 16% des données et ce sont 84% des données initiales qui
-permettent d’obtenir une représentation diagonale par blocs ; les sous-ensembles de données
-exclues sont entièrement formés de données bruitées. De plus, le taux de classification cor-
-recte parmi les données sériées s’élève à 99%, ce qui implique que ces sous-ensembles de
-données sériées sont structurels des 3 clusters. Afin d’évaluer la performance de notre ap-
-proche, trois méthodes de sériation basées sur des matrices de distances ont été appliquées : le
-clustering hiérarchique pour la sériation (fig. 4(a)), l’approche de Chen basée sur une structure
-anti-Robinson (Chen (2002), fig. 4(b)) ou encore une autre méthode de sériation anti-Robinson
-Sparsité et sériation
-(a) (b) (c)
-FIG. 3 – Visualisations du mélange de gaussiennes bruitées dans l’espace de données (à
-gauche), de l’évolution du critère Cλ selon le degré de voisins communs (milieu) et de la
-matrice centrale ordonnée par PB-Clus avec un seuil de sparsité de 67 voisins communs.
-(a) (b) (c)
-FIG. 4 – Visualisations de la matrice des distances sériée par une méthode de clustering hié-
-rarchique (gauche), une méthode de Chen (milieu) et une méthode basée sur une représentation
-anti-Robinson (droite).
-avec une approche par simulated annealing (Brusco et al. (2008)) illustrée par la figure 4(c).
-Ces méthodes sont détaillées dans Hahsler et al. (2009) et programmées dans le package R
-seriation. Parmi les méthodes de sériation utilisées, nous remarquons que seule la partition
-centrale obtenue par l’algorithme PB-Clus apporte une visualisation claire des trois clusters.
-La représentation de cette structure en trois groupes distincts est possible grâce à la famille de
-matrices binaires parcimonieuses. En effet, plus les matrices ont un degré de parcimonie élevé,
-plus la quantité de données bruitées pris en compte diminue.
-Influence du niveau de bruit : Cette deuxième expérience tend à montrer le comportement
-de l’algorithme PB-Clus en face de données fortement bruitées. A cet effet, nous avons si-
-mulé trois gaussiennes de dimension 2 de 50 observations chacune et ayant pour moyenne
-C. Brunet et al.
-niveau de bruit 0 0.2 0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0
-degré de
-parcimonie
-4 12 6 8 12 18 24 21 35 31 35
-pourcentage
-de données
-évincées
-0.06 0.16 0.12 0.23 0.11 0.04 0.12 0.19 0.16 0.11 0.08
-Taux de
-classification
-1 1 1 1 0.99 0.99 0.99 0.99 0.99 0.98 0.98
-TAB. 5 – Comportement de PB-Clus selon différents niveaux de bruit ajoutés aux données
-initiales.
-FIG. 5 – Evolution de la visualisation de la structure des données en fonction de différents
-niveaux de bruit ajoutés aux données initiales.
-m1 = (−0.4,−0.3), m2 = (0.4,−0.3) et m3 = (0, 0.3) respectivement et pour matrice de
-variances-covariances S = diag(0.1, 0.1). Ces groupes sont volontairement bien séparés afin
-de pouvoir évaluer la sensibilité de l’algorithme au bruit. Les données bruitées ont été générées
-selon une loi uniforme sur un cube [−1, 1] de dimension 2. Pour évaluer l’impact du bruit sur
-la visualisation, nous avons fait varier le nombre de données bruitées ajoutées de 10% à 200%
-du nombre des données de l’échantillon initial. La figure 5 présente l’évolution de la visua-
-lisation des données à mesure de l’ajout de bruit tandis que la table 5 représente les niveaux
-de parcimonie et le taux de données evincées associés au critère Cλ pour chaque niveau de
-bruit. On remarque tout d’abord que la visualisation de groupes se dégrade peu avec l’ajout
-de bruit. En effet, sur la figure 5, la structure ne se dégrade qu’à partir du moment où les
-données bruitées représentent plus de la moitié de l’ensemble des données. La qualité de ces
-représentations s’explique par le seuil de parcimonie qui, augmentant avec l’ajout de bruit (cf.
-table 5), exclut un plus grand nombre de données. L’objectif de PB-Clus, basé sur la sélection
-de sous-ensembles de données structurelles est bien atteint dans cette expérience puisque la
-visualisation met en exergue 3 groupes et ce, quel que soit le niveau de bruit.
-5 Comparaison avec des méthodes classiques
-Cette dernière section est destinée à évaluer la qualité de la visualisation d’une structure
-dans les données ainsi que celle de la partition obtenue par l’algorithme PB-Clus. Pour cela,
-nous avons emprunté deux types de jeux de données appartenant à des communautés diffé-
-rentes : d’une part, 5 bases de données réelles et de références pour la sériation accessibles
-Sparsité et sériation
-par le logiciel R et d’autre part, 7 jeux de données simulées, les données FCPS, présentant
-des difficultés particulières pour la tâche de clustering. Les familles de matrices binaires de
-voisinage commun ont été obtenues de la même manière que dans la Section 4.
-5.1 Données de référence pour la sériation
-Dans cette section, nous comparons les performances de l’algorithme PB-Clus en termes
-de visualisation d’une part avec deux autres méthodes de sériation, l’une utilisant la classifi-
-cation hiérarchique (HC), l’autre utilisant un critère de divergence reposant sur une structure
-anti-Robinson (CHEN) (Chen (2002)) décrites dans Hahsler et al. (2009) et en termes de classi-
-fication d’autre part, par l’intermédiaire d’une méthode de classification non supervisée basée
-sur les distances, le k-means. Cette comparaison a été faite sur 5 bases de données populaires
-dans la communauté statistique de clustering et de sériation qui sont disponibles dans le logi-
-cielR. Les 5 jeux de données que nous avons choisis sont décrits ci-dessous :
-– La base de données des iris de Fisher a été construite par Anderson (1935) qui a collecté
-3 espèces d’iris différentes dans la péninsule de Gaspé : les setosa, les virginica ainsi
-que les versicolor. Chaque espèce est représentée par 50 fleurs qui sont décrites par 4
-caractéristiques morphométriques basées sur la largeur et la longueur de leurs sépales et
-de leurs pétales. Cette base de données est extrêmement populaire dans la communauté
-statistique du fait de la difficulté à distinguer les virginica et les versicolor.
-– Les données ruspini proviennent des travaux de Ruspini (1970) sur le clustering : elles
-sont formées de 75 points décrits sur 2 dimensions et répartis en 4 classes homogènes et
-équilibrées.
-– Les données townships sont des données binaires relatant la présence ou l’absence de 9
-caractéristiques descriptives de 16 villes, telles la présence ou l’absence d’universités, de
-coopératives agricoles, de chemins de fer etc. Il n’y a aucune information sur le nombre
-de groupes structurant les données.
-– Les données faithful sont une base de données évaluant le temps entre deux éruptions
-de geysers du parc national de Yellowstone de Wyoming (USA) et leur durée. Elles sont
-caractérisées par 272 observations (Haerdle (1991)).
-– Les données geysers représentent une version complète des données précédentes et a été
-collectée par Azzalini et Bowman (1990). Ce sont quelques 299 éruptions qui ont été
-étudiées (mêmes types de mesures que précédemment) entre le 1er et le 15 août 1985.
-Pour évaluer la qualité de la visualisation de notre approche, nous avons utilisé deux critères de
-Niermann (Neumann et Moore) présentés dans la Section 2 ; la partition obtenue sera quand à
-elle évaluée par validation croisé avec le vrai label lorsque les données en sont dotées ou dans
-le cas échéant, avec les labels estimés par les k-means. Comme ce dernier suppose une connais-
-sance a priori du nombre de groupes du mélange, nous avons choisi d’utiliser le nombre de
-clusters détectés par PB-Clus afin d’obtenir des partitions comparables. La figure 6 de droite
-C. Brunet et al.
-représente les produits scalaires consécutifs des éléments i et i + 1 ordonnés sur les 5 bases
-de données exposées précédemment. Ces courbes de produits scalaires consécutifs rendent
-compte de la proximité entre deux observations adjacentes et de points de rupture pour le pas-
-sage d’un cluster à un autre, ce qui permet de sélectionner le nombre de clusters du mélange et
-d’obtenir une partition des données. La colonne de gauche de la figure 6 représente la visualisa-
-tion centrale de la matrice parcimonieuse ordonnée avec l’algorithme PB-Clus. Dans le cas des
-iris de Fisher, l’observation de sa matrice centrale de degré de voisinage commun 8, présente
-une structure globale à deux clusters dans laquelle il préfigure localement, au niveau du premier
-bloc, une séparation en deux parties différentes. On retrouve ici la structure particulière des iris
-dans laquelle les versicolor et les virginica sont des espèces peu distinctes. Par ailleurs, cette
-partition en 3 groupes se voit être confirmée par les 2 points de rupture présents sur la courbes
-de ses produits scalaires consécutifs. L’analyse simple de ces deux graphiques rend compte de
-la performance de notre approche parcimonieuse pour la visualisation des données, d’autant
-plus que rares sont les méthodes de clustering qui sélectionnent un modèle optimal à 3 classes
-d’iris (cf. les modèles de mélanges Raftery et Dean (2006)). Dans le cas des données Ruspini
-et Faithful, les ruptures sur la courbe des produits scalaires consécutifs sont nettes et amples ce
-qui rend compte de la déconnexion totale des clusters entre eux ; cette même conclusion est vi-
-sible sur leur matrice centrale ordonnée de degré 5 pour les données Ruspini et de 2 pour celles
-de Faithful. A l’inverse, les données Geysers et Townships présentent des ruptures de faibles
-ampleurs. On peut en effet observer sur les donnéesGeysers deux petites ruptures sur la courbe
-de ses produits scalaires consécutifs, lesquelles s’expliquent par la proximité des clusters les
-uns par rapport aux autres. Ensuite, dans le cas des données Townships, la courbe des scalaires
-consécutifs nous montre que la première ville est, certes, reliée aux 7 villes suivantes mais
-moins fortement que ces 7 villes entre elles ce qui suppose un certain éloignement de cette
-donnée au reste du groupe. La visualisation centrale de la matrice parcimonieuse ordonnée de
-degré 2 avec l’algorithme PB-Clus apporte une meilleure compréhension des relations entre
-les villes. En effet, on remarque que la première donnée est fortement corrélée à deux blocs
-de villes distincts. Cette interprétation se voit être confirmée par les travaux de Hahsler et al.
-(2009) qui, par une approche de sériation sur le tableau initial rectangulaire des données, ont
-montré l’existence d’une structure à 3 groupes : les villes urbaines, les villes de campagnes et
-les villes intermédiaires avec une ville en transition. Cette première évaluation basée sur notre
-perception visuelle est complétée par une mesure de qualité basée sur des critères de sériation
-évaluant la proximité du voisinage dans la matrice ordonnée. La table 6 évalue les perfor-
-mances de 3 méthodes de sériation, dont PB-Clus au regard des deux mesures de Niermann
-(2005) (Moore et Neumann), la meilleure méthode étant celle dont le critère est minimum. On
-remarque que les 2 critères de Niermann sont minimum pour une approche parcimonieuse des
-données et ceci sur l’ensemble des bases de données ce qui rend compte de la performance de
-PB-Clus relativement à HC ou à la méthode de Chen. Enfin, la dernière table 7 présente les ta-
-bleaux de classification croisée avec le vrai label dans le cas des iris de Fisher et avec les labels
-obtenus par k-means dans le cas des données Ruspini, Townships, Geysers et Faithful. Notons
-que dans le cas des données iris et Geysers c’est-à-dire ceux où les ruptures sur la courbe des
-scalaires consécutifs sont de faibles ampleurs, nous avons seuillé les scalaires afin d’obtenir
-une labellisation pour chaque donnée. Sur les iris de Fisher, notre algorithme présente un taux
-de classification correcte de 89.0% légèrement plus faible que est comparable à celui obtenu
-par les k-means (90.6%). Cette différence de taux est lié aux données situées à l’intersection
-Sparsité et sériation
-des virginica et des versicolor et à l’initialisation de notre algorithme. Pour les autres jeux de
-données, on observe que les partitions obtenues par PB-Clus et par les k-means concordent
-presque parfaitement, les taux de classification avoisinant les 98%.
-Méthodes PB-Clus HC Chen
-Critères Moore Neumann Moore Neumann Moore Neumann
-Données
-Iris 1 371.2 471.1 31 728.8 10 893.1 19 357.8 7 304.0
-Townships 0244.5 091.8 01 109.9 00441.5 00849.0 0342.0
-Ruspini 1 290.1 442.2 08 724.9 03 036.4 06 503.7 2 277.1
-Faithful 2 634.1 889.4 34 045.5 11 503.5 23 390.0 9 894.2
-Geysers 2 514.9 850.4 68 205.3 02 302.1 12 866.8 4 501.4
-1TAB. 6 – Comparaison de 3 méthodes de sériation, PB-Clus, HC et Chen selon les mesures
-de Moore et de Neumann sur les données de référence.
-Iris de Fisher Townships
-clusters PB-Clus clusters Kmeans clusters PB-Clus
-classes connues 1 2 3 classes connues 1 2 3 classes connues 1 2 3 4
-Setosa 50 0 0 Setosa 50 0 0 Urbaines 8 0 0 0
-Versicolor 0 50 0 Versicolor 0 49 1 Intermédiaires 0 4 0 0
-Virginica 0 17 33 Virginica 0 13 37 Campagnardes 0 0 2 0
-Inclassables 0 1 0 1
-Taux de classification = 0.88 Taux de classification = 0.90 Taux classification = 0.94
-Ruspini Faithful Geysers
-clusters PB-Clus clusters PB-Clus clusters PB-Clus
-clusters Kmeans 1 2 3 4 clusters Kmeans 1 2 clusters Kmeans 1 2 3
-groupe 1 13 0 0 0 groupe 1 168 4 groupe 1 88 2 7
-groupe 2 0 35 0 0 groupe 2 0 100 groupe 2 0 105 0
-groupe 3 0 0 15 0 groupe 3 0 0 97
-groupe 4 0 0 0 20
-Taux de classification = 1.00 Taux de classification = 0.98 Taux de classification = 0.97
-1
-TAB. 7 – Tableaux de validation croisée des données benchmarks de sériation.
-5.2 Données de référence pour le clustering
-Dans cette dernière expérience, nous considérons les jeux de données FCPS (Ultsch (2005))
-disponibles sur le site http ://www.informatik.uni-marburg.de/databionics et qui sont caracté-
-risés par des données de petite dimension (p ≤ 3) divisées en plusieurs clusters. Chacune de
-ces bases présente un problème particulier pour le clustering : certains groupes d’un même
-mélange ne suivent pas la même distribution telles que les données Lsun, Atom, TwoDiamonds
-ou encore WingNut ; d’autres sont caractérisés par des variances intra différentes comme les
-C. Brunet et al.
-FIG. 6 – Matrices de scalaires ordonnés (gauche) et représentation de scalaires consécutifs
-ordonnés sur des données de référence (droite).
-Sparsité et sériation
-données WingNut ou Lsun et d’autres encore ne sont pas linéairement séparables comme les
-données Atom. Toutes ces spécificités sont détaillées dans la table 8. L’objectif de cette ex-
-périence est d’évaluer la capacité de notre approche à trouver des sous-ensembles structurels
-caractérisant chaque base de données et ce, quelles que soient la forme ou la taille des clusters.
-L’algorithme PB-Clus est appliqué sur l’ensemble de ces données et la première partie de la
-table 9 présente les degrés de parcimonie sélectionnés par le critère Cλ, le taux d’éviction des
-données associé, le nombre de groupes détectés ainsi que la visualisation de la matrice cen-
-trale ordonnée. Notons que, comme précédemment, la partition obtenue ainsi que le nombre de
-groupes présents dans chaque jeu de données ont été obtenus par seuillage des scalaires consé-
-cutifs. On remarque tout d’abord, que la visualisation de la structure intrinsèque de l’ensemble
-des données est relativement nette. Cette qualité de la représentation des structures s’explique
-principalement par un niveau de parcimonie relativement élevé comme le montre les niveaux
-de voisinage commun sélectionnés de la table 9 mais aussi, par une analyse multi-échelle dans
-le cas des données Atom et Target marquées d’un astérisque. Dans le cas des données Atom,
-l’algorithme PB-Clus avait sélectionné initialement une représentation parcimonieuse excluant
-49% des données (soit le cluster de grande variance) avec un voisinage commun de 58. Pour
-les données Target, 48% des données avaient été évincées pour un seuil de voisinage com-
-mun s’élevant à 34, ce qui avait pour conséquence d’omettre le cluster en anneau ainsi que
-les tous petits clusters. L’approche multi-échelle a donc permis d’une part, de détecter des
-sous-groupes dans les données évincées (le niveau de parcimonie et le taux d’éviction ont été
-renseignés entre des parenthèses dans la table 9) et d’autre part, de les visualiser. Dans le cas
-des données Atom, on distingue bien deux groupes : l’un compact et carré, relatif au cluster
-dense et central, et l’autre beaucoup plus effilé, caractérisant le second cluster de variance
-beaucoup plus grande. De la même manière, l’analyse multi-échelle appliquée sur les données
-Target, permettent d’introduire le cluster en forme d’anneau dans la visualisation ainsi que les
-4 petits clusters. Quelle que soit la base de données considérée, la structure intrinsèque a bien
-été détectée par l’algorithme PB-Clus et ceci grâce à l’introduction de parcimonie dans les
-données. La deuxième partie de la table 9 présente les taux de classification correcte sur les
-données sériées (non évincées) issues de notre approche et ceux obtenus par Ultsch (2005) à
-partir de 3 méthodes non supervisées : les k-means et deux algorithmes de classification hié-
-rarchiques (SingleLinkage et Ward). Certes, les taux de classification sont comparables entre
-PB-Clus et les méthodes proposées, cependant, ces résultats ont été obtenus en apportant une
-connaissance a priori du nombre de groupes pour chaque jeu de données ce qui facilite le
-partitionnement des différents jeux de données pour les algorithmes des k-means ou de classi-
-fication hiérarchiques. De plus, dans notre approche, ce n’est pas tant la comparaison des taux
-de bonne classification entre les méthodes qui est intéressante mais plutôt le fait que d’une part,
-la structure intrinsèque des données est toujours bien évaluée quelle que soit leur difficulté et
-d’autre part, sur les 7 jeux de données proposés plus de 93% des données structurelles sont
-bien classées. L’ensemble de ces remarques rend compte de la performance de PB-Clus quant
-à la mise en exergue d’une structuration et de données structurelles et ce, quelle que soit la
-distribution des données, la taille des clusters ou leurs variances.
-C. Brunet et al.
-n K p Difficultés
-Atom 800 2 3
-différentes variances
-non linéairement séparables
-Hepta 211 7 2 aucune difficulté
-Lsun 400 3 2
-différentes variances
-différentes distances inter
-Target 770 6 2 outliers
-Tetra 400 4 3 clusters très proches
-TwoDiamands 800 2 2 frontière du cluster définie par une densité
-WingNut 1016 2 2 densité versus distances
-TAB. 8 – Nombre d’observations (n), de clusters (K) et de dimensions (p) des bases de don-
-nées FCPS.
-PB-ClusDonnées : Atom Hepta Lsun Target Tetra TwoDiam WingNut
-PB-Clus
-Voisins Communs
-Taux d’éviction
-Nombre de groupes
-34∗ (2)
-0.49∗ (0)
-2
-10
-0
-7
-68
-0.17
-3
-58∗ (2)
-0.48∗ (0)
-6
-53
-0
-4
-32
-0
-2
-110
-0.087
-2
-Visualisation
-Taux de classification :
-PB-Clus
-k-means
-Ward
-Single Linkage
-0.99
-0.71
-1.00
-0.66
-1
-0.97
-0.97
-0.97
-0.93
-0.76
-0.99
-0.72
-0.96
-0.63
-0.99
-0.65
-0.98
-0.99
-0.26
-0.98
-0.99
-1.00
-0.50
-1.00
-0.94
-0.96
-1.00
-0.88
-1
-TAB. 9 – Tableau des résultats de la sériation sur les bases de données FCPS.
-Sparsité et sériation
-6 Conclusion
-L’algorithme PB-Clus que nous proposons est une méthode de sériation qui permet de vi-
-sualiser des sous-ensembles de données et leurs dépendances dans une base de données. Pour
-ce faire, nous avons proposé une famille de matrices parcimonieuses formées de matrices de
-niveaux de parcimonie différents dont le niveau est directement déterminé par le nombre de
-voisins communs entre paires d’observations. Cette méthode est un outil efficace pour l’ana-
-lyse de données qui offre visuellement de meilleurs résultats que les méthodes traditionnelles
-de sériation, en particulier lorsque les données sont bruitées ou que les groupes sont superposés.
-De plus, cette approche parcimonieuse facilite l’interprétation des données et offre une qualité
-de partitionnement comparable aux k-means avec l’avantage de ne poser aucune hypothèse
-sur le nombre de clusters. Par ailleurs, choisir un niveau de parcimonie dans les données re-
-vient à chercher des sous-ensembles de données explicatifs d’une structure qui leur est propre.
-Ce nouveau point de vue peut s’apparenter à une approche par niveaux de densité communé-
-ment appelé levels set qui a été initialement abordée par Hartigan (1987) puis repris par Nolan
-(1991). Une comparaison de ces deux approches et la recherche d’un lien théorique font partis
-de nos travaux de recherche en cours.
-Remerciements
-Nous tenons à remercier le Comité de Lecture du numéro spécial RNTI ”Fouille de Don-
-nées Complexes : données multiples” qui a contribué à l’amélioration de la qualité de l’article
-présenté.
+Séquences de données dont on ne sait pas si elles
+supportent S ou non
+OS
+{
+Séquences de données ne supportant pas S
+FIG. 1 – Découpage de la base de données selon l’inclusion de S
+Pour chaque séquence candidateS, on ne considèrera donc que le sous-ensemblesOS ∪ OS
+afin de déterminer si la séquence S est fréquente ou non. Ce sous-ensemble de séquences de
+données forme la base de données valide pour S.
+Définition 1. Une base de données valide est une base de séquences complètes pour une
+séquence candidate donnée.
+La construction d’une base de données valide repose sur la désactivation temporaire des
+séquences de données qui contiennent des valeurs manquantes pour les items présents dans la
+séquence candidate. Cette désactivation implique une redéfinition de la notion de support, pour
+prendre en compte la désactivation d’une partie de la base.
+Définition 2. Une séquence de données est désactivée pour une séquence candidate S si elle
+est incomplète pourS (i.e. on ne sait pas si elle supporteS ou non). On noteDis(S) l’ensemble
+des séquences désactivées pour la séquence candidate S.
+SPoID : Motifs séquentiels et données incomplètes
+La notion de support définie dans la section 3 doit donc être modifiée afin de prendre en
+compte la notion de base de données valide et pour considérer le fait que seule une partie de la
+base est utilisée.
+Définition 3. Le support d’une séquence S est le taux d’apparition de cette séquence parmi
+les séquences de données qui peuvent la supporter. On le définit comme le ratio du nombre
+de séquences de données qui supportent cette séquence, par le nombre de séquences de don-
+nées dont on est sûr qu’elles pourraient ou non inclure cette séquence (complètes pour cette
+séquence). Il est donné par la formule :
+Supp(S) =
+|OS |
+|O| − |Dis(S)|
+Nous avons montré, sous certaines conditions peu restrictives, que cette définition respecte
+la propriété d’antimonotonie du support énoncée dans (Agrawal et Srikant, 1995).
+La nouvelle définition du support étant antimonotone, on peut utiliser les différentes pro-
+priétés énoncées dans (Agrawal et Srikant, 1995) afin de réaliser l’extraction de motifs séquen-
+tiels sur base de données incomplètes. Toutefois, la notion de fréquence dépend du calcul du
+support et de la taille de la base de données valide utilisée pour le calculer. On définit un critère
+de représentativité minimale : une base de données valide doit être un échantillon significatif
+de la base de départ pour qu’on considère la séquence comme fréquente si elle valide le support
+minimalminSup.
+Définition 4. La représentativité Rep(S) d’une séquence S est définie comme le ratio du
+nombre de fois où cette séquence apparaît complète ou n’apparaît pas avec certitude dans la
+base, par rapport au nombre total de séquences de données dans la base. Elle est donnée par :
+Rep(S) =
+|O| − |Dis(S)|
+|O|
+Définition 5. Une séquence est représentative si sa représentativité est supérieure à une valeur
+minimale donnée.
+Pour être considérée comme fréquente, une séquence doit donc être trouvée fréquente sur
+une base de données valide et représentative, c’est-à-dire si sa représentativité est supérieure au
+seuil minimal de représentativitéminRep et si son support est supérieur au support minimum
+spécifié par l’utilisateurminSup.
+3.3 Seuil de représentativité et marge d’erreur
+Les statisticiens disposent d’outils d’échantillonnage permettant de considérer un sous-
+ensemble d’une population afin d’estimer une proportion, à un pourcentage d’erreur près, avec
+un niveau de confiance suffisant. Ces outils permettent de déterminer la taille optimale d’un
+échantillon en fonction de la distribution des données. Ainsi, dans le cas d’une distribution au
+hasard des données, (Toivonen, 1996) utilise les bornes de Chernoff pour déterminer la taille
+minimale d’un échantillon tiré au hasard pour l’extraction de règles d’association. Ce résultat
+est également démontré théoriquement et empiriquement dans (Zaki et al., 1996).
+C. Fiot et al.
+Nous proposons donc d’utiliser deux formes de représentativité selon le souhait de l’uti-
+lisateur : soit celle-ci sera définie comme une proportion de la base, soit elle sera absolue et
+calculée à partir de formules statistiques dépendant de la distribution des données, en respectant
+un pourcentage d’erreur et un niveau de confiance spécifiés par l’utilisateur. Les expérimenta-
+tions montrent toutefois que le seuil de représentativité optimale n’est pas absolu mais dépend
+en fait du taux de valeurs manquantes contenues dans la base de données.
+4 Mise en œuvre
+4.1 Illustration
+Reprenons la base incomplète présentée TAB. 2. On pose minSup=50%, puis on calcule
+le support et la représentativité de chacun des items de la base pour déterminer les items fré-
+quents. L’item a est supporté de manière sûre par les trois objets son support est supp(a) =
+3/3 = 100% et sa représentativité vaut 1. Il en est de même pour les items b et c.
+Pour l’item d, on a O<d> = {O2} et Dis(< d >) = {O1, O3}, donc supp(d) = 1/(3-2) = 1 et
+rep(d) = (3-2)/3 = 0.33. Si le seuilminRep vaut 0.3, alors rep(d) > minRep et d est un item
+fréquent. Par contre, siminRep = 0.4, alors rep(d) < minRep et d n’est pas un item fréquent
+car la base valide qui permet de calculer son support n’est pas suffisamment représentative.
+On fixe minRep=0.3. Prenons maintenant la séquence S =< (a b)(a b c d) >. Cette
+séquence ne peut être supportée par aucune des trois séquences de données, car aucune ne
+comporte d’itemsets de 4 items, complet ou non, donc OS = {}, Dis(S) = {} et OS =
+{O1, O2, O3} et supp(S)=0. Cette séquence n’est pas fréquente.
+La séquence S′ =< (a b)(b c) >, quant à elle, est supportée parO1, ne peut l’être parO2 mais
+pourrait l’être par O3. On a doncOS′ = {O1},Dis(S′) = {O3} et OS′ = {O2}, ce qui donne
+supp(S′)=1/(3-1)=50% et rep(S’)=(3-1)/3 = 0.67. S′ est donc représentative et fréquente.
+En appliquant la méthode ci-dessus, les motifs extraits pour minSup=50% et minRep =
+0.3 sont : <(a b)(c)(b c)> et <(a)(c)(b d)>. Même si ces motifs ne sont pas exactement ceux
+extraits sur la base complète, on constate qu’ils sont plus proches des motifs qui devraient être
+extraits des motifs obtenus de la base après prétraitement.
+Les expérimentations présentées dans la section 5 montrent qu’il existe une valeur de la repré-
+sentativité à partir de laquelle l’algorithme SPoID extrait d’une base incomplète l’intégralité
+des motifs extraits sur la base complète.
+4.2 Algorithme
+Le principe de l’algorithme SPoID est similaire aux algorithmes d’extraction de motifs
+séquentiels de type générer-élaguer. Il consiste à générer toutes les séquences candidates de
+longueur k à partir des séquences fréquentes de longueur k-1, puis à scanner l’ensemble de
+la base pour compter le nombre de séquence de données qui supporte chacune des séquences
+candidates. La différence réside dans le dénombrement des séquences de données incomplètes
+pour la séquence candidate considérée. La phase de comptage est décrite par l’algorithme
+ALG. 1 : pour chaque séquence candidate, pour chaque objet,
+– si on trouve la séquence candidate, on incrémente les valeurs absolues du support,
+SPoID : Motifs séquentiels et données incomplètes
+– si on ne trouve pas la séquence candidate ni de séquence dans laquelle des valeurs man-
+quantes pourraient être remplacées par les items correspondant dans la séquence candi-
+date, alors l’objet ne supporte pas la séquence candidate. On n’incrémente pas le support.
+– on trouve une séquence incomplète dans laquelle des valeurs manquantes pourraient
+être remplacées par les items correspondant dans la séquence candidate. Dans ce cas, on
+ajoute cet objet à l’ensemble des objets désactivés.
+Une fois l’ensemble de la base parcouru, on divise la valeur absolue du support par la différence
+entre le nombre total d’objets et le nombre d’objets désactivés, on calcule la représentativité.
+Puis on procède à la phase d’élagage en supprimant toutes les séquences candidates qui ne sont
+pas fréquentes puis celles qui ne sont pas représentatives.
+SPoID - Input : |O|, une base de séquences de données, minSup, support minimum spécifié par l’utilisateur
+minRep, représentativité minimum, spécifiée ou calculée
+Ouput : SPList, liste des séquences fréquente
+C ← {i ∈ I} ; k = 1 ;
+F ← getFrepnRep(C,minSup,minRep) ;
+SPList.add(F ) ;
+While (C 6= ∅) do
+k++ ; C ← generate(F ,k) ;
+For chaque séquence candidate s ∈ C do
+For chaque objet o ∈ O do
+[On cherche s dans So] ;
+If (s ∈ So) Then
+supp(s)++ ;Dis(s)← Dis(s)\o ;
+Else
+If (s˜ ∈ So/s˜ pourrait être s) Then
+Dis(s)← Dis(s) ∪ o ;
+End If
+End If
+End For
+Support(s)← supp(s)/(|O| − |Dis(s)|) ; Rep(s)← |O| − |Dis(s)|/|O| ;
+If ((Support(s) < minSup)||(Rep(s) < minRep)) Then
+prune(s) ;
+End If
+End For
+End While
+return SPList ;
+ALG. 1 – SPoID - algorithme général.
+La complexité temporelle de cet algorithme est, dans le pire des cas, la même que celle
+de l’algorithme TOTALLYFUZZY présenté dans (Fiot et al., 2005). On utilise le même type
+d’optimisations afin de réduire le nombre de passes sur la base. Par contre, la complexité en
+mémoire est nettement moindre puisqu’elle est du même ordre que celle de PSP.
+5 Expérimentations
+Ces expérimentations ont été réalisées sur un PC équipé d’un processeur 2,8GHz et de
+512Mo de mémoire DDR, sous système Linux, noyau 2.6. Nous utilisons un jeu de données
+synthétiques générés aléatoirement par une loi normale dans lequel nous remplaçons certains
+C. Fiot et al.
+items par des valeurs manquantes, réparties de maniére aléatoire. On extrait les motifs séquen-
+tiels sur la base complète ainsi que sur la base prétraitée (dont les itemsets incomplets ont été
+supprimés). Puis on compare ces motifs extraits par les méthodes existantes aux motifs extraits
+par notre algorithme SPoID. Les résultats présentés ici ont été obtenus à partir du traitement de
+plusieurs jeux de données synthétiques comportant environ 2000 séquences de 20 transactions
+en moyenne. Chacune de ces transactions comporte en moyenne 10 items choisis parmi 100.
+Nos analyses sont basées sur le calcul du nombre de bons motifs séquentiels trouvés par
+SPoID et du nombre de motifs différents extraits par SPoID, ces derniers regroupant les motifs
+extraits, qui n’existe pas dans la base complète et les motifs non trouvés, mais contenus dans
+la base complète. Le tableau 4 récapitule l’ensemble de ces notations.
+β Nombre de motifs extraits par SPoID, contenus dans la base complète
+δ Nombre de motifs différents
+θ Nombre de motifs extraits par SPoID sur la base incomplète
+τ Nombre de motifs extraits sur la base de données complète
+TAB. 4 – Notations pour les différentes catégories de motifs séquentiels extraits.
+La FIG. 2(a), tout d’abord, montre l’évolution du rapport β/θ, en fonction de la représenta-
+tivité minimale. On constate que ce taux croît à mesure queminRep augmente, ce qui signifie
+que parmi les motifs extraits par SPoID, la proportion des motifs également trouvés dans la
+base complète augmente avec la représentativité minimale.
+On peut compléter cette observation par l’analyse de la FIG. 2(b), qui présente l’évolution
+du rapport β/τ (nombre de motifs extraits par rapport aux motifs à extraire) en fonction de la
+représentativité minimale. On constate que ce ratio diminue à mesure queminRep augmente,
+ce qui signifie qu’il est nécessaire de choisir une représentativité suffisamment faible pour
+permettre l’extraction de l’intégralité des motifs présents dans la base complète.
+Nous avons donc mis en évidence l’existence d’une valeur optimale du seuil de représen-
+tativité, pour laquelle les ratios β/θ (bons motifs/motifs extraits par SPoID) et β/τ sont les plus
+proches possibles de 1. Cette valeur correspond au seuil pour lequel le nombre de bons motifs
+extraits sur la base incomplète est le plus élevé possible par rapport au nombre de motifs diffé-
+rents. La FIG. 2(c) met en évidence l’existence de cette valeur optimale deminRep. Ce graphe
+montre l’évolution du rapport (β/δ), rapport du nombre de bons motifs extraits par SPoID et
+du nombre de motifs qui diffèrent des motifs extraits sur la base complète (manquants + sup-
+plémentaires). On constate qu’il n’existe pas de valeur absolue de la repésentativité minimale,
+commune à toutes les bases et dépendant d’une marge d’erreur donnée. D’après ces résultats,
+la représentativité minimale dépend uniquement du taux d’incomplétude de la base.
+Quelle que soit la proportion de valeurs manquantes dans la base incomplète, l’allure géné-
+rale de la courbe est la même : le ratio (β/δ) augmente avant d’atteindre un maximum puis de
+décroître. Ce point maximal correspond à la représentativité optimale, pour laquelle le nombre
+de bons motifs extraits par SPoID est le plus élevé et le nombre de motifs différents le plus
+faible. Le tableau TAB. 5 donne la valeur de la représentativité optimale trouvée expérimenta-
+lement pour chaque proportion de données incomplètes dans notre jeu de test.
+La FIG. 2(c) met aussi en évidence l’évolution de comportement de l’algorithme SPoID
+selon le taux de valeurs manquantes dans la base. On constate une différence entre l’allure de
+la courbe et la valeur du ratio β/δ pour les bases incomplètes contenant 40% de valeurs man-
+SPoID : Motifs séquentiels et données incomplètes
+ 0
+ 0.2
+ 0.4
+ 0.6
+ 0.8
+ 1
+ 1.2
+ 0.1  0.2  0.3  0.4  0.5  0.6  0.7  0.8  0.9
+#t
+ro
+uv
+es
+/#
+to
+ta
+l
+minRep
+Ratio #trouves/#extraits en fonction de minRep
+nb vm = 10%
+nb vm = 20%
+nb vm = 30%
+nb vm = 40%
+nb vm = 50%
+(a)
+ 0
+ 0.2
+ 0.4
+ 0.6
+ 0.8
+ 1
+ 1.2
+ 0.1  0.2  0.3  0.4  0.5  0.6  0.7  0.8  0.9
+#t
+ro
+uv
+es
+/#
+to
+ta
+l
+minRep
+Ratio #trouves/#atrouver en fonction de minRep
+nb vm = 20%
+nb vm = 30%
+nb vm = 40%
+nb vm = 50%
+(b)
+ 0
+ 0.5
+ 1
+ 1.5
+ 2
+ 2.5
+ 3
+ 3.5
+ 0.1  0.2  0.3  0.4  0.5  0.6  0.7  0.8  0.9
+#t
+ro
+uv
+es
+/#
+di
+ffe
+re
+nt
+s
+minRep
+Ratio #trouves/#differents en fonction de minRep
+nb vm = 20%
+nb vm = 30%
+nb vm = 40%
+nb vm = 50%
+nb vm = 60%
+(c)
+ 0
+ 1
+ 2
+ 3
+ 4
+ 5
+ 10  20  30  40  50  60  70  80
+#t
+ro
+uv
+es
+/#
+di
+ffe
+re
+nt
+s
+%valeurs manquantes
+Ratios #bons/(#differents) en fonction de l’incompletude
+SPoID (representativite optimale)
+PSP apres pretraitement
+(d)
+FIG. 2 – (a) : Proportion (bons motifs)/(motifs extraits) (β/θ) en fonction de la représentativité
+minimale ; (b) : Proportion (bons motifs)/(motifs à trouver) (β/τ ) en fonction de la représen-
+tativité minimale ; (c) : Proportion (bons motifs)/(motifs différents) (β/δ) en fonction de la
+représentativité minimale ; (d) : Proportion (bons motifs)/(motifs différents) (β/δ) en fonction
+du pourcentage de valeurs manquantes dans la base.
+% de valeurs manquantes 10% 20% 30% 40% 50% 60% 70% 80%
+minRep optimale 0.97 0.9 0.81 0.74 0.6 0.48 0.39 0.22
+TAB. 5 – Moyenne des représentativités optimales selon la proportion de valeurs manquantes
+dans la base de données.
+quantes et moins et celles qui comportent 50% d’enregistrements incomplets ou plus.
+Ainsi, la FIG. 2(d) permet de comparer le taux de réussite de SPoID et d’une extraction sur
+données préparées (base incomplète dans laquelle les données ont été supprimées). Cette figure
+permet de mettre en évidence qu’un certain nombre de bons motifs, extraits par SPoID, ne sont
+pas trouvés par un traitement classique précédé d’une préparation des données, en montrant
+C. Fiot et al.
+l’évolution du ratio optimal de bons motifs trouvés par SPoID selon le pourcentage d’incom-
+plétude de la base. On constate que ce taux chute rapidement lorsque l’on passe de 40 à 50%
+de valeurs manquantes : le nombre de motifs différents devient proportionnellement plus im-
+portant par rapport au nombre de bons motifs.
+On remarque également que ce ratio devient inférieur à 1, lorsque le pourcentage de valeurs
+manquantes dépasse 50%. SPoID permet donc d’extraire les motifs séquentiels d’une base in-
+complète tant que plus de la moitié de ses enregistrements sont complets alors qu’un algorithme
+classique ne permet pas de trouver tous les motifs fréquents dès 10% de valeurs manquantes.
+Lorsque le taux d’incomplétude atteint 40%, le nombre de bons motifs extraits est même quasi
+nul, alors qu’il reste encore relativement élevé pour SPoID.
+6 Perspectives
+La découverte de motifs séquentiels est une méthode de fouille de données intéressante
+lorsqu’il s’agit d’extraire des connaissances dans une base de données historisée, telle que des
+relevés de processus industriel ou de fonctionnement de machines. Or, dans ce type de bases
+de séquences, la présence de valeurs manquantes est inévitable. Pourtant il n’existe aucune
+technique permettant de découvrir des séquences fréquentes à partir de bases de données in-
+complètes. Nous avons donc proposé dans cet article une adaptation des définitions originales
+liées à l’extraction de motifs séquentiels afin de pouvoir traiter les informations incomplètes
+distribuées au hasard, directement pendant la fouille plutôt que de supprimer ces enregistre-
+ments, comme cela était le cas avec les algorithmes existants. Notre méthode, SPoID (Sequen-
+tial Patterns over Incomplete Database) a été implémentée et testée sur des jeux de données
+synthétiques, ce qui nous a permis de montrer sa robustesse aux valeurs manquantes jusqu’à
+un taux d’incomplétude d’environ 40%, alors que les méthodes classiques, après prétraitement,
+donnent de mauvais résultats dès 10% de valeurs manquantes.
+Nous envisageons maintenant d’étendre cette méthode afin de pouvoir prendre en compte
+d’autres types de valeurs manquantes (non distribuées au hasard, par exemple), après avoir
+détecté les différents types d’informations incomplètes contenues dans la base. Il apparaît éga-
+lement nécessaire de pouvoir distinguer, quand cela ne l’a pas été fait au préalable, les valeurs
+d’attribut inexistant, qui n’ont donc pas à être considérées comme manquantes. Enfin, le bruit
+est également une imperfection courante dans les bases de données du monde réel. Il pourra
+donc être intéressant de le prendre en compte dans une version ultérieure de notre algorithme.
 Références
-Anderson, E. (1935). The irises of the gaspe peninsula. Bulletin of the American Iris Society 59,
-2–5.
-Apaydin, T., A. Tosun, et H. Ferhatosmanoglu (2008). Analysis of basic data reordering tech-
-niques. SSDBM, 517–524.
-Applegate, D., R. Bixby, V. Chvàtal, et W. Cook (2007). The Traveling Salesman Problem.
-Princeton University Press.
-Arabie, P. et L. Hubert (1990). The bond energy algorithm revisited. IEEE transactions on
-systems, man, and cybernetics 20(1), 268–274.
-Arabie, P., L. J. Hubert, et G. D. Soete (1996). Clustering and Classification, Chapter An
-overview of combinatorial data analysis, pp. 5–63. World Scientific.
-Azzalini, A. et A. Bowman (1990). A look at some data on the old faithful geyser. Applied
-Statistics 39, 357–365.
-Batagelj, V. (1997). Notes on blockmodeling. Social Networks 7, 143–155.
-Brusco, M., H. F. Kohn, et S. Stahl (2008). Heuristic implementation of dynamic programming
-for matrix permutation problems in combinatorial data analysis. Psychometrika.
-C. Brunet et al.
-Brusco, M. et S. Stahl (2005). Branch and Bound applications in combinatorial data analysis.
-Springer.
-Brusco, M. et D. Steinley (2006). Inducing a blockmodel structure of two-mode binary data
-using seriation procedures. Journal of Mathematical Psychology 50, 468–477.
-Caraux, G. et S. Pinloche (2005). Permutmatrix : a graphical environment to arrange gene
-expression profiles in optimal linear order. Bioinformatics 21(7).
-Carroll, D. et P. Arabie (1980). Multidimensional scaling. Annu Rev Psychol 31, 607–649.
-Chen, C. (2002). Generalized association plots : Information visualization via iteratively ge-
-nerated correlation matrices. Statistica Sinica 12, 7–29.
-Climer, S. et W. Zhang (2006). Rearrangement clustering : Pitfalls, remedies and applications.
-Journal of Machine Learning Research 7, 919–943.
-Croes, G. (1958). A method for solving the traveling-salesman problems. Operations Re-
-search 6, 791–812.
-Dhillon, I., S. Mallela, et D. Modha (2003). Information theoric co-clustering. Ninth ACM
-SIGKDD, Int. Conf. Knowledge Discovery and Data Mining KDD’03, 89–98.
-Doreian, P., V. Batagelj, et A. Ferligoj (2004). Generalized blockmodeling of two-mode net-
-work data. Social Networks 26, 29–53.
-Eastman, W. (1958). Linear programming with pattern constraints. Master’s thesis, Ph.D.
-Dissertation, Harvard University, Cambridge, Mass.
-Govaert, G. et N. Nadif (2008). Algorithms for model-based block gaussian clustering. The
-4th international Conference on datamining, 536–272.
-Govaert, G. et N. Nadif (2010). Latent block model for contingency table. Communication in
-Statistics : Theory and Methods 39, 416–425.
-Gutin, G. et A. Punnen (2002). The traveling salesman problem and its variations, Volume 12.
-Springer.
-Haerdle, W. (1991). Smoothing Techniques with Implementation in S. Springer, New York.
-Hahsler, M., K. Hornik, et C. Buchta (2009). Getting things in order : an introduction to the r
-package seriation. Technical Report 58, R.
-Hartigan, J. (1987). Estimation of a convex density contour in two dimensions. Journal of the
-American Statistical Association 82(397), 267–270.
-Hubert, L., P. Arabie, et J. Meulman (2001). Combinatorial data analysis : Optimization by
-dynamic programming. Society ofr industrial and Applied Mathematics.
-I.Liiv (2010). Seriation and matrix reordering methods : an historical overview. Wiley inter-
-science 3(2), 70–91.
-Johnson, D., S. Krishnan, et J. Chhugani (2004). Compressing large boolean matrices using
-reordering techniques. Proceedings of the Thirtieth international conference on Very large
-data bases 30, 13–23.
-Jolliffe, I. (1986). Principal Component Analysis. Springer.
-Kirkpatrick, S., C. Gelatt, et M. Vecchi (1983). Optimization by simulated annealing.
-Science 220, 681–690.
-Sparsité et sériation
-Kohonen, T. (1995). Self Organizing Maps (Heidleberg ed.). Berlin : Springer.
-Long, B., Z. Zhang, et P. Yu (2005). Co-clustering by block value decomposition. Proceedings
-of the eleventh ACM SIGKDD international conference on Knowledge discovery in data
-mining, 635–640.
-Marcotorchino, F. (1987). Block seriation problems : a unified approach. Applied Stochastic
-Models and Data Analysis 3, 73–91.
-McCormick, W., P. Schweitzer, et T. White (1972). Problem decomposition and data reorga-
-nization by a clustering technique. Operations Research 20, 993 –1009.
-Mechelen, I. V., H.-H. Bock, et P. D. Boeck (2004). Two-mode clustering methods : a structu-
-red overview. Statistical Methods in Medical Research 13, 363–394.
-Niermann, S. (2005). Optimizing the ordering of tables with evolutionary computations. The
-American Statistician 59(1), 41–46.
-Nolan, D. (1991). The excess-mass. Journal of Multivariate Analysis 39, 348–371.
-Pearson, K. (1901). On lines and planes of closest fit to systems of points is space. Philoso-
-phical magazine series 6 2, 157–175.
-Prelic, A., S. Bleuler, P. Zimmermann, P. B. A. Wille, W. Gruissem, L. Hennig, L. Thiele, et
-E. Zitzler (2006). A systematic comparison and evaluation of biclustering methods for gene
-expression data. Bioinformatics 22(9), 1122–1129.
-Raftery, A. et N. Dean (2006). Variable selection for model-based clustering. journal of the
-American Statistical Association 101(473), 168–178.
-Rossman, M., R. Twery, et F. Stone (1958). A Solution to the Traveling Salesman Problem by
-combinatorial programming. Peat, Marwick, Mitchell and Co., Chicago.
-Ruspini, H. (1970). Numerical methods for fuzzy clustering. Information Sciences 2(3), 319–
-350.
-Ultsch, A. (2005). Clustering with som : U*C. In Proc. Workshop on Self-Organizing Maps,
-Paris, France, 75–82.
+Agrawal, R., T. Imielinski, et A. N. Swami (1993). Mining association rules between sets of
+items in large databases. In Proceedings of the 1993 ACM SIGMOD International Confe-
+rence on Management of Data, pp. 207–216. Peter Buneman and Sushil Jajodia.
+Agrawal, R. et R. Srikant (1995). Mining sequential patterns. In Eleventh International Confe-
+rence on Data Engineering, Taipei, Taiwan, pp. 3–14. IEEE Computer Society Press.
+Chen, R.-S., G.-H. Tzeng, C.-C. Chen, et Y.-C. Hu (2001). Discovery of Fuzzy Sequential
+Patterns for Fuzzy Partitions in QuantitativeAttributes. In ACS/IEEE Int. Conf. on Computer
+Systems and Applications, pp. 144–150.
+SPoID : Motifs séquentiels et données incomplètes
+Fiot, C., A. Laurent, et M. Teisseire (2005). Motifs séquentiels flous : un peu, beaucoup,
+passionnément. In 5èmes journées d’Extraction et Gestion des Connaissances (EGC ’05),
+pp. 507–519.
+Fiot, C., A. Laurent, et M. Teisseire (2006). Des motifs séquentiels généralisés aux contraintes
+de temps étendues. In 6èmes journées d’Extraction et Gestion des Connaissances, pp. 603–
+614.
+Hong, T., K. Lin, et S. Wang (2001). Mining Fuzzy Sequential Patterns from Multiple-Items
+Transactions. In Joint 9th IFSA World Congress and 20th NAFIPS Int. Conf., pp. 1317–
+1321.
+Liu, W. Z., A. P. White, S. G. Thompson, et M. A. Bramer (1997). Techniques for dealing with
+missing values in classification. Lecture Notes in Computer Science 1280, 527– ? ?
+Masseglia, F., F. Cathala, et P. Poncelet (1998). The PSP Approach for Mining Sequential
+Patterns. In Principles of Data Mining and Knowledge Discovery, pp. 176–184.
+Masseglia, F., P. Poncelet, et M. Teisseire (1999). Extraction efficace de motifs séquentiels
+généralisés : le prétraitement des données. In 15 ème Journée Bases de Données Avancées
+(BDA ’99), pp. 341–360.
+Masseglia, F., P. Poncelet, et M. Teisseire (2000). Incremental mining of sequential patterns in
+large databases. Technical report, LIRMM, France.
+Nayak, J. et D. Cook (2001). Approximate association rule mining. In Florida Artificial
+Intelligence Research Symposium.
+Ng, V. et J. Lee (1998). Quantitative association rules over incomplete data. In IEEE Interna-
+tional Conference, pp. 2821–2826.
+Ragel, A. et B. Cremilleux (1998). Treatment of missing values for association rules. In
+Pacific-Asia Conference on Knowledge Discovery and Data Mining, pp. 258–270.
+Srikant, R. et R. Agrawal (1996). Mining sequential patterns : Generalizations and perfor-
+mance improvements. In 5th International Conference on Extending Database Technology
+(EDBT ’96), London, UK, pp. 3–17. Springer-Verlag.
+Toivonen, H. (1996). Sampling large databases for association rules. In VLDB ’96 : Procee-
+dings of the 22th International Conference on Very Large Data Bases, pp. 134–145.
+Zaki, M. J., S. Parthasarathy, W. Li, et M. Ogihara (1996). Evaluation of sampling for data
+mining of association rules. Technical report, Rochester, NY, USA.
 Summary
-Seriation is a useful statistical method to visualize clusters in a dataset but since the data
-are noisy, the visualization of such a structure becomes difficult. To deal with this problem, a
-metric based on common neighborhood is proposed to introduce several degrees of sparsity in
-the dataset. A family of sparse matrices are ordered by a branch and bound algorithm and the
-matrix which has the best block diagonal form is selected by a compressing criterion. This tool
-enables to identify clusters without taking into account noisy data or outliers and reveals the
-intrinsic structure of data. However, if the metric introduces too much sparsity in the data, then
-under-sampled groups of data could be ousted ; we propose then a multi-scale approach which
-combines different levels of sparsity in a same visualization.
+Industrial databases often contains a large amount of unfilled information. During the
+knowledge discovery process one specific processing step is often necessary in order to re-
+move these incomplete data either by deleting them or by assessing them. When the data min-
+ing task consists in mining frequent sequences, incomplete data are, most of the time, deleted,
+which leads to an important loss of information. Extracted knowledge becomes so less repre-
+sentative of the whole database. We thus propose a method that uses the partial information
+contained into incomplete records, only ignoring missing values when they may imply errors
+in the extracted sequential patterns.

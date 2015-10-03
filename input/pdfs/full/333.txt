@@ -1,334 +1,216 @@
-Clustering de séquences d’activités pour l’étude de
-procédures neurochirurgicales
-Germain Forestier∗, Florent Lalys∗∗, Laurent Riffaud∗∗, Brivael Trelhu∗∗, Pierre Jannin∗∗
-∗ENSISA/MIPS/Université de Haute Alsace
-∗∗INRIA/INSERM/CNRS/Université de Rennes I/IRISA
-Résumé. L’utilisation de modèles de procédure chirurgicale (Surgical Process
-Model, SPM) a récemment émergé dans le domaine de la conception d’outils
-d’intervention chirurgicale assistée par ordinateur. Ces modèles, qui sont utilisés
-pour analyser et évaluer les interventions, représentent des procédures chirurgi-
-cales (Surgical Process, SP) qui sont formalisées comme des structures symbo-
-liques décrivant une chirurgie à un niveau de granularité donné. Un enjeu impor-
-tant réside dans la définition de métriques permettant la comparaison et l’éva-
-luation de ces procédures. Ainsi, les relations entre ces métriques et des données
-pré-opératoires permettent de classer les chirurgies pour mettre en lumière des
-informations sur la procédure elle-même, mais également sur le comportement
-du chirurgien. Dans ce papier, nous étudions la classification automatique d’un
-ensemble de procédures chirurgicales en utilisant l’algorithme Dynamic Time
-Warping (DTW) pour calculer une mesure de similarité entre procédures chirur-
-gicales. L’utilisation de DTW permet de se concentrer sur les différents types
-d’activité effectués pendant la procédure, ainsi que sur leur séquencement tout
-en réduisant les différences temporelles. Des expériences ont été menées sur 24
-procédures chirurgicales d’hernie discale lombaire dans le but de discriminer le
-niveau d’expertise des chirurgiens à partir d’une classification connue. A l’aide
-d’un algorithme de clustering hiérarchique utilisant DTW nous avons retrouvé
-deux groupes de chirurgiens présentant des niveaux d’expertise différents (junior
-et senior).
+Analyse en ligne d’objets complexes avec l’analyse factorielle
+Loic Mabit∗, Sabine Loudcher∗, Omar Boussaid∗
+∗Laboratoire ERIC, Université Lumière Lyon 2
+Université de Lyon
+5 avenue Pierre Mendès-France
+69676 Bron Cedex
+loic.mabit@gmail.com
+{sabine.loudcher | omar.boussaid}@univ-lyon2.fr
+Résumé. Les entrepôts de données et l’analyse en ligne OLAP (On-line Analy-
+sis Processing) présentent des solutions reconnues et efficaces pour le processus
+d’aide à la décision. Notamment l’analyse en ligne, grâce aux opérateurs OLAP,
+permet de naviguer et de visualiser des données représentées dans un cube multi-
+dimensionnel. Mais lorsque les données ou les objets à analyser sont complexes,
+il est nécessaire de redéfinir et d’enrichir ces opérateurs OLAP. Dans cet article,
+nous proposons de combiner l’analyse OLAP et la fouille de données (data mi-
+ning) afin de créer un nouvel opérateur de visualisation d’objets complexes. Cet
+opérateur utilise l’analyse factorielle des correspondances.
 1 Introduction
-Dans le domaine de l’ingénierie médicale, l’analyse et la modélisation des procédures chi-
-rurgicales sont des sujets qui ont récemment émergé. Les procédures chirurgicales peuvent être
-décomposées en quatre niveaux de granularité (Mackenzie et al., 2001) : les phases, étapes,
-tâches et mouvement. Une intervention chirurgicale peut alors être décrite en utilisant un ni-
-veau de granularité prédéfini afin de créer une Surgical Process, appelé SP dans la suite de cet
-article. Ces SPs peuvent être vues comme la séquence des activités effectuées par le chirur-
-gien lors d’une intervention. De fait, un enjeu important réside dans la définition de méthodes
-permettant de comparer et de grouper automatiquement des SPs similaires afin d’identifier
-des motifs qui peuvent par la suite être mis en relation avec des données pré-opératoires afin
-d’analyser de manière précise un type de chirurgie.
-- 137 -
-Clustering de séquences d’activités
-Le principal problème d’une telle analyse est la définition de mesures de similarité entre
-SPs qui permettent de mettre en lumière de manière objective et quantitative les différences
-entre des procédures chirurgicales. En effet, les SPs d’un même type d’intervention peuvent
-avoir une variabilité importante, qui peut être due à différents paramètres tel que la technique
-d’opération, la difficulté intrinsèque de la chirurgie ou encore l’expertise du chirurgien. Récem-
-ment, Riffaud et al. (2010) ont proposé la définition de métriques de similarité calculées à l’aide
-d’outils statistiques pour comparer des groupes de chirurgiens junior et senior, c’est-à-dire avec
-peu ou beaucoup d’expérience. Faisant suite à ces travaux, nous proposons dans cet article de
-définir une nouvelle approche utilisant l’algorithme Dynamic Time Warping (DTW) (Hiroaki
-et Chiba, 1978) afin d’évaluer la similarité entre SPs. L’utilisation de DTW nous permet de
-nous concentrer sur le séquencement des différentes activités qui composent une SPs. En effet,
-DTW réduit l’importance des différences temporelles et se concentre sur le nombre d’activités
-et leur organisation dans la chronologie de la chirurgie. A l’aide de DTW, nous avons étudié
-la classification automatique d’un ensemble de SPs à travers l’utilisation d’un algorithme de
-clustering hiérarchique ascendant. Ainsi, nous présentons des résultats pour le clustering de 24
-SPs correspondant à des chirurgies d’hernie lombaire discale pratiquées pour moitié par des
-chirurgiens juniors et pour moitié par des chirurgiens seniors. Les résultats montrent que notre
-approche a réussi de manière automatique à retrouver ces deux groupes de chirurgiens.
-Dans la Section 2, le formalisme et l’utilisation de DTW pour la comparaison de procédures
-sont présentés. La Section 3 présente les résultats des expériences, et la Section 4 conclut
-l’article.
-2 Méthodes
-2.1 Séquence d’activités composant le processus chirurgical
-Une procédure chirurgicale (Surgical Process, SP) peut être vue comme une séquence re-
-présentant les activités aci effectuées par le chirurgien pendant la chirurgie. L’ensemble de ces
-activités étant noté AC avec aci ∈ AC (aci étant la ième activité). Chaque activité dans une SP
-contient plusieurs informations, représentées par un triplet :
-aci =< a; s; i > a ∈ A, s ∈ S, i ∈ Imi (1)
-avecA l’ensemble des actions possibles (e.g. {cut, remove, . . . }), S l’ensemble des struc-
-tures anatomiques (e.g. {skin, dura matter . . . }), I l’ensemble des instruments possibles
-(e.g. {scalpel, scissors, . . . }) et mi le nombre d’instruments utilisés pour réaliser l’activité
-aci. Un exemple d’activité peut être : <cut, skin, scalpel>. Ainsi, le domaine de définition
-d’une activité est donné par : A × S × Imi . Ces ensembles sont généralement spécifiques
-à un type de chirurgie, et une ontologie peut être utilisée pour décrire le vocabulaire pour
-un type défini (Neumuth et al., 2010). En plus des informations sur l’action (a), la structure
-anatomique (s) et l’instrument utilisé (i), chaque activité a un début (start(aci)) et une fin
-(stop(aci)) dans la chronologie de la chirurgie (start(.) → R, stop(.) → R). Notons que
-start(aci) < stop(aci) induit un ordre partiel sur les activités.
-Une procédure chirurgicale (spk) peut ainsi être vue comme une séquence d’activités pra-
-tiquées pendant une chirurgie. Chacune des activités appartient à l’ensemble des différentes
-activités présentes pendant la chirurgie (ACk) :
-- 138 -
-Forestier et al.
-spk =< ac
-(k)
-1 ,ac
-(k)
-2 , . . . ,ac
-(k)
-nk
-> | ac(k)i ∈ ACk (2)
-2.2 Comparaison de procédures à l’aide de Dynamic Time Warping
-Un enjeu important réside dans la définition de métriques permettant d’évaluer la similarité
-entre SPs. En effet, définir une mesure de similarité est souvent la première étape pour identi-
-fier des motifs parmi un ensemble d’objets. Comme une SP peut être vue comme une séquence
-d’activités, nous proposons d’utiliser l’algorithme Dynamic Time Warping (DTW) (Hiroaki et
-Chiba, 1978) afin de les comparer. DTW est basé sur la distance de Levenshtein (ou distance
-d’édition), et a été initialement utilisé dans des applications de reconnaissance de voix. Il per-
-met de trouver l’alignement optimal entre deux séquences, et de capturer la similarité lors de
-l’alignement de ces deux séquences. Afin de pouvoir utiliser DTW pour comparer deux sé-
-quences, une mesure de similarité doit être définie entre les différents éléments composant la
-séquence. Dans notre cas, cela implique la définition d’une distance entre deux activités. Ainsi,
-nous avons défini une fonction binaire renvoyant 0 si les trois composantes (Eq. 1) des deux
-activités sont identiques, et 1 sinon :
-d(aci,acj) =
-
-0 if aci(a)
-∗
-= acj(a) et
-aci(s)
-∗
-= acj(s) et
-aci(i)
-∗
-= acj(i)
-1 sinon
-(3)
-avec ∗= un opérateur booléen qui réalise la comparaison entre l’action, la structure anato-
-mique et l’instrument utilisé (e.g. d( <cut, skin, scalpel>,<cut, skin, scalpel>)=0).
-Pour comparer deux SPs en utilisant DTW, les séquences d’activités sont étirées en consi-
-dérant le début et la fin de chaque activité. Cette étape est nécessaire pour avoir les SPs sur
-la même échelle temporelle et pouvoir ainsi comparer les activités effectuées dans chaque SP
-à un instant donné t pendant la chirurgie. L’activité pratiquée à l’instant t est définie comme
-aci(t) ssi t ∈ [start(aci); stop(aci)]. Notons qu’il n’est pas nécessaire que les deux SPs aient
-la même durée, la seule hypothèse étant que la première activité ait commencé à l’instant t = 0
-dans les deux SPs.
-Considérons deux SPs spk =< ac
-(k)
-1 ,ac
-(k)
-2 , . . . ,ac
-(k)
-nk > et spl =< ac
-(l)
-1 , ac
-(l)
-2 , . . . ,
-ac
-(l)
-nl >, le coup de l’alignement optimal peut être calculé récursivement par :
-d(spk(t), spl(t)) = (4)
-d(ac
-(k)
-i (t),ac
-(l)
-j (t)) +min
-
-d(spk(t− 1), spl(t− 1))
-d(spk(t), spl(t− 1))
-d(spk(t− 1), spl(t))
-où spk(t) est la sous-séquence < ac
-(k)
-1 , . . . ,ac
-(k)
-i (t) >.
-DTW a déjà été utilisé avec succès commemesure de similarité pour effectuer du clustering
-(Petitjean et al., 2011). De manière similaire, nous proposons d’utiliser la mesure de similarité
-fournie par DTW pour identifier automatiquement des clusters de chirurgies similaires. Nous
-- 139 -
-Clustering de séquences d’activités
-sp1 :
-ac
-(1)
-1︷ ︸︸ ︷ ac(1)2︷︸︸︷ ac(1)3︷︸︸︷
-temps0
-N1
-FIG. 1 – Exemple de SP avec trois activités.
-avons ainsi utilisé un algorithme de clustering hiérarchique ascendant avec la méthode du lien-
-moyen (average-link) (Anderberg, 1973), qui consiste à évaluer la similarité entre deux clusters
-par la similarité moyenne entre les couples d’objets des deux clusters.
-2.3 Visualisation des procédures chirurgicales
-Il est en général utile de posséder une représentation visuelle des données pour pouvoir les
-explorer. Cependant, les structures de données complexes posent parfois problème pour définir
-une visualisation aisée. Dans le cas des SPs, nous proposons d’utiliser des index-plot (Sche-
-rer, 2001) qui ont déjà été utilisés avec succès pour la visualisation de séquences. Le principe
-des index-plot est d’afficher une séquence représentant les activités comme des rectangles pos-
-sédant une couleur par activité différente et avec une largeur proportionnelle à sa durée (i.e.
-stop(aci)−start(aci)). Il est ainsi possible de visualiser facilement les SPs et d’effectuer une
-comparaison visuelle. La figure 1 présente une SP (sp1 =< ac
-(1)
-1 ,ac
-(1)
-2 ,ac
-(1)
-3 >) avec trois
-activités différentes.
-3 Expériences
-Vingt-quatre procédures (10 hommes, 14 femmes avec un âge médian de 52 ans) de chirur-
-gie d’hernie lombaire ont été enregistrées dans le département de neurochirurgie de l’université
-de Leipzig en Allemagne. Une procédure peut être divisée en 3 principales étapes : l’approche
-du disque hernié, la discectomie comprenant la dissection et l’enlèvement du disque, et la phase
-de fermeture. Une étape d’hemostase peut parfois être nécessaire avant la phase de fermeture.
-Cinq chirurgiens seniors et cinq chirurgiens juniors ont participé à cette étude ; Les chirur-
-giens seniors ayant déjà pratiqué plus de 100 retraits d’hernie, et les juniors ayant effectué au
-moins deux ans d’internat. Parmi les 24 procédures enregistrées, 12 ont été pratiquées par un
-chirurgien senior avec l’aide d’un chirurgien junior, et 12 ont été pratiquées par un chirurgien
-junior avec l’aide d’un chirurgien senior. Durant l’enregistrement des procédures effectuées par
-les chirurgiens juniors, seule la dernière étape a été pratiquée par le chirurgien junior sans l’aide
-du chirurgien senior. Ainsi, dans cette étude, nous nous sommes concentrés uniquement sur
-cette dernière étape pour pouvoir mieux discriminer les comportements entre chirurgien junior
-et senior. Les données ont été acquises à l’aide du logiciel Surgical Workflow Editor (Neumuth
-et al., 2006). Elles ont été enregistrées par un observateur humain, un neurochirurgien senior,
-qui a utilisé une tablette au cours de l’opération.
-La Figure 2 présente le dendrogramme obtenu par l’application de l’algorithme de cluste-
-ring hiérarchique ascendant (CHA) sur la phase de fermeture. L’index-plot représentant cha-
-- 140 -
-Forestier et al.
-20
-40
-60
-80
-100
-120
-Si
-m
-ila
-rit
-y 
-clu
-st
-er
- c
-om
-bi
-ne
-1
-jun
-2
-jun
-3
-jun
-4
-jun
-5
-jun
-6
-jun
-7
-jun
-8
-jun
-9
-jun
-10
-jun
-11
-jun
-12
-jun
-13
-sen
-14
-sen
-15
-sen
-16
-sen
-17
-sen
-18
-sen
-19
-sen
-20
-sen
-21
-sen
-22
-sen
-23
-sen
-24
-sen
-Patient id
-Experience
-FIG. 2 – Dendrogramme résultant du clustering des 24 procédures considérées.
-cune des SPs est affiché en dessous du dendrogramme. Trois clusters émergent visuellement
-de cette analyse. En coupant le dendrogramme pour obtenir 2 clusters, 12 chirurgies sont pré-
-sentes dans chaque cluster. Le premier cluster (à gauche, en vert et bleu) contient 10 chirurgies
-pratiquées par des chirurgiens seniors et 2 par des chirurgiens juniors. Le second cluster (à
-droite, en rouge) quant à lui contient 10 chirurgies pratiquées par des chirurgiens juniors et 2
-chirurgies pratiquées par des chirurgiens seniors. De plus, dans le premier cluster, deux sous-
-clusters sont présents (rouge et bleu), qui contiennent chacun 6 chirurgies. En conservant les
-deux clusters principaux, une précision de 83.33% peut être calculée en considérant que 20
-chirurgies sur 24 sont bien classées.
-4 Conclusion
-Dans cet article, nous avons proposé une nouvelle métrique basée sur l’algorithme DTW
-pour la comparaison et l’évaluation de procédures chirurgicales. Cette approche permet de se
-concentrer sur l’analyse des différentes activités effectuées pendant une chirurgie ainsi que
-leur séquencement, et minimise l’importance des différences temporelles. Des résultats sur
-le clustering de procédures chirurgicales permettant d’identifier automatiquement le niveau
-d’expertise du chirurgien ont été présentés. Une des pistes que nous explorons actuellement
-s’intéresse à l’introduction de sémantique dans la mesure de similarité entre activités. En effet,
-la comparaison binaire utilisée pourrait être améliorée en prenant en compte la sémantique
-des actions, structures anatomiques et instruments, permettant ainsi une analyse plus précise.
-- 141 -
-Clustering de séquences d’activités
-Nous souhaitons également essayer de mettre en relation les résultats obtenus avec d’autres
-variables pré-opératoires (par exemple la difficulté de la chirurgie, le devenir du patient, etc.)
-afin d’expliquer les sous-clusters identifiés.
+Les entrepôts de données et l’analyse en ligne OLAP (On-line Analysis Processing) pré-
+sentent des solutions reconnues et efficaces pour le processus d’aide à la décision. Notamment
+l’analyse en ligne, grâce aux opérateurs OLAP, permet de naviguer et de visualiser des données
+représentées dans un cube multidimensionnel. Cette technologie est bien rodée quant il s’agit
+de données simples où les faits sont analysés à travers des indicateurs numériques, souvent
+additifs, selon des descripteurs en général qualitatifs. Cependant, l’avènement des données
+complexes a remis en cause ce processus d’entreposage et d’analyse en ligne.
+Souvent les données complexes sont plutôt représentées par un ensemble de descripteurs de
+bas niveau et/ou sémantiques. Lorsqu’il s’agit d’analyser par exemple une image, une vidéo
+ou tout autre objet de l’univers, il est alors plus efficace de considérer chacun de ces éléments
+comme une entité, à part entière, à observer. Celle-ci est alors perçue comme un objet com-
+plexe. Ce dernier peut être considéré comme un agrégat hétérogène de données qui, une fois
+réunies, forment une unité sémantique.
+La vocation de l’analyse en ligne (OLAP) est de permettre d’agréger des données pour résu-
+mer l’information qu’elles contiennent et de représenter celle-ci sous différents angles. L’uti-
+lisateur peut alors naviguer dans les données afin de les explorer. Les opérateurs OLAP sont
+définis pour des données classiques. Ils sont par conséquent inadaptés quand il s’agit d’objets
+complexes. Le recours à d’autres techniques, par exemple de fouille de données, peut s’avérer
+RNTI-E-19- 381 -
+Analyse en ligne d’objets complexes
+intéressant (Ben Messaoud (2006), Imielinski et Mannila (1996), Han (1997)).
+Nous proposons dans ce papier une approche d’analyse en ligne d’objets complexes en uti-
+lisant l’analyse factorielle. Cette technique permet de représenter les données en les projetant
+sur des axes factoriels. Elle sera ainsi utilisée comme une opération de visualisation dans le
+cadre de l’analyse en ligne. Pour illustrer nos propos, nous avons effectué une étude de cas sur
+les publications des chercheurs d’un laboratoire. En effet, une publication peut être considérée
+comme un objet complexe du fait que nous souhaitons l’observer comme une entité séman-
+tique. Nous envisageons de l’analyser selon son premier auteur et ses co-auteurs, sa portée
+nationale ou internationale, son support tel un congrès national ou international ou un journal,
+etc. Nous voulons observer la diversité des thématiques dans lesquelles publient les chercheurs
+ainsi que la proximité de ces derniers lorsqu’ils travaillent dans les mêmes domaines. Comme
+nous pouvons le remarquer, contrairement à l’analyse en ligne (OLAP) classique qui propose
+des opérateurs arithmétiques pour agréger des données numériques, nous avons besoin, dans
+notre cas, de se baser sur le contenu sémantique des publications, tels que les mots-clés par
+exemple, pour étudier les objectifs d’analyse que nous venons de citer plus haut.
+Pour présenter cette nouvelle approche d’analyse en ligne sur des objets complexes, nous
+avons organisé ce papier comme suit. Nous allons d’abord développer le principe de notre
+démarche dans la section 2. Nous présentons dans la section 3, l’étude de cas sur les publica-
+tions qui illustre notre démarche. Nous avons validé cette dernière par l’implémentation d’une
+plate-forme logicielle que nous présentons succinctement dans la section 4. Nous terminons
+cet article par une section discussion et conclusion (section 5).
+2 Principe et démarche
+Dans les entrepôts de données, les données sont souvent représentées selon un modèle
+en étoile, Kimball et Merz (2000), Inmon (1996). Celui-ci est composé d’une table de faits
+centrale contenant une ou plusieurs mesures à observer, de tables de dimensions comprenant
+des descripteurs. Ces tables sont alors représentées dans une structure multidimensionnelle
+adaptée à l’analyse qu’on appelle les cubes de données. Un fait est donc représenté par un
+ensemble de modalités provenant des dimensions d’un cube et observé par une ou plusieurs
+mesures ayant des propriétés d’additivité plus ou moins fortes. La vocation de l’OLAP est
+de fournir à l’utilisateur des opérateurs pour résumer et naviguer dans les données afin d’y
+découvrir des informations pertinentes, Chaudhuri et Dayal (1997).
+Cependant, dans le cas des cubes de données complexes, les faits représentent des objets
+complexes, les dimensions peuvent comporter des images, du texte, des descripteurs, . . . Les
+mesures ne sont pas forcément additives. Compte tenu de ces particularités, les opérateurs
+usuels OLAP de navigation ne sont pas adaptés ou ne peuvent pas être utilisés. Il est donc
+nécessaire de définir de nouveaux opérateurs adaptés pour la navigation et la visualisation dans
+un cube de données complexes. Pour cela, nous proposons d’utiliser les principes des méthodes
+factorielles bien connues en fouille de données notamment grâce aux travaux de Benzecri
+(1982) et de L. Lebart et Piron (2004). Une méthode factorielle va permettre de visualiser les
+objets complexes tout en mettant en évidence les points de vue intéressants pour l’analyse. La
+méthode factorielle va ajuster au mieux le nuage ou le cube d’objets complexes. Quand les
+RNTI-E-19 - 382 -
+L. Mabit et al.
+FIG. 1 – Schéma de l’entrepôt de données
+faits représentent des objets complexes, souvent il n’y a pas de mesure au sens classique de la
+modélisation multidimensionnelle. En revanche, il est toujours possible de dénombrer les faits.
+La mesure COUNT est parfois la seule mesure utilisable quand on travaille dans des cubes de
+données complexes. Dans ce cas là, le cube de données complexes avec plusieurs dimensions
+et la mesure COUNT pour dénombrer les objets complexes peut être vu comme un tableau de
+contingence ou d’occurrences. Il est alors possible d’utiliser une analyse des correspondances
+pour visualiser les faits.
+L’analyse des correspondances produit des axes factoriels qui peuvent être utilisés comme
+nouvelles dimensions, à savoir des "dimensions factorielles". Ces nouveaux axes ou dimen-
+sions constituent un nouvel espace de représentation dans lequel il est possible de projeter les
+faits ou les objets complexes. Le premier plan factoriel (c’est à dire l’espace de représenta-
+tion créé à partir des deux premiers axes produits par l’analyse des correspondances) permet
+de visualiser les objets complexes contenus dans le cube. Ce plan factoriel est aussi appelé
+carte factorielle. L’utilisation de l’analyse des correspondances comme opérateur de visualisa-
+tion se justifie pleinement car l’analyse des correspondances reprend l’objectif de navigation
+et d’exploration de l’OLAP. En plus d’un principe, nous proposons à l’utilsateur OLAP une
+démarche complète en plusieurs étapes : (1) choix du contexte d’analyse, (2) construction du
+cube d’objets complexes, (3) construction du tableau d’occurrences, (4) réalisation de l’analyse
+des correspondances, (5) visualisation des objets complexes sur la carte factorielle.
+3 Etude de cas
+Présentation. Pour illustrer notre démarche, nous nous sommes appuyés sur l’exemple de
+l’analyse des publications de notre laboratoire de recherche. Dans cet exemple, l’objectif est
+de synthétiser nos travaux à partir de mots-clés résumant nos publications afin d’identifier les
+grands champs de recherche sur lesquels nous travaillons. Pour répondre à cette problématique,
+nous proposons un outil d’analyse en ligne offrant la possibilité de visualiser les publications
+à travers leurs auteurs et les mots-clés sur une carte factorielle.
+Nous proposons d’analyser le fait d’avoir publié. Nous modélisons ce fait par un schéma
+en étoile avec trois dimensions : le temps, les auteurs, les publications (figure 1). Les données
+présentent la particularité d’être complexes dans la mesures où elles sont représentées par
+différents types de données et qu’elles sont soumises à une structure particulière. Par exemple,
+un auteur est représenté par son nom (chaîne de caractère structurée), par sa photographie
+RNTI-E-19- 383 -
+Analyse en ligne d’objets complexes
+(image), son statut (professeur, maître de conférences, doctorant, ...), les dates d’arrivée et/ou
+de départ dans le laboratoire, etc. De plus, certaines dimensions ont une structure particulière
+comme par exemple la dimension "auteur" qui est évolutive ou la dimension "publication" qui
+est multiple.
+Contexte d’analyse et cube d’objets complexes. L’étape suivante consiste à définir le contexte
+d’analyse. Celui-ci est défini par l’utilisateur, compte tenu de l’analyse qu’il souhaite réali-
+ser. Par exemple, l’utilisateur peut choisir de travailler sur les publications de type "confé-
+rences" ayant été écrites au cours des trois dernières années, par des auteurs qui ont le statut de
+maître de conférences. La structure multidimensionnelle de l’entrepôt de données permet de
+construire le cube de donnée OLAP correspondant au choix de l’utilisateur. Dans le contexte
+des publications de type "conférences" ayant été écrites au cours des dernières années par des
+auteurs qui ont le statut de "maître de conférences", l’utilisateur peut construire, un cube des
+publications selon les mots-clés, l’année de parution et le nom du premier auteur (figure 2).
+Tableau d’occurrences. L’analyse factorielle des correspondances admet en entrée un ta-
+bleau d’occurrences. Dans notre démarche d’analyse en ligne d’objets complexes, l’idée est
+d’utiliser les opérateurs traditionnels de l’OLAP pour construire ce tableau d’occurrences.
+Dans notre exemple, celui-ci correspond au croisement l’ensemble des mots-clés avec l’en-
+semble des auteurs retenus dans le contexte d’analyse. Étant donné la structure de l’entrepôt
+de données, la démarche consiste à dénombrer les faits sur toutes les années en effectuant un
+drill-down sur les seules dimensions "auteur" et "mots-clés". Nous obtenons ainsi un tableau
+bidimensionnel admettant les mots-clés pour ligne et les auteurs pour colonne (figure 2).
+FIG. 2 – Construction d’un tableau d’occurrences
+Analyse factorielle. La méthode démarre par le calcul des valeurs propres à partir desquelles
+sont déductibles les vecteurs propres qui définissent les axes factoriels. Comme ce sont les deux
+premiers axes qui contiennent le plus d’informations, la projection des données sur ceux-ci se
+révèle souvent pertinente. Sur notre exemple des publications, en se positionnant sur le premier
+plan factoriel, les publications (représentées par leurs mots-clés) et leurs auteurs s’associent de
+manière plus ou moins marquée. La figure 3 est un exemple très concis de ce qu’on peut
+observer sur les données réelles : les mots-clés 1 et 2 sont très proches ce qui laisse supposer
+que les publications concernées ont été écrites par des auteurs communs. En revanche, les
+mots-clés 3 et 4 sont assez distants et paraissent relever par conséquent de deux champs de
+recherche différents. Le placement des auteurs permet quant à lui d’avoir un aperçu sur le(s)
+champs de recherche auquel(s) ils se rattachent. Par exemple, les auteurs 3 et 5 paraissent
+RNTI-E-19 - 384 -
+L. Mabit et al.
+travailler sur des thèmes de recherche communs, tandis qu’ils s’opposent aux auteurs 1 et 2,
+qui eux-mêmes s’opposent à l’auteur 4. Nous obtenons ainsi une synthèse graphique sur ce
+que les chercheurs de notre laboratoire publient et avec qui.
+FIG. 3 – Représentation des données sur les deux premiers axes factoriels
+Visualisation. Notre outil d’analyse en ligne retient les deux premiers axes factoriels comme
+nouvelles dimensions, dans le sens où les coordonnées des objets projetés agissent comme des
+descripteurs de leur position sur ces axes. Il est ainsi possible d’effectuer un drill-down de ces
+objets sur une carte factorielle.
+4 Implémentation
+Pour valider notre démarche, nous avons conçu une plate-forme logicielle implémentée
+sous la forme d’une application Web 2.0 Open Source. Elle s’installe sur un serveur Web Li-
+nux interprétant PHP5 et un serveur de base de données MySQL. Le logiciel R et son package
+FactoMiner doivent également être installés sur le serveur Web. D’un point de vue technique,
+l’interface graphique est gérée par le framework ExtJS qui a l’avantage de contenir un excellent
+support Ajax. D’un point de vue utilisateur, l’application se présente sous la forme d’un ac-
+cordéon à déployer pas à pas. Ainsi, l’utilisateur procède aisément par étape dans le processus
+d’analyse : définition du contexte d’analyse, exécution de l’analyse factorielle et visualisation.
+5 Discussion et conclusion
+Nous avons développé dans ce papier une approche d’analyse en ligne d’objets complexes
+c’est à dire d’entités sémantiques. Les analyses que l’on peut effectuer doivent être basées sur
+le contenu des objets. Notre démarche a montré la faisabilité et l’intérêt d’utiliser l’analyse
+factorielle pour permettre la navigation et la visualisation en ligne des données complexes tout
+en se basant sur le contenu sémantique des données.
+L’approche préconisée dans ce papier constitue seulement une première proposition. Il
+convient de poursuivre cette approche en la formalisant, en la dotant d’indicateurs sur la qua-
+lité de représentation, en donnant plus de sens à la nouvelle représentation, en l’appliquant
+RNTI-E-19- 385 -
+Analyse en ligne d’objets complexes
+à d’autres types de données complexes (par exemple géographiques, dans le domaine médi-
+cal, etc.). De plus, nous travaillons dès à présent sur plusieurs problèmes comme par exemple
+celui des cubes de données complexes ayant des dimensions qualitatives et quantitatives. Cet
+aspect revêt une importance particulière dans le cadre des techniques de fouille de données.
+Il convient de prendre en compte cette hétérogénéité des dimensions pour la visualisation des
+objets complexes. D’autre part, lorsqu’il existe une mesure autre que la mesure COUNT, nous
+réfléchissons pour pouvoir prendre en compte cette mesure dans la visualisation des objets
+complexes. Par exemple, si cette mesure est de type numérique ou quantitatif, on pourrait pon-
+dérer les faits par cette mesure dans l’analyse factorielle.
+Dans le problème particulier de l’analyse des publications du laboratoire, à l’heure actuelle,
+ce sont les auteurs qui affectent, à partir d’un thésaurus, les mots-clés à leurs publications. Ce
+mode d’affectation peut être fastidieux et peut biaiser l’analyse. Nous envisageons d’utili-
+ser des techniques de recherche d’informations pour détecter automatiquement les mots-clés
+de chaque publication à partir du titre ou du résumé. Ainsi un couplage de l’OLAP et de la
+recherche d’informations permettrait d’enrichir une nouvelle fois l’analyse en ligne d’objets
+complexes.
 Références
-Anderberg, M. (1973). Cluster analysis for applications. Technical report, Academic Press.
-Hiroaki, S. et S. Chiba (1978). Dynamic programming algorithm optimization for spoken word
-recognition. IEEE Transactions on Acoustics, Speech, and Signal Processing 26, 43–49.
-Mackenzie, C., J. Ibbotson, C. Cao, et A. Lomax (2001). Hierarchical decomposition of laparo-
-scopic surgery : a human factors approach to investigating the operating room environment.
-Minimally Invasive Therapy and Allied Technologies 10(3), 121–127.
-Neumuth, T., N. Durstewitz, M. Fischer, G. Strauß, A. Dietz, J. Meixensberger, P. Jannin,
-K. Cleary, H. Lemke, et O. Burgert (2006). Structured recording of intraoperative surgical
-workflows. In SPIE Medical Imaging, Volume 6145, pp. 61450A.
-Neumuth, T., P. Jannin, J. Schlomberg, J. Meixensberger, P. Wiedemann, et O. Burgert (2010).
-Analysis of surgical intervention populations using generic surgical process models. Inter-
-national Journal of Computer Assisted Radiology and Surgery 6, 59–71.
-Petitjean, F., A. Ketterlin, et P. Gançarski (2011). A global averaging method for dynamic time
-warping, with applications to clustering. Pattern Recognition 44, 678–693.
-Riffaud, L., T. Neumuth, X. Morandi, C. Trantakis, J. Meixensberger, O. Burgert, B. Trelhu,
-et P. Jannin (2010). Recording of surgical processes : a study comparing senior and junior
-neurosurgeons during lumbar disc herniation surgery. Neurosurgery 67, 325–332.
-Scherer, S. (2001). Early career patterns : A comparison of Great Britain and West Germany.
-European Sociological Review 17(2), 119.
+Benzecri, J. (1982). L’analyse des données (tome 2 : l’analyse des correspondances). Dunod,
+Paris, 4ème édition.
+Chaudhuri, S. et U. Dayal (1997). An overview of data warehousing and OLAP technology.
+In ACM-SIGMOD, Record 26(1).
+Han, J. (1997). Olap mining : An integration of olap with data mining. In Proceedings of the
+7th IFIP Conference on Data Semantics, Volume 39(11), Leysin, Switzerland.
+Imielinski, T. et H. Mannila (1996). A database perspective on knowledge discovery. In
+Communications of the ACM, Volume 39(11), pp. 58–64.
+Inmon, W. H. (1996). Building the Data Warehouse. John Wiley & Sons.
+Kimball, R. et R. Merz (2000). The data webhousing. Eyrolles.
+L. Lebart, A. M. et M. Piron (2004). Statistique exploratoire multidimensionnelle. Dunod,
+Paris, 3ème édition.
+Messaoud, R. B. (2006). Couplage de l’analyse en ligne et de la fouille de données pour
+l’exploration, l’agrégation et l’explication des données complexes. Ph. D. thesis, Université
+Lumière Lyon 2, Lyon, France.
 Summary
-Towards the creation of new computer-assisted intervention systems, Surgical Process
-Models (SPMs) is an emerging concept used for analyzing and assessing surgical interven-
-tions. SPMs represent Surgical Process (SPs) which are formalized as symbolic structured
-descriptions of surgical interventions, using a pre-defined level of granularity and a dedicated
-terminology. In this context, an important challenge is the creation of new metrics for the com-
-parison and the evaluation of SPs. Thus, the relations between these metrics and pre-operative
-data allow to classify surgeries and highlight specific information on the surgery itself and on
-the surgeon, such as his/her level of expertise. In this paper, we explore the automatic classifi-
-cation of a set of SPs based on the Dynamic Time Warping (DTW) algorithm. DTW allows to
-compute a distance between two SPs that focuses on the different types of activities performed
-during surgery and their sequencing, by minimizing time differences. Unsupervised classifi-
-cation experiments have shown that this approach was able to automatically identify groups of
-surgeons according to their level of expertise (senior and junior).
-- 142 -
+Datawarehouses and On-line Analysis Processing (OLAP) have aknowledge and efficient
+solutions in the decision help process. In this paper, we suggest to combine OLAP analysis
+and data mining in order to create a new operator of visualization of complex objects. This
+operator uses the correspondence analysis.
+RNTI-E-19 - 386 -

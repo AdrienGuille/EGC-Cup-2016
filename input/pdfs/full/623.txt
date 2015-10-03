@@ -1,631 +1,217 @@
-Affichage de publicités sur des portails web
-Victor Gabillon∗,∗∗ Jérémie Mary∗,∗∗ Philippe Preux∗,∗∗
-∗Équipe-Projet SequeL
-INRIA CR-LNE, 40 Av. Halley, 59650 Villeneuve d’Ascq, France
-prenom.nom@inria.fr, http://sequel.futurs.inria.fr/
-∗∗Laboratoire d’Informatique Fondamentale de Lille (LIFL, UMR CNRS Université de Lille 1 & 3),
-Cité Scientifique, 59655 Villeneuve d’Ascq Cedex, France
-Résumé. Nous nous intéressons au problème de l’affichage de publicités sur
-le web. De plus en plus d’annonceurs souhaitent maintenant payer uniquement
-lorsque quelqu’un clique sur leurs publicités. Dans ce modèle, l’opérateur du
-portail a intérêt à identifier les publicités les plus cliquées, selon ses catégories
-de visiteurs. Comme les probabilités de clic sont inconnues a priori, il s’agit d’un
-dilemme exploration/exploitation. Ce problème a souvent été traité en ne tenant
-pas compte de contraintes provenant du monde réel : les campagnes de publicités
-ont une durée de vie et possèdent un nombre de clics à assurer et ne pas dépasser.
-Pour cela, nous introduisons une approche hybride (MAB+LP) entre la program-
-mation linéaire et les bandits. Nos algorithmes sont testés sur des modèles créés
-avec un important acteur du web commercial. Ces expériences montrent que ces
-approches atteignent une performance très proche de l’optimum et mettent en
-évidence des aspects clés du problème.
+Définition et diffusion de signatures sémantiques dans les
+systèmes pair-à-pair
+Raja Chiky∗, Bruno Defude∗∗, Georges Hébrail∗
+∗ GET-ENST Paris
+Laboratoire LTCI - UMR 5141 CNRS
+Département Informatique et Réseaux
+46 rue Barrault, 75634 Paris Cedex 13
+Email: chiky@enst.fr, hebrail@enst.fr
+∗∗GET-INT
+Département Informatique
+9 rue Charles Fourier, 91011 Évry cedex
+Email: bruno.defude@int-evry.fr
+Résumé. Les systèmes pair-à-pair (peer-to-peer, P2P, égal-à-égal) se sont po-
+pularisés ces dernières années avec les systèmes de partage de fichiers sur In-
+ternet. De nombreuses recherches concernant l’optimisation de la localisation
+des données ont émergé et constituent un axe de recherche très actif. La prise
+en compte de la sémantique du contenu des pairs dans le routage des requêtes
+permet d’améliorer considérablement la localisation des données. Nous nous
+concentrons sur l’approche PlanetP, faisant usage de la notion de filtre de Bloom,
+qui consiste à propager une signature sémantique des pairs (filtres de Bloom) à
+travers le réseau. Nous présentons cette approche et en proposons une amélio-
+ration : la création de filtres de Bloom dynamiques, dans le sens où leur taille
+dépend de la charge des pairs (nombre de documents partagés).
 1 Introduction
-La publicité sur Internet est une source de revenus considérables. Une migration est en
-cours d’un modèle économique « à l’impression » (CPM) à un modèle « au clic » (CPC), i.e.,
-l’annonceur paye quand l’internaute clique sur sa publicité (CPC), et non seulement quand
-celle-ci est affichée (CPM) sur une page web, dans un certain contexte (compte tenu de la
-page, caractéristiques de l’internaute, ...). C’est un changement majeur car dans le CPM, le
-risque économique est supporté par l’annonceur, alors que dans le CPC, c’est l’opérateur du
-portail web où sont affichées les publicités qui prend les risques. Dans le CPC, cet opérateur
-doit optimiser l’affichage des publicités afin de maximiser la quantité de clics sur celles-ci.
-De plus, comme l’annonceur ne court aucun risque, le stock de publicités à afficher est bien
-plus grand que l’espace disponible sur les pages web et donc, l’opérateur du portail doit sé-
-lectionner judicieusement les publicités qu’il affiche pour réaliser au mieux ses contrats avec
-les annonceurs. L’aptitude à afficher des publicités sur lesquelles les internautes cliqueront
-effectivement est donc une question critique. Même une amélioration faible du taux de clics
-peut se révéler cruciale du fait de la masse énorme de publicités affichées chaque jour sur un
-portail important et que cette amélioration est obtenue avec un coût très faible. Aussi, c’est
-RNTI-E-19- 67 -
-Affichage de publicités sur des portails web
-sans surprise que l’on constate l’intérêt d’acteurs majeurs d’Internet comme Yahoo ! et Google
-pour ces questions (Mehta et al., 2005; Pandey et Olston, 2006; Chakrabarti et al., 2008). Par
-ailleurs, ce problème possède des contraintes pratiques qui sont rarement prises en compte
-dans les articles de recherche du domaine :
-– durée de vie : l’annonceur spécifie une durée de vie pour sa publicité (correspondant à
-une période de soldes par exemple). De plus, l’annonceur souhaite que ses publicités
-soient présentées avec une fréquence relativement uniforme durant cette période ;
-– budget de clics fixé : l’annonceur achète un certain nombre clics et n’en paiera pas plus ;
-par contre, si le nombre de clics obtenus pendant la durée de vie de sa publicité est
-inférieur à ce budget, il paiera finalement beaucoup moins l’opérateur du portail.
-Dans ce papier, nous ne nous intéressons qu’au modèle CPC. Nous souhaitons concevoir
-des algorithmes efficaces, effectivement capables de sélectionner en temps réel les publicités
-à afficher, de la meilleure manière possible. Une originalité majeure de notre article vient du
-fait que nous nous appuyons sur une modélisation aussi réaliste que possible du problème
-effectivement rencontré par les opérateurs de portail web. Dans la suite de cet article, nous
-commençons par définir le problème à résoudre dans des termes plus précis. Nous nous livrons
-alors à une revue de la littérature dans la section 3. Ensuite, dans la section 4, nous décrivons
-notre approche qui est un processus itératif qui hybride la résolution d’un programme linéaire,
-avec un algorithme à base de bandits multi-bras. La section 5 fournit quelques résultats expé-
-rimentaux saillants, puis nous concluons.
-2 Le problème et l’idée de notre solution
-2.1 Définition du problème
-Le problème que nous étudions est séquentiel dans le temps. À un instant t, nous disposons
-d’un ensemble de Kt campagnes publicitaires en cours Ad1, Ad2, . . . , AdKt . À l’instant t,
-chaque campagne Adj dispose d’un budget restant Btj qui est le nombre de clics que cette
-publicité doit encore recevoir pendant sa durée de vie restante Ltj . B
-t
-j et L
-t
-j sont connus : ils
-sont initialement spécifiés dans le contrat liant l’annonceur et l’opérateur du portail web. Les
-visites au portail web sont supposées segmentées en N profils notés Profilei, i ∈ 1, . . . , N .
-À chaque profil est associée sa probabilité quotidienne de visite sur le portail web R1, . . . , RN
-(
-∑N
-1 Ri = 1). La page (url) requêtée fait partie du profil de telle manière qu’une même
-personne requêtant deux pages différentes est généralement associée à deux profils différents.
-On suppose également que ces probabilités Ri sont connues : elles sont facilement estimées à
-partir des fichiers logs du siteweb : le nombre de visites est tellement grand que la confiance sur
-ces estimations est grande. Enfin, outre le fait que les campagnes de publicités ont une durée
-de vie finie et fixée à l’avance, de nouvelles campagnes apparaissent quotidiennement. Ceci
-étant posé, quand un internaute requête une page, on suppose qu’une publicité est sélectionnée
-pour être affichée sur la page. L’objectif est donc que pendant sa durée de vie, chaque publicité
-soit cliquée en fonction de son budget. Pour simplifier la présentation, nous supposons que
-toutes les campagnes de publicités apportent le même bénéfice financier en cas de succès, et
-ont le même coût en cas d’échec. De plus, les annonceurs souhaitent que leurs publicités soient
-cliquées à un rythme à peu près uniforme tout au long de leur durée de vie.
-RNTI-E-19 - 68 -
-V. Gabillon et al.
-2.2 Présentation informelle de notre approche
-Afin de maximiser le nombre total de clics, une information importante est le taux de
-clic (Click-Through Rate ou CTR en anglais) d’un certain profil, sur une certaine publicité.
-Notons pi,j la probabilité qu’un visiteur du profil Profilei clique sur la publicité Adj . Ces
-probabilités pi,j sont inconnues. Une bonne estimation de ces probabilités permet d’afficher
-des publicités qui ont une plus grande probabilité d’être cliquées individuellement par cha-
-cun des visiteurs du portail. Cependant, cet apprentissage étant réalisé en ligne, le principal
-problème consiste à combiner l’estimation de ces paramètres inconnus avec l’exploitation de
-leur estimation courante. Ce problème peut-être formulé dans le cadre des bandits multi-bras,
-les publicités jouant le rôle de bras. Plusieurs solutions documentées dans la littérature sont
-des exemples de formulation sous forme de bandits (Kakade et al. (2008), Langford et Zhang
-(2008)). Néanmoins, l’existence de budgets de clics finis, accompagnée à la durée de vie des
-campagnes publicitaires assez courte, nécessite des approches algorithmiques fournissant des
-solutions de bonnes qualités dans des temps courts, autrement dit, non asymptotiquement. En
-effet, on ne peut pas se contenter ici d’algorithmes prouvés optimaux avec des temps de conver-
-gence dépassant la durée de vie des campagnes, ou un nombre de visites d’internautes infini, un
-nombre de clic infini, ... Le fait que les budgets de clics soient finis rend le problème combina-
-toire, dans un contexte incertain, stochastique et évoluant dans le temps. L’aspect fini crée des
-dépendances entre les visites et les publicités qui sont présentées aux différents internautes et
-aux différents profils d’internautes. Ainsi, simplement afficher la publicité qui a la plus grande
-probabilité de clic à un profil donné n’est pas la stratégie optimale. Une technique envisageable
-pour déterminer la stratégie de sélection des publicités est la programmation linéaire (PL) ba-
-sée sur l’estimation courante des probabilités de clics de chaque profil sur chaque publicité pi,j .
-Néanmoins, comme la PL nécessite que lui soient spécifiés tous les paramètres du problème
-(nombre de visiteurs par profils, probabilités de clics, ...), elle nécessite aussi que le problème
-ne change pas au cours du temps. Ces paramètres du problème sont inconnus et doivent être
-estimés, cette estimation devant être mise constamment à jour. Aussi, nous proposons de mixer
-la programmation linéaire aux bandits pour résoudre ce problème dans un contexte incertain,
-stochastique et évoluant au cours du temps.
-3 Travaux connexes
-Nous brossons un rapide tour d’horizon des travaux existants sur ce problème de sélec-
-tion de publicités pour les pages web. Nous découpons cette présentation en deux parties, la
-première concernant les bandits, la seconde concernant la programmation linéaire.
-3.1 Bandits multi-bras
-La sélection d’une publicité pour un visiteur peut se formuler simplement comme le choix
-d’une machine à sou, un bandit manchot, dans le cadre des bandits multi-bras (MAB). Depuis
-le travail initial de Robbins (1952), ce problème de l’allocation optimale des tirages de bras
-parmi un ensemble de bras a vécu une révolution avec l’introduction de l’algorithme UCB par
-Auer et al. (2002). Face à un ensemble de bras, chaque bras ayant une probabilité de succès
-fixe et inconnue, l’objectif est de minimiser le nombre de tirage de bras sous-optimaux ; l’idée
-RNTI-E-19- 69 -
-Affichage de publicités sur des portails web
-est alors de tirer chacun des bras et, en fonction des succès observés, estimer les probabilités de
-succès sur chacun des bras, et tendre vers le choix exclusif du bras ayant la probabilité de succès
-maximale. À côté de ce cadre très épuré, de nombreuses variations ont été proposées et étudiées
-dans différents contextes. Les « bandits contextuels »sont une telle extension dans laquelle
-une information est présente associée à chaque bras qui, on l’espère, doit aider au choix du
-bras optimal (Pandey et al. (2007), Langford et Zhang (2008), Wang et al. (2005), Kakade
-et al. (2008)). Dans le problème qui nous intéresse ici, ces informations seraient typiquement
-l’internaute, ou du moins des caractéristiques connues de l’internaute, la page requêtée, la date,
-l’heure, . . . Parmi ces travaux, Pandey et al. (2007) considèrent une segmentation des pagesweb
-et des publicités et bâtit un bandit à deux étages : sélectionner d’abord le bon segment, puis
-sélectionner la bonne publicité pour ce segment. Dans Kakade et al. (2008), le contexte est un
-vecteur x ∈ Rd. Inspiré par le perceptron, leur « banditron » est un algorithme dont l’objectif
-est de classer ces vecteurs surK étiquettes, i.e. un bandit àK bras. Ici, le problème de sélection
-de publicités est réduit à un problème de classification multi-classes, avec un retour des bandits.
-Chakrabarti et al. (2008) analysent une version du MAB dans laquelle les publicités ont une
-durée de vie et un budget connus, voire qui sont stochastiques. Leurs résultats sont basés sur
-l’utilisation d’une connaissance a priori sur la probabilité de succès des bras et s’appuient
-sur cette dernière pour obtenir plus rapidement un bon bras à sélectionner. Pandey et Olston
-(2006) ont proposé une adaptation du cadre MAB dans le cas où des budgets de clics sont
-fixés aux publicités. Ces approches pourraient nous être utiles si elles permettaient d’induire
-les probabilités de clics. Mais, pour la plupart, elles ne font que sélectionner la « meilleure »
-publicité pour un certain contexte. Cependant, pour être optimal, l’allocation des publicités aux
-différents segments de profils doit être effectuée en tenant compte de ressources finies. Cette
-allocation peut être calculée par PL. De plus, ces travaux ne considèrent pas dans un même
-cadre unifié à la fois les limites de budgets, la création et la durée de vie limitée des campagnes
-publicitaires.
-3.2 Programmation linéaire
-Abe et Nakamura (1999) ont mixé un cadre MAB avec la programmation linéaire pour le
-problème de publicités en ligne, avec des contraintes sur les proportions d’impression. Néan-
-moins, il s’agît donc du modèle CPM et les auteurs n’ont considéré que des publicités ayant des
-budgets illimités, dans un contexte statique de campagnes publicitaires. Mehta et al. (2005) ont
-traité ce problème comme un problème d’appariement biparties, avec des contraintes de bud-
-gets limités. Cependant, il ont supposé n’avoir aucune information a priori sur les visites des
-différents profils, alors qu’en pratique, nous avons une estimation de cette information. Mah-
-dian et Nazerzadeh (2007) ont utilisé ces estimations tout en conservant une certaine quantité
-d’exploration pour pallier les incertitudes autour de ces estimations. L’extension à des budgets
-de clics finis est discutée dans le cas où les probabilités de clic sont connues et non apprises.
-De plus, ils s’intéressent à la maximisation quotidienne du revenu, ce qui n’est pas équivalent
-à avec une maximisation globale.
-RNTI-E-19 - 70 -
-V. Gabillon et al.
-4 Combiner bandits et programmation linéaire
-Nous désirons résoudre un problème d’optimisation combinatoire afin de déterminer les
-probabilités d’allocation de chaque profil pour chaque publicité. Cependant, l’élément prin-
-cipal, les probabilités de clic est inconnu. Elles doivent être estimées en ligne. Pour bien ap-
-préhender la suite, il est crucial de bien comprendre que les probabilités d’allocation et les
-probabilités de clics sont deux choses différentes : si les probabilités de clics étaient connues
-exactement, ce serait la même chose et la stratégie optimale serait une pure exploitation des
-probabilités de clics, en choisissant la publicité de manière gloutonne ; ici, les probabilités de
-clics sont estimées et cette estimation comprend donc des incertitudes. Aussi, face à un profil
-de visiteur donné, la publicité estimée comme étant celle ayant la plus grande probabilité de
-clic n’est peut-être pas celle qui a vraiment la plus grande probabilité de clic. Pour lever ce
-problème, il faut donc explorer, c’est-à-dire, proposer aussi des publicités pour lesquelles les
-estimations de probabilité de clic n’est pas la plus forte. Il faut donc judicieusement mixer
-exploration et exploitation pour pouvoir améliorer la stratégie courante. Ce double problème
-demande donc la combinaison d’une méthode d’optimisation combinatoire avec un algorithme
-d’apprentissage. La programmation linéaire et les bandits multi-bras seront les deux outils
-utilisés simultanément à cet effet : MAB estime les probabilités de clic et PL fournit une so-
-lution optimale de planification ; notons bien qu’ici, l’expression « optimale » est trompeuse
-car la solution calculée est la meilleure relativement aux estimations plus ou moins précises
-des probabilités de clic. Pour surmonter ces difficultés, une solution est d’adapter continûment
-la solution du problème aux nouvelles conditions observées. Ceci est réalisé en itérant simple-
-ment le processus d’estimation des probabilités, et en résolvant à chaque instant un problème
-d’optimisation combinatoire avec les estimations courantes sur les publicités actuelles.
-4.1 Notre algorithme hybride : MAB+LP
-Définissons à l’aide des notations introduites dans la section 2 le programme linéaire à
-résoudre. Notons H l’horizon, c’est-à-dire la prévision du nombre de requêtes de publicités
-(visites), paramètre dont nous préciserons le rôle par la suite. Solution du PL, chaque xi,j est
-le nombre de visites de profils i à allouer à la publicité j. Étant donné (N,Kt) ∈ N2, respec-
-tivement le nombre de profils et le nombre actuel de campagnes publicitaires, p ∈ [0, 1]N×Kt ,
-les probabilités de clic, (Bt, Lt) ∈ NKt × NKt les budgets, et R ∈ [0, 1]N , les proportions
-d’apparition des différents profils, PL calcule xt ∈ RN×Kt , la politique d’allocation solution
-du programme linéaire indiqué dans la table 1.
-On suppose que les publicités sont préalablement triées par ordre croissant de durée d’af-
-fichage restante. Le programme linéaire contient N × Kt variables et N × Kt + N + Kt
-contraintes. L’objectif (eq. (1)) est de maximiser le nombre de clics. Les inégalités (2) ex-
-priment les contraintes sur le budget en clics des publicités. Les inégalités (3) expriment les
-contraintes sur le nombre de visites provenant de chaque profil. Les inégalités (4) expriment
-les contraintes sur la durée de chaque campagne publicitaire. Pour ces dernières inégalités,
-l’idée est de contraindre, pour chaque profil, l’allocation sur une publicité à être inférieure au
-nombre total de visites qui se dérouleront durant son existence. De plus, récursivement, l’al-
-location pour une publicité A doit aussi prendre en compte le nombre de visites déjà allouées
-aux publicités qui disparaîtront avant elle. Remarquons que Lj peut être considéré comme un
-RNTI-E-19- 71 -
-Affichage de publicités sur des portails web
-Maximiser
+Pour la recherche, le partage et l’échange de ressources (données, programmes, services),
+le modèle pair-à-pair constitue une alternative au modèle client/serveur. Les pairs peuvent à
+la fois offrir (rôle serveur) et demander (rôle client) des ressources. Il existe de nombreuses
+architectures des systèmes pair-à-pair, se basant sur des techniques différentes de localisation
+des données, qui se traduisent par des méthodes différentes de routage des requêtes. Pour
+améliorer la localisation d’une ressource recherchée par un pair, on ajoute de l’information
+aux tables de routage des requêtes : il peut s’agir du contenu des pairs, de l’historique de leurs
+requêtes, ou des concepts qu’ils traitent...
+La difficulté rencontrée lors de l’intégration de la sémantique du contenu des pairs, est de
+déterminer un espace de représentation commun à tous les pairs du réseau. Quelques systèmes
+tels que SON (Semantic Overlay Network)(Crespo et al., 2002) utilisent des concepts définis
+à priori pour résoudre ce problème. Mais cette solution ne s’applique qu’à un domaine précis.
+- 463 - RNTI-E-6
+Définition et diffusion de signatures sémantiques dans les systèmes P2P
+Pour pallier cet inconvénient, PlanetP (Cuenca-Acuna et al., 2002) utilise une signature séman-
+tique pour représenter le contenu de chaque pair. Cette signature est définie par une structure
+de données appelée filtre de Bloom (Bloom, 1970).
+Notre travail s’inscrit dans le cadre du projet RARE mené au sein du GET (Groupement
+des Ecoles des Télécommunications). Dans ce projet, plusieurs approches sont étudiées comme
+l’utilisation des filtres de Bloom, la propagation efficace des index via des algorithmes de Gos-
+siping ou encore l’apprentissage sur les requêtes passées par des mémoires associatives. Dans
+ce papier, nous nous intéressons à l’utilisation des filtres de Bloom dans PlanetP et proposons
+une amélioration permettant de réduire la taille des filtres de Bloom, et par conséquent de fa-
+ciliter leur diffusion à travers le réseau pair-à-pair, tout en maintenant les performances de la
+recherche d’information. L’approche est validée par des expérimentations sur les collections
+de données suivantes : CACM, CISI, MED et CRAN de SMART (Buckley, 1985).
+Les sections 2 et 3 de cet article décrivent l’approche PlanetP et le fonctionnement du
+filtre de Bloom. La section 4 définit notre approche et la section 5 présente les différentes
+expérimentations menées.
+2 Filtres de Bloom
+2.1 Définition
+Un filtre de Bloom (Bloom, 1970) est un tableau de bits qui permet de tester d’une manière
+rapide l’appartenance d’un terme à un certain ensemble de termes (ceux d’un document ou
+d’un ensemble de documents). Le filtre de Bloom consiste en deux composants : un ensemble
+de k fonctions de hachage et un vecteur de bits d’une taille m donnée. Toutes les fonctions de
+hachage sont configurées de telle sorte que leurs intervalles correspondent à la taille du vecteur.
+Par exemple, si le vecteur de bits est de taille 200, alors toutes les fonctions de hachage doivent
+retourner une adresse entre 1 et 200. Les fonctions de hachage garantissent que les adresses
+générées sont réparties de façon équiprobable sur toutes les valeurs possibles.
+Pour introduire un terme dans un filtre de Bloom, on calcule les valeurs des fonctions de
+hachage et on active (on met à 1) les bits du vecteur correspondants.
+Pour tester l’appartenance d’un terme t à un ensemble Y de termes introduits dans le filtre
+de Bloom, on lui applique les fonctions de hachage. Si au moins un des bits est à 0 alors le
+terme t n’appartient pas à Y. Par contre, si tous les bits sont à 1 alors t appartient probablement
+à Y avec un taux de faux positif moyen donné par la relation suivante :
+f = (1− e−kn/m)k (1)
+Où m est la taille du vecteur du filtre de Bloom, n le nombre de termes indexés et k le nombre
+de fonctions de hachage.
+Pour minimiser ce taux, on choisit un nombre de fonctions de hachage k respectant la relation
+suivante :
+k = ln2(m/n) (2)
+- 464 -RNTI-E-6
+R. Chiky et al.
+3 PlanetP
+3.1 Définition
+PlanetP est un système pair-à-pair permettant de faire de la recherche textuelle sur le
+contenu des documents stockés par les pairs. Le contenu de chaque pair est représenté de
+manière compacte à l’aide d’un filtre de Bloom décrivant les termes des documents stockés
+par celui-ci. Les filtres de Bloom sont distribués dans le réseau en utilisant un algorithme de
+propagation : chaque pair a donc une vision résumée des contenus disponibles dans d’autres
+pairs. Afin de supporter la recherche par le contenu, PlanetP utilise deux structures de données
+présentes sur chaque pair :
+– Un index local : Chaque pair indexe localement de façon exacte les termes contenus dans
+ses propres documents.
+– Un index global : Chaque pair dispose d’une liste d’autres pairs, associés chacun à
+leur filtre de Bloom, permettant de donner au pair une vision partielle et approchée du
+contenu global du réseau. Les filtres de Bloom sont échangés entre les pairs en utili-
+sant un algorithme de propagation appelé «Algorithme de Gossiping». Ce qui permet à
+chaque pair d’améliorer sa connaissance du réseau.
+3.2 Recherche dans PlanetP
+La recherche d’information est basée sur le modèle vectoriel. PlanetP propose une approxi-
+mation à la mesure TFxIDF, qui nécessiterait une connaissance de tous les mots du réseau.
+Cette mesure adaptée aux P2P est l’Inverse Peer Frequency IPF, pouvant être calculée à l’aide
+des informations locales à chaque pair. La mesure IPF pour un terme t est donnée par :
+IPFt = log(1 +N/Nt) (3)
+Où N est le nombre de pairs connus dans le réseau par le pair effectuant la recherche et Nt le
+nombre de pairs parmi ceux-ci ayant les documents contenant t.
+Un nœud qui reçoit une requête cherche dans son index local. S’il ne peut pas honorer la
+requête, il calcule les rangs des pairs de son index global. Pour donner un rang aux pairs, on
+utilise l’expression suivante :
+Ri(Q) =
 ∑
-1≤i≤N
-1≤j≤Kt
-xi,j pi,j (1)
-Sous contraintes
+t∈Q et t∈BFi
+IPFt (4)
+Où Q est la requête, BFi le filtre de Bloom du pair i et t un terme de la requête.
+La requête est alors propagée aux pairs de plus grand rang.
+4 Filtre de Bloom dynamique
+Il existe des pairs qui contiennent plus de documents que d’autres. Généralement, la ré-
+partition des documents dans les pairs suit une loi de Zipf (Goh et al., 2005). Le nombre de
+termes à indexer dans les filtres de Bloom varie donc selon le nombre de documents de chaque
+pair. Une idée est de créer des filtres de Bloom de taille dynamique, dans le sens où la taille
+- 465 - RNTI-E-6
+Définition et diffusion de signatures sémantiques dans les systèmes P2P
+du filtre d’un pair dépend de son nombre de documents. Nous fixons une taille maximale pour
+les filtres de Bloom et un nombre maximum de fonctions de hachage. Chaque fonction sera
+affectée à un intervalle d’une partition du filtre de Bloom. Par exemple, nous fixons :
+– une taille maximale de 10 000 bits ;
+– 4 fonctions de hachage (chaque fonction donnera une adresse sur 2 500 positions)
+– 1ère fonction : 1→2 500 ;
+– 2ème fonction : 2 001→5 000 ;
+– 3ème fonction : 5 001→7 500 ;
+– 4ème fonction : 7 501→10 000.
+Soit di le nombre de documents du pair i, on choisit :
+– si di ≤ 40 : une seule fonction de hachage et un filtre de Bloom de 2 500 bits ;
+– si 41 ≤ di ≤ 60 : deux fonctions de hachage et un filtre de Bloom de 5 000 bits ;
+– si 61 ≤ di ≤ 80 : trois fonctions de hachage et un filtre de Bloom de 7 500 bits ;
+– sidi ≥ 81 : quatre fonctions de hachage et un filtre de Bloom de 10 000 bits ;
+Cette méthode nous permet de réduire d’environ 50% la taille des filtres de Bloom, ce qui
+facilitera leur diffusion à travers le réseau. Le fait de réduire la taille des filtres de Bloom
+n’affecte pas le taux de faux positif car le nombre de fonctions de hachage a été choisi selon
+l’équation ( 2).
+5 Expérimentations et résultats
+Pour nos expériences, nous avons utilisé les quatre collections de documents utilisées par
+PlanetP pour son évaluation (requêtes et jugements de pertinence associés). La table 1 présente
+le contenu de ces collections : elles sont composées de fragments de textes et résumés, et sont
+relativement petites en taille. Nous les avons préalablement traitées grâce à l’outil de recherche
+d’information SMART (Buckley, 1985), afin d’extraire les mots lemmatisés, leurs fréquences
+et d’éliminer les mots vides.
+Pour tester les performances de notre approche, nous avons utilisé les métriques standard,
+rappel(R) et précision (P), définies comme suit pour une requête Q :
+R(Q)= nombre de documents pertinents retournés/nombre de documents pertinents dans la
+collection
+P(Q)= nombre de documents pertinents retournés/nombre de documents retournés
+CACM CISI CRAN MED
+Nb. documents 3204 1460 1400 1033
+Nb. termes uniques 3029 5755 2882 4315
+Nb. moyen de termes par document 18.4 38.2 49.8 46.6
+Nb. requêtes 64 112 225 30
+Nb. moyen de termes par requête 9.3 23.3 8.5 9.5
+Nb. moyen de documents pertinents par requête 15.3 27.8 8.2 23.2
+TAB. 1 – Collections de documents utilisées dans les expérimentations et leurs caractéris-
+tiques
+- 466 -RNTI-E-6
+R. Chiky et al.
+La similarité entre une requête Q et un document D est calculée comme suit :
+sim(Q,D) =
 ∑
-1≤i≤N
-xi,j pi,j ≤ Btj ∀j ∈ {1, . . . ,Kt} (2)∑
-1≤j≤Kt
-xi,j ≤ Ri ∗H ∀i ∈ {1, . . . , N} (3)
-∑
-1≤k≤j
-xi,k ≤ Ltj ∗Ri ∀i ∈ {1, . . . , N},∀j ∈ {1, . . . ,Kt} (4)∑
-1≤k≤j
-xi,j ≥ 0 ∀i ∈ {1, . . . , N},∀j ∈ {1, . . . ,Kt} (5)
-TAB. 1 – Programme linéaire à résoudre.
-nombre de requêtes de publicités, car nous supposons que le nombre de visites est le même
-chaque jour (ce qui est faux mais qui n’affecte pas outre mesure notre solution qui essaye de
-maximiser le nombre de clics globalement et non jour après jour). Si les probabilités de clic
-pi,j étaient connues, la planification représentée par x serait, en espérance, la meilleure po-
-litique non-adaptative à suivre. Cependant, les CTRs doivent être appris en ligne. Une idée
-simple, déjà appliquée dans (Abe et Nakamura, 1999), est d’utiliser l’estimation courante de
-p pour générer la planification. Par exemple, après avoir observé un certain nombre de visites,
-un estimateur naturel des pi,j est p̂ti,j =
-NCti,j
-NIti,j
-avec, pour chaque profil i et publicité j, NCti,j
-le nombre de clics observés jusqu’à l’instant t etNIti,j le nombre d’affichages réalisés jusqu’à
-l’instant t. Ainsi, à chaque nouvelle visite, p̂ti,j peut être mis à jour car il existe un couple (i, j)
-pour lequel NIi,j a été incrémenté (et peut-être son NCi,j associé). Dès lors, cette nouvelle
-estimation peut être prise en compte pour recalculer une politique d’allocation associée. L’al-
-gorithme présenté dans la table 2 découle de ces observations. En pratique, résoudre le PL
-après chaque requête d’une page web n’est pas raisonnable lorsque l’on doit gérer des mil-
-lions de connexions par jour. Donc, pour rendre notre méthode réalisable et efficace, nous ne
-replanifions que toutes les T visites. Une analyse de sensibilité nous a permis de choisir T
-adéquatement. De plus, il s’agit d’un algorithme d’apprentissage en ligne qui doit estimer les
-pi,j utilisés pour le calcul de la solution du PL, à partir desquels les probabilités d’affichage
-des publicités pour les différents profils sont déduites (les sti,j). De ce fait, nous devons trou-
-ver un équilibre entre l’exploitation de nos estimateurs courants et l’exploration de l’ensemble
-des actions possibles (afficher une publicité actuellement considérée comme ayant moins de
-chance d’être cliquée) d’améliorer nos estimations. Ce compromis « exploration / exploita-
-tion » est naturellement traité par le formalisme des bandits multi-bras. En se basant sur le
-cadre MAB, différentes manières d’introduire l’exploration dans la politique d’allocation sont
-envisageables, parmi lesquelles nous différencions deux familles :
-Dévier de la planification du PL : les méthodes ε-gloutonnes peuvent être appliquées. Ceci
-implique de suivre la solution du PL avec (grande) probabilité ε et avec probabilité 1−ε,
-RNTI-E-19 - 72 -
-V. Gabillon et al.
-Itération au temps t :
-Politique d’allocation :
-Estimateurs courants : p̂ti,j
-Résoudre le programme linéaire : xt = PL(p̂t, Bt, Lt, R,H)
-Calculer les probabilités d’allocation : sti,j =
-xti,j
-‖xti‖ ∀i ∈ {1 . . . N}, ∀j ∈ {1 . . .K
-t}
-avec ‖xti‖ =
-∑Kt
-j=1 x
-t
-i,j
-Visite : Pour notre te visite, un Profilei apparaît.
-Affichage : Une publicité Adl est choisie selon la densité sti,..
-Clic : Un clic se produit ou non.
-Mise à jour : p̂ti,l est mis à jour.
-Lt+1k ← Ltk − 1 ∀ k ∈ {1, . . . ,Kt}
-Bt+1l ← Btl − 1 si un clic s’est produit.
-Une nouvelle publicité apparaît avec probabilité u (Mettre alors à jourKt).
-TAB. 2 – Principe de l’algorithme MAB+LP.
-choisir une publicité aléatoirement. Notons cette stratégie d’exploration « PL-ε ».
-Modifier le PL : Les p̂ti,j peuvent être modifiés pour que la planification inclut une part d’ex-
-ploration. Pour ce faire, Abe et Nakamura (1999) ont utilisé les indices de Gittins. Il est
-aussi possible de remplacer les p̂ti,j par les valeurs UCB, ou par une réalisation aléatoire
-tirée selon la distribution a posteriori Bêta sur les probabilités moyennes de clic (voir
-Granmo (2008)).
-4.2 L’horizon
-Dans la réalité, le temps n’est pas borné. Aussi, pour résoudre le PL faut-il fixer un horizon
-de planification Ht qui peut varier au cours du temps et est décrémenté après chaque requête.
-Le trafic sur le site est continu et de nouvelles publicités apparaissent constamment tandis que
-d’autres disparaissent. Cet environnement dynamique influence la manière optimale de gérer
-les publicités. C’est pourquoi nous désirons maximiser le nombre total de clics, plutôt que de
-maximiser jour après jour le nombre de clics. Dès lors, les performances des politiques sont
-dépendantes de la manière dont les nouvelles campagnes sont créées ainsi que de leur qualité
-(attirent-t-elles l’attention des visiteurs ?). À ce stade, une question importante se pose : devons
-nous être gourmand avec nos publicités actuelles et distribuer à chaque visiteurs sa campagne
-supposée préférée car bientôt d’autres campagnes attractives seront générées ? Devons-nous
-plutôt nous montrer plus prévoyant et allouer les publicités en envisageant une pénurie de nou-
-velles publicités ? Régler le paramètre H revient à moduler entre une politique gourmande et
-une stratégie prévoyante pour les publicités actuelles. En effet, si nous allouons les prochaines
-visites comme si le nombre total de visites était petit, les budgets des publicités ne nous em-
-pêcheraient pas de proposer à chacun sa publicité préférée et l’algorithme jouerait de façon
-gourmande. Au contraire, en prévoyant une arrivée massive de visites à traiter, MAB+LP op-
-terait pour une politique plus prévoyante pour gérer les publicités actuelles. La question est de
-RNTI-E-19- 73 -
-Affichage de publicités sur des portails web
-Budget 100 100
-H Ri Ad 1 Ad 2
-20 ↗ 1/2→ Profile 1 10 0↘ 1/2→ Profile 2 10 0
-Planification avec H = 20→ Gourmand
-Profile 1 : 100% sur Ad1
-Profile 2 : 100% sur Ad1
-Budget 100 100
-H Ri Ad 1 Ad 2
-300↗ 1/2→ Profile 1 125 25↘ 1/2→ Profile 2 0 150
-Planification avec H = 300→ Prévoyant
-Profile 1 : 73% sur Ad1, 17% sur Ad2
-Profile 2 : 100% sur Ad2
-TAB. 3 – Effet du paramètre horizon H sur l’allocation des profils sur les publicités.
-déterminer la valeur de H optimale en fonction de la manière dont sont créées les nouvelles
-campagnes publicitaires. Pour illustrer ces observations, considérons le problème ci-dessous
-où les valeurs pi,j représentées dans des tableaux possèdent des ordres de grandeur irréalistes
-par souci de clarté (les véritables CTR sont 103 fois plus petits) :
-Ad 1 Ad 2
-Profile 1 0,8 0,1
-Profile 2 0,8 0,5
-Supposons que nous ayons deux campagnes publicitaires
-disposant chacune d’un budget de 100 clics, et qu’il existe deux
-profils de visites. Dans la table 4.2, deux politiques distinctes
-d’allocation calculées par le PL sont représentées pour deux
-valeurs de H : H = 20, et H = 300. Les deux tableaux
-contiennent les nombres de visites allouées à chaque couple
-(Profile, Publicité) (les xi,j). On retrouve le nombre de clics pour chaque couple en multi-
-pliant ces valeurs par leurs pi,j respectifs. Pour H = 20, l’allocation est gourmande alors que
-pour H = 300, l’algorithme prend en compte les budgets limités (par rapport à la grande de-
-mande liée auH grand) afin de bien répartir les ressources sur les profils. Cependant le réglage
-de H dépend fortement de la manière dont naissent les campagnes. Et comme le choix de H
-mène à des politiques distinctes, ce choix s’avère crucial et sera étudié expérimentalement
-dans la section suivante. Notons qu’H = 1 correspond exactement à une stratégie consistant à
-systématiquement afficher sa publicité préférée à chaque visiteur.
-5 Expérimentations
-Nous présentons dans cette partie des expériences montrant l’intérêt de notre approche.
-Nous nous intéresserons a deux aspects : l’écart de diverses approches avec la solution optimale
-et l’importance de l’horizon H sur la performance de MAB+LP. Nos expérimentations sont
-basées sur un modèle jouet conçu avec des experts d’Orange Labs avec le souci de reproduire
-les difficultés du problème réel. Chaque publicité possède ses caractéristiques (secrètes) qui
-font qu’elle est plus ou moins adaptée aux profils.
-5.1 Mise en place
-Dans la suite, les pi,j ont une probabilité de base de 10−4, chaque fois qu’une caractéris-
-tique (conservée secrète) des publicités correspond à un élément de profil, la probabilité est
-RNTI-E-19 - 74 -
-V. Gabillon et al.
-multipliée par 4. Dans les simulations, la moyenne de Kt est 30 ; il y a 54 profils de visites ;
-nous supposons que la distribution des visites est uniforme au cours de la journée. Le lecteur
-intéressé trouvera des détails supplémentaires pour reproduire les expériences dans Gabillon
-(2009).
-5.2 Sans arrivée de nouvelles publicités
-Comparaison des stratégies
-Nombre de requêtes traitées en 106
-N
-om
-br
-e 
-de
- c
-lic
-s 
-cu
-m
-ul
-és
-0 5 10 15 20 25 30
-0
-20
-00
-40
-00
-60
-00
-80
-00
-Anytime LP−Best
-Anytime LP−ε
-Bandit Blind−ε
-Random Policy
-16M LP−ε
-FIG. 1 – Simulations sans apparition ni
-disparition de Publicités. La courbe la plus
-élevée (continue et en gras « Anytime Lp-
-Best x) est la stratégie optimale en suppo-
-sant connues les probabilités de clic, ce qui
-est impossible. La courbe « Random Po-
-licy » correspond à une allocation au ha-
-sard.
-Afin d’illustrer certains aspects du problème,
-il est plus facile de commencer par supposer que
-les publicités n’ont pas de limite de temps et
-qu’il n’y a pas apparition de nouvelles publici-
-tés au cours du temps. Notre premier objectif est
-de quantifier le gain obtenu par l’introduction de
-la programmation linéaire et donc par la prise en
-compte des budgets maximaux des publicités.
-Anytime LP-Best est une stratégie optimale
-calculée par PL dans le cas ou les pi,j
-sont connus. Nous l’utilisons pour avoir
-une borne sur les performances possibles.
-Random policy fournit une borne inférieure sur
-les performances. Elle choisit uniformé-
-ment une publicité parmi celles dont le
-budget restant est non nul.
-Anytime LP-ε est notre approche qui mélange
-PL et exploration. On utilise ici un ε-
-glouton. Dans ces expériences, ε a été
-choisi empiriquement à 0,92.
-Bandit Blind-ε utilise plusieurs bandits agis-
-sant indépendemment les uns des autres.
-Cela signifie que chacun essaie de servir
-à chaque profil la publicité avec la proba-
-bilité de clic la plus élevée. On ne tient pas
-compte du budget de chacune des publici-
-tés (excepté par le fait que quand le budget est atteint, la publicité ne peut plus être
-choisie).
-La figure 1 donne l’espérance du nombre de clics de chacune de ces techniques en fonc-
-tion du nombre de requêtes. On peut être surpris par la relativement bonne performance de la
-stratégie aléatoire pure. Cette bonne performance s’explique par les probabilités qui sont dans
-une large mesure réparties un peu uniformément et par la présence d’un grand nombre de pro-
-fils pour lesquels on ne dispose d’aucune information. Après environ 7 millions de visiteurs,
-et jusqu’à l’écoulement total des publicités, « Anytime LP-ε » se révèle plus performant que
-« Bandit Blind-ε ». Cela signifie que qu’au delà de 7 millions de requêtes, il est pertinent de
-tenir compte des limites de budget des publicités et donc de ne pas toujours servir la publicité
-avec l’espérance de clic la plus haute. L’amélioration est d’environ 5% et correspond dans ce
-RNTI-E-19- 75 -
-Affichage de publicités sur des portails web
-contexte à la moitié de l’écart à la courbe optimale (celle qui connaît toutes les probabilités).
-La faiblesse des stratégies basées sur la programmation linéaire provient du fait qu’elles ont
-à tout moment besoin de savoir combien il y aura de visites de chaque profil. Or, il semble
-difficile de prévoir ce nombre avec une grande précision. Dans la figure 1, les deux courbes
-PL ne sont pas des performances issues d’une seule simulation. En fait, chaque nombre de
-visiteurs fourni en abscisses, correspond à une PL effectuée en connaissant ce nombre de visi-
-teurs. On peut s’intéresser par exemple à l’évolution du nombre de clics pour un PL prévoyant
-16.106 de visiteurs au cours du temps. Cela est représenté par la courbe « 16M Simplex-ε ». On
-s’aperçoit que la performance est quasiment linéaire au cours du temps. Cela montre que notre
-algorithme identifie assez rapidement les allocations à réaliser sur les publicités importantes et
-tient bien compte des budgets. De plus, cela est intéressant car dans ce contexte, les publicités
-sont écoulées avec une vitesse quasi-constante au cours du temps. Par contre, il faut garder à
-l’esprit que si l’on a une estimation trop peu précise du nombre de visites, alors on peut faire
-beaucoup moins bien qu’une approche plus gloutonne comme les bandits parallèles.
-5.3 Dans un environnement dynamique
-Nous nous intéressons maintenant au rôle de l’horizonH discuté dans la sec. 4.2. Pour cela,
-nous introduisons un modèle génératif des publicités. À chaque pas de temps, une nouvelle pu-
-blicité peut apparaître avec une probabilité notée u. De plus, les publicités ont maintenant une
-durée de vie fixée. La figure 2 illustre les performances obtenues par différents réglages de
-H pour deux valeurs de la durée de vie L. Elle représente l’espérance du nombre de clics par
-unité de temps. Le début de la courbe correspond à l’écoulement du stock initial de publicités
-avant de se placer dans une sorte de régime stationnaire. Dans ce régime, les stratégies utilisant
-la PL sont systématiquement au-dessus des méthodes de bandit (Pour H = 1, MAB+LP est
-en fait un Bandit). Le gain de performance est de l’ordre de 4%. Il existe une valeur optimale
-pour l’horizon (autour de L2 ). Elle correspond à un équilibre entre l’apparition des nouvelles
-publicités et leur vitesse d’écoulement. Notons que plus on augmente la durée de vie des publi-
-cités, plus l’horizon optimal est grand. Dans le cas où la durée de vie est infinie, le plus grand
-horizon possible est le meilleur.
-6 Conclusion et perspectives
-Nous avons étudié le problème de l’optimisation du nombre de publicités cliquées sur un
-site web. Nous avons abordé le problème dans un cas plus proche de la réalité que celui étu-
-dié classiquement, en particulier du point de vue des contraintes de temps et de budget sur
-les publicités. Dans ce contexte, nous avons développé une approche hybride (MAB+LB) qui
-réalise une exploration tout en tenant compte des contraintes lors de sa phase d’exploitation.
-Les performances obtenues sont proches de celles des stratégies connaissant a priori les pro-
-babilités de clic et sont dans tous les cas supérieures aux bandits lancés en parallèle. De plus
-notre approche possède des aspects intéressants en pratique :
-– nous avons tendance à écouler les publicités à une vitesse constante au cours de sa durée
-de vie. Ce point est généralement très apprécié des annonceurs.
-– Il est possible d’estimer le gain obtenu a partir d’un nombre donné de profils. Il suffit
-pour cela de relancer une planification en éliminant les profils concernés. Cela est in-
-RNTI-E-19 - 76 -
-V. Gabillon et al.
-0 200 400 600 800 1000
-32
-0
-34
-0
-36
-0
-38
-0
-40
-0
-Environnement Dynamique : Comparaison des Horizons, 
- Durée d’affichage des Pubs : 50M ~ 12 jours
-Pas de Temps (un PdT = 1M =1 million de requêtes)
-N
-om
-br
-e 
-m
-oy
-en
- d
-e 
-cl
-ic
-s 
-pa
-r 
-pa
-s 
-de
- te
-m
-ps
-5
-10
-30
-50
-H = 5 M
-H = 10 M
-H = 30 M
-H = 50 M
-0 500 1000 1500 2000
-32
-0
-34
-0
-36
-0
-38
-0
-40
-0
-Environnement Dynamique : Comparaison des Horizons, 
- Durée d’affichage des Pubs : 120M ~ 1 mois
-Pas de Temps (un PdT = 1M =1 million de requêtes)
-N
-om
-br
-e 
-m
-oy
-en
- d
-e 
-cl
-ic
-s 
-pa
-r 
-pa
-s 
-de
- te
-m
-ps
-1
-10
-70
-100
-H = 1 M
-H = 10 M
-H = 70 M
-H = 100 M
-FIG. 2 – Illustration du rôle de l’horizon H dans un environnement dynamique avec durée
-de vie finie et apparition de nouvelles publicités, moyenne sur 1000 simulations. La fréquence
-d’apparition d’une nouvelle publicité a été choisie de façon à ce qu’il ne soit pas possible
-d’écouler toutes les publicités. Pour rester réaliste, on ne dispose pas non plus d’une surabon-
-dance de publicités. Le choix de l’horizon optimal est aussi lié à la durée de vie des publicités.
-Une nouvelle répartition optimisée par PL est faite toutes les 104 visites.
-téressant dans le cas où les revenus proviennent en partie d’une vente en coût par clic
-(CPC) et d’autre part d’une vente plus classique à l’impression (CPM).
-Plusieurs extensions sont d’ores et déjà envisagée à ce travail. Tout d’abord, un déploiement
-pour la régie publicitaire d’Orange Labs va être réalisé ; cela permettra notamment de tester
-notre approche face à de véritables internautes. Notons qu’il subsiste également de fortes in-
-terrogations dans le cas où plusieurs publicités sont affichées simultanément sur une page web
-(l’hypothèse d’indépendance devenant clairement très fausse). Enfin, nous n’avons pas men-
-tionné l’apprentissage par renforcement (RL) comme une approche possible pour résoudre ce
-problème. Hors, il est clair que nous faisons face ici à ce type de problèmes ; nous avons écarté
-les algorithmes traditionnels de RL du fait de la complexité de l’espace d’états (très grand,
-discret, mal structuré) et du nombre importants d’actions possibles. Notons qu’à l’inverse, l’al-
-gorithme que nous proposons ici (MAB+LP) peut très bien s’appliquer à tout un ensemble
-de problèmes de RL à horizon fini et variant dans le temps ; c’est plutôt cette voie que nous
-envisageons d’étudier par la suite.
-Remerciements
-Ce travail a été partiellement financé par les Orange Labs via le contrat de recherche exter-
-nalisé numéro 46 146 063 - 8360. Le modèle et ses paramètres utilisés dans cet article ont été
-conçus avec et validés par Orange Labs afin de conserver les caractéristiques essentielles du
-problème réel. Nous remercions tout particulièrement Fabrice Clérot et Stéphane Sénécal pour
-les riches et nombreuses discussions que nous avons eues tout au long de ce travail.
-RNTI-E-19- 77 -
-Affichage de publicités sur des portails web
+t∈Q IPFt × log(1 + fD,t)√|D| (5)
+Où fD,t est le nombre d’apparitions du terme t dans D et |D| le nombre de termes dans D.
+Pour mesurer le rappel et la précision dans les collections, nous distribuons aléatoirement
+les documents sur 20 pairs virtuels selon la loi de Zipf sans redondance (un document n’est
+présent que sur un seul pair). Nous construisons la signature de chaque pair en utilisant chacune
+des méthodes suivantes :
+– Filtre de Bloom fixe construit avec deux fonctions de hachage (comme dans le système
+PlanetP) avec une taille de 10 000 bits ;
+– Filtre de Bloom variable. Nous utilisons les configurations de l’exemple de la section 4.
+La taille des filtres de Bloom a été choisie afin d’assurer un taux de faux positif inférieur à
+5%. Le rang des pairs est calculé par l’équation (4) pour chacune des requêtes des collections
+puis ceux-ci sont triés par ordre décroissant de la mesure du rang. Ensuite p pairs jugés per-
+tinents sont sélectionnés, p variant de 1 à 20 pairs. Les documents contenus dans ces p pairs
+sont triés par la mesure de similarité selon l’équation (5). Nous extrayons les 30 documents
+de similarités les plus élevées et mesurons le taux de rappel et de précision. Par manque de
+place, nous ne présentons dans la figure 1 que les courbes obtenues pour la collection MED,
+des résultats similaires étant obtenus sur les autres collections.
+La figure 1 montre le taux de rappel et de précision en fonction du nombre de pairs contactés.
+FIG. 1 – (a)Rappel et (b)Précision pour la collection MED : var correspond au cas du filtre
+de Bloom variable et fixe au cas du filtre de Bloom avec deux fonctions de hachage.
+Nous observons à travers ces courbes que l’utilisation d’un filtre de Bloom dynamique n’altère
+pas les taux de rappel et de précision par rapport à un filtre de Bloom fixe.
+- 467 - RNTI-E-6
+Définition et diffusion de signatures sémantiques dans les systèmes P2P
+6 Conclusion
+Le système PlanetP permet de faire de la recherche textuelle de documents dans un envi-
+ronnement distribué, en proposant un même espace de représentation partagé par tous les pairs,
+sous la forme de filtres de Bloom de taille fixe. Nous avons proposé de rendre cette taille dy-
+namique, en fonction du nombre de documents stockés par chaque pair. Les expérimentations
+montrent que la dynamicité ne détériore pas les performances obtenues dans le cas classique
+(filtre de Bloom fixe). La bande passante utilisée pour la propagation des filtres de Bloom peut
+ainsi être réduite, ou bien le taux de leur diffusion à travers le réseau peut être augmenté, afin
+d’enrichir les index globaux. L’évaluation chiffrée de ces gains reste à réaliser, par simulation
+des échanges entre pairs, en utilisant le simulateur également développé dans le projet RARE.
 Références
-Abe, N. et A. Nakamura (1999). Learning to Optimally Schedule Internet Banner Advertise-
-ments. In Proc. 16th ICML, pp. 12–21. Morgan Kaufmann Publishers Inc.
-Auer, P., N. Cesa-Bianchi, et P. Fischer (2002). Finite-time Analysis of the Multiarmed Bandit
-Problem. Machine Learning Journal 47(2-3), 235–256.
-Chakrabarti, D., R. Kumar, F. Radlinski, et E. Upfal (2008). Mortal Multi-Armed Bandits. In
-D. K. et al. (Ed.), Proc. NIPS, pp. 273–280. MIT Press.
-Gabillon, V. (2009). Machine Learning Tools for On-line Advertisement. Technical report,
-INRIA Lille - Nord Europe, École Normale Supérieure de Cachan, TELECOM SudParis.
-Granmo, O.-C. (2008). A bayesian learning automaton for solving two-armed Bernoulli bandit
-problems. In Proc. 7th ICML-A, pp. 23–30. IEEE Computer Society.
-Kakade, S. M., S. Shalev-Shwartz, et A. Tewari (2008). Efficient Bandit Algorithms for Online
-Multiclass Prediction. In Proc. 25th ICML, pp. 440–447. ACM.
-Langford, J. et T. Zhang (2008). The Epoch-Greedy Algorithm for Multi-armed Bandits with
-Side Information. In J. P. et al. (Ed.), Proc. NIPS, pp. 817–824. MIT Press.
-Mahdian, M. et H. Nazerzadeh (2007). Allocating Online Advertisement Space with Unre-
-liable Estimates. In Proc. ACM Conference on Electronic Commerce, pp. 288–294.
-Mehta, A., A. Saberi, U. Vazirani, et V. Vazirani (2005). Adwords and Generalized On-line
-Matching. In Proc. 46th FOCS, pp. 264–273. IEEE Computer Society.
-Pandey, S., D. Agarwal, D. Chakrabarti, et V. Josifovski (2007). Bandits for Taxonomies : A
-Model-based A pproach. In Proc. 7th SIAM-DM.
-Pandey, S. et C. Olston (2006). Handling Advertisements of Unknown Quality in Search
-Advertising. In B. S. et al. (Ed.), Proc. NIPS, pp. 1065–1072. MIT Press.
-Robbins, H. (1952). Some Aspects of the Sequential Design of Experiments. Bulletin of the
-American Mathematics Society 58, 527–535.
-Wang, C.-C., S. Kulkarni, et H. Poor (2005). Bandit Problems With Side Observations. IEEE
-Transactions on Automatic Control 50(3), 338–355.
+Bloom H. (1970). Space/Time Trade-offs in Hash Coding with Allowable Errors. Commun.
+ACM 13, 7 (Jul. 1970), 422-426.
+Buckley C. (1985). Implementation of the SMART Information Retrieval System. Technical
+Report. UMI Order Number : TR85-686. Cornell University.
+Crespo A. et H. Garcia-Molina (2002). Semantic Overlay Networks for P2P Systems. Techni-
+cal report, Computer Science Department, Stanford University.
+Cuenca-Acuna F., C. Peery, P. Martin et D. Thu Nguyen (2002). PlanetP : Using Gossiping
+to Build Content Addressable Peer-to-Peer Information Sharing Communities. Department
+of Computer Science, Rutgers University. 12th IEEE International Symposium on High
+Performance Distributed Computing (HPDC-12).
+Goh S., P. Kalnis, S. Bakiras et K. Tan (2005). Real Datasets for File-Sharing Peer-to-Peer
+Systems. DASFAA, 201-213.
 Summary
-We consider the problem of displaying commercial ads on web pages. More and more
-advertisers are willing to pay only when their ads are clicked. In this emerging “cost per
-click” model, the ad server has to learn the interest of each type of visitors for the different
-ads in order to maximize the income. This “exploration versus exploitation” problem is often
-addressed as if resources were unlimited whereas in a realistic context, budget constraints on
-the ads like limited number of clicks, as well as the duration of the ad campaigns, should be
-taken into account. For this purpose, we introduceMAB+LP, a hybrid approach based on linear
-programming and multi-armed bandits to handle this problem and investigate its performance
-through simulations on a realistic model designed with an important commercial web actor.
-These experiments exhibit near optimal performance on the investigated problem setting.
-RNTI-E-19 - 78 -
+Peer-to-peer systems (P2P) have become popular these last years with sharing files on
+Internet. Much research has emerged concerning the optimization of data localization, and
+constitutes a very active research area. Taking into account semantic aspects improves consid-
+erably data localization. We based our study on the PlanetP approach, which uses the notion
+of Bloom Filter consisting on propagating peers’ semantic signatures (Bloom Filters) through
+the network. We present this approach and extend it with an improvement : the creation of
+dynamic Bloom Filters, their size depends on the load of peers (number of shared documents).
+- 468 -RNTI-E-6

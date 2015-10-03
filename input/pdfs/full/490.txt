@@ -1,593 +1,559 @@
-Extraction de motifs temporels à partir de séquences
-d’événements avec intervalles temporels
-Thomas Guyet∗, René Quiniou∗∗
-∗AGROCAMPUS-OUEST
-65 rue de Saint-Brieuc, CS 84215, 35 042 Rennes Cedex
-thomas.guyet@agrocampus-ouest.fr,
-∗∗INRIA, Centre de Rennes - Bretagne Atlantique
-Campus de Beaulieu, F - 35 042 Rennes Cedex
-rene.quiniou@irisa.fr
-Résumé. La fouille de base de données séquentielles a pour objet l’extraction
-de motifs séquentiels représentatifs. La plupart des méthodes concernent des
-motifs composés d’événements liés par des relations temporelles basées sur la
-précédence des instants. Pourtant, dans de nombreuses situations réelles une in-
-formation quantitative sur la durée des événements ou le délai inter-événements
-est nécessaire pour discriminer les phénomènes. Nous proposons deux algo-
-rithmes, QTIAPriori et QTIPrefixSpan, pour extraire des motifs temporels com-
-posés d’événements associés à des intervalles décrivant leur position dans le
-temps et leur durée. Chacun d’eux ajoute aux algorithmes GSP et PrefixSpan une
-étape de catégorisation d’intervalles multi-dimensionnels pour extraire les inter-
-valles temporelles représentatifs. Les expérimentations sur des données simulées
-montrent la capacité des algorithmes à extraire des motifs précis en présence de
-bruit et montrent l’amélioration des performances en temps de calcul.
+Utilisation de l’analyse factorielle des correspondances pour
+la recherche d’images à grande échelle
+Nguyen-Khang Pham∗,∗∗, Annie Morin∗, Patrick Gros∗, Quyet-Thang Le∗∗
+∗IRISA, Campus de Beaulieu, F - 35042, Rennes Cedex
+{pnguyenk,amorin,pgros}@irisa.fr,
+http://www.irisa.fr
+∗∗Université de Cantho, Campus III, 1 Ly Tu Trong, Cantho, Vietnam
+lqthang@cit.ctu.edu.vn
+http://www.cit.ctu.edu.vn
+Résumé. Nous nous intéressons à l’utilisation de l’Analyse Factorielle des Cor-
+respondances (AFC) pour la recherche d’images par le contenu dans une base de
+données d’images volumineuse. Nous adaptons l’AFC, méthode originellement
+développée pour l’Analyse des Données Textuelles (ADT), aux images en utili-
+sant des descripteurs locaux SIFT. En ADT, l’AFC permet de réduire le nombre
+de dimensions et de trouver des thèmes. Ici, l’AFC nous permettra de limiter le
+nombre d’images à examiner au cours de la recherche afin d’accélérer le temps
+de réponse pour une requête. Pour traiter de grandes bases d’images, nous pro-
+posons une version incrémentale de l’algorithme AFC. Ce nouvel algorithme
+découpe une base d’images en blocs et les charge dans la mémoire l’un après
+l’autre. Nous présentons aussi l’intégration des informations contextuelles (e.g.
+la Mesure de Dissimilarité Contextuelle (Jegou et al., 2007)) dans notre structure
+de recherche d’images. Cela améliore considérablement la précision. Nous ex-
+ploitons cette intégration dans deux axes: (i) hors ligne (la structure de voisinage
+est corrigée hors ligne) et (ii) à la volée (la structure de voisinage des images est
+corrigée au cours de la recherche sur un petit ensemble d’images).
 1 Introduction
-Dans de nombreux domaines d’application, médecine (Quiniou et al. (2003)), agronomie
-(Le Ber et al. (2006)), e-commerce (Masseglia et al. (2009)), industrie (Giannotti et al. (2006)),
-IHM (Cram et al. (2009)), les méthodes de fouille de données sont utilisées pour extraire des
-motifs séquentiels à partir de séquences. La fouille de séquences s’est principalement intéres-
-sée à l’extraction de motifs dont la dimension temporelle ou spatiale repose sur un ordonnan-
-cement simple des items (occurrences dans le temps ou dans l’espace des objets composant les
-motifs). Cependant, dans de nombreux domaines d’application un tel ordonnancement n’est
-pas suffisant : une caractérisation quantitative des durées des événements ou des délais entre
-les occurrences de ces événements est nécessaire pour affiner les motifs extraits et produire les
-connaissances utilisables pour différencier certains comportements. Par exemple, deux achats
-effectués à un jour, un mois ou un an d’intervalle ne sont pas corrélés de la même façon.
-Notre objectif est de définir une méthode de fouille de séquences temporelles composées
-d’occurrences d’événements pouvant avoir une durée. Le but est d’extraire les motifs séquen-
-Extraction de motifs avec intervalles temporels
-tiels intéressants, ici fréquents, composés d’événements auxquels sont associés des intervalles
-temporels numériques caractérisant à la fois leur durée et leur position relative dans le temps.
-Dans cet article, nous proposons deux algorithmes efficaces pour l’extraction de séquences
-d’intervalles temporels utilisant successivement une méthode de fouille de séquences et une
-caractérisation des intervalles à partir d’un algorithme de catégorisation d’intervalles. Nous
-comparons plusieurs méthodes et distances issues de l’analyse de données symboliques pour
-extraire les caractéristiques temporelles quantitatives représentatives des séquences.
-2 Travaux proches
-De nombreuses méthodes ont été proposées pour extraire efficacement des séquences in-
-téressantes à partir de grandes bases de données séquentielles. La plupart s’intéressent à des
-événements instantanés, représentés par un point sur l’axe des temps, liés par des relations tem-
-porelles symboliques basées sur la précédence simple associées à l’utilisation de contraintes
-globales (par exemple, Srikant et Agrawal (1996); Pei et al. (2001); Zaki (2001); Masseglia
-et al. (2009)). Pour les événements de durée non nulle, il est nécessaire d’enrichir la représen-
-tation des motifs par des relations temporelles, symboliques ou numériques, sur des intervalles.
-Concernant l’extraction d’informations temporelles quantitatives, plusieurs algorithmes
-traitent des séquences d’événements ponctuels datés et en extraient des motifs temporels dont
-les contraintes temporelles correspondent aux enveloppes de l’ensemble des bornes des in-
-tervalles qui sont couverts. Dousson et Duong (1999) ou Cram et al. (2009) ont proposé des
-méthodes d’extraction de chroniques – graphes de motifs contraints par des relations tempo-
-relles quantitatives sur les délais entre événements – à partir de séquences d’événements datés.
-Giannotti et al. (2006) ou Yoshida et al. (2000) extraient des delta-patterns, règles de la forme
-a
-[tl,tu]−−−−→ b, signifiant que la durée entre a et b est comprise entre tl et tu. La caractérisation des
-intervalles par des enveloppes bénéficie d’une propriété de monotonie dans un treillis de mo-
-tifs. Cette propriété est efficacement utilisée dans le processus de fouille pour élaguer certains
-motifs au plus tôt. QFIMiner de Washio et al. (2007) peut être classé dans la même catégo-
-rie bien qu’il ne traite pas des séquences mais des ensembles d’items possédant des attributs
-quantitatifs sous forme d’intervalles. Les motifs extraits sont des ensembles d’items auxquels
-sont associés des contraintes quantitatives extraites à partir d’une catégorisation des valeurs
-d’un attribut quantitatif pour les ensembles d’items supportant le motif. Cette classification,
-combiné avec PrefixSpan, est utilisé dans l’algorithme QTPSpan de Nakagaito et al. (2009).
-Néanmoins, la sémantique des motifs induites par l’utilisation de l’enveloppe de séquences
-n’est pas suffisamment fine pour extraire des motifs comportant les mêmes types d’événe-
-ments mais associés à des intervalles temporels différents. QTempIntMiner, de Guyet et Qui-
-niou (2008), résout ce problème en proposant une adaption de l’algorithme GSP qui utilise un
-algorithme de classification de séquences temporelles pour extraire des intervalles temporels
-typiques. Mais l’utilisation de l’algorithme EM pour cette classification le rend peu efficace.
-3 Notations
-Dans cette section, nous introduisons les notations et les définitions utiles à la formalisation
-du problème d’extraction de motifs temporels que nous nous proposons de résoudre.
-T. Guyet et R. Quiniou
-3.1 Séquence temporelle
-Définition 1 (Séquence temporelle). Une séquence temporelle S est un ensemble ordonné
-d’événements, où un événement A = (A, [l, u]), est composé d’un symbole A associé à un
-intervalle non-vide [l, u], où l, u ∈ R, l < u, sont des dates.
-S = {(si, [li, ui])}i∈Nn , tq ∀i, j ∈ N, li < lj ∨ (li = lj ∧ (si < sj ∨ (si = sj ∧ ui < uj)))
-|S| = n, le nombre d’événements, est appelé la taille de la séquence S . On note ⊕ l’opération
-de concaténation de séquences temporelles.
-Le début de l’intervalle d’un événement, li, donne la date d’occurrence du symbole si dans
-la séquence temporelle. Contrairement à une représentation qui utiliserait des durées entre
-événements, la définition des valeurs li et ui requiert un instant de référence temporelle pour
-chaque séquence temporelle.
-Définition 2 (Signature symbolique). La signature symbolique d’une séquence temporelle S =
-{(si, [li, ui])}i∈Nn , notée S , est la séquence de ses symboles : S = {si}i∈Nn . L’ordre de la
-séquence symbolique conserve l’ordre de la séquence d’intervalles (par dates de début puis
-par ordre lexicographique).
-Définition 3 (Intervalle multi-dimensionnel). Un intervalle multi-dimensionnel de dimension
-n est un n-uplet d’intervalles I = ([li, ui])i∈Nn .
-Définition 4 (Projection sur une signature symbolique pi). La projection d’une séquence tem-
-porelle S = {(si, [li, ui])}i∈Nn sur une signature symboliqueM = {mi}i∈Nk de taille k est
-un intervalle multi-dimensionnel de dimension k.
-SiM n’est pas une sous-séquence de S , alors piM(S) = ∅,
-Sinon piM(S) =
-(
-[lf(i), uf(i)]
-)
-i∈Nk , avec ∀i ∈ Nk, sf(i) = mi où f : Nn )→ Nk est
-injective, croissante (l’appariement respecte l’ordre des événements dans le motif et dans la
-séquence).
-On note pi(S) la projection de la séquence entière piS(S) = ([li, ui])i∈Nn .
-Exemple 1. Soit la séquence E = {(A, [1, 2]) , (C, [1.5, 4]) , (B, [3, 4]) , (C, [5, 6])}, illus-
-trée par la Figure 1, on a alors E = {A,C,B,C}, pi{A,B}(E) = ([1, 2], [3, 4]), et pi(E) =
-([1, 2], [1.5, 4], [3, 4], [5, 6]).
-FIG. 1 – Illustration de la séquence d’intervalles E .
-Définition 5 (Dissimilarité entre séquences temporelles). Soient S1 et S2 deux séquences tem-
-porelles, alors la dissimilarité entre S1 et S2, notée d(S1,S2), est définie par :
-d(S1,S2) =
-{ ∞ si S1 "= S2, (signatures symboliques différentes)
-δ
-(
-pi(S1),pi(S2))
-où δ est une mesure de distance entre intervalles multi-dimensionnels (cf. Section 4.4).
-Extraction de motifs avec intervalles temporels
-3.2 Extraction de motifs temporels fréquents
-Définition 6 (Motif temporel). Un motif temporel est une séquence temporelle représentative
-d’un ensemble de séquences temporelles (instances du motifs).
-Tout comme Giannotti et al. (2006), notre définition d’un motif s’appuie sur la notion de
-représentativité d’une sous-séquence. Les motifs temporels sont construits pour représenter
-statistiquement un ensemble de séquences temporelles, mais on n’exprime pas formellement
-la notion de représentativité. Ceci est à distinguer de motifs comme les chroniques ou les
-delta-patterns dont l’information temporelle est construite par l’enveloppe de l’ensemble des
-séquences d’événements ponctuels qu’ils recouvrent.
-Définition 7 (#-couverture d’un motif temporel). Un motif temporel P = {(pi, [lpi , upi ])}i∈Nn
-#-couvre une séquence S = {(si, [lsi , usi ])}i∈Nm , noté S ≺! P , si et seulement si il existe une
-projection de S sur P telle que la dissimilarité avec P soit inférieure à #, c.-à-d. :
-∃J ⊂ Nm, d
-(
-P,{(sj , [lsj , usj])}j∈J) < #
-Exemple 2. Considérons trois motifs p1 = {(C, [1, 2]) , (A, [2, 4])}, p2 = {(A, [1, 2]) , (C,
-[2, 4])} et p3 = {(A, [1, 2]) , (C, [4, 5])}). Choisissons # = 1 et la distance CityBlock (somme
-des valeurs absolues des différences entre bornes correspondantes des intervalles, cf. Section
-4.4) pour δ. p1 n’#-couvre pas E , la séquence de l’Exemple 1, car la sous-séquence {C,A}
-n’existe pas dans E . p2 #-couvre E car δ ( ([1, 2], [2, 3.8]), ([1, 2], [1.5, 4]) ) = 0.7 < #. p3
-n’#-couvre pas E car chacune des occurences de p3 dans E a une dissimilarité supérieure à # :
-δ ( ([1, 2], [4, 5]), ([1, 2], [1.5, 4]) ) = 3.5 et δ ( ([1, 2], [4, 5]), ([1, 2], [5, 6]) ) = 2.
-Définition 8 (Extraction de motifs temporels fréquents). Étant donnés un seuil de fréquence
-fmin ∈ [0, 1] et une dissimilarité maximale # ∈ R+, la tâche d’extraction de motifs temporels
-dans une base de séquences temporelles D consiste à extraire des motifs temporels tels que la
-fréquence des séquences qu’ils #-couvrent soit supérieure à fmin.
-Un motif temporel est le représentant d’un ensemble de séquences temporelles qu’il #-
-couvre. Le paramètre # précise la limite de proximité temporelle acceptable entre une séquence
-et son représentant. Il s’agit d’un paramètre supplémentaire par rapport au problème classique
-d’extraction de motifs séquentiels fréquents.
-4 Présentation des algorithmes
-Dans cette partie nous présentons deux algorithmes d’extraction de motifs séquentiels à
-base d’intervalles temporels : QTIAPriori et QTIPrefixSpan. Tout d’abord, nous introduisons
-une structure de données utilisée dans ces algorithmes.
-4.1 Structure de données
-Dans les algorithmes de recherche d’itemsets fréquents ou de séquences fréquentes, le
-calcul de la fréquence d’un itemset dans la base de séquences est très coûteux en temps de
-calcul. Pour éviter d’avoir à parcourir systématiquement l’ensemble de la base de séquences,
-T. Guyet et R. Quiniou
-Algorithme 1 : QTIApriori
-input : D : base de données de séquences temporelles, fmin : seuil de fréquence, ! : seuil de similarité entre
-motifs, δ(., .) : mesure de dissimilarité entre intervalles
-output : FP : ensemble des motifs temporels fréquents
-Construction de S1 // Symboles fréquents dans D1
-k = 1 ; C1 = S12
-while Ck != ∅ do3
-Lk = ∅4
-foreach q ∈ Ck do5
-if |L(q)| > fmin ∗ |D| then Lk = Lk ∪ q6
-FP = FP ∪ Lk7
-if Lk = ∅ then return FP8
-// Génération de nouveaux candidats9
-Ck+1 = ∅10
-foreach p ∈ Lk do11
-foreach e ∈ S1 do12
-np = p⊕ e // Extension du motif p13
-L(np) = L(p) // Attribution a priori d’une liste d’instance14
-if ∀j ∈ 1..|np|, ∃m ∈ Lk, d(m,np(1..j − 1, j + 1..|np|) ) ≤ ! then15 {Mr} = TemporalPatternConstruction(np) // Construction des contraintes temporelles et16
-raffinement de L(np)
-Ck+1 = Ck+1 ∪Mr17
-if Ck+1 = ∅ then return FP18
-k = k + 119
-Srikant et Agrawal (1996) proposent une structure de données associant un motif à l’ensemble
-des séquences qui supportent un itemset. Nous adaptons cette structure de données pour le
-comptage des séquences qui supportent un motif séquentielm.
-Pour chaque motif m, L(m) = {stidi} regroupe l’ensemble de ses instances représen-
-tatives. Chaque élément de L(m) est un triplet stid = 〈tid, pos, is〉 où tid est l’identifiant
-d’une séquence temporelle de D, is est une instance représentative du motif m, c.-à-d. une
-sous-séquence de la séquence tid #-couverte parm (is ≺! m), et pos est la position du dernier
-symbole de is dans la séquence tid.
-L(m) représente la base projetée sur m, au sens de PrefixSpan (2), c.-à-d. l’ensemble des
-suffixes (localisés par pos) de chaque séquence tid qui a une instance dem pour préfixe.
-Exemple 3. Avec # = 4, le motif temporel p3 (cf. Exemple 2) #-couvre deux sous-séquences
-de E (cf. Exemple 1, en attribuant tid = 1 à E dans D) :
-L(p3) = {〈1, 2, {(A, [1, 2]) , (C, [1.5, 4])}〉, 〈1, 4, {(A, [1, 2]) , (C, [5, 6])}〉} .
-4.2 QTIAPriori
-QTIAPriori, décrit dans l’algorithme 1, est un algorithme de recherche de motifs temporels
-fréquents fonctionnant par niveaux à la manière de GSP (Srikant et Agrawal (1996)). Dans
-une étape préliminaire, C1, l’ensemble des symboles fréquents dans D est construit (ligne 1).
-Ensuite, la boucle principale effectue itérativement les deux étapes classiques de l’algorithme
-Extraction de motifs avec intervalles temporels
-Algorithme 2 : QTIPrefixSpan
-input : D : base de données de séquences temporelles, fmin : seuil de fréquence, ! : seuil de similarité entre
-motifs, δ(., .) : mesure de dissimilarité entre intervalles, p : motif temporel
-output : FP : ensemble des motifs temporels fréquents
-Construction de S1 // Symboles fréquents dans D1
-foreach e ∈ S1 do2
-//Extension du motif temporel p3
-np = p⊕ e4
-L(np) = ∅5
-//Projection sur la base de séquences6
-foreach stid ∈ L(p) do7
-s = D(stid.tid)8
-foreach i tq i < stid.pos+ 1 ∧ si = e do9
-L(np) = L(np) ∪ 〈stid.tid, i, stid.is⊕ si〉10
-//Construction des contraintes temporelles et récursion11
-{Mr} = TemporalPatternConstruction(np)12
-foreach q ∈ {Mr} do13
-if q /∈ already_explored then14
-already_explored = already_explored ∪ q15
-if |L(q)| > fmin ∗ |D| then16
-ExtentedPatterns = QTIPrefixSpan( D, fmin, !, δ(., .), q )17
-FP = FP ∪ ExtentedPatterns18
-GSP : l’élagage des motifs candidats non-fréquents (lignes 5-6) puis la génération de nouveaux
-motifs candidats de taille k+1 à partir des motifs fréquents de taille k (lignes 10-17). Le cycle
-s’arrête lorsqu’il n’y a plus de motifs temporels fréquents à étendre.
-L’élagage de la première étape ne nécessite pas de comptage explicite des instances d’un
-motif puisque celles-ci sont représentées au moyen de la structure de données L(q). Si L(q)
-contient suffisamment d’instances (ligne 5), q est ajouté aux motifs temporels fréquents Lk.
-Dans la seconde étape (lignes 10-17), les motifs candidats sont composés d’un motif ap-
-partenant à Lk suivi d’un événement constitué d’un symbole e issu de S1. Initialement, e n’est
-associé à aucun intervalle temporel. À la ligne 14, on attribue provisoirement à np l’ensemble
-des instances associées à p. Comme p est un sous-motif de np, on sait a priori que la liste des
-instances #-couvertes par np est contenue dans la liste des instances #-couvertes par p.
-L’étape de construction des contraintes temporelles étant coûteuse en temps, il est plus
-efficace de pré-sélectionner les candidats ayant des chances d’être fréquents. Pour cela, on
-utilise la contrainte APriori exprimée ligne 15 : tous les sous-motifs de np de taille k doivent
-être similaires à au moins un des motifs m de Lk. Dans la mesure où e n’est associé à aucun
-intervalle temporel, le calcul de la similarité ignore la dimension temporelle de e. Ensuite, la
-fonction TemporalPatternConstruction (ligne 16) construit une liste de motifs temporels {Mr}
-ayant la même signature symbolique que np dont les caractéristiques temporelles sont obtenues
-par classification des intervalles multidimensionnels (cf. Section 4.4). Cette fonction se charge
-également de mettre à jour les structures de données pour chaque nouveau motif candidat.
-T. Guyet et R. Quiniou
-Algorithme 3 : TemporalPatternConstruction
-input : p : motif temporel avec L(p) qui contient la liste des instances du sous-motif de p
-output : {Mr} : ensemble des motifs temporels de signature symbolique p temporellement représentatifs des
-instances dans L(p)
-//Construction de l’ensemble des intervalles temporels à catégoriser1
-Ex = ∅2
-foreach stid ∈ L(p) do3
-Ex = Ex ∪ pi(stid.is)4
-C = categoriser(Ex)5
-//Construction des motifs temporels6
-{Mr} = ∅7
-foreach C ∈ C do8
-q =
-{
-(pi, ci)
-}
-i9
-L(q) = {stid ∈ L(p), d(stid.is, q) < !}10
-{Mr} = {Mr} ∪ q11
-4.3 QTIPrefixSpan
-QTIPrefixSpan (algorithme 2), est un algorithme récursif de type profondeur d’abord basé
-sur PrefixSpan (Pei et al. (2001)). Il explore les extensions d’un motif temporel p, fourni en
-paramètre, en effectuant des projections successives de la base de séquences afin de réduire la
-complexité du calcul du support et de la catégorisation temporelles des motifs étendus.
-Dans une première phase (lignes 3-5), l’algorithme étend le préfixe p avec l’un des sym-
-boles e de S1 (S1 est construit lors d’une étape préliminaire à la récursion). L’algorithme effec-
-tue ensuite la projection de la base de séquences sur le motif np = p⊕e (lignes 6-10). Comme
-la liste L(np) représente la base projetée (cf. Section 4.1), cette étape consiste à construire la
-liste de stid associée à np. Ici aussi, la dimension temporelle de e est ignorée.
-Dans la seconde phase (lignes 11-18), de même que pour QTIAPriori, la fonction Tempo-
-ralPatternConstruction construit des motifs temporels de même signature que np. Les motifs
-temporels non-fréquents sont ensuite élagués (ligne 16). Si le motif q est fréquent, alors il est
-ajouté aux motifs explorés. Enfin, QTIPrefixSpan est appelé récursivement pour étendre q.
-4.4 Catégorisation d’intervalles multi-dimensionnels
-L’algorithme TemporalPatternConstruction(p) (cf. Algorithme 3) est utilisé dans les algo-
-rithmes QTIAPriori (ligne 16) et QTIPrefixSpan (ligne 12). Il construit des motifs temporels
-représentatifs d’un ensemble de sous-séquences temporelles ayant la même signature sym-
-bolique. La méthode consiste 1) à catégoriser l’ensemble des intervalles multidimensionnels
-obtenus par la projection des stid.is contenus dans L(p), 2) à construire, pour chacune des ca-
-tégories, un nouveau motif q ayant la même signature symbolique que p et avec les contraintes
-temporelles caractéristiques des intervalles multidimensionnels de la catégorie, 3) à construire
-L(q) à partir de L(p).
-Pour la catégorisation réalisée à la ligne 5, nous utilisons un algorithme KMeans ou un
-algorithme Affinity Propagation (AP) de Frey et Dueck (2007), que nous avons adaptés à la
-catégorisation d’intervalles multi-dimensionnels. Pour ce faire, nous avons sélectionné deux
-similarités entre les objets à classer, ici des intervalles multi-dimensionnels I = ([lIk, u
-I
-k])k∈Nn
-Extraction de motifs avec intervalles temporels
-et J = ([lJk , u
-J
-k ])k∈Nn de dimension n : la distance de Haussdorf, notée dH , et la distance City-
-Block, notée dCB . D’autres mesures de distance entre intervalles multi-dimensionnels peuvent
-être trouvées dans Irpino et Verde (2008).
-dH(I, J) =
-n∑
-k=1
-max
-(|lIk − lJk |, |uIk − uJk |) , dCB(I, J) = n∑
-k=1
-|lIk − lJk |+ |uIk − uJk |
-À la ligne 10, la liste des instances du motif temporel q est mise à jour. Comme avec les
-bases projetées de PrefixSpan, on évite de parcourir l’ensemble de la base de séquences en ne
-cherchant les instances du motif temporel q qu’à partir des instances d’un sous-motif de q. En
-entrée de l’algorithme, on pose comme précondition que L(p) contient les instances du sous
-motif de p : p(1..|p|− 1), on construit donc L(q) à partir de cette liste de stid.
-Pour trouver le nombre de classes intrinsèques à la distribution d’intervalles, il faut tester
-différentes valeurs de k pour les K-Means, ou du paramètre s pour AP, et choisir celle qui
-convient le mieux aux données. Pour sélectionner le nombre de classes, nous utilisons le critère
-BIC (Bayesian Information Criterion).
-5 Expérimentations
-Les algorithmes QTIApriori et QTIPrefixSpan ont été implémentés en Matlab 1. Dans les
-expérimentations suivantes, nous comparons les performances en temps de calcul des algo-
-rithmes proposés et la qualité des motifs extraits. Les résultats sont comparés avec ceux de
-QTempIntMiner. Les expérimentations utilisent des données simulées.
-5.1 Production de données simulées
-Nous avons développé un générateur de séquences temporelles afin de produire des jeux
-de données paramétrables selon les caractéristiques des motifs à rechercher (en particulier
-leurs caractéristiques temporelles numériques) et celles de la base de séquences (nombre de
-séquences, proportion de bruit, ...). Le principe de la génération d’une base de séquences tem-
-porelles consiste, d’une part, à construire des séquences à partir d’un ou plusieurs prototypes
-de motif temporel et, d’autre part, à ajouter des séquences aléatoires (bruit) dans la base de
-séquences selon une proportion rP comprise entre 0 et 1.
-Un prototype de motif temporel est un ensemble de n 5-uplets {(Ei, µbi ,σbi , µdi ,σdi)}i∈Nn
-où Ei est un symbole, µbi , µdi (resp. σbi ,σdi ) sont les moyennes (resp. écarts-types) de la
-date de début et de la durée de Ei. Un prototype spécifie un motif temporel à découvrir
-({(Ei, [µbi , µbi + µdi ])}i∈Nn ). Les instances de ce motif sont générées en utilisant une dis-
-tribution Gaussienne des dates (resp. durées) centrée sur µb (resp. µd) avec un écart-type σb
-(resp. σd). Plus l’écart-type est important, plus les variations temporelles sont importantes et
-plus l’extraction du motif original sera difficile. Pour simplifier la présentation des résultats,
-nous fixons un unique paramètre tN ∈ R+ pour quantifier tous les écarts-types. Ce paramètre
-quantifie le bruit temporel d’un jeu de données.
-1. Les expérimentations ont été menées sur un ordinateur ayant un processeur Xeon (un seul cœur utilisé),
-avec 8Go de RAM. Les sources des algorithmes et le simulateur de données peuvent être téléchargés sur le site :
-www.irisa.fr/dream/QTempIntMiner/
-T. Guyet et R. Quiniou
-3 3.5 4 4.5 5 5.5 6
-0
-200
-400
-600
-800
-1000
-1200
-Te
-mp
+La recherche d’images par le contenu a pour but de trouver, dans une base d’images, les
+images les plus similaires à celle de la requête en utilisant des informations visuelles. Cette
+tâche n’est pas facile à cause de changement de vue, variation de luminosité, occlusion. Ré-
+cemment, l’utilisation des descripteurs locaux a apporté de bonnes améliorations à l’analyse
+d’images. Contrairement aux descripteurs globaux qui sont calculés sur une image entière,
+les descripteurs locaux sont extraits en des points particuliers d’une image. Cela permet de
+trouver des images qui partagent un ou plusieurs éléments visuels seulement avec l’image
+requête. Initialement, les méthodes basées sur un mécanisme de vote ont été utilisées pour
+la recherche d’images en mettant en correspondance des points d’intérêt (Lowe, 1999; Mi-
+kolajczyk et Schmid, 2004). Les méthodes originellement développées pour l’Analyse des
+AFC pour la recherche d’images à grande échelle
+Données Textuelles comme la pondération tf*idf (Salton et Buckley, 1988), LSA (Latent Se-
+mantic Analysis) (Deerwester et al., 1990), PLSA (Probabilistic Latent Semantic Analysis)
+(Hofmann, 1999), LDA (Latent Dirichlet Allocation) (Blei et al., 2003) ont été adaptées aux
+images (Bosch et al., 2006; Lienhart et Slaney, 2007; Sivic et al., 2005). Dans l’Analyse des
+Données Textuelles, ces méthodes utilisent un modèle sac-de-mots. Elles prennent en entrée
+une matrice de co-occurrences (appelé aussi un tableau de contingence qui croise des docu-
+ments et des termes/mots) et essayent de réduire la dimension. Dans l’adaptation aux images,
+nous avons les images comme documents et les « mots visuels » comme termes/mots. Dans le
+contexte de grandes bases d’images, les méthodes comme LSA, PLSA et LDA deviennent très
+coûteuses en terme de temps et de mémoire utilisée. Ici, nous nous intéressons à l’utilisation de
+l’Analyse Factorielle des Correspondances (AFC) pour la recherche l’images à grande échelle
+sous trois aspects : (i) l’utilisation de l’AFC permet d’améliorer la distance entre les images par
+rapport à tf*idf et PLSA (Pham et Morin, 2008). (ii) Dans le cas d’un grand nombre d’images,
+nous proposons une version incrémentale de l’algorithme AFC. Pour éviter les problèmes de
+mémoire, on découpe la base en blocs chargés les uns après les autres en mémoire. (iii) Nous
+introduisons une structure de recherche très efficace pour des images en utilisant un indicateur
+de l’AFC : la qualité de représentation. Cette structure se base sur un système de fichier in-
+versé (Sivic et Zisserman, 2003; Nistér et Stewénius, 2006) qui évite la comparaison entre la
+requête et toutes les images de la base. Néanmoins nos fichiers inversés ne sont pas construits
+directement à partir des « mots visuels » mais à partir des thèmes trouvés par l’AFC. Nous
+présentons aussi l’intégration de la Mesure de Dissimilarité Contextuelle (Jegou et al., 2007)
+dans notre structure de recherche.
+Le reste de l’article est organisé comme suit : la construction des mots visuels et son utili-
+sation pour la représentation des images sont présentées dans la section 2. Nous décrivons briè-
+vement l’Analyse Factorielle des Correspondances dans la section 3. La section 4 est dédiée
+à présenter la version incrémentale de l’algorithme d’AFC. La recherche d’images à grande
+échelle en utilisant l’AFC est présentée dans la section 5. Nous montrons quelques résultats
+expérimentaux dans la section 6 avant la conclusion et les perspectives.
+2 Représentation des images
+Les mots dans les images, appelés mots visuels, doivent être calculés pour constituer un
+vocabulaire de N mots. Chaque image sera donc représentée ensuite par un histogramme de
+mots. La construction des mots visuels se fait en deux étapes : (i) calcul des descripteurs locaux
+pour un ensemble d’images, (ii) classification (clustering) des descripteurs obtenus. Chaque
+cluster correspondra à un mot visuel. Il y aura donc autant de mots que de clusters obtenus à
+l’issue de l’étape (ii). Le calcul des descripteurs locaux dans une image se fait aussi en deux
+étapes : il faut d’abord détecter des points d’intérêt dans l’image. Ces points d’intérêt sont, soit
+des maximums du Laplacien du Gaussien (Lindeberg, 1998), soit des extremums locaux 3D
+de la différence de Gaussien (Lowe, 1999), soit des points extraits par un détecteur Hessien-
+affine (Mikolajczyk et Schmid, 2004). La figure 1 montre quelques points d’intérêt déctectés
+par un détecteur Hessien-Affine. Ensuite, le descripteur de ce point d’intérêt est calculé sur le
+gradient des niveaux de gris dans la région autour du point. La plupart des applications (Sivic
+et al., 2005; Bosch et al., 2006) utilisent des descripteurs invariants à la rotation et au change-
+ment d’échelle, les descripteurs SIFT (Lowe, 2004). Chaque descripteur SIFT est un vecteur
+N-K. Pham et al.
+FIG. 1 – Points d’intérêt détectés par un détecteur Hessian-Affine
+FIG. 2 – Un descripteur SIFT calculé à partir de la région autour d’un point d’intérêt (le
+cercle) : gradient de l’image (à gauche), et le descripteur du point d’intérêt (à droite)
+à 128 dimensions. Le calcul des descripteurs SIFT est illustré dans la figure 2. La seconde
+étape consiste à former des mots visuels à partir des descripteurs locaux calculés à l’étape
+précédente. La plupart des travaux effectue un k-means sur les descripteurs locaux et prend
+les moyennes de chaque cluster comme mots visuels (Sivic et al., 2005; Bosch et al., 2006).
+Après avoir construit le vocabulaire visuel, chaque descripteur est affecté au cluster le plus
+proche. Pour cela, on calcule dans R128 les distances de chaque descripteur aux représentants
+des clusters définis précédemment. Une image est ensuite caractérisée par la distribution des
+mots visuels. On obtient ainsi un tableau de contingence croisant les images et les clusters.
+3 Analyse Factorielle des Correspondances
+L’AFC est une méthode exploratoire classique pour l’analyse des tableaux de contingence.
+Elle a été proposée par (Benzecri, 1973) dans le contexte de la linguistique, c’est-à-dire pour
+l’analyse de données textuelles. L’AFC sur un tableau croisant des mots et des documents
+permet de répondre aux questions suivantes : Y a-t-il des proximités entre certains mots ? Y
+a-t-il des proximités entre certains documents ? Y a-t-il des liens entre certains mots et certains
+documents ? L’AFC comme la plupart des méthodes factorielles utilise une décomposition en
+valeurs singulières d’une matrice particulière et permet la visualisation des mots et des docu-
+ments dans un espace de dimension réduit. Cet espace de dimension réduit a la particularité
+d’avoir un nuage de points projetés (mots et/ou documents) d’inertie maximale. Par ailleurs,
+l’AFC fournit des indicateurs pertinents pour l’interprétation des axes comme la contribution
+d’un mot ou d’un document à l’inertie de l’axe ou la qualité d’un mot et/ou d’un document sur
+un axe (Morin, 2004; Greenacre, 2007).
+AFC pour la recherche d’images à grande échelle
+Soit un tableau de contingence F = {fij}M,N de tailleM ×N (N < M ). On normalise F en
+X = {xij}M,N par :
+s =
+M∑
+i=1
+N∑
+j=1
+fij (1)
+xij =
+fij
 s
-Taille des motifs
-(a)
- 
- 
-QTempIntMiner
-QTIPrefixSpan−KMeans (Hausdorff)
-QTIAPriori−KMeans (Hausdorff)
-100 200 300 400 500 600 700 800 900 1000
-0
-200
-400
-600
-800
-1000
-1200
-Te
-mp
-s
-Nbre d’exemples
-(b)
- 
- 
-QTempIntMiner
-QTIPrefixSpan−KMeans (Hausdorff)
-QTIAPriori−KMeans (Hausdorff)
-3 3.5 4 4.5 5 5.5 6
-0
-5
-10
-15
-20
-25
-30
-35
-40
-45
-(c)
-Te
-mp
-s
-Taille des motifs
- 
- 
-QTIPrefixSpan−KMeans (Hausdorff)
-QTIPrefixSpan−AP (Hausdorff)
-QTIAPriori−KMeans (Hausdorff)
-QTIAPriori−AP (Hausdorff)
-0 0.5 1 1.5 2 2.5 3 3.5
-x 105
-0
-0.5
+, ∀i = 1..M, j = 1..N (2)
+et note :
+pi =
+N∑
+j=1
+xij , ∀i = 1..M qj =
+M∑
+i=1
+xij , ∀j = 1..N (3)
+P =
+
+
+p1 0
+p2
+...
+0 pM
+
+ Q =
+
+
+q1 0
+q2
+...
+0 qN
+
+ (4)
+Pour déterminer le meilleur sous-espace de projection des données, on calcule les valeurs
+propres et les vecteurs propres de la matrice V de taille N ×N :
+V = X
+′
+P−1XQ−1 (5)
+où X
+′
+est la transposée de X .
+On obtient alors les valeurs propres λ et les vecteurs propres µ :
+λ =
+
+
+λ1
+λ2
+...
+λN
+
+ , µ =
+
+
+µ11 µ12 ... µ1N
+µ21 µ22 ... µ2N
+... ... ... ...
+µN1 µN2 ... µNN
+
+
+On ne garde que les K(K < N) premières valeurs propres les plus grandes et les vecteurs
+propres associés. CesK vecteurs propres constituent une base orthonormée de l’espace réduit
+(appelé aussi espace des facteurs). Le nombre de dimensions du problème passe de N à K.
+Les documents sont projetés dans le nouvel espace réduit :
+Z = P−1XA (6)
+Dans la formule 6, P−1X représente les profils lignes etA = Q−1µ est la matrice de transition
+associée à l’AFC. La projection des mots dans le sous-espace de dimension K est fournie par
+la formule suivante :
+W = Q−1X
+′
+Zλ−
 1
-1.5
+2 (7)
+Un nouveau document (i.e. la requête) r = [r1 r2 · · · rN ] sera projeté dans l’espace des
+facteurs par la formule de transition (6) :
+rˆi =
+ri∑N
+j=1 rj
+, ∀i = 1..N (8)
+Zr = rˆA (9)
+N-K. Pham et al.
+4 Algorithme incrémental pour l’AFC
+Comme présenté dans la section 3, le problème de l’AFC vise à construire la matrice V
+(formule 5) et à chercher ses valeurs propres et vecteurs propres. Dans le cas où il y a beaucoup
+d’images, la matrice X est très grande. Il est donc impossible de la charger dans la mémoire.
+L’idée est de chercher une procédure incrémentale pour construire la matrice V .
+D’abord, réécrivons la formule 5 :
+V0 = X
+′
+P−1X (10)
+V = V0Q
+−1 (11)
+Puis, la matrice X est découpée en blocs par lignes (supposons que nous avons B blocs notés
+par X1, X2, . . ., XB) :
+X =
+
+
+X1
+...
+XB
+
+ (12)
+Ensuite, nous calculons P1, P2, . . . , PB et Q1, Q2, . . . , QB de la même manière que nous cal-
+culons Q et P en replaçant X par Xi, i = 1..B. Il est clair que :
+P =
+
+
+(P1) 0
+(P2)
+. . .
+0 (PB)
+
+ et (13)
+Q =
+B∑
+i=1
+Qi (14)
+Si on note :
+Vi = X
+′
+iP
+−1
+i Xi (15)
+alors
+V0 =
+B∑
+i=1
+Vi (16)
+Les deux formules 14 et 16 nous aident à construire un algorithme incrémental pour calculer
+V . La projection des images Z dans la formule 6 peut être réalisée de la même manière. La
+version incrémentale de l’algorithme d’AFC est décrite dans le tableau 1.
+5 Recherche d’images à grande d’échelle
+5.1 Structure de recherche
+Afin d’accélérer la recherche, nous utilisons la méthode décrite dans (Pham et Morin, 2008)
+pour rejeter les images non pertinentes. L’idée est que l’application de l’AFC sur des images
+AFC pour la recherche d’images à grande échelle
+AFC incrémental
+1. Q = 0
+2. V0 = 0
+3. pour i = 1 à B
+4. charger le bloc Xi en mémoire
+5. calculer Pi, Qi à partir de Xi (voir formules (3) et (4))
+6. Q += Qi
+7. Vi = X
+′
+iP
+−1
+i Xi
+8. V0 += Vi
+9. fin pour
+10. V = V0Q−1
+11. calculer les valeurs propres λ et vecteurs propres µ de V
+12. garderK premiers vecteurs propres de V
+13. calculer matrice de transition A = µQ−1
+14. pour i = 1 à B
+15. charger le bloc Xi en mémoire
+16. calculer Pi à partir de Xi
+17. Zi = P
+−1
+i XiA
+18. fin pour
+TAB. 1 – Algorithme incrémental pour AFC.
+nous permet de trouver des axes correspondant à un thème. Une image qui est bien représentée
+sur un axe appartient au thème associé à cet axe. Une image ne partageant aucun thème avec
+la requête sera considérée comme non pertinente. Le filtrage des images non pertinentes est
+effectué en utilisant des fichiers inversés basés sur la qualité de représentation des images
+selon les axes.
+Définition 1 (qualité de représentation) : la qualité de représentation d’un point i (corres-
+pondant à l’image i) sur l’axe j est le cosinus carré de l’angle entre l’axe j et le vecteur joignant
+le centre du nuage au point i :
+Cos2j (i) =
+Z2ij∑K
+k=1 Z
 2
-2.5
-3
-3.5
-4
-4.5
-x 104
-Te
-mp
-s
-Nbre d’exemples
-(d)
- 
- 
-QTIPrefixSpan−KMeans (Hausdorff)
-FIG. 2 – Temps de calcul moyen (en secondes) en fonction de la taille des motifs temporels
-recherchés (a et c) et en fonction du nombre de séquences (b et d).
-5.2 Résultats
-Toutes les courbes présentées dans la suite ont été obtenues en moyennant les résultats sur
-plusieurs jeux de données différents (entre 5 et 10), générés avec les mêmes paramètres. Sans
-indication contraire, les paramètres ont les valeurs par défaut suivantes : |D| = 100, rP = 0.4,
-tN = 0.2, fmin = 0.1 et # = ∞. La distance de Hausdorff est utilisé et le motif temporel à
-extraire est le suivant :
-{(A, [2, 3]) , (B, [5, 5.5]) , (C, [8, 10]) , (B, [12, 12.5])} .
-Les Figures 2-(a) et 2-(b) comparent les temps de calcul des algorithmes QTempIntMiner,
-QTIAPriori et QTIPrefixSpan en fonction, d’une part, de la taille de la base de séquences et,
-d’autre part, de la taille des motifs recherchés. Dans les deux cas, on constate que les temps
-de calcul des trois algorithmes sont exponentiels. De plus, QTIAPriori et QTIPrefixSpan sont
-significativement plus rapides que QTempIntMiner.
-Plus précisément (cf. Figure 2-(c)), QTIPrefixSpan est deux fois plus rapide que QTIA-
-Priori, qu’il soit associé à KMeans ou à AP. La classification par KMeans mène à de meilleures
-performances que la classification par AP. QTIAPriori-KMeans est même plus rapide que
-QTIPrefixSpan-AP pour des motifs de taille supérieure à 4. La Figure 2-(d) illustre la capacité
-de QTIPrefixSpan-KMeans à passer à l’échelle. La croissance du temps de calcul en fonction
-du nombre de séquences est exponentielle mais de coefficient 1.26, soit relativement proche
-de 1. Le temps moyen de traitement d’une base de données de 100000 séquences, soit environ
-600000 symboles, est d’environ 15 min pour extraire des motifs temporels de taille 4.
-Extraction de motifs avec intervalles temporels
-0
-5
-10
-15
-(a)
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27
-ε x10
-Nb
- M
-otif
-s
- 
- 
-Nb de clones ε−couvrant le prototype
-Nb motifs total (tailles variables)
-0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.40
-0.2
-0.4
-0.6
-0.8
+ik
+(17)
+où Zij est la coordonnée de l’image i sur l’axe j. Plus le cosinus carré est proche de 1, plus
+la position du point observé dans la projection est proche de la position réelle du point dans
+l’espace.
+Définition 2 (fichier inversé) : étant donné un seuil ² > 0, un fichier inversé F+j (F
+−
+j ) associé
+à la partie positive (négative) de l’axe j est une liste d’images ayant une qualité de représenta-
+tion supérieure à ² et se trouvant dans la partie positive (négative) de l’axe j.
+F+j = {i|Cos
+2
+j (i) > ² and Zij > 0} (18)
+F−j = {i|Cos
+2
+j (i) > ² and Zij < 0} (19)
+N-K. Pham et al.
+Après avoir réduit la dimension des données à K, nous construisons, pour chaque axe, 2 fi-
+chiers inversés (un pour la partie positive et un autre pour la partie négative). Chaque fichier
+contient des images ayant une bonne qualité de représentation sur la partie (positive, négative)
+de l’axe associé.
+Étant donnée une image requête q, la recherche commence par filtrer les images non perti-
+nentes. Pour ce faire, d’abord nous projetons q dans l’espace réduit par la formule 8. Ensuite,
+nous choisissons les axes qui représentent bien la requête en triant la qualité de représentation
+de la requête sur ces axes et prenons les fichiers inversés associés. Puis, les fichiers inversés
+sont fusionnés. Enfin, nous ne gardons que les images qui partagent le plus de thèmes avec la
+requête. La liste contentant ces images-là est appelée la liste de candidates. La recherche des
+images les plus similaires à la requête est effectuée dans la liste des candidates dont la taille est
+beaucoup plus petite que celle de la base d’images. Cela diminue considérablement le temps
+de réponse.
+Le nombre de thèmes qu’une image partage avec la requête joue un rôle important pour sa
+présence dans la liste de candidates. Le choix d’un seuil adapté est déterminé empiriquement.
+L’utilisation du vote majoritaire pour déterminer ce seuil est une solution possible (Pham et
+Morin, 2008). Dans ce cas, une image sera retenue dans la liste de candidates si elle partage,
+avec la requête, au moins une moitié du nombre de thèmes auxquels la requête appartient. Dans
+la recherche de type k plus proches voisins (comme utilisé dans la section 5.2 pour calculer
+des termes de régularisation), on souhaiterait retourner les k images les plus proches à l’image
+requête. Il est nécessaire pour une liste de candidates de contenir au moins k images. C’est la
+raison pour laquelle nous utilisons la taille minimum de la liste de candidates, nb_min, comme
+un critère pour rejeter les images non pertinentes.
+5.2 Mesure de dissimilarité contextuelle
+La mesure de dissimilarité contextuelle, (MDC ou CDM : abréviation de Contextual Dis-
+similarity Measure) (Jegou et al., 2007) est une intégration des informations contextuelles à la
+recherche par la similarité. Cette mesure prend en compte la structure de voisinage des points
+pour corriger la symétrie du schéma de recherche de type k plus proches voisins (k-PPV).
+Nous associons à chaque point un poids proportionnel à la densité de la région contenant ce
+point. Cette pondération favorise les points isolés et pénalise les points se trouvant dans les
+regions denses.
+Considérons le voisinageN (i) d’un point i défini par #N (i) = nN plus proches voisins de
+i. Nous définissons la distance de voisinage r(i) comme la moyenne des distance du point i à
+tous les points dans son voisinage N (i) :
+r(i) =
 1
-1.2
-1.4
-1.6
-1.8
-(b)
-Dis
-sim
-ilar
-ite
-tN (bruit temporel)
- 
- 
-QTIPrefixSpan−KMeans (Hausdorff)
-QTIPrefixSpan−AP (Hausdorff)
-QTIAPriori−KMeans (Hausdorff)
-QTIAPriori−AP (Hausdorff)
-QTempIntMiner
-FIG. 3 – À gauche : nombre moyen de motifs extraits en fonction de # pour l’algorithme
-QTIPrefixSpan-KMeans. À droite : dissimilarité moyenne entre le meilleur motif extrait et le
-prototype en fonction du bruit temporel.
-La qualité des motifs extraits par QTIAPriori et QTIPrefixSpan peut être évaluée selon
-différents critères : i) la présence ou l’absence d’un motif #-couvrant le prototype parmi les
-motifs extraits ; ii) le nombre de motifs extraits n’#-couvrant pas le prototype ; iii) la dissimila-
-rité entre les intervalles temporels du prototype et ceux des motifs extraits, c.-à-d. la précision
-des intervalles temporels associés aux motifs extraits. iv) le nombre de clones du prototype (les
-motifs de même taille que le prototype et d’une dissimilarité inférieure à #) figurant parmi les
-motifs extraits. Ce dernier critère est lié à la facilité de lecture des résultats : plus le nombre de
-clones est bas, plus le traitement des résultats sera facile pour l’utilisateur.
-Les facteurs principaux affectant ces critères sont le niveau de bruit temporel tN , le seuil de
-dissimilarité # et le seuil de fréquence minimale fmin. Ces paramètres sont liés : si les données
-sont très bruités, alors un # grand sera nécessaire pour que les instances bruitées d’un motif
-soient classées dans une même catégorie. Mais si # est trop grand (par rapport à la valeur de tN )
-alors les classes seront plus larges et l’élagage par utilisation de fmin sera moins performant
-au détriment de l’efficacité de l’algorithme et du nombre de motifs extraits.
-Pour # suffisamment grand et fmin suffisamment petit, les trois algorithmes extraient le
-motif prototype des jeux de séquences. De plus, si on ajoute un second prototype avec la
-même signature symbolique que le premier mais des intervalles temporels différents, alors les
-deux motifs sont correctement extraits (un seul extrait par les algorithmes GSP ou PrefixSpan).
-La Figure 3 illustre la qualité des motifs extraits par QTIAPriori, QTIPrefixSpan et QTem-
-pIntMiner à partir de données simulées ne contenant qu’un seul motif fréquent au milieu de
-séquences aléatoires. La Figure 3-(a) illustre, pour l’algorithme QTIPrefixSpan, la variation du
-nombre de motifs de FP (ligne 18 de l’algorithme 2) et le nombre de clones du prototype, en
-fonction de #. Pour # petit (# < .1), peu de motifs de la taille du prototype sont construits : la si-
-milarité attendue entre les instances d’un motif impose une contrainte trop forte par rapport au
-bruit des données. Ensuite, le nombre de motifs construits grandit fortement, mais la classifica-
-tion temporelle produit un nombre de classes important, si bien que le nombre d’instances d’un
-motif associé à une classe reste inférieur à fmin. À partir de # = .8 plusieurs motifs fréquents
-sont extraits, puis leur nombre se stabilise à 1 à partir de # = 1.7. # est alors suffisamment
-grand pour considérer que les dissimilarités entre intervalles temporels sont acceptables.
-T. Guyet et R. Quiniou
-On constate sur la Figure 3-(b) que même avec du bruit, le meilleur motif temporel extrait
-par les trois algorithmes est toujours très proche du motif recherché : une distance de Hausdorff
-de 1 est faible pour un motif temporel ayant des valeurs d’intervalle allant jusqu’à 12 unités de
-temps. Pour QTIAPriori et QTIPrefixSpan, il se dégage logiquement que plus le bruit temporel
-augmente, plus la précision diminue. On constate également que l’algorithme de catégorisa-
-tion influence le plus la résistance au bruit, et ce indépendamment de la méthode d’exploration
-des motifs. KMeans résiste mieux au bruit temporel que AP. La dissimilarité moyenne obtenue
-avec KMeans est inférieure à celle obtenue avec AP. QTempIntMiner se montre aussi précis,
-voire plus précis, que les deux autres algorithmes pour les motifs de grande taille (catégorisa-
-tion par EM de qualité supérieure à celle par KMeans ou AP).
-6 Conclusion
-Nous avons présenté le problème de l’extraction de motifs temporels à partir de séquences
-d’événements qualifiés par une date et une durée c.-à-d. associés à des intervalles temporels nu-
-mériques. De tels motifs sont particulièrement expressifs : ils caractérisent et discriminent les
-séquences d’une base de séquences en entrée non seulement sur la succession des événements,
-mais également sur leurs positions relatives dans le temps et sur leurs durées. Nous avons
-proposé deux algorithmes, QTIAPriori et QTIPrefixSpan, pour extraire des motifs temporels
-contenant des informations temporelles quantitatives. Ils associent une étape de catégorisa-
-tion d’intervalles multidimensionnels aux deux algorithmes classiques d’extraction de motifs
-séquentiels. La comparaison avec QTempIntMiner montre que nos algorithmes sont plus effi-
-caces en temps de calcul et extraient des motifs temporels plus précis. Des trois algorithmes,
-QTIPrefixSpan est le plus efficace en temps de calcul sur nos jeux de données simulées.
-Les améliorations apportées à la fouille de séquences d’intervalles permettent de traiter
-efficacement un grand volume de données. Des applications pratiques, par exemple, pour la
-caractérisation de pathologies cardiaques à partir d’électrocardiogrammes doivent maintenant
-mettrent en évidence l’intérêt pratique de tels motifs temporels. La catégorisation demeure la
-source de complexité majeure des algorithmes proposés. Nous souhaitons étudier différentes
-pistes pour en améliorer l’efficacité, comme le choix heuristique a priori du nombre de classes
-ou l’introduction d’une certaine incrémentalité dans les méthodes de classification.
+nN
+∑
+j∈N (i)
+d(i, j) (20)
+où d(i, j) est la distance (ou une mesure de dissimilarité quelconque) entre les points i et j. La
+quantité r(i) est calculée pour tous les points de la base. La mesure de dissimilarité contextuelle
+dMDC(i, j) entre 2 points i et j est définie par :
+dMDC(i, j) = d(i, j)
+(
+r¯2
+r(i)r(j)
+)α
+(21)
+AFC pour la recherche d’images à grande échelle
+où 0 < α < 1 est le facteur de lissage et r¯ est la moyenne géométrique des distances de
+voisinage r(i) obtenue par :
+r¯ =
+M∏
+i=1
+r(i)
+1
+M (22)
+La formule 21 peut se réécrire :
+dMDC(i, j) = d(i, j)
+(
+r¯2
+r(i)r(j)
+)α
+(23)
+= d(i, j)
+(
+r¯
+r(i)
+)α(
+r¯
+r(j)
+)α
+(24)
+= d(i, j)δ(i)δ(j) (25)
+où
+δ(i) =
+(
+r¯
+r(i)
+)α
+(26)
+Les k plus proches voisins d’une requête q sont obtenus par :
+k-PPV (q) = k-argminj{d(j, q)δ(j)} (27)
+Les δ(i) sont appelés termes de régularisation et stockés avec la base.
+5.3 Intégration de la mesure de dissimilarité contextuelle dans la struc-
+ture de recherche
+Quand la taille de la base d’images est grande, un inconvénient de la MDC est que le calcul
+des termes de régularisation implique le calcul des distances entre les points de la base. La
+complexité de calcul est quadratique avec le nombre d’images. Pour réduire la complexité,
+(Jegou et al., 2007) ont proposé une structure de recherche en groupant les images en clusters.
+Le voisinage d’un point i est cherché dans un nombre limite (e.g. 3, soit 1% de la base) de
+clusters les plus proches de i. Le nombre de clusters voisins d’un cluster donné augmente de
+manière exponentielle avec le nombre de dimensions. Donc, si le nombre de clusters les plus
+proches est trop petit, le risque devient grand de ne pas obtenir un bon voisinage et la précision
+est dégradée.
+C’est pour cela que nous nous proposons d’utiliser notre structure de recherche se basant
+sur les fichiers inversés décrite dans la section 5.1 pour calculer les termes de régularisation.
+Notre structure de recherche permet de trouver de bons voisins d’une requête en examinant
+seulement un tout petit ensemble d’images (e.g. 0.05% de la taille de la base). Ainsi la com-
+plexité de calcul est diminuée et la précision est améliorée. Nous exploitons cette mesure de
+dissimilarité contextuelle de deux manière :
+– hors ligne : les termes de régularisation δ(i) sont calculés une seule fois avant la re-
+cherche. Cette solution est appropriée aux bases d’images statiques où la mise à jour des
+bases est rare.
+– à la volée : au cours de la recherche, nous calculons les termes de régularisation δ(i)
+seulement pour des images de la liste de candidates. De cette manière, le problème de
+mise à jour de la base n’existe plus.
+N-K. Pham et al.
+FIG. 3 – Images tirées de la base Nistér Stewénius
+6 Résultats expérimentaux
+6.1 Base d’images et critère d’évaluation
+Les expérimentations sont effectuées sur la base Nistér Stewénius (Nistér et Stewénius,
+2006). Cette base contient 2550 groupes de 4 images (prises sur une scène avec différentes
+positions de l’appareil photo) et fait au total 10200 images. La figure 3 montre certaines images
+tirées de la base Nistér Stewénius. Pour pouvoir évaluer notre approche à grande échelle, cette
+base est fusionnée avec 1 million d’images téléchargées de l’internet. Les mots visuels sont
+calculés à partir d’une autre base pour produire un vocabulaire de 5000 mots. Nous utilisons la
+même mesure que celle utilisée dans (Nistér et Stewénius, 2006) pour évaluer la performance
+de notre méthode. C’est à dire que nous calculons la précision sur les 4 premières images
+retournées.
+6.2 AFC sans MDC
+Le tableau 2 montre les résultats quand nous testons sur la base Nistér Stewénius avec
+différentes tailles (10200 images « plongées » dans 100000, 200000, 500000 et 1 million
+d’images internet). Dans cette expérimentation, la distance utilisée est celle du cosinus. La
+colonne nb_min décrit la taille minimum des listes de candidates (voir section 5.1) ; la co-
+lonne #list montre la taille réelle des listes de candidates ; la colonne #pert. décrit le nombre
+d’images pertinentes dans la liste de candidates ; la précision de l’algorithme est décrite dans
+la colonne préc. et la colonne tf*idf présente la précision de la méthode tf*idf avec la structure
+de recherche décrite dans (Jegou et al., 2007) en examinant 5% et 10% de la base. Il est clair
+que notre structure de recherche fait beaucoup mieux que tf*idf en terme de précision ainsi
+qu’en terme de temps de réponse. Avec une base d’un million d’images, une liste de candi-
+dates de 600 images (0.06% de la taille de la base) contient 86.7% images pertinentes. Cela
+explique pourquoi notre structure de recherche réduit le temps de recherche et à la fois préserve
+la précision.
+AFC pour la recherche d’images à grande échelle
+taille nb_min #liste pert. préc. tf*idf
+(5% - 10%)
+100K + 10200 200 242 0.885 0.757
+300 366 0.904 0.761 0.678 - 0.707
+500 609 0.922 0.763
+200K + 10200 200 244 0.881 0.745
+300 364 0.897 0.747 0.700 - 0.697
+500 608 0.914 0.748
+500K + 10200 200 244 0.858 0.728
+300 367 0.874 0.730 0.656 - 0.682
+500 611 0.892 0.731
+1M + 10200 200 248 0.834 0.717
+300 370 0.850 0.719 0.644 - 0.669
+500 614 0.867 0.720
+TAB. 2 – AFC sans Mesure de Dissimilarité Contextuelle, comparaison à la méthode tf*idf
+avec clustering.
+6.3 AFC avec MDC
+Dans le tableau 2, il est clair que le taux des images pertinentes dans la liste de candidates
+(colonne pert.) est assez élevé. Cela nous montre que la précision peut être améliorée si une
+mesure appropriée est utilisée. C’est aussi la raison principale pour laquelle nous essayons
+d’intégrer la Mesure de Dissimilarité Contextuelle dans notre structure de recherche. Le ta-
+bleau 3 montre les résultats avec l’intégration de la Mesure de Dissimilarité Contextuelle à la
+structure de recherche à l’aide de l’AFC. La colonne AFC(1) montre la précision de l’intégra-
+tion de l’AFC avec MDC hors ligne ; AFC(2) désigne la combinaison de l’AFC avec MDC
+calculée au cours de la recherche et la dernière colonne, tf*idf + MDC, décrit la précision de
+la méthode décrite dans (Jegou et al., 2007) qui combine MDC et clustering. Avec la méthode
+AFC(1), nous avons calé la taille minimum de la liste des candidates à 300 pour calculer les
+termes de régularisation, tandis qu’avec la méthode AFC(2), les termes de régularisation sont
+calculés pour toutes les images dans la liste de candidates dont la taille minimum, nb_min,
+est fixée à 200, 300 et 500 comme dans la colonne nb_min du tableau. Pour des raisons de
+comparaison, nous avons fixé nN égal à 10 et α égal à 0.6 comme dans (Jegou et al., 2007).
+Les résultats montrent que notre structure de recherche (hors ligne et en ligne) fait beaucoup
+mieux que la structure de recherche basée sur le clustering. Une explication possible est que la
+liste de candidates dans notre structure de recherche contient de vrais plus proches voisins. Par
+conséquent, (i) les termes de régularisation approximatifs sont très proches des idéaux (qui sont
+calculés de manière exhaustive) tandis que la méthode basée sur le clustering ne donne pas de
+bons termes de régularisation et (ii) un nombre limite de clusters ne contient pas suffisamment
+d’images pertinentes pour une requête et cela dégrade le résultat.
+7 Conclusion et perspectives
+Nous avons présenté dans cet article l’utilisation de l’Analyse Factorielle des Correspon-
+dances pour la recherche d’images par le contenu dans une très grande base d’images. Dans
+un premier temps l’AFC est utilisée à la place de tf*idf pour améliorer le calcul des distances
+N-K. Pham et al.
+taille nb_min #liste AFC(1) AFC(2) tf*idf + MDC
+(5% - 10%)
+100K + 10200 200 242 0.801 0.801
+300 366 0.803 0.808 0.736 - 0.772
+500 609 0.806 0.812
+200K + 10200 200 244 0.791 0.794
+300 364 0.793 0.798 0.727 - 0.762
+500 608 0.794 0.801
+500K + 10200 200 244 0.774 0.779
+300 367 0.776 0.783 0.712 - 0.745
+500 611 0.779 0.786
+1M + 10200 200 248 0.758 0.766
+300 370 0.763 0.772 0.701 - 0.732
+500 614 0.766 0.776
+TAB. 3 – AFC avec MDC - AFC(1) : combinaison de AFC avec MDC hors ligne ; AFC(2) :
+AFC avec MDC à la volée et tf*idf + MDC : combinaison de MDC et clustering.
+entre les images de la base de données. Ensuite, pour pouvoir traiter des bases avec un très
+grand nombre d’images, nous avons proposé une version incrémentale de l’algorithme d’AFC,
+qui ne charge à un instant t qu’un petit bloc d’images en mémoire. Puis nous avons utilisé un
+indicateur de l’AFC (la qualité de représentation) pour définir une structure de recherche pour
+les images basée sur un système de fichier inversé ce qui évite la comparaison entre l’image
+requête et toutes les images de la base de données. Enfin nous avons proposé une améliora-
+tion de cette structure de recherche en lui intégrant la Mesure de Dissimilarité Contextuelle de
+(Jegou et al., 2007). Les résultats expérimentaux montrent que :
+– l’AFC est bien plus performante que tf*idf,
+– les résultats sont encore améliorés (meilleure précision) lorsque que l’on intègre la Me-
+sure de Dissimilarité Contextuelle dans notre structure de recherche, que ce soit dans la
+version de calcul hors-ligne ou à la volée.
+Avec la méthode proposée seulement 0.06% de la base de données est exploré (en moins d’un
+huitième de seconde) et ces 0.06% contiennent 86.7% d’images pertinentes. Une amélioration
+possible de ce travail est la parallélisation de l’algorithme d’AFC.
 Références
-Cram, D., A. Cordier, et A. Mille (2009). An interactive algorithm for the complete discovery
-of chronicles. Technical Report RR-LIRIS-2009-011, LIRIS UMR 5205 CNRS.
-Dousson, C. et T. Duong (1999). Discovering Chronicles with Numerical Time Constraints
-from Alarm Logs for Monitoring Dynamic Systems. In Proceedings of the 16th Internatio-
-nal Joint Conference on Artificial Intelligence, pp. 620–626.
-Frey, B. et D. Dueck (2007). Clustering by passing messages between data points. Science 315,
-972–976.
-Giannotti, F., M. Nanni, D. Pedreschi, et F. Pinelli (2006). Mining sequences with temporal
-annotations. In Proceedings of the Symposium on Applied Computing, pp. 593–597.
-Extraction de motifs avec intervalles temporels
-Guyet, T. et R. Quiniou (2008). Mining temporal patterns with quantitative intervals. In
-Proceedings of the 4th International Workshop on Mining Complex Data, pp. 10.
-Irpino, A. et R. Verde (2008). Dynamic clustering of interval data using a wasserstein-based
-distance. Pattern Recognition Letters 29, 1648–1658.
-Le Ber, F., M. Benoît, C. Schott, J.-F. Mari, et C. Mignolet (2006). Studying crop sequences
-with CarrotAge, a HMM-based data mining software. Ecological Modelling 191, 170–185.
-Masseglia, F., P. Poncelet, et M. Teisseire (2009). Efficient mining of sequential patterns with
-time constraints : reducing the combinations. Expert Systems with Applications 36(2), 2677–
-2690.
-Nakagaito, F., T. Ozaki, et T. Ohkawa (2009). Discovery of quantitative sequential patterns
-from event sequences. In Proceedings of the International Conference on Data Mining
-Workshops, pp. 31–36.
-Pei, J., J. Han, B. Mortazavi-Asl, H. Pinto, Q. Chen, U. Dayal, et M.-C. Hsu (2001). PrefixSpan
-mining sequential patterns efficiently by prefix projected pattern growth. In Proceedings of
-International Conference on Data Engineering, pp. 215–226.
-Quiniou, R., G. Carrault, M.-O. Cordier, et F. Wang (2003). Temporal abstraction and in-
-ductive logic programming for arrythmia recognition from electrocardiograms. Artificial
-Intelligence in Medicine 28, 231–263.
-Srikant, R. et R. Agrawal (1996). Mining sequential patterns : Generalizations and perfor-
-mance improvements. In Proceedings of the Fifth International Conference on Extending
-Database Technology, pp. 3–17.
-Washio, T., K. Nakanishi, et H. Motoda (2007). A classification method based on subspace
-clustering and association rules. New Generation Computing 25, 235–245.
-Yoshida, M., T. Iizuka, H. Shiohara, et M. Ishiguro (2000). Mining sequential patterns in-
-cluding time intervals. In Proceedings of the conference on Data Mining and Knowledge
-Discovery : theory, tools, and technology, pp. 213–220.
-Zaki, M. J. (2001). Spade : An efficient algorithm for mining frequent sequences. Machine
-Learning 42(1/2), 31–60.
+Benzecri, J. P. (1973). L’analyse des correspondances. Paris : Dunod.
+Blei, D. M., A. Y. Ng, et M. I. Jordan (2003). Latent dirichlet allocation. Journal of Machine
+Learning Research 3, 993–1022.
+Bosch, A., A. Zisserman, et X. Munoz (2006). Scene classification via pLSA. In Proceedings
+of the European Conference on Computer Vision.
+Deerwester, S., S. Dumais, G. Furnas, T. Landauer, et R. Harsman (1990). Indexing by latent
+semantic analysis. Journal of the American Society for Information Science 41(6), 391–407.
+Greenacre, M. J. (2007). Correspondence analysis in practice, Second edition. Chapman and
+Hall.
+AFC pour la recherche d’images à grande échelle
+Hofmann, T. (1999). Probabilistic latent semantic analysis. In Proceedings of the 15th Confe-
+rence on Uncertainty in Artificial Intelligence (UAI’99), pp. 289–296.
+Jegou, H., H. Harzallah, et C. Schmid (2007). A contextual dissimilarity measure for accurate
+and efficient image search. In Proceedings of CVPR’07, pp. 1–8.
+Lienhart, R. et M. Slaney (2007). plsa on large scale image databases. In IEEE International
+Conference on Acoustics, Speech and Signal Processing, pp. 1217–1220.
+Lindeberg, T. (1998). Feature detection with automatic scale selection. International Journal
+of Computer Vision 30(2), 79–116.
+Lowe, D. G. (1999). Object recognition from local scale-invariant features. In Proceedings of
+the 7th International Conference on Computer Vision, Kerkyra, Greece, pp. 1150–1157.
+Lowe, D. G. (2004). Distinctive image features from scale-invariant keypoints. In International
+Journal of Computer Vision, pp. 91–110.
+Mikolajczyk, K. et C. Schmid (2004). Scale and affine invariant interest point detectors. Pro-
+ceedings of IJC V 60(1), 63–86.
+Morin, A. (2004). Intensive use of correspondence analysis for information retrieval. In
+Proceedings of the 26th International Conference on Information Technology Interfaces,
+ITI2004, pp. 255–258.
+Nistér, D. et H. Stewénius (2006). Scalable recognition with a vocabulary tree. In IEEE
+Conference on Computer Vision and Pattern Recognition (CVPR), Volume 2, pp. 2161–
+2168.
+Pham, N.-K. et A. Morin (2008). Une nouvelle approche pour la recherche d’images par le
+contenu. In Revue des Nouvelles Technologies de l’Information - Serie Extraction et gestion
+des connaissances, Volume RNTI-E-11, pp. 475–486.
+Salton, G. et C. Buckley (1988). Term-weighting approaches in automatic text retrieval. Infor-
+mation Processing & Management 24(5), 513–523.
+Sivic, J., B. C. Russell, A. A. Efros, A. Zisserman, et W. T. Freeman (2005). Discovering ob-
+jects and their location in image collections. In Proceedings of the International Conference
+on Computer Vision, pp. 370–377.
+Sivic, J. et A. Zisserman (2003). Video Google : A text retrieval approach to object matching
+in videos. In Proceedings of the International Conference on Computer Vision, Volume 2,
+pp. 1470–1477.
 Summary
-Most of the sequential patterns extraction methods proposed so far deal with patterns com-
-posed of events linked by temporal relationships based on simple precedence between instants.
-In many real situations, some quantitative information about event duration or the inter-event
-delay is needed in order to discriminate phenomena. We propose two algorithms, QTIAPriori
-and QTIPrefixSpan, for extracting temporal patterns composed of events to which are associ-
-ated temporal intervals describing their position in time and their duration. Each of them, adds
-to algorithms GSP and PrefixSpan a multi-dimensional interval categorisation step for extract-
-ing representative temporal intervals. Experiments on simulated data show that both algorithms
-are efficient for extracting precise patterns even in noisy contexts and improve the performance
-of an older algorithm using a categorisation method based on Expectation-Maximization.
+We are interested in the intensive use of Factorial Correspondance Analysis (FCA) for
+Large-scale Content-Based Image Retrieval. We adapt FCA, method for analyzing textual
+data, on images using local descriptors SIFT. Here, FCA is used to reduce dimensions and
+limite the number of images to be considered during the search. An incremental algorithm for
+FCA is proposed to deal with large databases. Finally we integrate the Contextual Dissimilarity
+Measure in our search structure in order to improve the response time and the accuracy.

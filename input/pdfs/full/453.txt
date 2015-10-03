@@ -1,568 +1,470 @@
-Adaptation de l’algorithme CART
-pour la tarification des risques en assurance non-vie
-Antoine Paglia∗,∗∗∗, Martial Phélippé-Guinvarc’h∗∗, Philippe Lenca∗∗∗,∗∗∗∗
-∗EURO Institut d’actuariat EURIA, antoine.paglia@gmail.com
-∗∗Actuaire, Direction des assurances Agricoles et Professionnelles, GROUPAMA SA
-martialphelippeguinvarch@sfr.fr, martial.phelippe-guinvarc-h@groupama.com
-∗∗∗Institut Télécom; Télécom Bretagne; UMR CNRS 3192 Lab-STICC,
-philippe.lenca@telecom-bretagne.eu
-∗∗∗∗Université européenne de Bretagne
-Résumé. Les développements récents en tarification de l’assurance non-vie
-se concentrent majoritairement sur la maîtrise et l’amélioration des Modèles
-Linéaires Généralisés. Performants, ces modèles imposent cependant à la fois
-des contraintes sur la structure du risque modélisé et sur les interactions en-
-tre variables explicatives du risque. Ces restrictions peuvent conduire, dans cer-
-taines sous-populations d’assurés, à une estimation biaisée de la prime d’assur-
-ance. Les arbres de régression permettent de s’affranchir de ces contraintes et,
-de plus, augmentent la lisibilité des résultats de la tarification. Nous présentons
-une modification de l’algorithme CART pour prendre en compte les spécificités
-des données d’assurance non-vie. Nous comparons alors notre proposition aux
-modèles linéaires généralisés sur un portefeuille réel de véhicules. Notre propo-
-sition réduit les mesures d’erreur entre le risque mesuré et le risque modélisé, et
-permet ainsi une meilleure tarification.
+Diagnostic multi-sources adaptatif
+Application à la détection d’intrusion dans des serveurs Web
+Thomas Guyet∗, Wei Wang∗,∗∗
+René Quiniou∗, Marie-Odile Cordier∗
+∗INRIA/IRISA - Université Rennes 1
+{thomas.guyet, rene.quiniou, marie-odile.cordier}@irisa.fr,
+http://www.irisa.fr/dream/Pages_Pros/Thomas.Guyet/
+∗∗Sophia Antipolis/INRIA
+wwangemail@gmail.fr
+Résumé. Le but d’un système adaptatif de diagnostic est de surveiller et diag-
+nostiquer un système tout en s’adaptant à son évolution. Ceci passe par l’adap-
+tation des diagnostiqueurs qui précisent ou enrichissent leur propre modèle pour
+suivre au mieux le système au fil du temps. Pour détecter les besoins d’adap-
+tation, nous proposons un cadre de diagnostic multi-sources s’inspirant de la
+fusion d’information. Des connaissances fournies par le concepteur sur des rela-
+tions attendues entre les diagnostiqueurs mono-source forment un méta-modèle
+du diagnostic. La compatibilité des résultats du diagnostic avec le méta-modèle
+est vérifiée en ligne. Lorsqu’une de ces relations n’est pas vérifiée, les diagnos-
+tiqueurs concernés sont modifiés.
+Nous appliquons cette approche à la conception d’un système adaptatif de dé-
+tection d’intrusion à partir d’un flux de connexions à un serveur Web. Les éva-
+luations du système mettent en évidence sa capacité à améliorer la détection des
+intrusions connues et à découvrir de nouveaux types d’attaque.
 1 Introduction
-Les compagnies d’assurances utilisent quotidiennement des modèles statistiques pour éval-
-uer les risques auxquels elles doivent faire face. L’objectif actuariel est d’estimer l’espérance de
-sinistre de chaque risque souscrit. Les trente dernières années ont été marquées par la sophis-
-tication des modèles de régression utilisés pour quantifier ces risques. La régression linéaire
-simple qui permettait de modéliser par une droite les variations d’une variable cible –le risque
-étudié–, a été remplacée à partir des années 1980 par les Modèles Linéaires Généralisés (Mc-
-Cullagh et Nelder, 1989), notés GLM par la suite. Ces modèles permettent à la fois de mod-
-éliser des comportements non linéaires et des distributions de résidus non gaussiens. Cela est
-particulièrement utile en assurance non-vie où les coûts des sinistres, quand ils se concrétisent,
-suivent une densité très asymétrique clairement non gaussienne. Ils ont permis d’améliorer net-
-tement la qualité des modèles de prédiction du risque et sont aujourd’hui largement utilisés par
-les compagnies d’assurance. Cependant, bien que très sophistiqués, les modèles GLM présen-
-tent des limites en terme de modélisation des interactions entre variables explicatives et en
-Adaptation de CART pour la tarification des risques en assurance
-terme de modélisation de la structure des risques. Ces limites nous conduisent à tester d’autres
-outils d’apprentissage statistiques ayant démontré des capacités à extraire des structures de
-dépendances et des particularités entre les données qui restaient jusque là non détectées par
-les outils de régression classiques. Parmi ceux-ci, mentionnons les réseaux de neurones, les
-arbres de décision ou encore les support vector machines dont l’efficacité a été prouvée dans
-de nombreux domaines (Wu et al., 2008). Leur utilisation en assurance est cependant moins ré-
-pandue et/ou confidentielle, notamment en assurance de véhicule, notre domaine applicatif. La
-littérature est ainsi peu abondante. Nous renvoyons cependant le lecteur intéressé aux études
-de Apte et al. (1999), Dugas et al. (2003) et Christmann (2004).
-Parmi les algorithmes de référence, nous avons testé en pré-étude les arbres de décision
-simples, les arbres de décision boostés et les réseaux de neurones. Nous avons constaté la
-meilleure performance en terme de mean square error des arbres de décision boostés et l’ex-
-cellente lisibilité des arbres de décision simples. C’est la lecture visuelle associée au principe
-de l’algorithme -qui est de créer des groupes de risque homogènes- et aux bonnes perfor-
-mances en terme de mean square error, notée MSE par la suite, de l’arbre de régression simple
-qui nous ont invités à retenir ce modèle. Notons que les tous les véhicules ne sont pas assurés
-sur l’année complète, par exemple quand ils sont achetés ou vendus en cours d’année. Si la
-durée moyenne d’exposition d’un groupe de véhicules est inférieure à la durée d’exposition
-moyenne de la base 1 l’arbre identifie ce groupe de véhicules comme étant moins risqué. Cela
-conduit à une sous-estimation de la prime pour ces groupes de véhicules (Christmann, 2004).
-Nous proposons ainsi CART-ANV une modification de l’algorithme CART (Breiman et al.,
-1984) pour prendre en compte cette spécificité assurance non-vie.
-Le premier enjeu de l’assureur est la bonne mesure du risque. L’article vise donc pre-
-mièrement à comparer la performance globale des GLM (le modèle de référence en actuariat)
-par rapport à l’algorithme CART-ANV. L’amélioration de la segmentation d’un portefeuille
-d’assurés constitue un enjeu économique et stratégique majeure. En effet, l’assureur cherche
-à développer sa part de marché sur les segments qui conduisent à la fois à un avantage con-
-currentiel et à un profit. La qualité d’une segmentation par groupe de risques peut se mesurer
-selon quatre critères majeurs que sont l’équité, l’homogénéité, le caractère réalisable et le car-
-actère incitatif (Feldblum, 2006). L’absence de biais entre le risque mesuré et le risque prédit
-correspond au critère d’équité et stipule que les primes payées par le groupe doivent refléter
-les pertes occasionnées par ce groupe. Le critère d’homogénéité exprime le fait que les risques
-au sein d’un groupe sont homogènes et qu’il n’est pas possible de subdiviser ce groupe en
-plusieurs sous groupes ayant des primes significativement différentes. Nous comparons donc
-également la performance des deux approches par segment sur les deux principaux critères
-d’équité et d’homogénéité. Enfin, nous comparons également les deux approches dans leurs
-aspects pratiques i.e. dans la préparation des données, la mise en œuvre des outils, la fiabilisa-
-tion des résultats, leurs lectures et dans leurs communications interne et externe.
-La tarification en assurance se fait généralement sur la somme de modèles par risque (Re-
-sponsabilité Civile, incendie, bris de glace, tout accident...). Cela se comprend statistiquement
-par le fait que les densités des sinistres et les variables explicatives sont différentes sur cha-
-cun de ces risques. De plus, dans les systèmes informatiques, les primes de chaque risque
-sont souvent paramétrées indépendamment les unes des autres. Néanmoins, évaluer la prime
-1C’est le cas par exemple des véhicules neufs qui rentrent en base systématiquement quand ils sont achetés en
-cours d’année.
-A. Paglia et al.
-pure au niveau du véhicule permet d’augmenter la performance du modèle global et d’inté-
-grer les dépendances éventuelles entre les risques souscrits. C’est pourquoi, tant d’un point
-de vue technique que commercial, nous modélisons le sinistre total du véhicule plutôt que de
-construire un modèle par risque.
-Dans la section 2, nous présentons les données réelles ayant servi à comparer les modèles
-CART-ANV et GLM. La section 3 présente les options retenues pour le modèle GLM et pour
-le modèle CART-ANV. La section 4 présente les résultats de la comparaison entre GLM et
-CART-ANV. Enfin nous concluons en section 5.
-2 Les données
-Nous avons suivi une méthodologie proche de CRISP-DM2 (Shearer, 2000), dont l’une
-des étapes les plus importantes consiste à préparer les données. Nous décrivons ci-dessous les
-principaux éléments de la base de données brute et les transformations opérées.
-Nous précisons que nous utilisons une base de données réelle, brute et volumineuse d’un
-assureur. Pour des raisons -évidentes- de confidentialité, nous avons dépersonnalisé la base. Par
-exemple, nous n’avons pas explicité des variables comme l’usage des véhicules (noté usage1,
-usage2 . . .) et avons effectué des homothéties des variables quantitatives comme le montant du
-sinistre.
-Par ailleurs, l’assureur est en charge de la mesure de son propre risque et donc de valider
-les modèles sur sa propre base de données correspondant à son business. Nous ne comparons
-donc les modèles que sur une seule base de données. Une comparaison sur d’autres bases, dont
-les caractéristiques seraient différentes car par exemple issues de processus métier différents,
-ne ferait pas sens pour l’objectif que nous poursuivons.
-2.1 Description de la base de données brute
-La base de données rassemble plusieurs exercices, soit un total de plus de trois mil-
-lions de contrats. Les contrats d’assurance sont décrits par 45 variables explicatives (âge du
-véhicule, puissance, montant de la franchise . . .) dont la majorité sont discrètes et compor-
-tent de nombreuses modalités (code postal, Catégories Socio-Professionnelles -CSP-, marque
-du véhicule . . .). Un souscripteur assure en moyenne 1,9 véhicule, mais cela va de 1,2 pour
-les salariés et retraités à presque 4 pour la catégorie socio-professionnelle la plus équipée. La
-durée moyenne de présence d’un contrat dans le portefeuille est de 0,84 an. L’assuré paye une
-prime au prorata de la durée assurée. Si l’assureur n’intègre pas cette période d’exposition
-dans la modélisation de la prime pure, il ne récoltera que 84% du montant des primes. Nous
-proposerons dans cet article une méthode pour intégrer cette composante dans l’algorithme
-CART et qui sera présentée section 3.2.2.
-Environ 150 000 garanties sinistrées sont enregistrées dans la base. Le montant enregistré
-est le montant d’indemnisation de l’assureur sur une garantie, ce qui correspond à la valeur
-totale du sinistre diminuée de la franchise. La fréquence moyenne des sinistres est de 7,49%
-pour un montant moyen de 1237 euros, soit une prime pure en ne tenant compte d’aucunes
-variables explicatives de 276 euros. La table 1 détaille la répartition des sinistres. Ainsi, 6,48%
-2http://www.crisp-dm.org
-Adaptation de CART pour la tarification des risques en assurance
-des assurés ont eu un sinistre compris entre 1 et 4500 euros. Ces sinistres de faible montant
-contribuent à 39,30% de la charge totale des sinistres. Il est intéressant de noter l’importance
-prise par les sinistres extrêmes : seulement 0,01% des assurés ont eu un sinistre extrême mais
-la somme de ces sinistres contribue à 19% du montant total des sinistres. Le montant maximum
-de sinistre est de 7,8 millions d’euros.
-Charge de sinistre % obs. % du montant total Moyenne Médiane
-0 92,51 0 0 0
-]0,4500] 6,48 39,30 1680 1266
-]4500,30000] 0,92 28,00 8394 6762
-]30000,150000] 0,06 13,78 60705 50682
-[150000,max] 0,01 19,10 471627 276012
-TAB. 1 – Répartition de la charge de sinistre. Cette répartition montre l’importance des
-valeurs extrêmes : 0,01% des assurés contribuent à 19% du montant total des sinistres.
-L’écart entre le montant moyen et la médiane dans une tranche de sinistre montre que la dis-
-tribution des sinistres est très asymétrique. Ceci est confirmé par le coefficient de dissymétrie -
-skewness - qui est de 3,2 et l’histogramme de la distribution des sinistres par contrats présenté
-dans la figure 1.
-Histogramme des montants de sinistres dans la vision client
-montant de sinistre
-d
-e
-n
-s
-it
-é
-0 5000 10000 15000 20000 25000 30000
-0
-e
+Les systèmes automatiques de surveillance sont de plus en plus répandus. Ils ont pour tâche
+d’émettre des alarmes lors de dysfonctionnements de systèmes aussi variés que les patients
+en unités de soins intensifs, les systèmes physiques (e.g. voitures, machines industrielles) ou
+informatiques (e.g. les serveurs Web). Si les données disponibles sur le fonctionnement des
+systèmes surveillés sont de plus en plus riches, et si les techniques de monitoring sont de plus
+en plus performantes, l’adaptation en ligne du monitoring reste un défi important pour assurer
+une surveillance précise, robuste, en continu et ne nécessitant que peu d’intervention humaine.
+En particulier, l’adaptation en ligne de ces systèmes doit permettre de :
+– faciliter l’installation d’un système de surveillance en le laissant automatiquement s’adap-
+ter aux conditions particulières de son utilisation (e.g. adaptation aux caractéristiques
+physiologiques d’un patient),
+Diagnostic multi-sources adaptatif
+– assurer un fonctionnement en continu malgré les évolutions naturelles du système (e.g.
+adaptation à l’usure d’un système physique) ou du contexte (e.g. adaptation à des chan-
+gements de température),
+– intégrer dynamiquement de nouvelles “situations” (e.g. adaptation à de nouveaux types
+d’intrusion dans des serveurs Web).
+Nous sommes en particulier motivés par la conception d’un système de détection d’intru-
+sion dans des serveurs Web. Les modifications des contenus d’un serveur Web ainsi que l’ap-
+parition fréquente de nouveaux types d’intrusion justifient le besoin d’adaptation automatique
+d’un système séparant les requêtes intrusives de celles destinées à être traitées normalement.
+Si de tels systèmes adaptatifs n’existent pas à l’heure actuelle, c’est que, outre le pro-
+blème du temps disponible pour réaliser dynamiquement les adaptations nécessaires, l’adap-
+tation en ligne soulève deux problèmes majeurs : (1) le choix des informations utilisées pour
+l’adaptation, et (2) le choix de la direction de l’adaptation à mener. Lorsqu’on automatise la
+construction hors-ligne des modèles d’un système dans le but de les diagnostiquer en ligne, on
+dispose de données annotées qui permettent de connaître quels sont les exemples et les contre-
+exemples des situations qui doivent être modélisées. De plus, les différents modèles peuvent
+être confrontés les uns aux autres pour identifier les meilleurs. Lorsque l’adaptation doit être
+réalisée en ligne, d’une part, le diagnostiqueur ne dispose pas d’annotations sur la situation
+courante puisque il doit lui-même décider de la nature de la situation courante, et d’autre part,
+il ne dispose pas des ressources permettant de retenir toutes les données et les différents mo-
+dèles pour les confronter.
+Dans cet article, nous nous intéressons à l’utilisation d’un méta-modèle de diagnostic, dé-
+fini à partir de connaissances a priori, pour décider dynamiquement des adaptations à mener.
+Un méta-modèle de diagnostic, tel que celui de De Kleer (2007), modélise des comportements
+attendus du diagnostiqueur et permet de détecter en ligne les manquements et les défaillances
+des modèles utilisés pour le diagnostic. Nous proposons une méthode de diagnostic multi-
+sources qui utilise plusieurs sources d’informations sur l’état d’un système pour en déterminer
+l’état global. Par exemple, Fromont et al. (2005) utilisent des signaux provenant de plusieurs
+capteurs pour du monitoring cardiaque. Chaque source est traitée par un diagnostiqueur mono-
+source (DMoS). Les diagnostics fournis par les DMoS sont progressivement fusionnés pour
+fournir un diagnostic global en suivant un schéma défini par le méta-modèle et leur compatibi-
+lité avec les contraintes exprimées dans le méta-modèle est vérifiée pour identifier les besoins
+d’adaptation. Ces besoins d’adaptation sont utilisés individuellement par les DMoS pour qu’ils
+réalisent leur propre adaptation.
+2 Diagnostic multi-sources adaptatif
+2.1 Diagnostic et décision de diagnostic
+Notre architecture de diagnostic multi-sources reprend certains formalismes introduits dans
+le domaine de la fusion d’information que nous rappelons ici pour donner nos définitions de
+diagnostic et de décision de diagnostic. Parmi les techniques de fusion d’information exis-
+tantes (réseaux de neurones, réseaux bayésiens, théorie possibiliste, ...) nous avons choisi d’uti-
+liser la théorie de Dempster-Shafer (1976) (DS), pour sa capacité à intégrer la méconnaissance
+dans la prise de décision.
+T. Guyet et al.
+L’ensemble des décisions de diagnostic possibles, noté Ω et appelé espace de discerne-
+ment dans la théorie de DS, représente les états possibles du système à diagnostiquer. Un diag-
+nostic est une distribution normalisée de masses d’évidence sur les parties de Ω. C’est-à-dire
+qu’un diagnostic est une fonction :
+m : 2Ω 7→ [0, 1],
+∑
+A∈2Ω
+m(A) = 1
+La distribution m associe des degrés de croyance (Belm) et de plausibilité (Plm) aux
+parties de Ω :
+∀A ∈ 2Ω, Belm(A) =
+∑
+B⊂A
+m(B), P lm(A) =
+∑
+B∩A
+m(B).
+Par définition, la décision de diagnostic est la partie de Ω qui a le plus fort degré de croyance,
+i.e. argmaxA∈2Ω (Belm(A)).
+2.2 Éléments du diagnostic multi-sources adaptatif
+Avant d’introduire les mécanismes qui réalisent le diagnostic et l’adaptation, on introduit
+dans cette section les trois éléments principaux de notre cadre de diagnostic multi-sources
+adaptatif : les diagnostiqueurs mono-source, les diagnostiqueurs multi-sources et le méta-
+modèle de diagnostic.
+2.2.1 Diagnostiqueur mono-source (DMoS)
+Un diagnostiqueur mono-source (DMoS) prend en entrée les observations sur le système
+à diagnostiquer et construit en ligne un diagnostic élémentaire en appliquant, d’une part, une
+fonction d’extraction d’information et, d’autre part, une fonction de diagnostic. À partir
+des observations, la fonction d’extraction d’information construit une information qui pourra
+être utilisée par la fonction de diagnostic. Son rôle est de permettre, d’une part, de focaliser le
+diagnostiqueur sur une partie des observations (filtrage et concentration de l’information) et,
+d’autre part, de structurer celle-ci. La fonction de diagnostic construit le diagnostic élémentaire
+à partir des informations extraites.
+Un DMoS est également doté d’une fonction d’adaptation qui lui est propre. Elle prend
+comme paramètre une proposition d’adaptation formée (1) d’observations o, en pratique
+il s’agit des observations en cours d’analyse, et (2) d’une décision de diagnostic d qui est
+attendue pour ces observations. L’adaptation modifie la fonction de diagnostic de sorte que
+celle-ci fournisse un diagnostic pour o “plus proche” de d qu’elle ne le faisait auparavant.
+2.2.2 Diagnostiqueurs multi-sources (DMuS)
+Un diagnostiqueur multi-sources (DMuS) prend en entrée plusieurs diagnostics : diag-
+nostics élémentaires ou diagnostics provenant d’autres DMuS, dits intermédiaires. Il propose
+en sortie un nouveau diagnostic intermédiaire obtenu par la fusion des diagnostics d’entrée.
+Contrairement aux DMoS, les DMuS n’ont pas de fonction d’adaptation.
+Diagnostic multi-sources adaptatif
+La cadre théorique de la fusion d’information de DS définit la règle de fusion des diagnos-
+tics, notée ⊕, que nous utilisons. Elle consiste à construire un diagnostic m à partir de deux1
+diagnostics définis par leurs distributions de massesm1 etm2. Pour toute partie A de l’espace
+de discernement, sa masse est calculée par la formule :
+m(A) = (m1 ⊕m2)(A) =
+∑
+B∩C=Am1(B)m2(C)
+1−
+∑
+B∩C=∅m1(B)m2(C)
+.
+2.2.3 Méta-modèle du diagnostic
+Unméta-modèle de diagnostic définit les DMuS à partir des DMoS disponibles en précisant
+(1) les sources des diagnostics en entrée des DMuS et (2) les contraintes associées à chaque
+DMuS.
+Le méta-modèle peut être représenté sous la forme d’un arbre dans lequel les nœuds sont
+des DMuS et les feuilles sont des DMoS. Les sous-branches d’un nœud D précisent les diag-
+nostics qui sont utilisés en entrée par le DMuS D et la branche supérieure figure le diagnostic
+de sortie deD. Le diagnostic à la sortie du DMuS situé à la racine de l’arbre donne le diagnos-
+tic global.
+Une contrainte définit une relation systématiquement attendue entre les diagnostics en
+entrée et en sortie du DMuS. Nous verrons en Section 2.3.2 comment ces contraintes sont
+utilisées pour proposer des adaptations. Dans cet article, on définit un seul type de contrainte :
+la concordance du diagnostic de sortie du DMuS avec chacun de ses diagnostics d’entrée. Si
+on note D(o) le diagnostic construit par un diagnostiqueur D pour des observations o, alors
+D et D′ concordent si et seulement si ils décident de la même décision de diagnostic (i.e.
+argmaxA∈2Ω BelD(o) (A) = argmaxA∈2Ω BelD′(o) (A)). Dans la représentation du méta-
+modèle sous la forme d’un arbre, les nœuds sont décorés avec la contrainte à laquelle le DMuS
+correspondant est associé.
+FIG. 1 – Illustration d’un méta-modèle : il s’agit d’une hiérarchie des DMuS indiquant les
+dépendances.
+La Figure 1 illustre la notion de méta-modèle. Les nœuds marqués ⊗ expriment les con-
+traintes de concordance, tandis que les autres expriment l’absence de contrainte entre les diag-
+nostics des sous-branches. Dans cet exemple, les DMoS de D1, D2 et D3 doivent fournir des
+diagnostics (élémentaires) qui concordent avec celui de Dg . Les DMoS de D4 et D5 ne sont
+pas contraints, mais le diagnostic (intermédiaire) du DMuS Dd est contraint à être concordant
+avec le diagnostic global obtenu par la fusion de son diagnostic avec celui du DMuSDg.
+1On notera que ⊕ dispose des bonnes propriétés (symétrie et associativité) pour généraliser facilement cette for-
+mule à la fusion de plus de deux diagnostics.
+T. Guyet et al.
+2.3 Construction d’un diagnostic global et adaptation
+Dans cette section, on décrit l’utilisation du méta-modèle pour construire le diagnostic
+global et adaptater des DMoS.
+2.3.1 Construction du diagnostic global
+La hiérarchie du méta-modèle est utilisée pour organiser la construction du diagnostic glo-
+bal par l’application successive des diagnostiqueurs à partir des DMoS (les feuilles de l’arbre).
+Tout d’abord, les DMoS construisent leur diagnostic élémentaire à partir des observations. En-
+suite, les DMuS construisent récursivement les diagnostics intermédiaires par la fusion des
+diagnostics définis par le méta-modèle jusqu’à obtenir le diagnostic global. Dans la théorie de
+DS, la fusion des diagnostics est symétrique et associative, l’ordre dans lequel sont exécutés
+les DMuS n’a donc pas d’importance.
+2.3.2 Détection d’un besoin d’adaptation et adaptation
+Lorsqu’un DMuS a construit son diagnostic, il vérifie si celui-ci satisfait les contraintes
+que le méta-modèle lui impose. Si le diagnostic résultant ne satisfait pas la contrainte du méta-
+modèle, c’est l’indication qu’il y a eu une défaillance dans le diagnostic. Le DMuS fait alors
+une proposition d’adaptation formée par les observations en cours d’analyse et le diagnostic
+du DMuS. Lorsqu’aucune contrainte n’est exprimée, un DMuS ne peut pas proposer d’adap-
+tation. Par exemple, on s’attend à ce que des thermomètres identiques donnent la même tem-
+pérature s’ils sont plongés dans la même eau (méta-modèle exprimant la concordance des
+diagnostiqueurs). Si l’un des thermomètres indique une température très différente des autres,
+c’est probablement qu’il fonctionne mal et qu’il est judicieux de proposer une réparation.
+Dans notre système, l’adaptation ne vise pas, comme pour Chair et Varshney (1986), à
+ajuster l’influence relative des différentes sources d’information pour arriver à un meilleur ré-
+sultat, ni à permettre d’accueillir dynamiquement de nouveaux DMoS comme le propose le
+système MidFusion de Alex et al. (2008). Les DMuS appliquent un schéma de fusion qu’il ne
+s’agit pas d’adapter. L’adaptation vise à modifier les fonctions de diagnostic utilisées par les
+DMoS en faisant judicieusement appel aux fonctions d’adaptation. Par conséquent, la propo-
+sition d’adaptation est directement envoyée aux DMoS situés aux feuilles du sous-arbre ayant
+pour racine le DMuS qui l’a proposée.
+Plus précisément, dans le cas de la contrainte de concordance des diagnostics, si un diag-
+nostic d’entrée d ne concorde pas avec le diagnostic de sortie alors les DMoS du sous-arbre de
+d reçoivent une proposition d’adaptation. Pour limiter le sur-apprentissage et les adaptations
+à partir de contre-exemples, les propositions d’adaptation sont faites uniquement lorsque la
+décision de diagnostic du DMuS est sûre, i.e. maxA∈Ω2 Bel(A) > sh, et que la décision de
+diagnostic en entrée est peu sûre , i.e.maxA∈Ω2 Bel(A) < sb.
+Les propositions d’adaptation sont traitées par les DMoS une fois que tous les DMuS ont
+proposés des adaptations. Si un DMoS a reçu plusieurs propositions d’adaptation, il utilise
+uniquement celle dont la croyance est la plus forte pour adapter sa fonction de diagnostic.
+Diagnostic multi-sources adaptatif
+3 Détection d’intrusion à partir de logs HTTP
+L’approche de diagnostic multi-sources adaptatif est maintenant appliquée à la détection
+d’intrusion dans des serveurs Web. Afin d’éviter les utilisations malveillantes des serveurs
+Web, il faut développer des systèmes capables de détecter et d’identifier les intrusions (Intru-
+sion Detection System ou IDS). Pour éviter les tâches fastidieuses de mise à jour de la base
+des modèles d’intrusion, le système doit pouvoir s’adapter de manière autonome pour intégrer
+dynamiquement la détection de nouvelles intrusions.
+Nous nous intéressons aux IDS permettant la détection d’intrusion dans des serveurs Web
+à partir du journal des connexions HTTP (logs HTTP). Les logs HTTP constituent un flux
+de données structurées et riches. Un log contient des lignes décrivant les requêtes successives
+qui sont parvenues au serveur que l’on cherche à protéger des intrusions. Chaque ligne du
+log, illustrée par la Figure 2, est composée de plusieurs champs décrivant la requête et le
+comportement du serveur, par exemple l’IP du client, la date, l’URL de la requête ou le status
+code, statut attribué à la requête par le serveur (e.g. 404 : erreur dans l’URL de la requête, 200 :
+requête accomplie avec succès).
+FIG. 2 – Exemple d’une ligne de log de serveur Apache (format Combined).
+3.1 Décisions de diagnostic possibles et fusion des diagnostics
+Dans le cas de la détection d’intrusion, l’espace de discernement (Ω) est composée de trois
+parties disjointes correspondant aux trois décisions de diagnostic possibles pour les lignes de
+log : intrusion (I), normal (N ) ou inconnu (U ). Le type inconnu sert à la normalisation des
+masses et traduit la méconnaissance dans la théorie de DS. L’expression de la méconnaissance
+nous permet de prendre en compte les imprécisions des DMoS. Il est, par exemple, difficile de
+décider de manière certaine du caractère intrusif d’une requête à partir de la seule connaissance
+du status code.
+Comme l’espace de discernement est une partition (Ω = {I,N,U}), il est possible de
+simplifier les formules de combinaison de deux diagnostics :
+∀A ∈ Ω, (m1 ⊕m2)(A) =
+m1(A)m2(A)
+1−
+∑
+B∩C=∅m1(B)m2(C)
+,
+avec
+∑
+B∩C=∅m1(B)m2(C) = m1(N)m2(I) +m1(N)m2(U) +m1(U)m2(I)
++m1(U)m2(N) +m1(I)m2(N) +m1(I)m2(U)
+Un diagnostiqueur a détecté une intrusion lorsque la croyance associée à la décision I est
+au-dessus d’un seuil si (Bel(I) > si).
+T. Guyet et al.
+3.2 DMoS et méta-modèle du diagnostic
+Pour réaliser le diagnostic multi-sources des logs, on utilise deux types de DMoS :
+– les DMoS qui utilisent la ligne de log courante,
+– les DMoS qui utilisent la transaction dont fait partie la ligne courante.
+Une transaction est l’ensemble des requêtes qu’un client (identifié par son IP) a transmis au
+serveur dans une fenêtre temporelle fixée à 10min. On fait l’hypothèse que toutes les lignes de
+logs d’une transaction sont de même nature, c’est-à-dire qu’un utilisateur normal, ne tentera
+pas d’intrusion (au pire il aura un mauvais usage du serveur conduisant à des erreurs sans
+mauvaises intentions), tandis que si un utilisateur effectue des requêtes jugées intrusives, alors
+on considérera l’ensemble de ses requêtes dans la fenêtre temporelle comme potentiellement
+intrusives.
+Cette hypothèse permet de proposer un méta-modèle du diagnostic, illustré par la Figure 3,
+dans lequel il n’y a pas de contrainte entre les DMoS à partir de la ligne, ni entre les DMoS à
+partir de la transaction. Mais le diagnostic de la ligne obtenu par Dl et celui de la transaction
+obtenu par Dt doivent concorder avec le diagnostic global.
+FIG. 3 – Méta-modèle du diagnostic d’intrusion dans des logs HTTP.
+Nous avons implémenté des DMoS à partir des modèles d’intrusions et de requêtes nor-
+males suivants :
+– distribution de caractères de l’URL d’une ligne de log,
+– distribution de tokens2 de l’URL d’une ligne de log,
+– distribution Gaussienne de la proportion d’erreurs dans une transaction,
+– distribution de caractères sur l’ensemble des URL d’une transaction.
+Tous les modèles utilisés s’appuyant sur des distributions, leurs fonctionnements sont as-
+sez similaires. Par manque de place, on ne donne des détails que sur les fonctions du DMoS
+à partir de la distribution de caractères de l’URL. Pour ce diagnostiqueur, la fonction d’ex-
+traction d’information focalise l’attention uniquement sur l’URL de la ligne de log courante,
+et construit (i.e. structure l’information selon) une distribution normalisée des 256 caractères
+ASCII possibles d’une ligne courante. La fonction de diagnostic calcule la distance entre la
+distribution courante et un modèle de distribution appris à partir d’un ensemble d’intrusions
+connues. Un autre DMoS similaire utilise un ensemble de requêtes normales pour apprendre
+un modèle de requête normale. Moins la distance avec le modèle d’intrusion est importante,
+plus la masse mI est grande. Lors de l’apprentissage préliminaire, la masse mU est calculée
+par la proportion d’erreurs obtenue sur le jeu d’apprentissage. La fonction d’adaptation du
+diagnostiqueur ajoute la distribution de caractères de la ligne au modèle si la ligne correspond
+à une intrusion, mais ne fait rien si la ligne n’est pas une intrusion.
+2Les tokens sont des unités sémantiques d’une URL distinguées par des séparateurs (’/’, ’ ?’, ’&’).
+Diagnostic multi-sources adaptatif
+4 Expérimentations et résultats
+4.1 Données et implantation du système
+L’objectif des évaluations du système est de montrer que la méthode d’adaptation en ligne
+adapte de manière pertinente les modèles d’intrusion. Les adaptations du système sont perti-
+nentes si, d’une part, elles améliorent les performances du système n’utilisant pas les méca-
+nismes d’adaptation (i.e. augmentation du rappel et de la précision), et si, d’autre part, elles
+permettent de découvrir les nouvelles intrusions, c’est-à-dire d’intégrer ces nouveaux exemples
+aux modèles d’intrusion initialement appris.
+Nous avons recours à la simulation d’intrusion dans des logs réels. Nous disposons de logs
+d’accès aux serveurs Web des laboratoires INRIA/IRISA et INRIA/Sophia Antipolis chacun
+sur une période de 1 mois (respectivement, juin 2008 et mai 2007). Après un filtrage important,
+nous avons vérifié l’absence d’intrusion dans les données. Pour réaliser les expérimentations,
+nous utilisons une partie de ces logs dans laquelle nous introduisons artificiellement des tran-
+sactions de requêtes intrusives tirées aléatoirement parmi 576 requêtes correspondant à des
+intrusions connues. Une portion de log d’une longueur fixée à 10000 lignes (environ 20 min
+de connexions) est extraite de l’ensemble des données originales et on y insère aléatoirement
+une grande quantité d’intrusions (environ 110 en moyenne, réparties dans une moyenne de 20
+transactions).
+Le rappel et la précision sont calculés pour plusieurs valeurs du seuil si (cf. Section 3.1) et
+on obtient ainsi des courbes rappel-précision.
+Un sous-ensemble de 527 requêtes intrusives connues a été manuellement sélectionné pour
+servir d’ensemble d’apprentissage initial des modèles d’intrusions. Les 49 requêtes intrusives
+supprimées correspondent à un même type d’intrusion (requêtes permettant d’identifier des
+scripts se sachant vulnérables) dont aucune autre occurrence n’est présente dans l’ensemble
+d’apprentissage.
+La méthode de détection d’intrusion a été implémentée sous la forme d’un logiciel d’ana-
+lyse de logs de connexions Apache : LogAnalyzer3. Ce logiciel permet également la visualisa-
+tion et l’exploration des logs (filtrage, analyse de la structure du serveur ou des transactions).
+4.2 Expérimentation et résultats
+Apport de la fusion des diagnostics multi-sources Nous mettons tout d’abord en évidence
+l’intérêt du diagnostic multi-sources et de la méthode de fusion des diagnostics en comparant
+les résultats obtenus à différents niveaux de la hiérarchie de notre méta-modèle de diagnostic
+(cf. Figure 3). La courbe (a) de la Figure 4 donne les courbes rappel/précision obtenues pour
+l’analyse d’un log par :
+1. les DMoS seuls : distribution de tokens (Tokens) et distribution de caractères (CD),
+2. les DMuS fusionnant les diagnostics obtenus respectivement à partir des lignes de logs
+(LL) et des transactions (Trans),
+3. le DMuS global (LL + Tr).
+3Plus d’informations sur le LogAnalyzer sont disponibles sur le site : http ://www.irisa.fr/dream/LogAnalyzer/.
+T. Guyet et al.
+Toutes les expérimentations menées avec différents jeux de données montrent un profil
+similaire des courbes. On observe systématiquement que les diagnostics obtenus par fusion
+ont un meilleur rappel et une meilleure précision que les diagnostics des DMoS :
+– la courbe des lignes de logs (verte) a une AUC (aire sous la courbe) supérieure à celle
+des courbes des tokens (cyan) et des distributions de caractères (mauve),
+– la courbe du diagnostic global (rouge) a une AUC supérieure à celui des transactions et
+des lignes.
+Pertinence des adaptations On s’est ensuite intéressé à la pertinence des adaptations réa-
+lisées. On a pour cela effectué 26 expérimentations à partir de jeux simulés différents. En
+moyenne, 121.04 (+− 97.94) adaptations ont été réalisées. L’écart type élevé s’explique surtout
+par une grande disparité dans le nombre d’adaptations réalisées à partir de requêtes normales.
+On a constaté que les adaptations sont correctement réalisées à 95% (+−0.02). C’est-à-dire
+qu’une adaptation dans le sens d’une ligne normale (resp. intrusive) n’a été lancée à par-
+tir d’une ligne intrusive (resp. normale) que dans 5% des adaptations. Ce résultat illustre la
+pertinence générale des choix d’adaptation. En pratique, cela signifie que le système limite
+l’intégration de requêtes intrusives dans le modèle normal et réciproquement.
+De plus, dans 35% des expérimentations le système s’est adapté à partir d’une requête ini-
+tialement inconnue. Ceci veut dire que dans plus d’un tiers des expérimentations, on a décou-
+vert le nouveau type d’intrusion et les modèles se sont bien enrichis pour les détecter ensuite.
+Amélioration par l’adaptation Dans la mesure où les adaptations sont pertinentes, nous
+sommes en mesure d’attendre une amélioration des performances de la détection. Pour la
+mettre en évidence, on compare les résultats obtenus avec adaptation aux résultats obtenus
+sans adaptation pour des logs identiques.
+La Figure 4 (b) donne les courbes rappel/précision typiques obtenues pour l’analyse d’un
+log. Les AUC des courbes obtenues avec une adaptation des modèles montrent des perfor-
+mances supérieures. La courbe orange est nettement au-dessus de la courbe cyan indiquant que
+l’adaptation de la distribution de tokens accroît efficacement les performances de ce DMoS.
+Ces améliorations accroissent les performances du DMuS des lignes : la courbe noire est éga-
+lement nettement au-dessus de la courbe verte. La fusion permet donc d’améliorer de façon
+significative les résultats obtenus à partir des indices pris individuellement. L’amélioration des
+performances globales du système (courbe jaune contre courbe rouge) n’est pas aussi impor-
+tante que pour les autres courbes. D’une part, les performances de la détection à partir des
+transitions évoluent peu, et atténuent, par la fusion, les améliorations de la détection à partir
+des lignes. D’autre part, les performances globales sans adaptation sont initialement bonnes,
+l’amélioration qui peut être apportée par l’adaptation ne peut être très importante.
+Le Tableau 1 présente des résultats obtenus à partir de 20 logs différents. Pour chaque
+expérimentation, on n’a conservé que les rappels et précisions correspondant à la F-Mesure
+maximale. Les résultats montrent que l’adaptation permet d’augmenter à la fois le rappel et
+la précision de la détection d’intrusion. En pratique,de nombreuses adaptations des modèles
+de requêtes normales sont réalisées (121 (+−98) en moyenne). Ainsi, même si le nouveau type
+d’intrusion n’est pas systématiquement détecté, les performances globales du système sont tout
+de même meilleures dans plus de 60% des expérimentations et stables sinon.
+Diagnostic multi-sources adaptatif
+FIG. 4 – Courbes rappel/précision pour la détection d’intrusion. (a) Comparaison des per-
+formances des DMoS et des DMuS, (b) Comparaison avec et sans adaptation. CD : Distribu-
+tion de caractères, Tokens : Distribution des tokens, LL ; Ligne de log, Tr : Transaction,
+(adapt) : avec adaptation.
+Avec adaptation Sans adaptation
+Temps (s.) 12.68 (+− 0.46) 11.83 (
 +
-0
-0
-1
-e
--0
-4
-2
-e
--0
-4
-3
-e
--0
-4
-4
-e
--0
-4
-FIG. 1 – L’histogramme restreint aux sinistres compris entre 0 et 30 000 euros montre une
-distribution très asymétrique et la présence d’un pic
-A. Paglia et al.
-2.2 Préparation des données
-La plupart des variables de la base de données brutes ont fait l’objet d’un traitement préal-
-able. Nous présentons dans cette section les traitements les plus importants et de leurs con-
-séquences éventuelles sur les résultats du modèle.
-Les valeurs non-cohérentes et extrêmes pour les variables explicatives : les valeurs non-
-cohérentes ont été détectées notamment à l’aide d’un expert sur le risque assuré (particulière-
-ment pour les variables puissances et des âges des véhicules). Une fois identifiées, ces valeurs
-ont été, soit remplacées par la valeur la plus probable (après une régression sur la variable à
-remplacer), soit définies comme valeurs manquantes. Les assureurs étant soumis à des con-
-trôles externes (IFRS, Solvency), ils s’imposent une rigueur de traitement des données. Ainsi
-même si cela surprend, les règles de contrôles de cohérences établies par des experts (qui con-
-naissent les véhicules, les contrats d’assurance et les processus d’alimentation de la base de
-données) sont jugées plus fiables qu’une procédure automatique non-experte de traitement des
-incohérences.
-Regroupements : des regroupements de modalités ont été opérés notamment pour les vari-
-ables aux modalités très nombreuses afin d’éviter, comme c’est le cas avec la méthode GLM,
-la création d’un nombre très important de variables binaires pour ces variables. Ces regroupe-
-ments sont réalisés, soit en utilisant des outils de classification statistique, soit en utilisant l’avis
-d’experts. Par exemple les 100 modalités d’origine de la variable CSP ont été regroupées en
-12 modalités ; la variable Genreduvehicule est issue d’un regroupement d’une cinquantaine
-de variables en 6 groupes à dire d’experts métier ; la variable Usage a également été créée à
-partir d’un regroupement d’une cinquantaine de catégories et possède 8 niveaux (Usage1, Us-
-age2 . . .). Bien que les regroupements des variables qualitatives ne soient pas nécessaire pour
-CART-ANV, ils sont utiles dans le cadre d’une comparaison avec la GLM.
-Les sinistres extrêmes : la table 1 montre l’importance des sinistres extrêmes dans le mon-
-tant final de la prime puisque ces sinistres qui ne représentent que 0,01 % du nombre total
-d’assurés contribuent à hauteur de 19 % du montant total des sinistres. Dans notre approche,
-les classes de risques ne sont pas fixées a priori, ce qui nécessite de fixer un seuil d’écrêtement
-pour l’ensemble du portefeuille. En utilisant la méthode de la fonction moyenne des excès -
-mean excess loss - présentée dans Embrechts et al. (1997), on obtiendrait un seuil d’écrête-
-ment de 300 000 euros pour le montant des sinistres agrégés au niveau du véhicule. Toutefois,
-il peut être préférable de fixer le seuil d’écrêtement selon d’autres critères en fonction du mod-
-èle statistique utilisé (en particulier pour les modèles minimisant une distance quadratique).
-Le seuil S est fixé au quantile à 99 % de la distribution des montants des sinistres strictement
-positifs, soit 30 000 euros (parmi les 2,2 millions d’observations de la base, 1600 observations
-sont supérieures à ce seuil).
-Agrégation au niveau du véhicule : nous proposons de modéliser le tarif global d’un
-véhicule plutôt que de modéliser le risque de chaque garantie souscrite. Pour cela, il nous
-faut sommer les coûts de sinistre de chaque garantie et créer une variable qui décrit la formule
-« théorique » de garantie utilisée par le véhicule. Ces formules sont notées de la « formule 1 »
-Adaptation de CART pour la tarification des risques en assurance
-(Responsabilité Civile uniquement, 25% des cas) à la « formule 4 » (Tout Accident, 45% des
-cas). D’autres formules existent mais ne figurent plus dans la cible commerciale actuelle. Ces
-formules atypiques représentent 14 % des cas et ne seront pas utilisées pour la modélisation.
-3 La modélisation
-Par nature, si les sinistres deviennent prévisibles, le risque ne peut plus faire l’objet d’un
-contrat d’assurance. L’assureur n’ambitionne donc pas de prévoir chaque sinistre mais vise
-à estimer l’espérance du sinistre. C’est pourquoi, le Mean Square Error est intrinsèquement
-élevé quelque soit le modèle mis en œuvre.
-Notons également les particularité de la distribution des coûts de sinistre. En plus d’obtenir
-un coefficient de variation élevé, nous observons une très forte asymétrie (Kurtosis ￿ 3) des
-coûts de sinistre (cf. figure 1). Cela s’aggrave par le fait que le coût est forcé à 0 quand il n’y
-pas de sinistre (ce qui représente souvent plus de 90% des lignes en assurance non-vie). Ainsi,
-même si la taille de la base paraît importante, elle n’est pas surdimensionnée pour obtenir des
-résultats significatifs.
-La préparation des données (section 2.2) a explicité l’importance des sinistres extrêmes et
-a retenu un seuil d’écrêtement S = 30 000e. Dans les modèles mis en œuvre, cela se traduit
-par : E[Y |X] = E[Y |X,Y < S] + E[Y |X,Y ≥ S] où Y désigne la charge de sinistre
-par police et X les variables explicatives associées à la police. Dans la suite, Y désignera les
-sinistres écrêtés.
-3.1 Régression par modèle linéaire généralisé
-Un modèle linéaire généralisé a été ajusté sur la base d’apprentissage. L’hypothèse d’une
-loi de « poisson » a été retenue pour l’erreur dans le paramétrage de la GLM. La sélection de
-modèle a été effectuée selon une stratégie de sélection « forward ». Cette stratégie consiste à
-partir du modèle sans variable explicative, puis à ajouter la variable qui réduit le plus l’erreur
-sur la base de validation. Cette opération est réitérée jusqu’à ce que l’ajout de variables aug-
-mente l’erreur sur la base de validation. Le modèle final est celui dont le choix des variables
-explicatives minimise l’erreur sur la base de validation. Cette stratégie de sélection de modèle
-est consistante avec la stratégie utilisée pour paramétrer les autres algorithmes et permet de
-comparer de manière objective les résultats produits par ces algorithmes et les modèles GLM.
-3.2 L’algorithme CART pour les arbres de régression
-CART peut être utilisé pour des problèmes de classification ou de régression. Dans le
-cadre de l’estimation de la prime pure, le problème est lié à une régression sur le montant et
-la fréquence des sinistres. Nous renvoyons le lecteur à Breiman et al. (1984) et à Hastie et al.
-(2008) pour une explication complète de l’algorithme, en particulier sa capacité à gérer les
-valeurs manquantes.
-Le résultat de l’algorithme CART qui cherche à prédire la valeur de Y , le sinistre, est une
-fonction notée fˆw(X) en fonction des valeurs explicatives X (i.e. E[Y |X]) et un paramètre
-de complexité w qui correspond au nombre de nœuds dans l’algorithme CART. L’ajustement
-de l’algorithme se fait en deux étapes. La première étape est l’ajustement de la fonction fˆw(x)
-A. Paglia et al.
-sur la base d’apprentissage et la deuxième étape consiste à trouver le nombre de nœuds ter-
-minaux w qui minimise l’erreur de généralisation sur la base de test.
-Notons que la fonction fˆw(x) est de la forme :
-fˆw(x) =
-w￿
-j=1
-Y¯j,w × I{x ∈ Rj,w}
-où w désigne le nombre de nœuds terminaux de l’arbre, I{x ∈ Rj,w} est la fonction
-indicatrice associée au nœud finalRj,w et ¯Yj,w désigne la moyenne empirique dans le groupe j.
-Partant de la base de données initiale, l’algorithme calcule pour chaque variable et pour
-chaque séparation possible la valeur de la déviance du nœud parent, fils gauche et fils
-droit. Dans le cas d’une minimisation de l’erreur quadratique, cette déviance a pour expres-
-sion : D =
-￿
-i∈Noeud (yi − y¯i)2. L’algorithme calcule ensuite, pour chacune des séparations
-possibles, la valeurR de la réduction de déviance : R = Dparent−(Dfils gauche+Dfils droit).
-Le nœud finalement retenu est la séparation qui maximise la réduction de déviance R. L’al-
-gorithme recommence ensuite la création d’un nouveau nœud jusqu’à ce que le critère d’arrêt
-sur le nombre minimum d’individu dans un nœud soit rencontré. L’arbre produit de nombreux
-nœuds. Une deuxième étape, appelée élagage, consiste à retirer tous les nœuds qui résultent du
-surapprentissage en utilisant une deuxième base, la base de validation.
-3.2.1 Paramétrage de l’algorithme sous R
-Plusieurs packages existent sous R pour construire des arbres de décision avec l’algorithme
-CART. Nous avons retenu le package de référence rpart de Therneau et al. (2009) car il nous
-permet de recoder les modifications à apporter sur l’algorithme pour intégrer le temps d’expo-
-sition.
-La fonction rpart a 6 paramètres : xval, minbucket, maxcompete, maxsurrogate, cp
-etmaxdepth.
-Le paramètre xval désigne le nombre de validations croisées effectuées par le modèle
-(xval = 10 par défaut). Pour un portefeuille d’assurance qui possède une forte variance dans
-la variable Y à expliquer, la validation croisée n’est pas très adaptée à moins d’utiliser un faible
-nombre de validations croisées de façon à ce qu’à chaque étape la proportion de la base utilisée
-pour la validation contienne un grand nombre d’observations. Notre approche préconise donc
-de ne pas utiliser cette option (xval = 0) et de découper aléatoirement, classiquement, la base
-de donnée en trois parties : 50% de la base sert à l’apprentissage, 25% servent à la validation et
-à trouver le paramètre de complexitéw optimal du modèle, les 25% restant serviront de base de
-test permettant de comparer les différents modèles. Les modèles GLM et CART-ANV seront
-donc comparés objectivement sur les mêmes bases.
-Le paramètre minbucket désigne le nombre minimum d’individus dans un groupe de
-risque final. Ce paramètre est un des deux critères d’arrêt dans la construction de l’arbre. Une
-valeur trop grande ne permet pas de modéliser les singularités des données. Une valeur trop
-petite crée des nœuds trop spécifiques qui seront supprimés par le second critère d’arrêt. Dans
-notre cas, il est fixé à 1000 véhicules. En effet, l’ordre de grandeur de la fréquence de surve-
-nance d’un sinistre (<10%) et l’importance de la variance et de l’asymétrie de Y , font qu’une
-Adaptation de CART pour la tarification des risques en assurance
-moyenne sur moins de 1000 véhicules a peu de chance d’être significative. Les temps de traite-
-ment étant raisonnables, il n’était pas utile d’optimiser ce paramètre à une valeur supérieure.
-maxcompete impacte uniquement l’affichage et pas les résultats (il permet l’affichage des
-maxcompete meilleurs critères de réduction de déviance R du nœud parent).
-maxsurrogate est le paramètre qui permet de définir le nombre de variables de substi-
-tution pour les variables prédictives ayant des valeurs manquantes dans la base de données.
-En effet, d’une part, CART ne supprime pas les observations ayant des valeurs manquantes
-et d’autre part, ne remplace pas les valeurs manquantes par des valeurs estimées. Une fois le
-nœud créé, l’algorithme sélectionne parmi les variables de substitution celles qui représentent
-le mieux le nœud créé pour répartir les observations où la variable est manquante. Par exem-
-ple, si la séparation du nœud est créée sur l’âge et que la seconde variable qui explique le
-mieux cette séparation est la puissance l’algorithme va classer les observations où l’âge n’est
-pas renseigné dans le nœud en fonction de la puissance. Dans notre cas, deux variables de
-substitutions sont suffisantes.
-cp est un critère d’arrêt qui utilise le critère de complexité w et qui vise à optimiser les
-temps de calculs. Nous l’avons fixé à zéro pour ne pas retenir ce critère d’arrêt.
-maxdepth désigne la profondeur maximum de l’arbre, fixée à 11 dans notre estimation
-car l’arbre, une fois élagué, a une longueur maximale de 10 nœuds. Ce paramètre n’a donc pas
-d’impact sur les résultats mais sur le temps de calcul.
-3.2.2 Adaptation de l’algorithme au problème de l’estimation de la prime pure
-Dans son papier sur l’application des algorithmes de support vector machine à l’estimation
-de la prime pure, Christmann (2004) propose de diviser les sinistres dans la base de données
-par leur période d’exposition. Mathématiquement, l’effet de cette transformation est présenté
-dans l’inéquation suivante :
-M￿
-i=1
-ti ∗ ( 1
-M
-∗
-M￿
-i=1
-Yi
-ti
-) ≥
-M￿
-i=1
-Yi soit
-M￿
-i=1
-ti ∗ Y˜ ≥
-M￿
-i=1
-Yi
-où M désigne le nombre d’individus dans un groupe d’assurés payant la même prime, Yi
-désigne le montant de sinistre et ti la période d’exposition. La démonstration de cette inéqua-
-tion se fait par récurrence. Cette méthode conduit à une surestimation de la prime i.e. que
-la somme des primes estimées dans un groupe de M assurés est supérieure à la somme des
-sinistres dans ce groupe.
-Afin d’obtenir l’égalité entre les primes pures actuarielles et la sommes des sinistres réels￿￿M
-i=1 ti ∗ Y˜ =
-￿M
-i=1 Yi
-￿
-il vient algébriquement que la quantité Y˜ estimée par l’algorithme
-dans un nœud et la fonction de déviance D˜ deviennent :
-Y˜ =
-￿M
-i=1 Yi￿M
-i=1 ti
-et D˜ =
-￿
-i∈Noeud
-(yi − y˜i ∗ ti)2
-Nous avons donc intégré cette modification directement dans l’algorithme CART. Cette
-approche permet de prendre en compte l’effet de la période d’exposition sur la sinistralité du
-portefeuille et est équivalente mathématiquement à l’introduction d’un offset dans les modèles
-GLM qui possèdent une fonction de lien logarithmique.
-A. Paglia et al.
-4 Résultat de la comparaison CART-ANV/GLM
-Nous comparons dans cette section, les performances générales des deux modèles, leurs
-performances par segment sur les deux principaux critères d’équité et d’homogénéité. Nous
-discuterons enfin des aspects pratiques de ces deux approches dans le cadre actuariel.
-4.1 Le Mean Square Error
-Nous comparons d’abord les modèles à l’aide du Mean Square Error (MSE), un critère
-usuel de performance d’un modèle. Nous constatons clairement que sur la base de test, l’algo-
-rithme CART-ANV sur-performe le modèle GLM.
-Modèle MSEapprentissage MSEtest
-Régression GLM (poisson) 1148103 1177830
-CART-ANV 1144881 1176777
-TAB. 2 – MSE calculé sur la base d’apprentissage et sur la base de test
-Les faibles différences indiquées dans le tableau 2 peuvent sembler minimes. Rappelons
-que le Mean Square Error, est intrinsèquement très élevé en assurance non-vie. Ainsi, réduire
-de 1/1 000 la valeur du MSE constitue une réelle réduction de l’erreur sur l’estimation de la
-prime. Cette réduction du MSE est réellement utile à l’assureur qui cherche, sur son porte-
-feuille, le meilleur résultat. 3
-4.2 Le critère d’équité
-Nous cherchons à illustrer graphiquement la performance des deux approches en terme
-d’équité en projetant les résultats par segment (i.e. groupe de véhicules homogènes).
-Réaliser cette analyse pose le problème du choix de la taille du segment dans lequel on
-mesure les écarts entre les modèles. Si le segment est trop grand, les écarts tendent à s’effacer
-quelques soient leurs performances. Si au contraire, on cherche à mesurer les écarts dans des
-segments trop petits, le caractère aléatoire de la sinistralité ne permet plus de comparer les
-écarts produits par les modèles.
-Ainsi que le montre la figure 2, dans sa partie en haut à gauche, l’algorithme CART-ANV
-et la GLM montrent des performances comparables en terme de biais lors d’une projection des
-résultats sur une seule variable explicative (segments-unidimensionnels). En effet, les courbes
-CART-ANV et GLM épousent toutes les deux l’histogramme des sinistres.
-En revanche, la projection des résultats sur deux variables explicatives (segments multi-
-dimensionnels) tend à montrer que l’algorithme CART-ANV est moins biaisé que la GLM,
-tendance qu’il s’agirait de confirmer dans des travaux futurs, comme cela est illustré dans les
-trois autres parties de la figure 2. Elles montrent la projection sur la puissance du véhicule
-pour différentes tranches d’âge. Dans ces trois cas, nous observons que la courbe CART-ANV
-épouse beaucoup mieux l’histogramme des sinistres. Considérons par exemple les assurés dont
-3Nous ne cherchons pas à prouver que l’algorithme CART-ANV sur-performe la GLM de manière systématique
-en assurance non-vie.
-Adaptation de CART pour la tarification des risques en assurance
-l’âge des véhicules est compris entre 0 et 15 ans (partie en haut à droite de la figure 2) et dont
-la puissance se situe entre 50 et 75 ch. Nous remarquons un écart significatif de la GLM qui
-inciterait ces assurés à souscrire au juste prix chez un autre assureur.
-âge dans [0;90]
-puissance du véhicule
-E
-U
-R
-0;50 050;75 100;125 150;200
-0
-2
-0
-0
-4
-0
-0
-6
-0
-0
-prime pure
-arbre
-GLM
-âge dans [0;15[
-puissance du véhicule
-E
-U
-R
-0;50 050;75 100;125 150;200
-0
-2
-0
-0
-4
-0
-0
-6
-0
-0
-âge dans [15;30[
-puissance du véhicule
-E
-U
-R
-0;50 050;75 100;125 150;200
-0
-2
-0
-0
-4
-0
-0
-6
-0
-0
-âge dans [30;60[
-puissance du véhicule
-E
-U
-R
-0;50 050;75 100;125 150;200
-0
-2
-0
-0
-4
-0
-0
-6
-0
-0
-FIG. 2 – Montant de sinistres en fonction de la puissance du véhicule pour le portefeuille
-global puis restreint à différentes tranches d’âge
-4.3 Lecture des résultats produits par l’arbre
-L’arbre ajusté sur la base d’apprentissage puis élagué sur la base de validation possède un
-total de 65 nœuds finaux. Le premier résultat qu’il convient de remarquer est la possibilité
-d’avoir une vision exhaustive du modèle à la fois sur le montant des primes en fonction des
-variables explicatives et le nombre d’assurés concernés par ce montant de prime.
-Cette lisibilité de la tarification permet ainsi de réunir à une même table techniciens, re-
-sponsables marketing et actuaires pour discuter des stratégies tarifaires à mettre en place. Con-
-cernant cette stratégie, il peut par exemple être décidé de supprimer une séparation finale en
-deux nœuds si celle-ci segmente le risque d’une façon incompatible avec les prix de marché.
-De plus, l’arbre permet de montrer que certains critères de risque sont plus importants
-dans certaines sous-populations que d’autres. Ainsi, la seconde variable d’influence chez les
-véhicules récents (âge inférieur à 5,6 ans) est la puissance alors que pour les véhicules anciens,
-la variable puissance intervient beaucoup plus bas dans l’arbre pour discriminer les risques.
-Un autre avantage des arbres de régression tient au fait que l’algorithme cherche à chaque
-étape à créer le nœud qui engendre la réduction d’erreur quadratique la plus importante et ne
-fournis pas la même profondeur de segmentation sur tout le portefeuille. Par exemple, pour les
-A. Paglia et al.
-véhicules d’âge supérieur à 24,5 ans qui représentent la moitié du portefeuille, seuls six tarifs
-sont produits par l’arbre sur une profondeur de deux ou trois nœuds seulement (figure 3). La
-segmentation des risques sur cette partie du portefeuille n’ayant pas un grand intérêt pour l’as-
-suré (les majorations/minorations de tarif étant faibles), cette propriété de l’algorithme apparaît
-comme un avantage face aux méthodes statistiques qui segmentent uniformément le risque sur
-le portefeuille.
-17,40 N:423048
-11,00 N: 320664 37,70 N:1023884
-24,29 N:55988 54,69 N: 46396
-9,87 N:293318 24,50 N:27346
-19,50 N:42811 40,00 N:13177 40,40 N:23303 59,30 N:23093
-Puiss ≥ 73,5Puiss < 73,5
-Puiss ≥ 74,5
-Puiss < 74,5
-Age < 29,5Age ≥ 29,5
-Formu = 4Formu = 1,2,3
-Puiss ≥ 77,5Puiss < 77,5
-Age ≥ 24,5
-FIG. 3 – Arbre de régression pour la branche concernant les véhicules anciens.
-5 Conclusion
-Cette étude met en œuvre une approche innovante pour la tarification des risques d’assur-
-ance non-vie. Alors que les développements récents en actuariat de l’assurance dommage se
-sont focalisés sur la maîtrise et l’amélioration des Modèles Linéaires Généralisés, nous pro-
-posons une version modifiée de l’algorithme CART pour la régression. L’algorithme CART,
-modifié pour prendre en compte des spécificités assurancielles, a permis de faire ressortir des
-informations nouvelles sur le risque tout en améliorant les mesures d’erreur entre le risque
-mesuré et le risque modélisé. L’assureur trouve également une réelle plus-value dans la seg-
-mentation produite par l’algorithme. Les véhicules anciens, très nombreux, mais qui ont un
-risque faible et peu d’enjeux commerciaux, sont modélisés très simplement sur six classes. Par
-contre, la segmentation est beaucoup plus fine pour les véhicules récents, tout en évitant de
-paramétrer le modèle sur des classes de risque dont le nombre de personnes assurées n’est pas
-significatif (évite donc le phénomène de surapprentissage). De plus, les tests réalisés tendent à
-montrer que l’algorithme CART est moins biaisé que la GLM sur les différents segments de la
-base. Enfin, la lisibilité des arbres de décision permet de réunir à une même table techniciens,
-responsables marketing et statisticiens pour discuter des stratégies tarifaires à mettre en place.
-Adaptation de CART pour la tarification des risques en assurance
+− 0.38)
+Rappel 0.94 (+− 0.03) 0.93 (
++
+− 0.04)
+Précision 0.81 (+− 0,25) 0.78 (
++
+− 0.31)
+F-mesure 0.85 (+− 0.18) 0.81 (
++
+− 0.22)
+TAB. 1 – Résultats des expérimentations comparant les détections d’intrusion avec et sans
+adaptation.
+Les temps de calcul sont très raisonnables puisque les 10000 lignes qui correspondent à
+environ 20 minutes d’enregistrement sur les serveurs testés sont traitées en quelques secondes.
+Cependant, nos expérimentations ont été volontairement menées avec peu d’indices, mais à
+terme, l’utilisation d’un grand nombre d’indices pourrait augmenter sensiblement le temps de
+traitement.
+5 Autres approches de la détection d’intrusions
+Les systèmes de détection d’intrusions à partir de logs HTTP utilisent pour la plupart des
+méthodes basées sur des signatures d’intrusions. Ces signatures sont comparées successive-
+ment et indépendamment sur chaque requête. Tombini et al. (2004) proposent comme modèle
+une liste de couples qui représentent la page demandée et les arguments éventuels des scripts.
+T. Guyet et al.
+Kruegel et Vigna (2003) ont introduit l’utilisation de modèles qui sont appris à partir d’une
+base d’exemples. Les modèles les plus simples reposent sur la distribution de caractères des
+URLs utilisées dans les requêtes et la distribution des tokens. Ingham et al. (2007) utilisent des
+automates déterministes finis pour représenter les URLs.
+Mais pour Bass (2000), l’avenir des systèmes de détection d’intrusions passe par les mé-
+thodes de fusion d’information. Chaque signature est efficace pour détecter un certain type
+d’attaque, mais pas tous. Une approche qui permet de combiner différentes signatures apparaît
+comme une solution raisonnable pour détecter des intrusions de manière robuste et précise.
+Les outils actuels de détection d’intrusions dans les serveurs Web (e.g. ModSecurity ou
+Snort de Roesch (1999)) nécessitent beaucoup de mises à jour manuelles des signatures d’in-
+trusion. Des travaux cherchent donc à automatiser (totalement ou partiellement) la découverte
+de nouvelles intrusions, la construction de leurs signatures et la mise à jour des IDS. Krei-
+bich et Crowcroft (2004) proposent HoneyComb, une méthode permettant d’automatiser la
+construction de signatures par l’observation d’un HoneyPot, i.e. un serveur Web peu protégé
+mais factice – personne n’est censé y accéder. Tout le trafic qui s’y passe peut être considéré
+comme malveillant et HoneyComb s’en sert pour automatiser la construction de nouvelles si-
+gnatures. D’autres approches cherchent à adapter leurs modèles en ligne et parallèlement à la
+détection d’intrusion. Bojanic (2005) propose une méthode utilisant des HMM pour détecter
+des intrusions dans des séquences de commande système et Srinoy (2006) utilise des SVMs
+pour modéliser les intrusions et une technique d’intelligence collective (Swarm intelligence)
+pour permettre une adaptation dynamique des modèles d’intrusion.
+6 Conclusion
+Nous avons proposé une méthode de diagnostic multi-sources adaptatif qui s’inspire de
+la fusion d’information pour combiner les diagnostics de DMoS. Un méta-modèle du diag-
+nostic est construit à partir de contraintes connues entre les DMoS. La comparaison entre les
+diagnostics réalisés et le méta-modèle permet de proposer les adaptations qu’effectuent indivi-
+duellement les DMoS sur eux-mêmes.
+Nous avons appliqué cette méthode à la conception d’un système adaptatif de détection
+d’intrusion à partir de logs Apache et nous avons montré que 1) les choix d’adaptation étaient
+pertinents, 2) que le système découvre de nouvelles intrusions et 3) que les performances de
+détection d’intrusion étaient améliorées.
+Actuellement, la fusion centralise toutes les adaptations et les appliquent a posteriori de la
+construction du diagnostic. La première perspective de ce travail est de proposer une approche
+multi-agents du diagnostic adaptatif multi-sources dans laquelle les décisions d’adaptation se-
+raient discutées entre agents conjointement au calcul du diagnostic. Le seconde perspective
+est de permettre l’expression dans le méta-modèle de nouveaux types de contraintes entre les
+diagnostiqueurs.
 Références
-Apte, C., E. Grossman, E. Pednault, B. Rosen, F. Tipu, et B. White (1999). Probabilistic
-estimation based data mining for discovering insurance risks. IEEE Intelligent Systems 14,
-49–58.
-Breiman, L., J. Friedman, R. Olshen, et C. Stone (1984). Classification and regression trees.
-Chapman & Hall/CRC.
-Christmann, A. (2004). An approach to model complex high–dimensional insurance data.
-Allgemeines Statistisches Archiv 88(4), 375–396.
-Dugas, C., N. Chapados, Y. Bengio, P. Vincent, G. Denoncourt, et C. Fournier (2003). Statisti-
-cal learning algorithms applied to automobile insurance ratemaking. In Casualty Actuarial
-Society Forum-Arlington, pp. 179–213.
-Embrechts, P., C. Kluppelberg, et T. Mikosch (1997). Modelling extremal events. Springer
-Berlin.
-Feldblum, S. (2006). Risk Classifications, Pricing Aspects. Encyclopedia of Actuarial Science.
-John Wiley and Sons.
-Hastie, T. M., R. Tibshirani, et J. Friedman (2008). The Elements of Statistical Learning.
-Springer Series in Statistics.
-McCullagh, P. et J. Nelder (1989). Generalized linear models (2 ed.). UK : Chapman and Hall.
-Shearer, C. (2000). The crisp-dm model : The new blueprint for data mining. Journal of data
-Warehousing 5(4), 13–22.
-Therneau, T. M., B. Atkinson, et B. Ripley. (2009). Rpart : Recursive Partitioning. CRAN. R
-package version 3.1-45.
-Wu, X., V. Kumar, J. Ross Quinlan, J. Ghosh, Q. Yang, H. Motoda, G. McLachlan, A. Ng,
-B. Liu, P. Yu, et al. (2008). Top 10 algorithms in data mining. Knowledge and Information
-Systems 14(1), 1–37.
+Alex, H., M. Kumar, et B. Shirazi (2008). MidFusion : An adaptive middleware for information
+fusion in sensor network applications. Information Fusion 9(3), 332–343.
+Diagnostic multi-sources adaptatif
+Bass, T. (2000). Intrusion detection systems and multisensor data fusion. Communication of
+the ACM 43(4), 99–105.
+Bojanic, I. (2005). On-line adaptive IDS scheme for detecting unknown network attacks using
+HMM models. Master’s thesis, University of Maryland.
+Chair, Z. et P. K. Varshney (1986). Optimal data fusion in multiple sensor detection system.
+IEEE Transactions on Aerospace and Electronic Systems 22(1), 98–101.
+De Kleer, J. (2007). Dynamic domain abstraction through meta-diagnosis. In I. Miguel et
+W. Ruml (Eds.), Proceedings of the 7th International Symposium on Abstraction, Reformu-
+lation, and Approximation (SARA), pp. 109–123.
+Fromont, É., R. Quiniou, et M.-O. Cordier (2005). Learning rules from multisource data for
+cardiac monitoring. In Proceedings of the 10th conference on Artificial Intelligence in Me-
+dicine (AIME’05), pp. 484–493.
+Ingham, K. L., A. Somayaji, J. Burge, et S. Forrest (2007). Learning DFA representations of
+HTTP for protecting web applications. Computer Networks 51, 1239–1255.
+Kreibich, C. et J. Crowcroft (2004). HoneyComb : creating intrusion detection signatures using
+honeypots. SIGCOMM Computer Communication Review 34(1), 51–56.
+Kruegel, C. et G. Vigna (2003). Anomaly detection of web-based attacks. In Proceedings of the
+10th ACM conference on Computer and communications security (CCS ’03), pp. 251–261.
+Roesch, M. (1999). Snort : Lightweight intrusion detection for networks. In Proceedings of
+the 13th Conference on Systems Administration, pp. 229–238.
+Shafer, G. (1976). A Mathematical Theory of Evidence. Princeton University Press.
+Srinoy, S. (2006). An adaptive IDS model based on swarm intelligence and support vector ma-
+chine. In Proceedings of the International Symposium on Communications and Information
+Technologies (ISCIT ’06), pp. 584–589.
+Tombini, E., H. Debar, L. Mé, et M. Ducassé (2004). A serial combination of anomaly and
+misuse IDS applied to HTTP traffic. In Proceedings of the 20th annual computer security
+application conference (ACSAC ’04), pp. 428–437.
 Summary
-Non-life actuarial researches mainly focusses on improving Generalized Linear Models.
-Nevertheless, this type of model sets constraints on the risk structure and on the interactions
-between explanatory variables. Then, a bias between the real risk and the predicted risk by
-the model is often observed on a part of data. Nonparametric tools such as machine learning
-algorithms are more efficient to explain the singularity of the policyholder.
-Among these models, decision trees offer the benefit of both reducing the bias and improv-
-ing the readability of the results of the pricing estimation. Our study introduces a modification
-of the Classification And Regression Tree (CART) algorithm to take into account the specifici-
-ties of insurance data-sets and compares the results produced by this algorithm to the prices
-obtained using Generalized Linear Models. These two approaches are then applied to the pric-
-ing of a vehicle insurance portfolio.
+An adaptive monitoring system aims at monitor and diagnose a system while adapting
+to its evolution. This requires the adaptation of the diagnosers which specify or enrich their
+own model to evolve with the system at the same time. We propose a multi-source diagnosis
+framework based on the information fusion. Relations between mono-source diagnosers are
+provided by the designer and define a meta-model of diagnosis. The compatibility of the cur-
+rent diagnosis with the meta-model is checked online. When one relationship is not satisfied,
+the underlying mono-source diagnosers are adapted.
+We apply this approach to the design of an adaptive intrusion detection system for a HTTP
+connection log stream from a Web server. The evaluations show that the system improves its
+ability to detect known intrusions and that it discovers new kinds of attack.

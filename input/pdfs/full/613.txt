@@ -1,557 +1,543 @@
- Sécurisation des entrepôts de données contre les inférences  
-en utilisant les réseaux Bayésiens 
  
  
-Salah TRIKI*, Hanene BEN-ABDALLAH*, Jamel FEKI*,  Nouria HARBI** 
+Combinaison de l’approche inductive (progressive)  
+et linguistique pour l’étiquetage morphosyntaxique des  
+corpus de spécialité 
  
-* Laboratoire Mir@cl 
-Département d’Informatique,  
-Faculté des Sciences Economiques et de Gestion de Sfax, 
-Route de l’Aéroport Km 4 – 3018 Sfax, BP. 1088 
-{Salah.Triki, Hanene.BenAbdallah, Jamel.Feki}@Fsegs.rnu.tn 
-**Laboratoire ERIC  
-Université Lyon 2, 
-5 avenue P. Mendès France 69676 Bron, Cedex 
-Nouria.Harbi@univ-lyon2.fr 
+Ahmed Amrani*,**, Yves Kodratoff** 
+*ESIEA Recherche, Pôle ECD, 11 rue Baudin, 74200 Ivry sur Seine, France 
+amrani@esiea.fr 
+**LRI, UMR CNRS 8623, Bât. 490, Université de Paris-Sud 11,  91405 Orsay, France  
+yk@lri.fr 
  
-Résumé. Les entrepôts de données permettent aux analyste-décideurs d’établir 
-des prévisions et de prendre des décisions stratégiques. La sécurisation de ces 
-entrepôts est, par conséquent, importante afin de protéger les informations 
-sensibles. Par ailleurs, cette sécurisation ne doit pas constituer une entrave à 
-l'exploitation efficace et rapide de l’entrepôt, ni être trop souple induisant 
-l’inférence des données interdites (i.e., données personnelles, confidentielles). 
-Dans cet article, nous examinons la sécurisation des entrepôts de données à 
-travers une approche basée sur les réseaux Bayésiens. Elle comporte deux 
-avantages : d'une part, elle ne nécessite pas un traitement supplémentaire après 
-chaque phase d’alimentation de l’entrepôt et, d'autre part, elle n'entraine pas 
-l’altération des données originales. 
- 
+Résumé. Les étiqueteurs morphosyntaxiques sont de plus en plus performants 
+et cependant, un véritable problème apparaît lorsque nous voulons étiqueter 
+des corpus de spécialité pour lesquels nous n’avons pas de corpus annotés. La 
+correction des ambiguïtés difficiles est une étape importante pour obtenir un 
+corpus de spécialité parfaitement étiqueté. Pour corriger ces ambiguïtés et di-
+minuer le nombre de fautes, nous utilisons une approche itérative appelée In-
+duction Progressive. Cette approche est une combinaison d’apprentissage au-
+tomatique, de règles rédigées par l’expert et de corrections manuelles qui se 
+combinent itérativement afin d’obtenir une amélioration de l’étiquetage tout en 
+restreignant les actions de l’expert à la résolution de problèmes de plus en plus 
+délicats. L’approche proposée nous a permis d’obtenir un corpus de biologie 
+moléculaire « correctement » étiqueté. En utilisant ce corpus, nous avons ef-
+fectué une étude comparative de quatre étiqueteurs supervisés. 
 1 Introduction 
-Les entrepôts de données (ED) occupent une place importante dans les organisations. Ils 
-permettent aux décideurs d’explorer les données de celles-ci et de prendre des décisions 
-stratégiques. Les données sont agrégées selon des dimensions formant ainsi un cube. 
-L’agrégation permet de ressortir les corrélations entre les données et de définir les tendances. 
-L’utilisation des opérations de forage vers l’avant rend possible l’exploration de ces 
-corrélations et de ces tendances, offrant de l’information qui aide à la prise de décision. 
-Evidemment, les données de l’ED d’une organisation sont sensibles et ne doivent pas être 
-cédées sans contrôles. Dans ce cadre, plusieurs gouvernements ont promulgué des lois pour 
-la protection des vies privées de leurs citoyens. Parmi ces lois, HIPPA (« Health Insurance 
-Portability and Accountability Act » HHS (1996)) vise à protéger les données médicales des 
-patients américains en obligeant les établissements du secteur des soins de la santé de suivre 
-des règles de sécurités strictes ; de même, GLBA (« Gramm-Leach-Bliley Act » GPO 
-Sécurisation des entrepôts de données 
-(1999)) oblige les organismes financiers américains à protéger les données de leurs clients ; 
-Safe Harbor (Export (2008)) permet aux entreprises s'y conformant de transférer et d'utiliser 
-les données concernant les internautes européens ; Sarbanes-Oxley (Soxlaw (2002)) garantit 
-la fiabilité des données financières des entreprises.  
-Par ailleurs, la sécurisation des entrepôts de données peut être abordée à deux niveaux : 
-(i) niveau conception qui vise à concevoir un entrepôt de données sécurisé ; et (ii) niveau 
-exploitation qui vise à renforcer les droits d’accès/habilitations des utilisateurs, et à interdire 
-tout utilisateur malicieux d’inférer des données interdites à partir des données auxquelles il a 
-accès. Pour le premier niveau de sécurité, plusieurs travaux ont proposé des méthodes de 
-conception d’ED sécurisé (cf, Priebe et Pernul (2000), Rosenthal et Sciore (2000), Villarroel 
-et al. (2006), Soler et al. (2007)) et des notations pour la modélisation des aspects de la 
-sécurité (cf., Soler et al. (2006), Soler et al. (2008)). Ces propositions permettent de 
-modéliser les droits d’accès/habilitations des utilisateurs de l’ED, qui devraient être renforcés 
-par le serveur OLAP et ce au deuxième niveau.  
-Quant au deuxième niveau de sécurité, le serveur OLAP est sensé assurer des accès en 
-fonction des habilitations de chaque utilisateur.  Le serveur OLAP peut refuser les accès aux 
-données d’une mesure, d’une dimension, et/ou au-delà d’un niveau dans une hiérarchie.  A 
-l’instar des SGBD des systèmes d’information, les droits d’accès peuvent être explicitement 
-spécifiés sur les tables/colonnes de tables de l’entrepôt.  Cependant, le serveur OLAP tout 
-seul ne peut pas protéger l’accès aux données interdites et ce par inférence.     
-L’objectif de cet article et de montrer la possibilité de protéger un entrepôt de données 
-contre les inférences grâce l’ajout d’un module de contrôle qui complète le travail d’un 
-serveur OLAP comme proposé dans l’architecture présentée dans (Salah et al. (2009)),  
-Le module de contrôle vise à interdire à un utilisateur d'inférer des données protégées à 
-partir des données qui lui sont accessibles. Dans ce travail, nous nous intéressons aux cas des 
-requêtes utilisant les fonctions d’agrégations Max et Min. Nous proposons une approche 
-basée sur les réseaux Bayésiens qui ne nécessite pas un traitement supplémentaire après 
-chaque phase d’alimentation de l’entrepôt de données et qui n'entraine pas l’altération des 
-données originales. 
-Le reste de l’article est organisé comme suit : dans la section 2, nous présentons un état 
-de l’art des travaux effectués dans le domaine de la sécurisation des entrepôts de données. La 
-section 3 constitue une introduction aux réseaux Bayésiens, à la section 4 nous détaillons 
-notre approche et nous étudions sa complexité. La section 5 présente un exemple illustrant 
-l’utilisation de notre approche. Finalement nous concluons l’article par la section 6.  
-2 Etat de l’art 
-Sung et al. (2006) signalent qu’il existe des similitudes entre les bases de données 
-statistiques et les entrepôts de données ; vu leur ancienneté, les premières peuvent aider à 
-trouver des solutions pour la prévention des inférences dans les entrepôts de données. Dans 
-les bases de données statistiques, seules les requêtes utilisant les fonctions d’agrégations sont 
-autorisées. Au niveau des entrepôts de données le besoin de sécurisation s’est fait ressentir 
-depuis longtemps (Shoshani et al 1997, Bhargava 2000, Pernul et al 2000). Plusieurs travaux 
-ont été réalisés couvrant les niveaux métier (Soler et al. 2008), conception (Villarroel et al. 
-2006) et niveau logique (Soler et al. 2006) d’une approche MDA (« Model Driven Approach 
-»). La sécurisation au niveau exploitation, comporte deux classes d’approches.  
-Triki et al. 
+Dans le cadre d’un processus complet de fouille de textes (Kodratoff et al., 2003, Amrani 
+et al., 2004a), nous nous sommes intéressés à l’étiquetage morphosyntaxique des corpus de 
+spécialité. L’étiquetage morphosyntaxique consiste à affecter à chaque mot dans la phrase 
+son étiquette morphosyntaxique, en prenant en considération le contexte et la morphologie de 
+ce mot. L’étiquette morphosyntaxique est composée de la catégorie syntaxique du mot (nom 
+commun, nom propre, adjectif, etc.) et souvent comporte des informations morphologiques 
+(genre, nombre, personne, etc.). Les outils informatiques nécessaires à l’opération 
+d’étiquetage sont appelés « étiqueteurs ». 
+Un problème se pose lorsque les étiquettes des mots sont ambiguës. Par exemple, le mot 
+functions peut être un nom au pluriel (‘biological functions are…’) ou bien un verbe au sin-
+gulier (‘this gene functions as…’). Le problème à résoudre est celui de trouver l’étiquette 
+correcte selon le contexte. La correction de ces ambiguïtés est une étape importante pour 
+obtenir un corpus de spécialité « parfaitement » étiqueté. Pour lever ces ambiguïtés et donc 
+diminuer le nombre de fautes d’étiquetage, nous proposons une approche interactive et itéra-
+tive appelée Induction Progressive. Cette approche est une combinaison d’apprentissage 
+automatique, de règles rédigées par l’expert et de corrections manuelles. L’induction pro-
+- 247 - RNTI-E-6
+Combinaison de l’approche inductive (progressive) et linguistique pour l’étiquetage  
+gressive nous a permis d’obtenir un corpus de biologie moléculaire « correctement » étique-
+té. Nous avons alors utilisé le corpus obtenu pour entraîner quatre étiqueteurs morphosyn-
+taxiques supervisés, puis nous avons effectué une étude comparative. 
+2 Étiquetage morphosyntaxique 
+2.1 Les approches d’étiquetage morphosyntaxique 
+Il y a deux approches principales pour l’étiquetage morphosyntaxique : l’approche induc-
+tive et l’approche linguistique. 
+L’approche inductive nécessite la disponibilité d’un grand corpus annoté. L’annotation de 
+corpus est tout apport d’information aux textes bruts. L’information requise ici est l’étiquette 
+morphosyntaxique correcte de chaque mot. Parmi les étiqueteurs inductifs, nous pouvons 
+citer : l’étiqueteur à base de transformation (Brill, 1995), l’étiqueteur à base de « Séparateurs 
+à vaste marge (SVM)» (Giménez et Màrquez 2003) et les étiqueteurs probabilistes (Ratna-
+parkhi, 1996, Toutanova et al., 2003). Des étiqueteurs plus élaborés ont été développés 
+comme les étiqueteurs basés sur la combinaison de plusieurs étiqueteurs individuels, permet-
+tant ainsi de pallier les déficiences de chacun des systèmes pris séparément (Brill et Wu 
+1998, Halteren et al., 2001). Les résultats publiés de ses étiqueteurs appliqués au corpus 
+classique ‘WSJ’ sont de l’ordre de 96-97%. 
+L’approche linguistique, quant à elle, consiste à coder manuellement les connaissances 
+linguistiques sous forme de règles. Les règles acquises sont ensuite utilisées pour l’étiquetage 
+de nouveaux textes. L’un des travaux les plus important de cette approche est le développe-
+ment d’une grammaire de contraintes (Karlsson et al., 1995) et son application à l’étiquetage 
+morphosyntaxique (Voutilainen, 95). Cet étiqueteur peut être considéré comme le meilleur 
+étiqueteur existant. En effet, il atteint une précision supérieure à 99% d’étiquettes correctes. 
+Afin de bénéficier des avantages des deux approches, plusieurs chercheurs ont combiné 
+les étiqueteurs inductifs et les règles linguistiques (Tapanainen et Voutilainen 1994, Samuel-
+son et Voutilainen 1997). Il existe d’autres systèmes d’étiquetage qui utilisent de petits cor-
+pus annotés pour accélérer l’annotation d’un corpus plus grand ; ces systèmes combinent 
+l’utilisation d’un étiqueteur appris sur un petit corpus et l’intervention d’un humain via une 
+interface interactive. Nous  pouvons citer par exemple, les systèmes ANNOTATE (Plaehn et 
+al., 2000) et KCAT (Won-Ho et al., 2000) qui sont basés sur des étiqueteurs statistiques. 
+2.2 Problématique de l’étiquetage morphosyntaxique 
+Quelque soit le système sur lequel ils sont basés, les étiqueteurs actuels atteignent des 
+performances très satisfaisantes mais il est difficile de dépasser la précision de 96-97%. Plu-
+sieurs chercheurs justifient cette difficulté par les incohérences dans le corpus 
+d’apprentissage (Ratnaparkhi, 1996, Toutanova et al., 2003). Les corpus sont annotés ma-
+nuellement, ils peuvent donc contenir des erreurs. Par conséquent, l’amélioration de la quali-
+té des corpus et la correction des erreurs ont une importance capitale. 
+De plus, les bons résultats des étiqueteurs supervisés s’expliquent par le fait que les tra-
+vaux en question se situent dans le domaine de l’apprentissage supervisé où le corpus de test 
+est de nature similaire au corpus d’apprentissage. Un véritable problème apparaît lorsque 
+nous voulons traiter des corpus de spécialité pour lesquels nous n’avons pas de corpus anno-
+- 248 -RNTI-E-6
+A. Amrani et al. 
+tés. L’acquisition d’un tel corpus est coûteuse et elle constitue le goulet d’étranglement pour 
+construire un étiqueteur pour une nouvelle application ou un nouveau domaine. 
+La plupart des étiqueteurs utilisent des informations de nature essentiellement locale (une 
+séquence de deux ou trois mots consécutifs). Par conséquent, ces étiqueteurs butent sur les 
+ambiguïtés qui demandent la prise en considération d'un contexte large. Par exemple : l'am-
+biguïté relatif/conjonction pour que. Bien que l’approche linguistique engendre des modèles 
+de très bonne qualité et traite efficacement les ambiguïtés difficiles, elle est coûteuse et labo-
+rieuse. Par exemple, le développement de l’étiqueteur ENGCG (Voutilainen, 95) a nécessité 
+plusieurs années. Cependant, comme pour les étiqueteurs supervisés, les performances des 
+étiqueteurs linguistiques se détériorent lorsqu’ils sont appliqués à de nouveaux corpus. 
+3 Induction progressive 
+La correction des ambiguïtés difficiles est une étape importante pour obtenir un corpus de 
+spécialité parfaitement étiqueté. Pour corriger ces ambiguïtés et diminuer le nombre de fautes 
+d’étiquetage, nous utilisons une approche itérative appelée Induction Progressive. 
+L’induction progressive est une combinaison d’apprentissage automatique, de règles rédigées 
+par l’expert et de corrections manuelles qui se combinent itérativement afin d’obtenir une 
+amélioration de l’étiquetage tout en restreignant les actions de l’expert à la résolution de 
+problèmes de plus en plus délicats. Le principe de l’induction progressive est le suivant : en 
+utilisant le langage CorTag (détaillé dans la section suivante), l’expert écrit une règle (ou 
+plusieurs règles) pour corriger une ambiguïté spécifique. Les règles de l’expert sont ensuite 
+appliquées au corpus Corp0 et engendrent un corpus CorpRegExp0. Un algorithme 
+d’apprentissage de règles est ensuite utilisé pour apprendre la modification engendrée par les 
+règles de l’expert. Les règles apprises sont aussi appliquées au corpus Corp0 et engendrent un 
+corpus CorpRegInd0. En utilisant une nouvelle version du logiciel interactif ETIQ (Amrani et 
+al., 2004b, Amrani et al., 2005a), les différences entre les deux corpus (CorpRegExp0 et 
+CorpRegInd0) sont alors visualisées pour faciliter leur analyse. Les points de désaccords sont 
+souvent des cas particulièrement difficiles à étiqueter. Leur  visualisation permet de : 
+- détecter les erreurs produites par les règles de l’expert. 
+- mettre à jour les règles de l’expert si elles se trompent. Pour ce faire, les règles induites 
+ayant trouvé l’étiquette correcte sont une indication précieuse. 
+- confirmer ou corriger les étiquettes obtenues par les règles de l’expert, ainsi nous obte-
+nons une base d’étiquettes sûres. Cette base servira pour améliorer progressivement la 
+qualité des règles induites. 
+3.1 Le langage d’étiquetage : CorTag 
+Le langage CorTag (Kodratoff et Azé, non publié) traite principalement les problèmes 
+d’étiquetage relationnel. Il offre la possibilité à l’utilisateur d’exprimer ses règles contextuel-
+les sous forme de conditions qui doivent être vérifiées et d’actions associées. Les règles peu-
+vent admettre des exceptions. La forme générale d’une règle est la suivante : si conditions 
+alors actions sauf exceptions. 
+Les conditions, actions et exceptions s’expriment généralement sous la forme de triplet : 
+(Pos, Mot, Etiquette) où Pos est la position relative du mot dans la phrase, Mot est le mot 
+situé à la position indiquée et Etiquette est l’étiquette morphosyntaxique du mot. Les posi-
+- 249 - RNTI-E-6
+Combinaison de l’approche inductive (progressive) et linguistique pour l’étiquetage  
+tions s’expriment relativement à un élément central que nous nommons le pivot. Le pivot est 
+l’élément autour duquel la règle va s’articuler et il s’agit très souvent du mot qui doit être ré-
+étiqueté. Le pivot doit obligatoirement être présent dans la partie conditions de la règle et 
+s’exprime de la manière suivante : (0, Mot, Etiquette). Les informations Mot et Etiquette 
+peuvent ne pas être toutes les deux renseignées. 
+Par exemple, la règle « si (-1,,RB) (0,,NN) (+1,,JJ) alors (-1,,JJ) sauf (-2,,JJ) » exprime 
+le fait que si l’élément central est étiqueté comme un nom (0,,NN) et qu’il est précédé d’un 
+adverbe (-1,,RB) et suivi d’un adjectif (+1,,JJ) alors l’adverbe est ré-étiqueté en adjectif sauf 
+s’il est lui-même précédé d’un adjectif. 
+Le langage offre la possibilité d’écrire des règles complexes en permettant à l’expert de 
+manipuler des éléments dont la position peut être inconnue lors de l’écriture de la règle mais 
+qui seront instanciés lors de l’application de celle-ci. Par exemple, le langage permet d’écrire 
+la règle relationnelle suivante : Si le premier verbe avant le mot that appartient à une liste 
+donnée alors le mot that est étiqueté IN (conjonction de subordination) sauf s’il y a un non 
+commun (singulier ou pluriel) entre le mot that et ce verbe. 
+Le langage dispose aussi d’une bibliothèque de fonctions intégrées qui permettent à 
+l’expert d’exprimer des contraintes sur les mots, les étiquettes, les positions et la phrase. 
+3.2 Induction Progressive 
+L’étape 0 consiste à obtenir un corpus (Corp0) de spécialité étiqueté par un étiqueteur 
+morphosyntaxique généraliste. Pour ce faire, nous utilisons l’étiqueteur de Brill (Brill, 1995). 
+Puis, avec l’aide de ETIQ (Amrani et al., 2004b, Amrani et al., 2005b), l’expert adapte les 
+règles morphologiques et contextuelles au domaine étudié. Nous avons constaté que les er-
+reurs dues aux mots inconnus de la spécialité sont facilement et efficacement résolues par les 
+règles morphologiques d’ETIQ. Cependant, les confusions contextuelles qui nécessitent des 
+règles relationnelles sont difficilement résolues. Pour les résoudre, nous utilisons l’induction 
+progressive. 
+L’expert identifie alors des erreurs qui lui paraissent importantes, et rédige des règles de 
+correction pour chaque ambiguïté. Ces règles peuvent être rédigées au sein de ETIQ, ou bien, 
+s’il s’agit de règles fortement contextuelles, en utilisant un langage de programmation dédié 
+à la rédaction de ces règles (le langage CorTag). Chaque règle s’applique à un contexte pré-
+cis et sert à corriger une erreur spécifique. L’expert produit ainsi un certain nombre de règles, 
+qu’il applique au corpus Corp0 et il obtient ainsi le corpus CorpRegExp0. Un problème quasi 
+insurmontable se présente lorsque l’expert travaille sur de gros corpus : le nombre 
+d’application des règles peut atteindre plusieurs milliers, et l’expert ne peut alors vérifier la 
+validité de ses règles que sur un sous-corpus du corpus initial. 
+Une fois que l’expert estime qu’il a franchi une étape et qu’il pense avoir résolu un pro-
+blème à peu près correctement, il fait alors appel à un algorithme d’apprentissage automati-
+que de règles. Cet algorithme sert à apprendre les modifications produites par les règles de 
+l’expert pour résoudre une erreur spécifique. Bien entendu, l’apprentissage correspondant 
+peut se faire sans problème sur le corpus complet. Le logiciel ETIQ permet d’apprendre ces 
+modifications en comparant deux versions du même corpus : 
+- Le corpus Corp0 avant l’application des règles de l’expert. 
+- Le corpus CorpRegExp0 après l’application des règles de l’expert. 
+Une base d’apprentissage est engendrée à partir de ces deux corpus. La base contient les 
+exemples modifiés par les règles de l’expert (exemples positifs) et les exemples non modifiés 
+- 250 -RNTI-E-6
+A. Amrani et al. 
+(exemples négatifs). Les règles induites sont aussi appliquées au corpus Corp0 et engendrent 
+le corpus CorpRegInd0. 
+Enfin, les corpus CorpRegInd0 et CorpRegExp0 sont présentés à l’expert lorsque les 
+corrections apportées par les règles de l’expert diffèrent de celles apportées par les règles 
+induites (Voir les exemples du tableau 1). L’expert examine ces cas. Un point important est 
+de remarquer que l’expert doit soit confirmer ‘son’ étiquetage (Voir tableau 1, les exemples 
+1, 2, 3 et 4), soit constater que les règles induites ont ‘raison’ (Voir tableau 1, les exemples 5, 
+6, 7 et 8). Lorsque le cas se produit assez fréquemment (c'est-à-dire que le processus inductif 
+est de bonne qualité), ceci produit une sorte de compétition entre lui-même et l’induction, si 
+bien que son attention reste éveillée sans problème. 
  
-La première consiste à interdire les requêtes des utilisateurs malicieux à l’aide de ses 
-anciennes requêtes. Cette façon d’aborder le problème a été faite dans le cadre des bases de 
-données statistiques. Ainsi, Denning et Schlörer (1983) proposent de fixer le nombre 
-minimal de tuples utilisés dans une requête, Dobkin et al (1979). proposent de fixer le 
-nombre de valeurs communes utilisés dans les requêtes, Dobkin et al (1979) proposent une 
-approche permettant d’auditer les requêtes utilisant les fonctions de type moyenne et 
-médiane, tandis que Chin et Ozsoyoglu  (1982), proposent une approche permettant d’auditer 
-les requêtes contenants la fonction d’agrégations Max. De même dans le cadre des entrepôts 
-de données, Zhang et al (2004) proposent une approche consistant à compter le nombre de 
-cellules utilisées dans les requêtes précédentes afin de décider est ce que la nouvelle requête 
-peut être répondue, Malvestuto et al (2006) proposent une approche utilisant ILP (« Integer 
-Linear Programming »).  
-La deuxième classe d’approches consiste à ajouter des perturbations aux données 
-originales. Au niveau des bases de données statistiques, Traub et al (1984) proposent 
-d’effectuer des perturbations aléatoires sur les données, tandis que Beck (1980) proposent de 
-les porter sur les réponses des requêtes et Schlërer (1981) proposent de les faire sur les 
-structures de la base de données. Au niveau des entrepôts de données, Sung et al (2006) 
-proposent d’altérer aléatoirement les données, Agrawal et al (2005) proposent une approche 
-répartie dans laquelle chaque client porte des perturbations aux données et le serveur rétablit 
-les distributions, Hua et al (2005) proposent une approche permettant de cacher les données à 
-partir des quelles les risques d’inférences existent. 
-Au sujet des travaux utilisant les perturbations, nous avons recensé deux inconvénients. 
-Le premier inconvénient est dû au fait que ces perturbations entrainent un traitement 
-supplémentaire après la phase d’alimentation de l’entrepôt de données. Le second est la perte 
-totale des données originales une fois les perturbations sont appliquées. L’approche que nous 
-proposons ci-après pallie à ces deux insuffisances. 
-3 Les réseaux Bayésiens 
-Un réseau Bayésien est un graphe orienté sans circuit (DAG : Direct Acyclic Graph) 
-(Stuart 2000). Chaque nœud possède plusieurs états annotés par leur probabilité. Celles-ci 
-sont indiquées dans une table de probabilités conditionnelles (CPT : Conditional 
-Probabilities Table).  
-La topologie d’un réseau Bayésiens dans un domaine donné, décrit l’interdépendance des 
-variables entre elles. L’état observé d’un nœud, appelé évidence, peut avoir une répercussion 
-sur les états des autres nœuds. Les arcs entre les nœuds représentent les relations de causes à 
-effets existantes entre ceux-ci. On dit que le nœud X est le père d’un nœud Y, s’ils sont reliés 
-par un arc orienté allant du nœud X vers le nœud Y ; inversement, Y est l’enfant de X. Un 
-nœud peut avoir plusieurs parents ainsi que plusieurs enfants. L’ensemble des parents d’un 
-nœud Xi est noté Pa(Xi). La taille de la CPT d’un nœud dépend du nombre de ses états, du 
-nombre n de ses parents ainsi que du nombre des états de ses parents. La figure 1 indique un 
-réseau Bayésien composé de deux nœuds parents Pa1 et Pa2 et un nœud enfant P où  chacun 
-possède 2 états. La taille du CPT des nœuds parents est 2, et celle du nœud enfant est 16. 
+ mot -3 mot -2 mot -1 mot 0 mot 1 mot 2 mot 3 
+that rad59 Delta exhibits synergistic effects with 
+IN FRM NNP NNS JJ NNS IN 1 
+IN FRM NNP VBZ JJ NNS IN 
+, pathway that functions to bypass the 
+, NN IN NNS TO VB DT 2 
+, NN WDT VBZ TO VB DT 
+suggesting that TANK2 kills cells by necrosis 
+VBG IN FRM NNS NNS IN NN 3 
+VBG IN FRM VBZ NNS IN NN 
+transcription activator that modulates , with Aft1p 
+NN NN DT NNS , IN FRM 4 
+NN NN WDT VBZ , IN FRM 
+hypoplasia congenila and blocks steroid biosynthesis by 
+NN NN CC VBZ JJ NN IN 5 
+NN NN CC NNS JJ NN IN 
+the CFTR gene augments intestinal expression in_vivo 
+DT NNP NN VBZ JJ NN NN 6 
+DT NNP NN NNS JJ NN NN 
+gln3 gat1 mutant displays a pronounced sensitivity 
+FRM FRM JJ VBZ DT VBN NN 7 
+FRM FRM JJ NNS DT JJ NN 
+contains Six membrane spans , two of 
+VBZ CD NN NNS , CD IN 8 
+VBZ CD NN VBZ , CD IN 
  
+TAB. 1 – Une liste d’exemples relatifs à la confusion VBZ-NNS. Dans ces exemples, le mot 
+central (mot 0) est étiqueté différemment par les règles induites et les règles de l’expert (les 
+étiquettes attribuées par les règles de l’expert sont soulignées). Nous constatons que pour 
+certains exemples, les règles de l’expert ont ‘raison’ (les quatre premiers exemples) et que 
+pour d’autres, les règles induites ont ‘raison’ (les quatre derniers exemples). Par exemple, 
+l’expert constate que ses règles ont incorrectement étiqueté le mot ‘displays’ comme (NNS) 
+(le mot central du 7ème exemple du tableau). En utilisant notre logiciel ETIQ, l’expert peut 
+corriger sa faute en cliquant sur un menu. 
  
+Exemple. Dans la phrase “…that rad59 Delta exhibits synergistic effects...”, le mot exhibits 
+est étiqueté incorrectement comme NNS par les règles induites et il est étiqueté correctement 
+comme VBZ par les règles de l’expert (le 1er exemple du tableau 1). Cependant, dans la 
+phrase “…gene responsible for adrenal hypoplasia congenita and blocks steroid biosynthesis 
+- 251 - RNTI-E-6
+Combinaison de l’approche inductive (progressive) et linguistique pour l’étiquetage  
+by…”, le mot blocks est étiqueté incorrectement comme NNS par les règles de l’expert et 
+étiqueté correctement comme VBZ par les règles induites (le 5ème exemple du tableau 1). 
  
-Sécurisation des entrepôts de données 
+Ainsi nous disposons de trois versions successives du même corpus : CorpRegExp0, Cor-
+pRegInd0 et CorpSûr0. 
+- CorpRegExp0 est le corpus de départ sur lequel nous appliquons les règles de l’expert. 
+- CorpRegInd0 est le corpus de départ sur lequel nous appliquerons les règles induites.  
+- CorpSûr0 est le corpus dans lequel nous gardons les étiquettes corrigées manuellement 
+(si l’induction ‘gagne’ comme pour les exemples 5, 6, 7 et 8 du tableau 1) ou confirmées 
+par l’expert (si c’est lui qui a ‘gagné’ comme pour les exemples 1, 2, 3 et 4 du tableau 1) 
+durant le processus. 
+Encore une fois, si le corpus est suffisamment petit, l’expert peut corriger toutes les er-
+reurs et il n’est pas vraiment nécessaire d’itérer ce processus. Comme nous partons du prin-
+cipe que le corpus est volumineux, l’expert ne peut pas examiner les milliers de cas où on 
+peut voir une différence entre ses règles et les règles induites. Par contre, il peut noter cer-
+tains des cas où il a ‘perdu’ par rapport à l’induction et afficher dans ETIQ la règle induite 
+qui a ‘gagné’ sur lui (voir exemple ci-dessous). Il analyse ces règles et reçoit ainsi une indi-
+cation sur la façon d’améliorer ses propres règles pour ne plus faire les erreurs qu’il a corrig-
+ées à la main. Il applique alors ces nouvelles règles à CorpSûr0 qui devient le corpus de dé-
+part de l’itération suivante, pour engendrer CorpRegExp1 en lui appliquant les nouvelles 
+règles déduites au cours de l’itération « 1 ». 
+Exemple. Nous avons expliqué dans le tableau 1 que l’expert peut modifier ‘à la main’ ses 
+erreurs. Il peut aussi apprendre de nouvelles règles qui lui sont suggérées par le programme 
+d’induction de règles. Illustrons ce procédé sur le 7ème exemple du tableau 1, relatif à la 
+confusion NNS-VBZ. En examinant Corp0 (le corpus étiqueté par un étiqueteur généraliste), 
+l’expert avait écrit, en utilisant le langage CorTag (voir Section 3.1), quelques règles pour 
+améliorer l’étiquetage. En appliquant ces règles au corpus Corp0, nous obtenons le corpus 
+CorpRegExp0. En utilisant ETIQ, nous collectons les différences relatives à la confusion 
+NNS-VBZ entre Corp0 et CorpRegExp0. Puis, en nous basant sur ces différences, nous ap-
+prenons des règles en utilisant l’algorithme d’apprentissage de règles RIPPER (Cohen 1995). 
+Pour cette confusion, l’algorithme a engendré 50 règles. L’attention de l’expert est attirée par 
+son erreur sur l’exemple 7. Il peut alors cliquer sur le mot incorrectement étiqueté (displays), 
+et faire ainsi apparaître la règle de RIPPER qui a trouvé, elle, la bonne étiquette. Dans ce cas, 
+la règle qui s’affiche est : « SI le mot courant est étiqueté VBZ ou NNS ET SI il est suivi par 
+un déterminant (DT) ALORS attribuer l’étiquette VBZ au mot courant » (c’est-à-dire qu’un 
+verbe est souvent suivi d’un déterminant). Sur le corpus de départ Corp0 (c’est-à-dire avant 
+l’application des règles induites), cette règle s’applique correctement 630 fois et engendre 20 
+erreurs. Après avoir affiché les 630 phrases où un VBZ est suivi d’un DT, nous avons 
+constaté que ces 630 étiquettes sont correctes. Cette règle doit donc contenir une certaine 
+vérité linguistique. Nous avons ensuite affiché les 20 phrases où un mot étiqueté NNS est 
+suivi par un déterminant (DT). Nous avons observé quatre cas : 
+- cas 1 : Le déterminant (DT) est both ou each. Par conséquent, la règle était un peu 
+trop générale et devrait tenir compte de ces deux exceptions (both et each). 
+-  cas 2 : Une virgule devrait apparaître après le NNS mais elle a été omise. 
+-  cas 3 : L’étiquette déterminant (DT) est attribuée au ‘A’ (comme dans : Proteins A 
+and B) et le ‘A’ est incorrectement étiqueté comme DT. 
+- 252 -RNTI-E-6
+A. Amrani et al. 
+- cas 4 : Le mot d'intérêt a été incorrectement étiqueté comme NNS, ce type d’erreurs 
+sera corrigé par la règle courante. 
+Par cet exemple, nous avons illustre le fait que l’ensemble des règles induites permet 
+souvent d’optimiser les règles l’expert et de détecter des exceptions. 
  
+Il est bien entendu théoriquement possible que l’expert se trompe complètement et que 
+l’itération « i+1 » contienne plus d’erreurs que l’itération « i », et ce serait un cas d’échec de 
+notre méthode qui se traduirait d’ailleurs par un découragement et un abandon de l’expert. 
+En fait, mis face à ses erreurs, l’expert a plutôt tendance à les corriger et à obtenir des règles 
+plus efficaces. Le danger serait alors que le système induise des règles faisant les mêmes 
+erreurs qu’à l’itération précédente, et que l’expert revoie ces mêmes erreurs à chaque itéra-
+tion. Nous n’avons jamais constaté ce comportement de la part de notre système inductif qui 
+apprend des règles très différentes quand les ensembles d’apprentissage sont différents. On 
+notera au passage l’importance des corrections manuelles de l’expert, même si elles sont 
+relativement peu nombreuses, afin de partir d’étiquetage vraiment différent. 
+En conséquence, et en pratique, l’expert constate à chaque itération que le nombre de fois 
+où il est mis en défaut par le système inductif diminue, au point qu’après quelques itérations 
+il peut examiner toutes les différences et, éventuellement corriger toutes ses erreurs manuel-
+lement, sans recourir à des règles. Le corpus final, CorpSûrp est alors parfaitement étiqueté 
+du point de vue de l’erreur d’étiquetage considérée au départ. Il est évidemment nécessaire 
+de répéter le processus entier pour chacune des confusions que l’on désire corriger. 
+3.2.1 Les types de confusions traités par l’induction progressive 
+Les fautes les plus importantes sont celles qui faussent la compréhension de la phrase en 
+détruisant la structure syntaxique. Les confusions les plus importantes que nous ayons résolu 
+avec l’induction progressive sont les suivantes :  
+- Les erreurs d’étiquetage du mot « that » qui peut être étiqueté comme un déterminant « 
+DT », une conjonction de subordination « IN », un pronom relatif « WDT », un pronom « 
+PRP » (e.g. I do not like that.) ou un prédéterminant « PDT ». 
+- Les confusions entre les noms et les verbes, notamment la confusion entre un  nom 
+commun au pluriel « NNS » et un verbe au présent, à la troisième personne du singu-
+lier « VBZ ». Par exemple : le mot « functions ». 
+- La confusion qui concerne un mot qui se termine par « ed » qui peut être un verbe au 
+participe passé « VBN »,  un verbe au passé « VBD» et adjectif « JJ ». 
+- La confusion qui concerne un mot se terminant par « ing » qui peut être principalement 
+un nom au singulier « NN », un verbe au gérondif « VBG » ou un adjectif « JJ ». 
+Ainsi, le processus doit être répété 3 ou 4 fois entièrement, ce qui n’est pas exagéré au vu 
+des avantages qu’il y a à posséder un corpus spécialisé « correctement » étiqueté.  
+Nous avons appliqué notre approche à corpus de biologie moléculaire composé de 600 
+résumés d’intérêt parmi un corpus initial (de 6119 résumés) obtenu par requête sur Medline 
+(http://www.ncbi.nlm.nih.gov) avec les mots-clés DNA-binding, proteins, yeast. Ce qui nous 
+a permis d’obtenir un corpus « correctement » étiqueté. 
+De plus, à la fin du processus nous obtenons un ensemble de règles relationnelles intelli-
+gibles. Ces règles pourraient être utilisées pour résoudre les ambiguïtés qui ne sont pas bien 
+traités par les étiqueteurs supervisés. 
+- 253 - RNTI-E-6
+Combinaison de l’approche inductive (progressive) et linguistique pour l’étiquetage  
+4 Comparaison des étiqueteurs supervisés 
+Dans la mesure où il existe déjà d’excellents étiqueteurs avec comme défaut, que nous 
+l’avons déjà évoqué, de ne pas être capable de s’adapter à de nouveaux corpus. La tâche 
+fondamentale d’un chercheur abordant un nouveau domaine consiste à créer un corpus 
+correctement étiqueté. C’est cette tâche que nous venons d’illustrer. Maintenant, il est tout de 
+même intéressant de comparer les performances des étiqueteurs existants. En utilisant le 
+corpus « correctement » étiqueté obtenu, nous avons comparé les étiqueteurs suivants : 
+1- L’étiqueteur à base de transformation (Brill 1994). 
+2- L’étiqueteur à base de SVM (Giménez et Màrquez 2003). Pour entraîner cet étiqueteur 
+nous avons utilisé la boite à outils SVMTool (Giménez et Màrquez 2004). 
+3- L’étiqueteur probabiliste de Stanford (Toutanova et al. 2003). Cet étiqueteur atteint 
+une précision de 97,22% d’étiquettes correctes sur le corpus WSJ. 
+4- L’étiqueteur à base d’Entropie Maximale (Ratnaparkhi 1996). 
+Dans le tableau 2 nous présentons une comparaison entre les quatre étiqueteurs utilisés 
+sur une partie du corpus du WSJ: (i) Les précisions publiées des étiqueteurs appliqués à un 
+corpus test issu du corpus WSJ. (ii) Les précisions que nous avons calculées en appliquant 
+ces étiqueteurs (appris sur le corpus WSJ) à notre corpus de biologie moléculaire. 
  
+Etiqueteurs  SVM Brill Stanford ME 
+Précision (corpus : WSJ) 97.0 96.6 97.22 96.6 
+Précision (corpus : biologie) 88.97 89.47 85.73 82.81 
  
+TAB. 2 – Les précisions relatives de quatre étiqueteurs entraînés sur le corpus WSJ. 
  
+4.1 Les critères d’évaluation 
+Pour comparer les étiqueteurs nous avons utilisé les mesures de précisions et de rappel 
+pour chaque étiquette. La précision est définie par la formule suivante : 
+Précision = nombre d’exemples positifs couvets / nombre d’exemples couvets. 
+Le rappel est défini par la formule suivante : 
+Rappel = nombre d’exemples positifs couverts / nombre d’exemples positifs. 
+Il est important de déterminer un compromis entre le rappel et la précision. Pour ce faire, 
+nous utilisons la mesure du Fscore (avec β=1) :  
+Rappelécision
+Rappelécision
+Fscore
++×
+××+
+=
+Pr
+Pr)1(
+)( 2
+2
+β
+β
+β  
+4.2 Résultat de la comparaison 
+Pour comparer les quatre étiqueteurs, nous les avons entraînés sur le même sous-corpus. 
+Le sous-corpus d’apprentissage a été constitué à partir de deux tiers de notre corpus (87965 
+mots) de biologie moléculaire. Pour l’évaluation, nous avons utilisé le tiers restant du corpus 
+de biologie moléculaire. Le corpus entier comporte 131 346 mots. Le tableau 3 présente les 
+Fscore obtenus pour chaque étiquette par les différents étiqueteurs. 
+- 254 -RNTI-E-6
+A. Amrani et al. 
+Etiq. Nbr Fscore (Brill) Fscore (ME) Fscore (SVM) Fscore (Stan.) 
+WRB 97 99.48 98.96 99.48 99.48 
+WPP 9 100.00 100.00 100.00 100.00 
+WP 1 100.00 0.00 100.00 100.00 
+WDT 340 98.20 97.03 99.85 98.83 
+VBZ 1197 97.96 97.84 98.67 98.58 
+VBP 817 92.33 92.97 93.73 94.13 
+VBN 1193 90.16 91.73 92.75 92.66 
+VBG 540 91.87 88.59 91.31 91.76 
+VBD 595 86.21 90.71 89.64 92.35 
+VB 562 87.30 90.15 90.00 92.63 
+TO 760 99.80 97.09 100.00 99.67 
+RP 3 0.00 0.00 40.00 0.00 
+RBS 12 100.00 100.00 100.00 100.00 
+RBR 23 66.67 78.95 88.37 82.05 
+RB 1163 97.62 95.75 97.58 97.36 
+PRPP 154 99.67 99.67 99.67 99.67 
+PRP 383 99.87 99.21 99.87 99.87 
+POS 13 100.00 100.00 100.00 100.00 
+PDT 13 63.15 46.15 86.95 63.15 
+NNS 2257 98.25 97.40 98.69 98.56 
+NNPS 185 88.95 79.56 91.88 89.39 
+NNP 5841 97.63 96.32 97.83 98.46 
+NN 7215 97.27 95.89 97.85 97.93 
+MD 160 100.00 99.69 100.00 100.00 
+JJS 23 100.00 95.65 100.00 97.78 
+JJR 27 72.73 77.19 87.27 86.21 
+JJ 3900 94.78 93.31 95.48 95.32 
+IN 5584 99.71 98.80 99.86 99.80 
+EX 13 100.00 100.00 100.00 100.00 
+DT 3890 99.79 99.69 99.90 99.87 
+CD 393 89.91 92.41 86.89 97.16 
+CC 1399 100.00 99.82 100.00 100.00 
+    : ou "  141 100.00 100.00 100.00 100.00 
+. 1790 100.00 99.86 100.00 100.00 
+, 1641 100.00 99.97 100.00 100.00 
+SYM 531 100.00 99.53 100.00 100.00 
+( 516 100.00 99.90 100.00 100.00 
+total 43381 97.41 96.66 97.87 98.06 
+TAB. 3 –  Comparaison des quatre étiqueteurs supervisés. Les étiquetages ont été appris et 
+testés sur un corpus de biologie moléculaire. Le Fscore a été calculé pour chaque étiquette. 
+- 255 - RNTI-E-6
+Combinaison de l’approche inductive (progressive) et linguistique pour l’étiquetage  
+A partir de cette expérience, nous remarquons que les performances réalisées par les éti-
+queteurs entraînés sur un corpus de la même spécialité sont significativement meilleures que 
+celles obtenues avec des étiqueteurs généralistes. De plus, nous pouvons constater qu’un 
+petit corpus d’apprentissage de la même spécialité est plus bénéfique qu’un grand corpus 
+généraliste de plus grande taille. En effet, la taille du corpus d’apprentissage de biologie 
+moléculaire (87965 mots) est inférieure au dixième du corpus du WSJ (1 million de mots). 
+Comme pour le corpus du WSJ, nous constatons que pour le corpus de biologie molécu-
+laire les deux meilleurs étiqueteurs sont l’étiqueteur de Stanford et l’étiqueteur à base de 
+SVM, avec un léger avantage pour l’étiqueteur de Stanford. 
+Bien que les étiqueteurs que nous avons utilisés sont parmi les meilleurs étiqueteurs exis-
+tants et leur performance sont globalement très satisfaisantes, nous constatons que les Fscore 
+de certaines étiquettes sont encore assez faibles. Par exemple : les meilleurs Fscore obtenus 
+pour les étiquettes VBN, VBG, VBD et VB sont respectivement de 92.75, 91.87, 92.35 et 
+92.63. En effet, même les étiqueteurs les plus performants sont incapables de résoudre ces 
+ambiguïtés difficiles. Par contre, les règles relationnelles écrites par l’expert sont très effica-
+ces pour corriger ces ambiguïtés. 
+Voici des exemples de règles relationnelles (CorTag) relatives à la correction des erreurs 
+des VBD et des VBN: 
+- si (?1,been,) (*1,,RB) (0,@BEENedVBP,) alors (0,,VBD) 
+« si le mot been est suivi par une suite d’adverbes et cette dernière est suivie par un mot 
+(position 0) appartenant au groupe BEENedVBP alors ce dernier mot est étiqueté VBD » 
+- si (?1,are,) (*1,,RB) (0,@AREedVBP,) alors (0,,VBN) 
+« s‘il existe un ‘are’ suivi par un certain nombre (éventuellement 0 mots) d’adverbes 
+(RB) et un mot appartenant à la classe AREedVBP suit les adverbes alors ce dernier mot 
+est étiqueté comme VBN » 
  
+D’après ces exemples, nous constatons que la correction des ambiguïtés difficiles néces-
+site souvent des règles relationnelles. Les prémisses de ces règles sont fondées sur des 
+contraintes pourtant sur les mots contextuels. Pour que ces règles soient efficaces, il est donc 
+nécessaire que les mots du contexte soient bien étiquetés. 
+D’autre part, les précisions des étiqueteurs entraînés et évalués sur le corpus de biologie 
+moléculaire sont meilleures que celles des étiqueteurs entraînés et évalués sur le corpus géné-
+ral du WSJ. Les étiqueteurs se comportent donc mieux lorsqu’il s’agit d’un corpus très spéci-
+fique. En effet, les corpus spécifiques sont plus homogènes et contiennent plus de régularités 
+que les corpus généralistes (le WSJ corpus ou le Brown corpus). 
+Le tableau 4 présente les précisions obtenues par les différents étiqueteurs supervisés sur 
+les corpus du WSJ et de biologie moléculaire : 
  
+Corpus Brill ME SVM Stanford 
+WSJ 96.60 96.60 97.00 97.22 
+Bio. Mol. 97.43 96.68 97.88 98.07 
  
- 
- 
- 
- 
- 
- 
- 
- 
-4 Présentation de l’approche 
-Dans cette section, nous présentons une approche basée sur les réseaux Bayésiens pour la 
-prévention des inférences à travers des requêtes utilisant les fonctions d’agrégations Min et 
-Max. Nous détaillons le cas des requêtes utilisant les fonctions de type Max. Cependant, le 
-cas des requêtes utilisant les fonctions d’agrégations de type Min est traité de la même façon.  
-4.1 Définitions 
-Définition 1 : Q = {S1 , S2, … , Sn} : Si = {Val1, Val2… Valn}  
-Le résultat d’une requête Q est un ensemble de sous-ensembles de mesures. Chaque 
-ensemble regroupe les mesures correspondantes aux mêmes valeurs des paramètres. Ceux-ci 
-appartiennent aux dimensions utilisées dans la requête Q. 
-La figure 2 montre le résultat de la requête les commissions des employés par 
-département et par année. 
-Etat Pr(Pa2) 
-a … 
-b … 
-Etat Pr(Pa1) 
-c … 
-d … 
-Pa1 Pa2 Pr(P) 
-e1 e2 
-a c … … 
-b c … … 
-a d … … 
-b d … … 
- 
-FIG. 2 –  Le résultat de la requête les commissions des employés par département 
-et par année. 
-Commission 
-600 
-Année=2009 
-Département =Marketing 
-300 
-800 
-500 
- 
-Année=2009 
-Département =Finance 
-700 
-900 
-300 
-400 
-FIG. 1 – La CPT d'un nœud dépend du nombre d'états des nœuds de ses parents. 
-CPT  de Pa2 
-Pa1 Pa2 
-P 
-CPT  de Pa1 
-CPT  de P 
-Triki et al. 
- 
-Définition 2 : Le résultat d’une requête contenant une fonction d’agrégation Max est un 
-ensemble de mesures. Chaque mesure de cet ensemble est le maximum d’un ensemble de 
-mesures. Celui-ci appartient au résultat de la même requête sans la fonction d’agrégation 
-Max. 
-Q = { S1 , S2, … , Sn} : Si = {Val1, Val2… Valn} 
-Max (Q) = {M1, M2, … , Mn} : Mi = Max(Si) 
- 
-La figure 3 montre le résultat de la requête le maximum des commissions des employés 
-par département et par année. 
- 
- 
- 
- 
-4.2 Construction du réseau Bayésien 
-Les définitions 1et 2 nous permettent de créer un réseau Bayésien pour chaque mesure 
-qui existe dans le résultat d’une requête de type Max (Min). Le réseau Bayésien contient un 
-ensemble de nœuds parents et un nœud enfant : Les nœuds parents contiennent les mesures 
-utilisées pour calculer la valeur maximale et leur nœud enfant contient celle-ci. Chaque nœud 
-parent possède deux états : =Mesure Maximale, et <Mesure Maximale. 
-La figure 4 montre les réseaux créés en réponse à la requête le maximum des commissions 
-des employés par département et par année. 
- 
-Définition 3 :  
-Soit :  
-  Q = { S1 , S2, … , Sn} , 
-Vali ∈ Si 
- Max (Q) = {M1, M2, … , Mn}, 
- Card (Si) = Nombre d’élément de Si, 
-800 900 
-FIG. 3 –  Le résultat de la requête le maximum des commissions des 
-employés par département et par année 
-Année = 2009 
-Département =Marketing 
- 
-Année = 2009 
-Département =Finance 
- 
-FIG. 4 – Les réseaux Bayésiens créés en réponse à la requête le maximum des 
-commissions des employés par département et par année 
-Année = 2009 
-Département =Finance 
- 
-Année = 2009 
-Département =Marketing 
- 
-(a) (b) 
-800 
-Nœud 1 
-800 
-300 
-500 
-600 300 
-700 900 
-400 
-900 
-Sécurisation des entrepôts de données 
- Occ (v,Si) = Nombre d’occurrences de v dans Si 
-La probabilité d’inférer Vali est : 
-Pr ( Vali = v | Max(Si) = v ) = Occ (v,Si) / Card (Si) 
- 
-En appliquant la définition 3 au Noeud1 du réseau Bayésien de la figure 4 (a) on obtient 
-les probabilités indiquées dans le tableau 1. Pour le nœud 1, la valeur 1/4 de probabilité de 
-chacun de ses deux états ('inférieur à 800' et 'égal à 800') provient du fait que les quatre 
-nœuds ont des valeurs différentes (cf. TAB. 1). 
- 
-Max = 800 Pr (Nœud1 = 800) Pr (Nœud1 < 800) 
-Vrai 1/4 1/4 
-TAB. 1 – La CPT du Nœud 1 
-4.3 Prévention contre les inférences 
-Dans cette section, nous présentons les algorithmes permettant la prévention contre les 
-inférences. Ces algorithmes utilisent les structures de données illustrées dans TAB. 2 .  
-L’algorithme AutoriserRequête opère sur trois étape pour autoriser ou interdire une 
-requête de type Max qu’il reçoit en paramètre : 1) élimination de la clause Max de la 
-requête ; 2) création du réseau Bayésien correspondant à la requête en utilisant la fonction 
-CréerBayesNet ; enfin 3) vérification que les probabilités des différents nœuds du réseau sont 
-inférieures au seuil donné en paramètre, si c’est le cas alors la requête est autorisée si non 
-elle est interdite.  
-L’algorithme EstimerProbabilitésBayesNet permet de calculer les probabilités d’un 
-réseau issu de l’union de deux autres réseaux. Le premier réseau Bayésien est celui qui 
-correspond à la dernière requête lancée par l’utilisateur et le deuxième correspond à l’union 
-de l’ensemble des réseaux Bayésiens correspondants aux anciennes requêtes autorisées. Cet 
-algorithme utilise la procédure MettreAJourProbabilités afin de mettre à jour les probabilités 
-du nouveau réseau. Si les probabilités sont inférieures à un seuil, alors la valeur retournée est 
-Vrai sinon la valeur retournée est Faux. La procédure utilise l’algorithme Clustering (Stuart 
-et al. 2003) afin de mettre à jour les probabilités du réseau Bayésien donné en paramètre.  
-L’idée de base de Clustering est de réduire le nombre de nœuds en groupant ceux-ci en 
-clusters.  Les nœuds de chaque cluster seront remplacés un seul nœud possédant les états de 
-ceux-ci. 
- 
-Nom Les éléments Description 
-BayesNet Nœuds : Nœud [ ] Cette Structure de données permet de 
-mémoriser les réseaux Bayésiens 
-Nœud Valeur : Réel 
-Probs : Probabilité [ ] 
-Parents : Nœud [ ] 
-Enfants : Nœud [ ] 
-Cette structure de données décrit un nœud 
-du réseau Bayésien. 
--Valeur : Valeur du nœud 
--Probs : contient les probabilités d’inférer 
-la valeur du nœud.  
--Parents : Les nœuds parents 
-Triki et al. 
- 
--Enfants : Les nœuds enfants 
-   
-Probabilité Valeur : Réel 
-Max : Réel 
-Cette structure de données permet de 
-mémoriser la probabilité d’avoir la valeur 
-d’un nœud égale à une valeur Max. 
-TAB. 2 – Les nouvelles structures de données 
- 
-Algorithme 1 : AutoriserRequête ( Qm : Requête MDX, VAR BNS : BayesNet , Seuil : 
-Réel) : Booléen 
-1: VARIABLES 
-2: Qc : Requête MDX  
-3: Rst : Résultat d’une requête MDX 
-4: BN : BayesNet 
-5: aut : Booléen 
-6: DEBUT 
-7: Qc ← SupprimerMaxClause ( Qm ) 
-8: Rst ←  ExécuterRequête ( Qc ) 
-9: BN ← CréerBayesNet ( Rst )  
-10: SI (   	 ,    : .    ) ALORS 
-11: aut  ←  faux 
-12: SINON 
-13: aut ← EstimerProbabilitésBayesNet (BN ,BNS ,Seuil)  
-14: FIN SI 
-15: RETOUR aut  
-16: FIN 
- 
-Algorithme 2 : CréerBayesNet (Rst : Résultat d’une requête MDX) : BayesNet 
-1: VARIABLES 
-2: Bn : BayesNet 
-3: n : Entier 
-4: DEBUT 
-5: POUR CHAQUE m DANS Mesures ( Rst ) 
-6: Bn.Nœuds [ i ].Valeur ← m 
-7: FIN POUR 
-8: n ← Nombre des Mesures 
-9: Bn. Nœuds [ n ].Value ← Max (Mesures ( Rst ) ) 
-10: POUR CHAQUE n DANS Bn.Nodes 
-11: n.Probs [ lastIndex+1 ].Max ← Max (Mesures ( Rst ) ) 
-12: n.Probs [ lastIndex+1 ].Valeur  ← Nombre de ( n.Valeur ) dans Rst / n 
-13: FIN POUR 
-14: RETOUR Bn 
-15: FIN 
- 
- 
-Sécurisation des entrepôts de données 
-Algorithme 3 : EstimerProbabilitésBayesNet ( BN : BayesNet , VAR BNS : , Seuil : 
-Réel) : Booléen 
-1: VARIABLES 
-2: newBNS : BayesNet 
-3:  
-4: DEBUT 
-5: SI (BNS est Vide ) ALORS 
-6: newBNS ← BN 
-7: SINON 
-8: newBNS ← BNS  BN 
-9: FIN SI 
-10: MettreAJourProbabilités ( newBNS ) 
-11: SI (   	 ,    : .    ) ALORS 
-12: RETOUR faux 
-13: SINON 
-14: BNS ← newBNS 
-15: RETOUR Vrai 
-16: FIN SI 
-17: FIN 
- 
-Algorithme 4 : MettreAJourProbabilités ( VAR BNS : BayesNet ) 
-1: DEBUT 
-Mettre à jour les probabilités de BNS en utilisant l’algorithme Clustering 
-FIN 
-2: 
-3: 
- 
-L’algorithme CréerBayesNet permet de créer un réseau Bayésien correspondant à une 
-requête utilisant la fonction d’agrégation Max. L’instruction permettant la création du réseau 
-est la plus coûteuse. Elle est linéaire en nombre de mesures utilisées par la requête. Ainsi, la 
-complexité de l’algorithme est O(n).  
-L’algorithme MettreAJourProbabilités permet de mettre à jour les probabilités d’un 
-réseau Bayésien en utilisant l’algorithme Clustering. Ce dernier ayant une complexité O(n) 
-(Stuart et al 2003), la complexité de l’algorithme MettreAJourProbabilités est de ce fait O(n).  
-L’algorithme EstimerProbabilitésBayesNet permet dans une première étape de créer un 
-nouveau réseau Bayésien à partir de l’union de deux réseaux et dans une deuxième étape de 
-mettre à jour les probabilités du nouveau réseau en appelant la procédure 
-MettreAJourProbabilités ; en troisième étape l’algorithme retourne la valeur booléenne Vrai 
-dans le  cas où des valeurs des probabilités sont inférieures à un seuil et Faux pour le cas 
-contraire. Le temps de traitement concernant la première étape dépend du nombre de nœuds 
-des deux réseaux et celui de la troisième étape du nombre de nœuds du nouveau réseau ; la 
-complexité de l’algorithme est alors est O(n).  
-L’algorithme AutoriserRequête permet d’autoriser ou de refuser la requête d’un 
-utilisateur. La première étape de l’algorithme consiste à créer le réseau Bayésien 
-correspondant à la requête en appelant la fonction CréerBayesNet ; La complexité de cette 
-étape est donc O(n). En deuxième étape l’algorithme compare les valeurs des probabilités par 
-rapport à un seuil ; dans le cas où les valeurs des probabilités sont inferieures au seuil, il 
-appel la fonction EstimerProbabilitésBayesNet et retourne le résultat de celle-ci ; dans le cas 
-Triki et al. 
- 
-contraire il retourne la valeur booléenne Faux. Le temps de traitement concernant cette étape 
-dépend du nombre des nœuds du réseau, donc sa complexité est O(n).  
-5  Exemple 
-Dans cette section nous présentons un exemple démontant comment notre approche peut 
-prévenir contre les inférences. 
-5.1 Exemple d’un cas d’inférence 
-La figure 5  contient un cube fictif permettant d’analyser les performances d’une société 
-de commerce international. Il contient le fait commission et les deux dimensions : 
-département, temps. Le tableau 3 regroupe les descriptions des différents paramètres.  
- 
- 
-Paramètre Dimension/Fait Description 
-MNT_COM Commission Montant de la commission 
-TYPE_COM Commission Le type de transaction sur lequel l’employé a 
-obtenu la commission. Les valeurs que peut prendre 
-ce paramètre sont : Nationale et Internationale 
-DEP_ID Département Nom du département 
-NB_EMP Département Nombre d’employés du département 
-Jour Date Jour de la date de l’obtention de la commission 
-Mois Date Mois de la date de l’obtention de la commission 
-Année Date Année de la date de l’obtention de la commission 
-TAB. 3 – Les paramètres des dimensions et du fait 
- 
-Supposons que : la société possède deux département Finance et Marketing. ; le nombre 
-d’employés de ce dernier est 4 ; Alice et Bob sont les seuls employés du département 
-Marketing habilités à faire des transactions internationales ; et que Alice n’a pas travaillé en 
-décembre 2009 parce qu’elle a eu un congé de maladie. Est-il possible d’inférer le nom de 
-l’employé du département Marketing ayant la commission maximale ? 
-A partir du résultat de la première requête (cf. TAB. 4) : maximum des commissions par 
-nombre d’employés et par département, et le résultat de la deuxième requête (cf. TAB. 5) 
-FIG. 5 – Le schéma en étoile de l’exemple 
-Département 
-DEP_ID 
-NB_EMP 
-Commission 
- MNT_COM 
-TYPE_COM 
-Mois Année 
-Date 
-Jour 
-Sécurisation des entrepôts de données 
-maximum des commissions par année et par mois, il possible d’inférer que la commission 
-maximale du département Marketing a été obtenue au mois de décembre. A partir du résultat 
-de la troisième requête (cf. TAB. 6) : maximum des commissions par année et par type de 
-commission, il est possible d’inférer que l’employé ayant eu la commission maximale est 
-Bob. 
-NB_EMP DEP_ID MNT_COM 
-4 Marketing 900 Finance 950 
-TAB. 4 – Le résultat de la requête 1 
- 
-Année Mois Max commissions 
-2009 
-Octobre 850 
-Novembre 720 
-Décembre 900 
-TAB. 5 – Le résultat de la requête 2   
- 
-Année TYPE_COM Max commissions 
-2009 Nationale 840 Internationale 900 
-TAB. 6 – Le résultat de la requête 3 
-5.2 Prévention contre le cas d’inférence 
-Nous fixons la valeur du seuil à 1/2. La figure 6 ( a) présente le réseau Bayésien 
-correspondant à la première requête (par soucis de clarté uniquement, les commissions du 
-département marketing sont représentées). Les nœuds correspondent aux différentes 
-commissions.  Le nombre de ceux-ci est 10 donc la probabilité d’inférer la commission de 
-Bob est 1/10. La figure 6 (b) montre le réseau Bayésien correspondant à la deuxième requête. 
-En faisant l’union du réseau Bayésien de la première requête et celui de la deuxième, nous 
-obtenons le réseau de la figure 7. L’union fait croitre la probabilité d’inférer la commission 
-de Bob à 1/4. La figure 8 montre le réseau Bayésien correspondant à la troisième requête. 
-L’union de ce dernier réseau (cf. FIG. 9) avec les réseaux des deux premières requêtes fait 
-croitre la probabilité d’inférer la commission de Bob à 1/2. Puisque celle-ci devient égale au 
-seuil, le résultat de la troisième requête ne sera pas délivré à l’utilisateur. 
- 
-Triki et al. 
- 
- 
- 
-FIG. 6 – Les réseaux Bayésiens correspondant aux deux premières requêtes  
- 
-FIG. 7 – Le résultat de l’union des réseaux Bayésiens de la première et la deuxième requête 
- 
-FIG. 8 – Le réseau Bayésien correspondant à la troisième requête 
- 
-FIG. 9 – Le résultat de l’union des réseaux Bayésiens correspondant aux trois requêtes 
-(a) (b) 
-Sécurisation des entrepôts de données 
-6 Conclusion 
-Dans cet article, nous avons présenté une approche permettant la prévention contre les 
-inférences dans les entrepôts de données sur la base des réseaux Bayésiens.  
-Un ensemble de définitions pour traduire une requête en réseau Bayésiens a été proposé. 
-A partir de ces définitions des algorithmes ont été élaborés en vu de construire les réseaux 
-Bayésiens correspondants aux requêtes des utilisateurs et d’interdire celles qui sont 
-susceptibles de générer des inférences. La complexité de ces algorithmes est linéaire en 
-nombre de valeur dans l’entrepôt.   
-L’approche présentée tient compte des requêtes utilisant les fonctions d’agrégation Max 
-et Min. Des investigations concernant les autres types de requêtes sont envisageables ainsi 
-que l’allégement du traitement effectué par les réseaux Bayésiens et la détermination de la 
-valeur du seuil. 
- 
+TAB. 4 – Précisions obtenues par les différents étiqueteurs sur les corpus de biologie molé-
+culaire et du WSJ. 
+- 256 -RNTI-E-6
+A. Amrani et al. 
+5 Conclusion 
+L’induction progressive est une combinaison de l’approche inductive et l’approche lin-
+guistique. L’approche inductive aide l’expert à détecter les erreurs engendrées par ces règles 
+et lui propose de nouvelles règles pour optimiser et traiter les exceptions de ses règles. De 
+plus, les corrections manuelles permettent d’améliorer progressivement la qualité des règles 
+induites. 
+L’étude comparative des étiqueteurs a montré que les étiqueteurs supervisés sont perfor-
+mants lorsqu’ils sont appliqués à des corpus de spécialité. Cependant, les étiqueteurs induc-
+tifs ont tous des difficultés pour traiter les cas épineux. Ces cas sont efficacement traités par 
+les règles relationnelles utilisées dans l’approche linguistique. 
+L’induction des règles effectuée par ETIQ se limite aux règles propositionnelles, 
+l’extension de l’induction aux méthodes d’apprentissage de la programmation logique induc-
+tive permettra d’étendre la famille de règles pouvant être apprises. Nous envisageons aussi 
+de développer des algorithmes pour détecter les incohérences dans le corpus. 
 Références 
-Agrawal, R., Srikant, R. et Thomas, D. (2005). Privacy-Preserving OLAP. In: ACM 
-SIGMOD, pp.251–262. 
-Beck L.L. (1980). A security mechanism for statistical databases. ACM Trans. on Database 
-Systems, 5(3):316–338. 
-Bhargava B. (2000). Security in data warehousing (invited talk). In Proceedings of the 3rd 
-Data Warehousing and Knowledge Discovery (DaWak’00). 
-Chin, F.Y., et Ozsoyoglu, G. (1982). Auditing and Inference Control in Statistical Databases. 
-IEEE Transactions on Software Engineering 8(6), 574–582. 
-Denning D.E. et Schlörer J. (1983). Inference controls for statistical databases. IEEE 
-Computer, 16(7):69–82. 
-Dobkin D., Jones A.K., et Lipton R.J. (1979). Secure databases: protection against user 
-influence. ACM Trans. on Database Systems, 4(1):97–106. 
-Export (2008). http://www.export.gov/safeharbor/ 
-HHS (1996). http://www.hhs.gov/ocr/privacy/index.html 
-Hua, M., Zhang, S., Wang, W., Zhou, H. et Shi, B. (2005). FMC: An Approach for Privacy 
-Preserving OLAP. In: Tjoa, A.M., Trujillo, J. (eds.) DaWaK 2005. LNCS, vol. 3589, pp. 
-408–417.Springer, Heidelberg  
-Malvestuto F.M., Mezzani M. et Moscarin M. (2006). Auditing Sum-Queries to Make a 
-Statistical Database Secure. ACM Transactions on Information and System Security 9(1), 
-31–60. 
-Pernul G., Priebe T. (2000). Towards olap security design - survey and research issues. In 
-Proceedings of 3rd ACM International Workshop on Data Warehousing and OLAP 
-(DOLAP’00), pages 114–121. 
-Triki et al. 
- 
-GPO (1999). http://www.gpo.gov/fdsys/pkg/PLAW-106publ102/content-detail.html 
-Salah T., Jamel F., Hanene BEN-ABDALLAH, Nouria H, (2009). Sécurisation des entrepôts 
-de données : Etat de l’art et proposition d’une architecture. Quatrième Atelier sur les 
-Systèmes Décisionnels. 10-11 novembre 2009, Jijel, Algérie 
-Schlërer J. (1981). Security of statistical databases: multidimensional transformation. ACM 
-Trans. Database Systems, 6(1):95–112. 
-Soxlaw (2002). http://www.soxlaw.com/ 
-Shoshani A. (1997). OLAP and statistical databases: Similarities and differences. In 
-Proceedings of the Sixteenth ACM SIGACT-SIGMOD-SIGART Symposium on 
-Principles of Database Systems (PODS’97), pages 185–196. 
-Soler, E., V. Stefanov, J.-N. Mazón, Trujillo J., Fernández-Medina E., et Piattini M. (2008). 
-Towards comprehensive requirement analysis for data warehouses : Considering security 
-requirements. In ARES, pp. 104–111. IEEE Computer Society. 
-Soler, E., Villarroel R., Trujillo J., Fernández-Medina E., et Piattini M. (2006). Representing 
-security and audit rules for data warehouses at the logical level by using the common 
-warehouse metamodel. In ARES, pp. 914–921. IEEE Computer Society.  
-Stuart J. Russell N., Peter N., (2003). Artificial Intelligence A Modern Approach Second 
-Edition. New Jersey : Pearson Education, Inc. 
-Sung, S.Y., Liu, Y., Xiong, H. et Ng, P.A. (2006). Privacy Preservation for Data Cubes. 
-Knowledge and Information Systems 9(1), 38–61. 
-Traub J.F., Yemini Y., et Wozniakowski H. (1984). The statistical security of a statistical 
-database. ACM Trans. on Database Systems, 9(4):672–679. 
-Zhang, N., Zhao, W. et Chen, J. (2004). Cardinality-based Inference Control in OLAP 
-Systems: An Information Theoretic Approach. In: ACM DOLAP, pp. 59–64. 
+Amrani, A., J. Azé et Y. Kodratoff (2005a). ETIQ: Logiciel d'aide à l'étiquetage morpho-
+syntaxique de textes de spécialité. Dans la revue RNTI, numéro spécial EGC'2005, pages 
+673-678 (Session démonstration de logiciel). 
+Amrani, A., J. Azé, T. Heitz, Y. Kodratoff et M. Roche (2004a). From the texts to the con-
+cepts they contain: a chain of linguistic treatments. In proceedings of Text REtrieval Con-
+ference 2004 (TREC'04), Maryland USA, p 712-722. 
+Amrani, A., Y. Kodratoff et O. Matte-Tailliez (2004b). A Semi-automatic System for Tag-
+ging Specialized Corpora, H. DAI, R. SRIKANT, C. ZHANG Eds., Advances in Knowl-
+edge Discovery and Data Mining, PAKDD, May, Sydney, LNAI, Vol. 3056, pp 670-681. 
+Amrani, A., M. Roche, Y. Kodratoff et O. Matte-Tailliez (2005b). Inductive Improvement of 
+Part-of-Speech Tagging and its Effect on a Terminology of Molecular Biology. Canadian 
+Conference on AI 2005, Canada, LNAI, Vol. 3501, pp 366-376. 
+Brill, E (1995). Transformation-Based Error-Driven Learning and Naturel Langage Process-
+ing : A case Study in Part of Speech Tagging. Computational Linguistics. Decembre. 
+Brill, E. et J. Wu (1998). Classifier Combination for Improved Lexical Disambiguation. 
+Proceedings of the Thirty-Sixth ACL and Seventeenth COLING. 
+Cohen, W. W. (1995), Fast Effective Rule Induction, Proceedings of the 12th International 
+Conference on Machine Learning, 1995. 
+Giménez, J. et L. Marquez (2003). Fast and accurate part-of-speech tagging: The SVM ap-
+proach revisited. RANLP- 2003. pages 153-163. 
+Halteren, V., J. Zavrel et W. Daelemans (2001). Improving Accuracy in Wordclass Tagging 
+through Combination of Machine Learning Systems. Computational Linguistics, 
+27(2):199-230. 2001. 
+- 257 - RNTI-E-6
+Combinaison de l’approche inductive (progressive) et linguistique pour l’étiquetage  
+Karlsson, F., A. Voutilainen, J. Heikkila et A. Anttila (1995) Constraint Grammar: A Lan-
+guage–Independent System for Parsing Unrestricted Text. Mouton de Gruyter, Berlin and 
+New York, 1995. 
+Kodratoff, Y., J. Azé, M. Roche et O. Matte-Tailliez (2003). Des textes aux associations 
+entre les concepts qu'ils contiennent. Dans les actes des XXXVièmes Journées de Statis-
+tique, Volume 2, p599-602 (résumé) et dans le numéro spécial "Entreposage et Fouille de 
+Données" de la Revue RNTI. 1:171-182, 2003. 
+Plaehn, O. et T. Brants (2000). Annotate - An Efficient Interactive Annotation Tool. In Pro-
+ceedings of the 6th Conference on ANLP, Seattle, 2000. 
+Ratnaparkhi, A (1996). A maximum entropy model for part-of-speech tagging. In EMNLP 1, 
+pages 133–142. 
+Samuelsson, C. et A. Voutilainen (1997). "Comparing a Linguistic and a Stochastic Tagger". 
+In Procs. Joint 35th Annual Meeting of the ACL and 8th Conf. of the European Chapter of 
+the Association for Computational Linguistics, pp. 246-253. 
+Tapanainen, P. et A. Voutilainen (1994). Tagging accurately - Don't guess if you know. In 
+Proceedings of the 4th ACL Conference on Applied Natural Language Processing, pp 47-
+52, 1994. Stuttgart. 
+Toutanova, K., D. Klein, C. Manning et Y. Singer. (2003). Feature-Rich Part-of-Speech 
+Tagging with a Cyclic Dependency Network. In Proc. of HLT-NAACL 2003 pages 252-
+259. 
+Voutilainen, A (1995). A syntax-based part-of-speech analyser. Proc. of the 7th Conference 
+of the European Chapter of the Association for Computational Linguistics, Dublin, 1995. 
+Won-Ho, R., L. Heui-Seok, K. Jin-Dong et R. Hae-Chang (2000). KCAT : A Korean Corpus 
+Annotating Tool Minimizing Human Intervention, Proc. of the 19th  COLING 2000. 
 Summary 
-Data warehouses provide business leaders and analysts to make strategic decisions and 
-make predictions. Securing data warehouse is therefore important. Moreover, securing a data 
-warehouse should not be very restrictive preventing effective use of the data warehouse, nor 
-too loose allowing the inference of prohibited data (i.e. personal, confidential). In this article 
-we examine the security of data warehouses using an approach based on Bayesian networks. 
-This has two advantages: it requires no further treatment after each feeding phase of the data 
-warehouse and does not involve alteration of the original data. 
- 
- 
+The part-of-Speech taggers are more and more powerful. Their accuracy, however, drops 
+down dramatically when applied in a domain the genre of which differs from the one they 
+have been trained upon. The correction of difficult part-of-speech ambiguities is a significant 
+stage to obtain a ‘perfectly’ tagged specialized corpus. To correct these ambiguities and to 
+decrease the number of tagging mistakes, we use an approach we call: Progressive Induction. 
+The process of correction is iterative. This approach is a combination of machine learning, of 
+rules written by the expert, and of manual corrections that are iteratively combined in order 
+to obtain an improvement of the tagging while restricting the actions of the expert to the 
+resolution of increasingly delicate problems. The proposed approach enabled us to obtain a 
+“correctly” tagged molecular biology corpus. By using this corpus, we carried out a 
+comparative study of four supervised tagger. 
+- 258 -RNTI-E-6

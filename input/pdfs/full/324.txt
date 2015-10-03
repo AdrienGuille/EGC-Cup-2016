@@ -1,411 +1,79 @@
-Apprentissage d’ensemble d’opérateurs de projection
-orthogonale pour la détection de nouveauté
-Fatma Hamdi∗, Younès Bennani∗
-∗ LIPN-UMR 7030, Université Paris 13,
-99, av. J-B Clément, 93430 Villetaneuse, France,
-Prénom.Nom@lipn.univ-paris13.fr
-Résumé. Dans ce papier, nous proposons une approche de détection de nou-
-veauté fondée sur les opérateurs de projection orthogonale et l’idée de double
-bootstrap (bi- bootstrap). Notre approche appelée Random Subspace Novelty
-Detection Filter (RS-NDF), combine une technique de rééchantillonnage et
-l’idée d’apprentissage d’ensemble. RS-NDF est un ensemble de filtres NDF
-(Novelty Detection Filter), induits à partir d’échantillons bootstrap des données
-d’apprentissage, en utilisant une sélection aléatoire des variables pour l’appren-
-tissage des filtres. RS-NDF utilise donc un double bootstrap, c’est à dire un
-rééchantillonnage avec remise sur les observations et un rééchantillonnage sans
-remise sur les variables. La prédiction est faite par l’agrégation des prédictions
-de l’ensemble des filtres. RS-NDF présente généralement une importante amé-
-lioration des performances par rapport au modèle de base NDF unique. Grâce à
-son algorithme d’apprentissage en ligne, l’approche RS-NDF est également en
-mesure de suivre les changements dans les données au fil du temps. Plusieurs
-métriques de performance montrent que l’approche proposée est plus efficace,
-robuste et offre de meilleures performances pour la détection de nouveauté com-
-parée aux autres techniques existantes.
-1 Introduction
-Plusieurs travaux de recherche ont été proposées pour le problème de la détection de nou-
-veauté (Markou et Singh, 2003a,b) et (Markou et Singh, 2003c) avec une grande variété d’ap-
-plications et méthodes. Le but essentiel de la détection de nouveauté conciste à apprendre
-un modèle ou un ensemble de modèles sur des données disponibles, et l’utiliser aprés pour
-identifier les données nouvelles (nouveauté). Les applications typiques de ce problème sont
-la détection des fraudes, la maintenance préventive, la détection des intrusions dans le réseau,
-le diagnostic de maladies rares et de nombreux autres domaines. La détection de nouveauté
-est particulièment utile quand une classe importante est sous représentée dans les données.
-L’exemple typique de ce problème est la détection des fraudes oú il peut y avoir un intervalle
-de plusieurs heures entre deux transactions frauduleuses. On distingue trois grandes familles
-d’approches de détection de nouveauté :
-– Les méthodes qui déterminent la nouveauté sans aucune connaissance préalable sur les
-données. Il s’agit essentiellement d’approches d’apprentissage analogues à la classifica-
-- 405 -
-Détection de nouveauté
-tion non supervisée. Ces approches traitent les données comme une distribution statique,
-et cherchent à identifier les points les plus éloignés. Ces points sont concidérés comme
-des valeurs potentiellement aberrantes.
-– Un deuxième type de méthodes consiste à modéliser à la fois les données normales et
-la nouveauté. Ces approches sont analogues à la classification supervisée et nécessitent
-des données pré-étiquetées.
-– Et finalement des méthodes de détection de nouveauté analogues à une tâche de classi-
-fication semi-supervisée. Le but essentiel est de repérer la nouveauté apportée par des
-données encore inconnues, en exploitant la connaissance extraite à partir d’un ensemble
-de données de référence (données d’apprentissage). Les données de référence se limitent
-à des exemples positifs des données normales ou familières, du fait de la difficulté, voire
-l’impossibilité dans certains cas, d’identifier a priori ce qui constituerait une nouveauté
-par rapport aux données déjà connues (ce qui amène au problème de la classification à
-partir d’une seule classe).
-Dans cet article nous proposons une nouvelle technique de détection de nouveauté fondée sur
-les opérateurs de projection orthogonale utilisées par Kohonen et Oja dans le modèle NDF (Ko-
-honen et Oja, 1976), l’idée du bootstrap ainsi que le paradigme de l’apprentissage ensembliste.
-Notre approche appelée Random subspace novelty detection filter (RS − NDF ) est un en-
-semble de NDF , induit à partir d’échantillons bootstrap des données d’apprentissage, en uti-
-lisant la sélection aléatoire au niveau des variables. La prédiction est faite en agrégeant les
-prévisions de l’ensemble. Une caractéristique intéressante du modèle NDF est sa simple mise
-en œuvre par une architecture de réseau de neurones (Kohonen et Oja, 1976) ainsi que son ap-
-prentissage adaptatif et sa robustesse au bruit. Cet article est organisé comme suit : la section
-2 introduit les concepts de base de notre modèle Random Subspace Novelty Detection Filter.
-La section 3 décrit les bases de données de validation et le protocole expérimental ainsi que les
-résultats obtenus. Une conclusion est présentée dans la section 4.
-2 Le principe de notre approche : RS-NDF
-2.1 Le filtre détecteur de nouveauté de Kohonen et Oja
-En 1976, Kohonen et Oja (Kohonen et Oja, 1976) ont proposé un filtre détecteur de nou-
-veauté (NDF ). C’est un système linéaire adaptatif qui agit, après son apprentissage sur des
-données de référence, comme un opérateur de projection dans un espace vectoriel orthogonal
-à l’espace vectoriel engendré par les données de référence. Le modèle NDF laisse passer
-seulement les propriétés nouvelles d’une donnée par rapport à l’ensemble de données de réfé-
-rence déjà apprises ; les propriétés sont dites nouvelles si elles ne sont pas représentées dans les
-données de référence. Une autre description du filtre est donnée dans (Kohonen et Oja, 1993).
-Le filtre détecteur de nouveauté peut être implémenté par un réseau récurrent de d neurones
-élémentaires, étroitement connectés en forme de boucles rétroactives, ou feedback (Figure 1).
-La sortie de chaque neurone est calculée comme une combinaison linéaire de l’entrée xi et
-du feedback qu’il reçoit de la sortie. L’opérateur de transfert est décrit par l’équation suivante :
-- 406 -
-Hamdi et al.
-FIG. 1 – L’architecture neuronale du modèle de filtre détecteur de nouveauté NDF
-x˜i = xi +
-∑
-j
-mij x˜j (1)
-L’equation précedente peut s’écrire sous forme matricielle comme suit :
-x˜ = x+Mx˜ (2)
-Les poids des connexions rétroactives mij caractérisent l’état interne du réseau. Ils sont
-initialisés à zéro et, ensuite, mis à jour après la présentation de chaque donnée en entrée du
-réseau selon une règle d’apprentissage de type anti-Hebbian :
-dM
-dt
-= −αx˜x˜T (3)
-où α est un coefficient positif qui peut être modifié de manière adaptative au cours de
-l’apprentissage.
-La fonction du transfert du réseau Φ ∈ Rd×d est définie par :
-x˜ = (I−M)−1x = Φx (4)
-où I représente la matrice identité.
-L’équation différentiel de Φ est obtenue de la manière suivante :
-dΦ−1
-dt
-= −Φ−1 dΦ
-dt
-Φ−1 = −dM
-dt
-dΦ
-dt
-= −αΦ2xxTΦTΦ (5)
-Le théorème de Greville (Greville, 1960) permet de donner une expression récursive pour
-estimer la fonction de transfert du réseau de la manière suivante :
-Φk = Φk−1 − x˜kx˜
-T
-k
-‖ x˜k ‖2 (6)
-- 407 -
-Détection de nouveauté
-où xk = [x1, x2, ..., xd]T est un vecteur de la matrice des données de référence, chaque xi
-est un vecteur de n diensions. Pendant la phase d’apprentissage, Le modèle NDF s’habitue
-aux données présentées en entrée. Une fois l’apprentissage terminé, si une des donnée de ré-
-férences ou une de leurs combinaisons linéaires est présentée à l’entrée du modèle, la sortie
-correspondante sera nulle. D’autre part, si une donnée n’appartenant pas à l’espace formé par
-les données de référence est choisie comme entrée, la sortie correspondante ne sera pas nulle et
-elle peut être vue comme représentative des variables nouvelles extraites à partir de la donnée
-d’entrée vis-à-vis des données de référence qui ont été déjà apprises.
-Une extension du modèle de base NDF proposée par (Kassab et al., 2005), (Kassab et Fre-
-deric, 2009) est le modèle d’apprentissage incrémental ILoNDF. Cette extension a été guidée
-par des réflexions sur le problème du modèle NDF. L’adaptation qui a été envisagée est di-
-rectement liée au fait que l’apprentissage du modèle est guidé uniquement par la nouveauté :
-L’adaptation de l’état interne du modèle NDF décrite par la formule prcécedente ne considère
-que les variables représentant la nouveauté qu’apportent les données d’entrée. Donc pour faire
-participer toutes les variables des données d’entrée au processus d’apprentissage, la stratégie
-adaptée, consiste à introduire la matrice identité à chaque étape de l’apprentissage et de proje-
-ter les données d’entrée à la fois sur la matrice identité et sur la matrice du filtre. La nouvelle
-règle d’apprentissage s’écrit sous la forme suivante :
-Φk = I+Φk−1 − x˜kx˜
-T
-k
-‖ x˜k ‖2 (7)
-Oú x˜k = (I+Φk−1)xk et Φ0 est une matrice nulle.
-Dans notre travail, nous avons utilisé cette nouvelle règle d’apprentissage. Pour le problème de
-détection de nouveauté, deux proportions peuvent être calculées :
-– La proportion de nouveauté : C’est une mesure qui permet de quantifier la nouveauté
-apportée par une donnée par rapport à un ensemble de données déjà apprises par le filtre.
-Nxi =
-‖ x˜i ‖
-L× ‖ xi ‖ (8)
-où L est le nombre d’exemples utilisés pour l’apprentissage.
-– La proportion d’habituation : C’est un indicateur de similarité d’un exemple vis-à-vis
-des données précédemment apprises :
-Hxi = 1−Nxi (9)
-Cette proportion pourrait être considérée comme le score de classification d’un exemple xi.
-Elle indique la probabilité que xi appartient à la nouvelle classe. Il est également possible de
-calculer un vecteur PΦ qui représente les exemples utilisés pour l’apprentissage. Ainsi, le score
-de classification des données d’entrée peut être calculé de la façon suivante :
-PΦ =
-∑
-f∈F
-Hf−→uf (10)
-- 408 -
-Hamdi et al.
-où −→uf est le vecteur unité associé à chaque variable f dans F (l’ensemble des variables) et
-Hf est la proportion d’habituation d’une variable f calculée comme suit :
-Hf = 1− ‖ Φ
-−→uf ‖
-n× ‖ −→uf ‖ (11)
-Le vecteur PΦ est défini comme un vecteur de poids. Les composantes de PΦ représentent
-la proportion d’habituation de chaque variable dans l’espace des données.
-2.2 L’algorithme RS-NDF
-Notre approche est basée sur la coopération d’un ensemble deNDF calculés sur plusieurs
-échantillons. Ces derniers sont obtenus par un double bootstrap (Un tirage aléatoire avec remise
-sur les données et un tirage aléatoire sans remise pour les variables). La prédiction est faite en
-agrégeant les prévisions de l’ensemble. L’idée de base de notre algorithme RS −NDF com-
-bine donc les opérateurs de projection orthogonale utilisées par Kohonen et Oja dans le modèle
-NDF (Kohonen et Oja, 1976), la technique de bootstrap et le principe de l’apprentissage d’en-
-semble.
-FIG. 2 – L’architecture neuronale du modèle RS-NDF
-Pour déterminer le seuil de détection de chaque filtre, nous avons appliqué les règles sui-
-vantes (Kassab et al., 2005), (Kassab et Frederic, 2009) :
-– Les scores (sorties du filtre) attribués aux données d’apprentissage peuvent être utilisés
-comme un bon indicateur des scores de données qui peuvent être positives et qui sont
-faciles à détecter car elles sont fortement similaires aux données d’apprentissage. Par
-- 409 -
-Détection de nouveauté
-conséquent, la moyenne de ces scores peut être admise comme une limite supérieure
-pour le seuil de détection.
-– Les scores attribués aux données disponibles pour l’apprentissage avant leur utilisation,
-peuvent être utilisés comme un bon indicateur des scores de données qui sont positives
-mais qui sont moins faciles à détecter. Par conséquent, la moyenne de ces scores peut
-être admise comme une limite inférieure pour le seuil de détection.
-L’algorithme d’apprentissage RS −NDF est le suivant :
-Algorithme 1 : Random Subspace Novelty Detection Filter
-Entrées :
-sD = x1, x2, ..., xL ensemble de données d’apprentissage.
-sT = x1, x2, ..., xM ensemble de données de test.
-F = f1, f2, ..., fn ensemble de variales.
-NF nombre de filtres.
-Φ0 la matrice initial.
-Sorties :
-NF filtres (Φi).
-NF vecteurs qui représentent les classes cibles (Pvi).
-D matrice de détection de nouveauté.
-Begin
-for i = 1 jusqu’à NF do
-Un tirage aléatoire avec remise sur les données d’apprentissage.
-Un tirage aléatoire sans remise sur les variables.
-Appliquer RS-NDF Φi avec les variables choisies aléatoirement (formule 7)
-end for
-for i = 1 jusqu’àM do
-for k = 1 jusqu’à NF do
-Calculer la proportion d’habituation Hxi ( formule 9)
-pour xi ∈ sT en utilisant le filtre Φk.
-end for
-Agréger les prédictions de l’ensemble des filtres et mettre la prédiction finale dans D.
-end for
-End
-3 Validation
-3.1 Description des base de données
-Pour démontrer l’efficacité de la méthode proposée, nous l’avons testé sur huit jeux de
-données en utilisant la validation croisée (10 fois). La description de données est résumée dans
-le tableau 1. Les différents jeux de données (Asuncion et Newman, 2007) sont disponibles sur
-http://archive.ics.uci.edu/ml/datasets.html.
-- 410 -
-Hamdi et al.
-Pour notre expérimentation, nous avons adapté les différentes bases de données utilisées au
-contexte de la détection de nouveauté et l’apprentissage à partir d’une seule classe. Une classe
-a été choisie aléatoirement dans chaque base de données. Cette classe a été considérée comme
-étant la classe nouveauté. Les autres classes restantes sont fusionnées pour obtenir la classe
-normale de l’apprentissage.
-TAB. 1 – Description des bases
-Base de données Dimension Taille Taille de la classe nouvelle
-Glass 9 214 70
-Ionosphere 34 351 225
-Oil 48 937 41
-Spectf 44 187 15
-Waveform 21 5000 1647
-WDBC 30 569 212
-Wine 13 178 59
-Yeast 8 1484 244
-3.2 Les mesures de performances et le protocole expérimental
-Pour évaluer notre approche, nous avons calculé plusieurs métriques de performance. La
-plupart de ces dernières se concentrent sur la capacité des classifieurs à identifier correctement
-les observations de chaque classes. Ces différentes métriques sont obtenues à partir d’une ma-
-trice de confusion et qui sont les suivantes : Acc−, Acc+, Prcision, Fmesure,G−mean et
-AUC. Le tableau 2 présente la matrice de confusion pour la classification binaire, oú V P sont
-les vrais positifs, FP les faux positifs, FN les faux négatifs, et V N les vrais négatifs.
-TAB. 2 – Matrice de confusion pour la classification binaire.
-Classe Positive Prédite Classe Negative Prédite
-Classe Positive Réelle VP FN
-Class Negative Réelle FP VN
-TauxdeV raisNgative(Acc−) = V N
-V N + FP
-(12)
-TauxdeV raispositive(Acc+)(Rappel) =
-V P
-V P + FN
-(13)
-Precision =
-V P
-V P + FP
-(14)
-Fmesure =
-2 ∗ Precision ∗Rappel
-Precision+Rappel
-(15)
-G−mean = (Acc− ∗Acc+)1/2 (16)
-Nous avons aussi utilisé l’aire sous la courbe ROC (AUC) (Peterson, 1997). La courbe ROC
-est une représentation graphique du compromis entre le taux de faux négatifs et le taux de faux
-- 411 -
-Détection de nouveauté
-positifs. Il existe plusieurs méthodes pour estimer l’aire sous la courbe ROC. Dans le cas de la
-classification binaire, le AUC est définie comme suit :
-AUC =
-Acc−+Acc+
-2
-(17)
-Nous avons utilisé toutes ces mesures pour comparer notre méthode RS −NDF avec des
-approches couramment utilisées pour le problème d’apprentissage à partir d’une seule classe
-pour la détection de nouveauté. Les résultats de ces différents indicateurs de performance sont
-obtenus suite à une validation croisée.
-Les algorithmes sélectionnés sont : L’analyse en composantes principales (ACP ) (Jolliffe,
-1986), les Séparateurs à Vastes Marges (SVM ) (Scholkopf et al., 1999), Le Perceptron Multi-
-couches auto-associatif (MLP ) (Rumelhart et al., 1986) et le modèle de base NDF .
-3.3 Résultats
-Pour chaque base de données, les cinq approches ont été testées et leurs résultats ont été
-évalués en termes des différentes mesures de performances citées. Le tableau 3 montre les
-performances des différents algorithmes sur la base V in.
-TAB. 3 – Comparaison des Performances sur la base de données Vin
-Acc− Acc+ Prec F− AUCb G−
-(Rappel) measure mean
-MLP 0,78 0,68 0,83 0,81 0,73 0,73
-ACP 0,60 0,69 0,80 0,68 0,65 0,64
-SVM-1C 0,68 0,76 0,81 0,73 0,72 0,71
-NDF 0,84 0,78 0,88 0,86 0,81 0,81
-RS-NDF 0,87 0,85 0,92 0,89 0,86 0,86
-À partir des résultats obtenus, notre approche RS − NDF montre un fonctionnement
-meilleur par rapport à toutes les autres méthodes :MLP , ACP , SVM − 1C et NDF . Cette
-amélioration a touché les différents critères d’évaluation.
-Les tableaux 4 et 5 montrent respectivement les performances de RS − NDF et les dif-
-férents algorithmes utilisés sur la base Ionosphere et la base Glass. Ces résultats montrent
-encore une fois que notre approche dépasse le MLP , ACP et SVM − 1C avec toutes les
-mesures de performances utilisées seulement pour l’Acc−, notre approche donne un résultat
-légèrement inférieur à celui de NDF pour la base ionosphere et à MLP , SVM − 1C et
-ACP pour la base Glass.
-TAB. 4 – Comparaison des Performances sur la base de données Ionosphere
-Acc− Acc+ Prec F− AUCb G−
-(Rappel) measure mean
-MLP 0,63 0,64 0,50 0,55 0,64 0,64
-ACP 0,64 0,55 0,45 0,52 0,59 0,59
-1-SVM 0,66 0,56 0,45 0,54 0,61 0,60
-NDF 0,90 0,61 0,57 0,70 0,76 0,74
-RS-NDF 0,87 0,74 0,65 0,74 0,80 0,80
-- 412 -
-Hamdi et al.
-TAB. 5 – Comparaison des Performances sur la base de données Glass
-Acc− Acc+ Prec F− AUCb G−
-(Rappel) measure mean
-MLP 0,96 0,49 0,49 0,65 0,73 0,69
-ACP 0,96 0,43 0,46 0,62 0,69 0,64
-1-SVM 0,89 0,54 0,80 0,84 0,72 0,69
-NDF 0,82 0,69 0,84 0,83 0,75 0,75
-RS-NDF 0,87 0,84 0,93 0,90 0,86 0,85
-Dans ces tableaux , nous avons montré l’amélioration apportée par notre approche RS −
-NDF par rapport aux méthodes utilisées. Les résultats sont également confirmés par une ins-
-pection visuelle. En effet les figures 3 et 4 représentent les performances obtenues (avec les 6
-critères d’évaluation) sur les 8 bases de données testées. En regardant les graphiques des quatre
-radars (figure 3), certaines conclusions peuvent être tirées. En général RS − NDF donne de
-meilleurs résultats par rapport aux autres méthodes et avec tous les critères de performances
-utilisés. Dans le pire des cas, les résultats obtenus parNDF ,ACP ,MLP et SVM−1C sont
-légèrement supérieurs aux résultats de notre approche. Pour la base de données Waveform,
-RS−NDF dépasse les autres algorithmes en utilisant la Precision, F −mesure,G−mean
-et AUC. La precision est définie comme le pourcentage d’exemples correctement étiquetés
-comme positif. Nous pouvons donc conclure que notre approche classe les exemples positifs
-mieux que les autres méthodes. Aussi pour les critèresG−mean, etAUC,RS−NDF donne
-de meilleurs résultats comparé à NDF ,MLP , ACP et SVM − 1C.
-Par ailleurs, les graphiques des radars des bases de données V in, Y east, WDBC et
-Spectf (figure 5) confirment les bonnes performances de notre approche RS − NDF . En
-effet les valeurs de AUC montrent que notre approche est en mesure de donner des résul-
-tats intéressants. Cette mesure de performance est une représentation quantitative de la courbe
-ROC. La courbe ROC est largement utilisée pour l’évaluation des classifieurs, c’est un outil
-de visualisation, organisation et sélection des algorithmes tout en se basant sur le compromis
-entre les vrais positifs et les faux négatifs.
-La figure 4 montre le radar de la mesure Acc+ qui représente la capacité des modèles à
-détecter la classe nouveauté. Nous avons choisi cette métriques pour montrer la bonne capacité
-de RS −NDF à détecter la classe nouveauté. Ainsi, nous pouvons voir clairement que notre
-approche donne de meilleurs résultats comparé aux autres méthodes.
-4 Conclusion
-Dans cet article, nous avons proposé une nouvelle approche adaptée au problème de l’ap-
-prentissage à partir d’une seule classe pour des applications de détection de nouveauté. L’ap-
-proche est basée sur les opérateurs de projection orthogonale, la technique de bootstrap et le
-princie de l’apprentissage d’ensemble. L’approche proposée RS −NDF est un ensemble de
-NDF , induit à partir d’échantillons bootstrap sur les donn ées et une sélection aléatoire des
-variables dans le processus d’induction du modèle de base NDF. La prédiction a été faite en
-agrégeant les prévisions de l’ensemble. Les mesures de performance telles que la pr écision,
-le rappel, le taux de faux positifs, le taux de faux négatifs, F-mesure et l’AUC sont calculées
-à travers une validation croisée sur des basesr de données accessibles au public. Des amélio-
-- 413 -
-Détection de nouveauté
-FIG. 3 – Radars des bases : Waveform, Oil, Glass et Ionosphère
-FIG. 4 – La mesure Acc+ sur les différentes base de données
-- 414 -
-Hamdi et al.
-FIG. 5 – Radars des bases : Vin, Yeast, WDBC et Spectf
-rations significatives dans la précision ont été obtenues en utilisant notre méthode. L’approche
-RS-NDF présente généralement une amélioration substantielle des performances par rapport
-aux algorithmes existants. Grâce à un algorithme d’apprentissage en ligne, l’approche RS-NDF
-est également en mesure de suivre les changements dans les données au fil du temps.
-Références
-Asuncion, A. et D. J. Newman (2007). Uci : Machine learning repository.
-Greville, T. N. E. (1960). Some applications of the pseudoinverse of a matrix. SIAM Rev,
-15–22.
-Jolliffe, I. (1986). Principal Component Analysis. Springer Verlag.
-Kassab, R. et A. Frederic (2009). Incremental data-driven learning of a novelty detection
-model for one-class classification problem with application to high-dimensional noisy data.
-Machine Learning.
-- 415 -
-Détection de nouveauté
-Kassab, R., L. Jean-Charle, et N. Emmanuel. (2005). Novelty detection for modeling users
-profile. The 18th International FLAIRS Conference.
-Kohonen, T. et E. Oja (1976). Fast adaptative formation of orthogonalizing filters and associa-
-tive memory in reccurent networks of neuron-like elements. Biological Cybernetics 21, 85
-– 95.
-Kohonen, T. et E. Oja (1993). Self-organization and associative memory. 3rd ed. Springer,
-Berlin.
-Markou, M. et S. Singh (2003a). Novelty detection : a review - part 1 : statistical approaches.
-Signal Processing 83, 2481–2497.
-Markou, M. et S. Singh (2003b). Novelty detection : a review - part 2 : neural network based
-approaches. Signal Processing 83, 2499 – 2521.
-Markou, M. et S. Singh (2003c). Novelty detection in learning systems. Neural Computing 39,
-157 –195.
-Peterson, B. A. (1997). the use of the area under the roc curve in the evaluation of machine
-learning algorithms. Pattern Recogn, 1145–1159.
-Rumelhart, D. E., G. E. Hinton, et et R. J Williams (1986). Learning internal representation by
-error propagation. Parallel Distributed Processing : Explorations in the microstructures of
-cognition 65, 318–362.
-Scholkopf, B., J. Platt, J. Shawe-Taylor, A. J. Smola, et R. C. Williamson (1999). Estimating
-the support of a high-dimensional distribution. Neural Computation, 318– 362.
-Summary
-In this paper we propose a novelty detection framework based on the orthogonal projection
-operators and the bootstrap idea. Our approach called Random Subspace Novelty Detection
-Filter (RS−NDF ) combines the sampling technique and the ensemble idea.RS−NDF is an
-ensemble ofNDF , induced from bootstrap samples of the training data, using random feature
-selection in the NDF induction process. Prediction is made by aggregating the predictions
-of the ensemble. RS −NDF generally exhibits a substantial performance improvement over
-the single NDF . Thanks to an online learning algorithm, the RS − NDF approach is also
-able to track changes in data over time. The RS −NDF method is compared to single NDF
-and other novelty detection methods with tenfold cross-validation experiments on publicly
-available datasets, where the method superiority is demonstrated. Performance metrics such
-as precision and recall, false positive rate and false negative rate, F-measure, AUC and G-
-mean are computed. The proposed approach is shown to improve the prediction accuracy of
-the novelty detection, and have favorable performance compared to the existing algorithms.
-- 416 -
+ 
+ 
+Vers la fusion d’informations hétérogènes et partielles pour 
+l’aide au codage diagnostique 
+ 
+Laurent Lecornu*’***, Clara Le Guillou**’*** Frédéric Le Saux*, Matthieu Hubert**, 
+Julien Montagner*’***, John Puentes*’***, Jean-Michel Cauvin**’*** 
+ 
+* Telecom Bretagne , Technopole Brest Iroise, CS 83818 
+29238 Brest Cedex 3 
+Laurent.Lecornu@telecom-bretagne.eu 
+**CHRU de Brest, DIM, Boulevard Tanguy Prigent 
+29609 Brest Cedex 
+jean-michel.cauvin@chu-brest.fr 
+***Latim, Inserm U650 
+ 
+1 Contexte 
+En effet, depuis la mise en place du Programme de Médicalisation des Système 
+d’Information (PMSI), l’ensemble des informations médicales concernant le patient au cours 
+de son séjour à l’hôpital doit être recueilli sous une forme standardisée et codée. Malheure-
+sement, choisir un code diagnostique est une opération non-intuitive pour le praticien en 
+raison de la quantité de codes prévue par les normes, et de la difficulté d’en établir une clas-
+sification pertinente. Les erreurs sont fréquentes avec des conséquences graves tant au niveau 
+de l'évaluation des soins de santé qu’au niveau financier. Pour aider le médecin-codeur, 
+l’approche choisie consiste à lui présenter une liste de codes diagnostiques adaptée au cas du 
+patient dont il code le séjour, ordonnée par ordre de pertinence, et correspondant aux élé-
+ments diagnostiques qu’il a en tête à partir des informations réparties au sein du Système 
+d’Information Hospitalier (SIH) et sur des connaissances externes. Dans ce but, un ensemble 
+de modules spécifiques d’aide au codage a été développé. Chacune d’entre eux analyse une 
+partie spécifique des données du SIH et en extrait une information partielle sous la forme 
+d’une liste ordonnée et contextualisée de codes diagnostiques classés selon une valeur de 
+pertinence qui lui est propre. L’ensemble des listes est alors fusionné pour ne présenter au 
+médecin qu’une seule liste ordonnée. Deux stratégies d’ordonnancement de ces valeurs sont 
+explorées (la 1ère méthode est dérivée d’une fusion procédurale et la 2ème utilise la théorie des 
+possibilités). 
+2 Méthode 
+Le premier module développée s’appuie sur une étude statistique des codes diagnostiques 
+en fonction de l’âge du patient, de son sexe, de la durée du séjour, de l’unité médicale fré-
+quentée, des actes médicaux effectués et des diagnostics déjà codés (Lecornu (2009b)). Le 
+second s’appuie sur le codage de séjours antérieurs en tenant compte du temps écoulé entre 
+Vers la fusion d’informations hétérogènes et partielles pour l’aide au codage diagnostique 
+les séjours. Le choix des diagnostics repose sur l’étude de la courbe de survie de la réappari-
+tion du code (Lecornu (2009a)). Enfin, le troisième module exploite les résultats d’analyses 
+biologiques (Lecornu 2010) grâce à un ensemble de règles associées à une valeur de perti-
+nence linguistique tel que « rare » ou « souvent ». 
+Deux méthodes de fusion ont été envisagées afin de résoudre le problème d’hétérogénéité 
+de des valeurs de pertinence. La première approche développée s’appuie sur une méthode 
+procédurale c’est-à-dire basée sur un système de vote qui permet d’effectuer un classement 
+par le nombre de voix. Pour classer les codes ayant le même nombre de voix, on utilisera la 
+valeur de pertinence du module considéré comme le meilleur (ici, AnterOcod, suivit de Refe-
+rOcod et d’AlertOcod). La deuxième s’appuie sur un tableau de conversion, déterminé empi-
+riquement pour chaque module et utilisant la précision obtenue dans chaque module pour un 
+intervalle de pertinence ou pour un terme linguistique. La méthode de fusion s’appuie sur la 
+théorie des possibilités et les opérateurs de fusion qui peut y être associé.  
+3 Conclusion 
+Les résultats obtenus permettent de retrouver 80% des codes diagnostiques (sur un échan-
+tillon de 998 séjours anonymisés) qui avaient été codé par le médecin, malgré la difficulté 
+d’associer à chaque valeur de probabilité, ou de terme linguistique, une valeur de nécessité 
+cohérente. La seconde méthode de fusion apparait plus efficace car les codes à trouver sont 
+mieux placés dans la liste. 
+Ce projet est un projet TECSAN soutenu par l’ANR sous le nom Med1dex associant le 
+CHU de Brest, TELECOM Bretagne, le LaTIM Unité INSERM U650 et la société 
+PRISMEDICA. 
+Références 
+Lecornu, L., C. Le Guillou, G. Thillay, P. J. Garreau, H. Jantzem, J. M. Cauvin (2009a). C2i: 
+A tool to gather medical indexed information, ITAB 2009. Larnaca, Cyprus, 5-7 Nov. 
+Lecornu, L., G. Thillay, C. Le Guillou, P. Saliou, J. Puentes, H. Jantzem, P. J. Garreau, J. M. 
+Cauvin (2009b). REFEROCOD : a probabilistic method to medical coding support, 31st 
+Annual International Conference of the IEEE Engineering in Medicine and Biology Soci-
+ety, 02-06 sept. 2009, Minneapolis, United States, 3421-3424 
+Lecornu, L, C. Le Guillou, F. Le Saux, M. Hubert, J. Puentes, J. M. Cauvin (2010). 
+ANTEROCOD: Actuarial Survival Curves Applied to Medical Coding Support for 
+Chronic Diseases, 32nd Annual International Conference of the IEEE Engineering in 
+Medicine and Biology Society, sept. 2010, Buenos Aires, Argentine. 
+Summary 
+To support the discharge abstract coding by the physician, we developed a coding-aid 
+system composed of a set of modules connected to the Hospital Information System. A fu-
+sion module has been developed to synthetize the partial information extracted from each 
+module. 

@@ -40,31 +40,32 @@ def pdf2txt(pdf_folder):
 
 def download_pdfs(df, what_to_download="1page"):
     import urllib
-
-    if what_to_download == "1page" or what_to_download == "full":
+    col_dict = {"1page": "pdf1page", "full": "pdfarticle"}
         # Download 1page pdfs
-        logging.info("Downloading {} pdf files.".format(what_to_download))
-        for f in df.iterrows():
-            try:
-                urllib.urlretrieve(f[1]['pdf1page'], "../input/pdfs/1page/" + str(f[1]['id']) + ".pdf")
-                logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
-            except:
-                logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
-                filo = open("../input/pdfs/1page/{}_URL_INVALID.txt".format(f[1]["id"]), "w")
-                filo.close()
+    logging.info("Downloading {} pdf files.".format(what_to_download))
+    for f in df.iterrows():
 
-    if what_to_download == "fullpdf" or what_to_download == "all":
-
-        # Download full page pdfs
-        logging.info("Downloading full pdf files.")
-        for f in df.iterrows():
-            try:
-                urllib.urlretrieve(f[1]['pdfarticle'], "../input/pdfs/full/" + str(f[1]['id']) + ".pdf")
-                logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
-            except:
-                logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
-                filo = open("../input/pdfs/full/{}_URL_INVALID.txt".format(f[1]["id"]), "w")
-                filo.close()
+        try:
+            urllib.urlretrieve(f[1][col_dict[what_to_download]], "../input/pdfs/{}/".format(what_to_download)
+                               + str(f[1]['id']) + ".pdf")
+            logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
+        except:
+            logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
+            filo = open("../input/pdfs/1page/{}_URL_INVALID.error".format(f[1]["id"]), "w")
+            filo.close()
+            #
+            # if what_to_download == "full":
+            #
+            #     # Download full page pdfs
+            #     logging.info("Downloading full pdf files.")
+            #     for f in df.iterrows():
+            #         try:
+            #             urllib.urlretrieve(f[1]['pdfarticle'], "../input/pdfs/full/" + str(f[1]['id']) + ".pdf")
+            #             logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
+            #         except:
+            #             logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
+            #             filo = open("../input/pdfs/full/{}_URL_INVALID.error".format(f[1]["id"]), "w")
+            #             filo.close()
 
 
 def add_new_columns(df):
@@ -146,7 +147,8 @@ def do_OCR(df, path_txt_files, min_size, list_files=None):
     for f in text_files:
         if os.path.getsize(f) < min_size or list_files:
             lang = df.loc[df["id"] == int(os.path.basename(f)[:-4])]["lang_title"].tolist()[0]
-            call("convert -density 300 {0}[0] -depth 8 -background white -alpha remove  {0}.tiff".format(
+            call(
+                "convert -density 300 {0}[0] -depth 8 -background white -alpha remove -flatten +matte  {0}.tiff".format(
                 f.replace(".txt", ".pdf")), shell=True)
             call("tesseract -l {0} {1}.tiff {2}".format(lang_map[lang], f.replace(".txt", ".pdf"), f[:-4]), shell=True)
             call("rm {0}.tiff".format(f.replace(".txt", ".pdf")), shell=True)
@@ -155,6 +157,8 @@ def do_OCR(df, path_txt_files, min_size, list_files=None):
 def get_EGC_articles(df):
     return df[df["booktitle"] == "EGC"].copy()
 
+def get_french_articles(df):
+    return df[df["lang_title"] == "fr"].copy()
 
 
 
@@ -185,7 +189,7 @@ def getfull_pdfs(df):
     download_pdfs(df, what_to_download="full")
 
     # Convert pdfs to txt
-    pdf2txt("../input/pdfs/1page")
+    pdf2txt("../input/pdfs/full")
 
     # Detect those pdfs that have garbage text and try to obtain the text through OCR
     gt = detect_garbage_text("../input/pdfs/full")
@@ -215,13 +219,13 @@ def get1page_pdfs(df):
     """
 
     # 1. Get pdfs from the interwebz
-    # download_pdfs(df, what_to_download="1page")
+    download_pdfs(df, what_to_download="1page")
 
     # 2. Convert pdfs to txt
-    # pdf2txt("../input/pdfs/1page")
+    pdf2txt("../input/pdfs/1page")
 
     # 3. Do OCR to those pdfs that seem to be images. Do it with those text files smaller than 17bytes (
-    # do_OCR(df, "../input/pdfs/1page", 17)
+    do_OCR(df, "../input/pdfs/1page", 17)
 
     # 4. Detect those pdfs that have garbage text and try to obtain the text through OCR
     gt = detect_garbage_text("../input/pdfs/1page", 5)
@@ -273,12 +277,16 @@ def normalize_affiliations():
     return new_affiliations
 
 def main():
-    # df = load_data_egc("../input/RNTI_articles_export_fixed1347_ids.txt")
-    # add_index_column(df)
-    # df = get_EGC_articles(df)
-    # df = add_lang_column(df)
-    # df = add_new_columns(df)
+    df = load_data_egc("../input/RNTI_articles_export_original.txt")
+    df = get_EGC_articles(df)
+    df = add_lang_column(df)
+    df = get_french_articles(df)
+    add_index_column(df)
+    df = add_new_columns(df)
     normalize_affiliations()
+    get1page_pdfs(df)
+    getfull_pdfs(df)
+    # df = get_EGC_articles(df)
 
 
 if __name__ == "__main__":

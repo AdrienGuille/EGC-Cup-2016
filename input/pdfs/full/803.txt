@@ -1,643 +1,272 @@
-Une Démarche Conjointe de Fragmentation et de Placement
-dans le Cadre des Entrepôts de Données Parallèles
-Soumia Benkrid ∗, Ladjel Bellatreche ∗∗
-∗ Ecole Nationale Supérieure en Informatique, Oued-Smar Alger - Algérie
-s_benkrid@esi.dz
-∗∗ LISI/ENSMA - Université de Poiters, Futuroscope 86960 France
-bellatreche@ensma.fr
-Résumé. Traditionnellement, concevoir un entrepôt de données parallèle consiste
-d’abord à partitionner son schéma ensuite allouer les fragments générés sur les
-noeuds d’une machine parallèle. L’inconvénient majeur d’une telle approche est
-son ignorance de l’interdépendance entre les processus de fragmentation et d’al-
-location. Une des entrées du problème d’allocation est l’ensemble de fragments
-générés par la fragmentation. Notons que les deux processus cherchent à optimi-
-ser le même ensemble de requêtes. Dans ce papier, nous proposons une approche
-de conception d’un entrepôt de données relationnel parallèle selon une archi-
-tecture distribuée (shared nothing) intégrant les processus de fragmentation et
-d’allocation. Ensuite, une méthode de répartition de charges sur les noeuds de la
-machine parallèle est proposée. Finalement, une validation de nos propositions
-en utilisant le banc d’essai APB-1 release II est présentée.
+Fouille dans la structure de documents XML
+Amandine Duffoux, Omar Boussaid,
+Stéphane Lallich, Fadila Bentayeb
+ERIC  Université Lumière Lyon 2
+5 avenue Pierre Mendès-France  69676 Bron Cedex  France
+{ aduffoux | boussaid | lallich | bentayeb }@eric.univ-lyon2.fr
+Résumé. La prolifération des documents XML appelle des techniques
+appropriées pour extraire et exploiter l'information contenue dans ces do-
+cuments. On distingue deux approches de fouille : XML Content Mining
+portant sur le contenu et XML Structure Mining qui a trait à la structure
+des documents. Combiner ces deux approches est très intéressant. Les in-
+formations contenues dans la structure orientent la fouille sur le contenu.
+Nous présentons la première étape de cette démarche : une nouvelle mé-
+thode d'extraction des règles d'association à partir de la structure des
+documents XML qui permet de gérer les aspects hiérarchiques de ces do-
+cuments tout en améliorant les mécanismes d'extraction grâce à la création
+d'une structure spéciale représentant la hiérarchie des balises rencontrées.
+Mots-Clés : document XML, structure, règles d'association.
 1 Introduction
-Le processus d’aide à la décision est souvent mené par l’intermédiaire de requêtes com-
-plexes caractérisées par des jointures, sélections et agrégations exécutées sur des entrepôts de
-données très volumineux. Au cours de la dernière décennie, la taille des entrepôts de données a
-augmenté de 5 à 100 téra octets (DeWitt et al.). Pour optimiser les requêtes décisionnelles sur
-des entrepôts de données de telle taille, les techniques d’optimisation classiques telles que les
-vues matérialisées, les index avancés, la fragmentation ne sont pas suffisantes. Le traitement
-parallèle devient alors une solution incontournable pour réduire les coûts de requêtes com-
-plexes. Ce dernier n’a pas eu la même attention de la part de la communauté des entrepôts de
-données contrairement aux techniques classiques ; à l’exception des travaux de (Stöhr et al.,
-2000; Stöhr et Rahm, 2001) et de (Furtado, 2004). Paradoxalement, les éditeurs de bases de
-données proposent des solutions parallèles comme InfoSphere d’IBM et Oracle.
-La conception d’un entrepôt de données parallèle passe par cinq phases principales : (i)
-le choix de l’architecture matérielle, (ii) la fragmentation de l’entrepôt de données, (iii) l’al-
-location (ou le placement) de fragments générés par le processus de la fragmentation, (vi) la
-répartition des charges et (v) le traitement des requêtes.
-Fragmentation et Allocation dans les Entrepôts de Données
-Trois architectures principales existent pour supporter une base de données (ou un entrepôt
-de données) parallèle : (1) l’architecture à mémoire partagée (shared-memory), (2) l’architec-
-ture à disques partagés (shared disk) et (3) l’architecture distribuée (shared nothing).
-Dans le shared memory, chaque processeur peut accéder à n’importe quel module de la
-mémoire ou à n’importe quelle unité du disque à travers un réseau d’interconnexion. Cette
-architecture permet un accès rapide aux données et assure un bon équilibrage de charges mais
-elle présente les inconvénients suivants : (a) la complexité du réseau d’interconnexion, due à
-la nécessité de relier chaque processeur à tous les modules, augmente le coût d’une telle archi-
-tecture et (b) la limite d’extension du nombre de processeurs qui pénalise la disponibilité des
-données. Cette architecture a été utilisée par le système Volcano (Graefe, 1994). Ce type de
-système représente cependant un excellent rapport coût/performance pour des applications de
-bases de données de taille moyenne (Bouganim, 1996).
-Dans le shared disk, chaque processeur a accès à n’importe quelle unité de disque à travers le
-réseau d’interconnexion mais n’a accès qu’à sa mémoire locale. Cette architecture assure un
-bon équilibrage de charges, une bonne possibilité d’extension du nombre de processeurs et une
-grande disponibilité des données. Mais, elle souffre du problème du goulot d’étranglement po-
-tentiel ainsi que le surcoût de maintenance pour assurer la cohérence des copies caches. (Stöhr
-et al., 2000) a utilisé cette architecture dans le contexte des entrepôts de données parallèles.
-Dans le shared nothing, excepté le réseau d’interconnexion, rien n’est partagé entre les pro-
-cesseurs. Ainsi, chaque noeud de la machine correspond à un processeur avec ses disques et
-sa mémoire locale. Les noeuds communiquent entre eux par envois de messages via un réseau
-d’interconnexion permettant des échanges à haut débit (Bouganim, 1996). Cette architecture
-assure une bonne disponibilité des données et la possibilité d’une bonne extension. Par contre,
-elle présente une mauvaise réparation de charges. De nombreux systèmes de gestion de bases
-de données parallèles exploitent ce type d’architecture comme TANDEM, Bubba, Gamma, Te-
-radata, etc. Dans le contexte des entrepôts de données, cette architecture a été adoptée par (Fur-
-tado, 2004). Cette architecture a été recommandée pour les entrepôts de données relationnels
-modélisés par des schémas en étoile par (DeWitt et al.). En conséquence, nous la considérons
-dans ce papier.
-Une fois l’architecture matérielle choisie, le concepteur fragmente son entrepôt de données
-en un ensemble de partitions. La fragmentation est une pré-condition dans la conception des
-entrepôts parallèles. Cette fragmentation peut être horizontale (selon ses instances) ou verticale
-(selon ses attributs). La fragmentation horizontale est souvent utilisée pour concevoir des bases
-de données parallèles (Stöhr et al., 2000) et (Furtado, 2004).
-Le placement des données est le processus affectant les fragments générés par la frag-
-mentation sur les noeuds d’une machine parallèle. L’allocation peut être soit redondante (les
-fragments sont répliqués sur les sites/noeuds) ou non redondante (chaque fragment réside dans
-un et un seul noeud/site).
-Une fois l’allocation réalisée, les requêtes globales seront réécrites en fonction des frag-
-ments. Lors du traitement de requêtes, nous devons vérifier si les noeuds de la machine paral-
-lèle sont uniformément chargés.
-En nous penchant sur la littérature sur les travaux concernant la conception des bases de
-données parallèles en général et les entrepôts de données parallèles, en particulier, nous consta-
-tons que les deux processus de fragmentation et d’allocation se font d’une manière indépen-
-dante et séquentielle : le concepteur partitionne d’abord son entrepôt en utilisant son algorithme
-S. Benkrid et al.
-favori de fragmentation (le schéma de fragmentation doit optimiser un ensemble de requêtes)
-ensuite il alloue les fragments sur des noeuds en utilisant un algorithme favori d’allocation
-(le schéma d’allocation généré doit optimiser le même ensemble de requêtes exécutées sur les
-différents noeuds). Cette indépendance a fait naître deux communautés de recherche ; l’une
-travaille que sur la sélection de schéma de fragmentation (Özsu et Valduriez, 1999), (Bella-
-treche et al., 2006), (Chakravarthy et al., 1994), (Mahboubi et Darmont, 2008), (Navathe et
-Ra, 1989) et l’autre travaille sur le problème de placement (Apers, 1988), (Karlapalem et Pun,
-1997), (Mehta et DeWitt, 1997), (Menon, 2005). Cette communauté ne se soucie pas de la gé-
-nération des fragments, elle suppose leur existence. L’inconvénient majeur de cette conception
-est son ignorance de l’interdépendance entre la fragmentation et l’allocation. Étant donné que
-les fragments générés par le processus de fragmentation sont l’une des entrées du problème
-d’allocation et que la fragmentation et l’allocation cherchent souvent à optimiser un ensemble
-de requêtes, nous proposons dans cet article une approche traitant conjointement le problème
-de fragmentation et de placement. Un algorithme d’équilibrage de charge entre les noeuds est
-proposé. A notre connaissance, ce travail est le premier qui offre une solution complète de
-conception d’un entrepôt de données parallèles : fragmentation, allocation et équilibrage de
-charge.
-Ce papier est divisé en six sections : la section 2 résume l’approche itérative de conception
-d’un entrepôt de données parallèle, plus précisément le problème de fragmentation horizontale
-dans un entrepôt de données centralisé et le problème d’allocation. La section 3 décrit notre
-démarche de conception conjointe d’un entrepôt de données parallèle, où un algorithme gé-
-nétique est décrit. La section 4 décrit l’algorithme de traitement de requêtes sur les fragments
-alloués sur une machine parallèle de type Shared Nothing qui équilibre la charge. La section
-5 montre les résultats expérimentaux obtenus en utilisant le banc d’essai APB-1 release II. La
-section 6 conclut le papier en récapitulant les résultats principaux et en suggérant des travaux
-futurs.
-2 État de l’Art
-Dans cette section, nous décrivons les principaux travaux sur la fragmentation et l’alloca-
-tion proposés dans le cadre des entrepôts de données parallèles (Furtado, 2004), (Stöhr et al.,
-2000) et (Stöhr et Rahm, 2001).
-Dans (Stöhr et al., 2000), les auteurs proposent une approche de construction et d’exploita-
-tion d’un entrepôt de données sur une machine parallèle de type shared disk ayant K disques.
-L’entrepôt considéré est modélisé par un schéma en étoile caractérisé par une table de faits
-volumineuse et un nombre de tables de dimension de petite taille. Ils ont proposé une approche
-de fragmentation qui décompose la table des faits en utilisant une méthode de partitionnement
-appelée Fragmentation Hiérarchique Multidimensionnelle. Elle consiste à fragmenter la table
-de faits en utilisant plusieurs attributs de tables de dimension. Chaque table de dimension est
-fragmentée virtuellement en utilisant le mode intervalle (Range partitioning) sur des attributs
-appartenant à des niveaux plus bas de la hiérarchie. Les tables dimensions et leurs index (B*-
-arbre) sont répliquées sur chaque disque de la machine parallèle. Pour accélérer les requêtes,
-des index de jointure en étoile entre les tables de dimension et la table des faits sur des attributs
-appartenant à des niveaux plus hauts de la hiérarchie sont définis.
-Fragmentation et Allocation dans les Entrepôts de Données
-Le processus d’allocation concerne alors les fragments de la table des faits et les index de
-jointure définis. Notons que le nombre de fragments générés N peut être largement supérieur
-au nombre de disquesK. Pour soutenir un degré de parallélisme élevé et un bon équilibrage de
-la charge, une allocation circulaire des fragments de la table des faits sur les disques est utilisée.
-Les index de jointure binaires définis sur le même fragment sont placés consécutivement sur
-les disques afin de permettre un parallélisme intra-requêtes. Par exemple, si le fragment fragi
-de la table des faits est placé sur le disque j, tous les k index de jointure qui lui sont associés
-sont placés sur les disques j, j+1, ..., j+k−1modulo d. A la fin de leur papier, certaines di-
-rectives pour les concepteurs d’entrepôts de données parallèles ont été recommandées : exclure
-tous les schémas de fragmentation qui ne respectent pas les contraintes suivantes : (i) le nombre
-des index binaires autorisés que l’administrateur souhaite matérialiser, (ii) le nombre de frag-
-ments des tables des faits générés que l’administrateur souhaite avoir, (iii) la taille de disque
-de chaque noeud, (vi) éviter que le nombre de fragments générés soit inférieur au nombre
-de disques. Malheureusement, ces recommandations n’ont pas toutes été prises en considéra-
-tion dans leurs algorithmes de fragmentation et d’allocation. Dans le Warlock (Stöhr et Rahm,
-2001), certaines recommandations, comme le nombre des fragments de la table des faits ont
-été prises en compte.
-Dans (Furtado, 2004) ; une stratégie de placement de données consistant à partitionner ho-
-rizontalement la table des faits et les grosses tables de dimension ensuite les allouer sur les
-noeuds en utilisant une distribution circulaire ou aléatoire est proposée. Les tables de petite
-taille sont répliquées sur tous les noeuds. Les tables de dimension plus importantes sont frag-
-mentées par hachage selon leurs clés primaires. La table des faits est à son tour partitionnée par
-hachage en utilisant les clés étrangères. Cette fragmentation ne prend pas en considération des
-exigences de requêtes de jointure en étoile ((i) des sélections sur les tables de dimension et (ii)
-des jointures entre la table des faits et les tables de dimension). (Mahboubi et Darmont, 2008)
-proposent une approche de fragmentation des entrepôts de données XML. Les fragments gé-
-nérés sont ensuite alloués sur des grilles de calcul. (Lima et al., 2009) proposent une approche
-de conception d’un entrepôt relationnel sur clusters de données. Un cluster de base de données
-est un ensemble de machines chacune a son propre SGBD, inter connectées par une couche
-middleware. Elles gèrent une base de données et exécutent des requêtes. Le problème traité
-par (Lima et al., 2009) est comment allouer d’une manière efficace les données sur les diffé-
-rentes machines. Deux solutions peuvent exister : répliquer totalement la base de données sur
-toutes les machines, ou partitionner les données sur les machines. Leur contribution consiste à
-combiner la fragmentation et la réplication. La table des faits est partitionnée et les tables de
-dimensions sont totalement répliquées. Les auteurs ne contrôlent pas le nombre de fragments
-générés comme dans (Stöhr et al., 2000).
-Dans les travaux cités, les processus de partitionnement et d’allocation se font d’une ma-
-nière séquentielle (itérative).
-3 Les Étapes de l’Approche Itérative
-Dans cette section, nous décrivons brièvement les principes de base des deux processus de
-la conception itérative ; à savoir la fragmentation et l’allocation.
-La fragmentation horizontale constitue le coeur de la conception d’un entrepôt de don-
-nées parallèle. Dans le contexte des entrepôts de données relationnels, elle consiste à dé-
-S. Benkrid et al.
-composer réellement ou virtuellement les tables de dimension en utilisant la fragmentation
-primaire (en exploitant les prédicats de sélection définis dans les requêtes) ensuite utiliser
-leurs schémas de fragmentation pour décomposer la table des faits (Bellatreche et al., 2008;
-Stöhr et al., 2000). Cette méthodologie de fragmentation peut générer un nombre impor-
-tant de fragments de la table des faits (Bellatreche et al., 2008). Pour éviter l’explosion de
-ce nombre, nous offrons à l’Administrateur de l’Entrepôt de Données (DBA), la possibilité
-de choisir un nombre des fragments maximal (seuil W ) qu’il souhaite avoir (pour plus de
-détails sur cette méthodologie, consulter (Boukhalfa et al., 2008)). Pour illustrer cette dé-
-marche de fragmentation, nous considérons un schéma en étoile avec trois tables de dimen-
-sion : Client, Temps et Produit et une table de fait Ventes. Supposons que la table de dimen-
-sion Client est fragmentée en trois fragments Client1, Client2 et Client3 définis par les
-clauses suivantes : Client1 = σV ille=′′Alger′′(Client), Client2 = σV ille=′′Paris′′(Client)
-et Client3 = σV ille=′′Montpellier′′(Client). En conséquence, la table peut être fragmentée en
-trois fragments V ente1, V ente2 et V ente3 définis comme suit : V entei = V ente⋉ Clienti
-(1 ≤ i ≤ 3) (⋉ représente l’opération de semi jointure). Cette méthodologie de fragmen-
-tation a été proposée dans le contexte centralisé, où l’objectif principal est d’optimiser une
-charge de requêtes Q = {Q1, Q2, ..., Qn} (chaque requête Qi a une fréquence d’accès fi).
-Plusieurs algorithmes de fragmentation horizontale ont été proposés dans la littérature (Bella-
-treche et al., 2006, 2008; Mahboubi et Darmont, 2008; Stöhr et al., 2000; Furtado, 2004). Le
-problème de fragmentation dans les entrepôts de données est NP-complet (Bellatreche et al.,
-2008). Soit F = {F1, ..., FK} l’ensemble des fragments horizontaux générés par le processus
-de fragmentation.
-Ensemble 
-des requêtes
-Fragmentation de l’entrepôt
-Schéma de fragmentation 
-Schéma d’allocation
-Allocation des fragmentations
-Entrepôt
-Seuil W
-Nombre de nœuds
-Stockage/nœud
-Modèle de Coût 
-pour la Fragmentation
-Modèle de Coût 
-pour l’Allocation
-FIG. 1 – Les étapes de l’approche de conception itérative
-Le processus de placement quant à lui consiste à trouver une distribution optimale de F sur
-l’ensemble de noeudsN de la machine parallèle afin d’améliorer la performance de l’ensemble
-de requêtes. Ce problème d’allocation est NP-complet (Saccà et Wiederhold, 1985; Karlapalem
-et Pun, 1997). Cependant, la plupart des approches existantes d’allocation dans le contexte
-des bases de données parallèles alloue des fragments en utilisant des techniques comme le
-Fragmentation et Allocation dans les Entrepôts de Données
-round robin (placement circulaire) ou le placement par hachage (Furtado, 2004). La Figure
-1 résume l’approche itérative de la conception des entrepôts de données parallèles. Une des
-conséquences de cette conception itérative est l’utilisation de deux modèles de coût ; un utilisé
-pour assurer la qualité du schéma de fragmentation et le deuxième assurant un placement
-optimal (ou quasi optimal) des fragments sur les noeuds.
-4 Notre Approche de Conception d’un Entrepôt Parallèle
-Dans cette section, nous présentons une formalisation de notre approche de conception
-des entrepôts de données parallèles, où la fragmentation et l’allocation se font simultanément
-comme un problème d’optimisation à contrainte ensuite un algorithme de fragmentation et
-d’allocation pour le résoudre.
-4.1 Formalisation de Notre Problème
-Étant donné :
-– Un entrepôt de données composé de d tables de dimension {D1, ...,Dd} et d’une table de
-faits F . Comme dans (Furtado, 2004; Lima et al., 2009), nous supposons que toutes les
-tables de dimension sont répliquées sur tous les noeuds et résident dans leurs mémoires
-centrales.
-– Un ensemble de charge de requêtes Q = {Q1, Q2, ..., Qn} exécuté sur une machine
-parallèle Shared Nothing àM noeuds N = {N1, N2, ..., NM}. Chaque noeud Ni (1 ≤
-i ≤M) possède une capacité de stockage STi.
-– Une contrainte de maintenance W représentant le nombre de fragments de l’entrepôt
-que le DBA considère pertinents pour le processus d’allocation. Ce nombre doit être
-largement supérieur au nombre de noeuds (voir les recommandations de (Stöhr et al.,
-2000) dans Section 2).
-Le problème de conception d’un entrepôt de données parallèle consiste à fragmenter la table
-des faits en N fragments et à les allouer simultanément afin de réduire le coût d’exécution de
-requêtes sur les noeuds de la machine parallèle. Figure 2 illustre les étapes de notre approche.
-Nous constatons l’existence d’un seul modèle de coût contrairement à l’approche itérative.
-Pour répondre à ce problème, nous proposons dans la section suivante un algorithme de
-sélection des schémas de fragmentation et d’allocation.
-4.2 Algorithme de Conception
-Étant donné que notre démarche partitionne l’entrepôt de données et en même temps, elle
-alloue les fragments, il nous faut une procédure de fragmentation et une autre d’allocation. Pour
-la fragmentation, nous avons adopté notre algorithme génétique pour fragmenter l’entrepôt de
-données (Bellatreche et Boukhalfa, 2005). Les grandes étapes de cet algorithme sont décrites
-dans la Figure 3.
-Au démarrage de l’algorithme génétique, nous générons une population initiale d’une ma-
-nière aléatoire. Pour chaque individu généré 1, nous vérifions s’il satisfait la contrainte de
-1Un individu représente un schéma de fragmentation de la table des faits et les tables de dimension
-S. Benkrid et al.
-Ensemble 
-des requêtes
-Fragmentation de l’entrepôt
-& Allocation des fragments
-1. Schéma de fragmentation
-2. Schéma d’allocation
-Entrepôt
-Seuil W
-Nombre de nœuds
-Stockage/nœudModèle de Coût 
-FIG. 2 – Les étapes de l’approche de conception conjointe
-maintenance (W ). Si c’est le cas, il sera gardé dans la population. Dans le cas contraire, des
-opérations de fusions sont effectuées afin de réduire son nombre de fragments. Une fois la
-population initiale créée, notre algorithme effectue des opérations génétiques (croisement et
-mutation) afin d’améliorer la population. Il est à noter que nous gardons le même principe
-de sélection, croisement et mutation que dans (Bellatreche et Boukhalfa, 2005). L’applica-
-tion de ces opérations est contrôlée par une fonction d’évaluation. Dans (Bellatreche et Bou-
-khalfa, 2005), cette dernière calcule le coût d’exécution de la charge de requêtes en utilisant le
-schéma de fragmentation proposé par chaque individu. Dans notre cas, cette fonction alloue les
-fragments de chaque individu sur les différents noeuds en calculant le coût d’exécution de la
-charge de requêtes sur les fragments placés. A la fin, nous considérons l’individu générant un
-bon schéma de placement. Dans la section suivante, nous décrivons la procédure d’allocation
-utilisée pour placer chaque chromosome.
-Chromosome
-Evaluation
-Résultat
-Sélection
-Croisement/Mutation
-Fin
-OuiNon
-Allocation
-Fragmentation
-FIG. 3 – Étapes de base d’un Algorithme Génétique
-Fragmentation et Allocation dans les Entrepôts de Données
-4.3 Procédure d’allocation des fragments
-Lors de l’évaluation de chaque solution candidate de la fragmentation, nous allouons ses
-fragments sur les différents noeuds. Cette allocation est basée sur les affinités entre les frag-
-ments. Nous avons emprunté cette idée de travaux de (Navathe et Ra, 1989) consacrés à la
-génération des fragments verticaux des tables traditionnelles 2. Contrairement à (Navathe et
-Ra, 1989) qui regroupent des attributs ayant des grandes affinités dans le même fragment ver-
-tical, nous regroupons les fragments de la table des faits ayant une faible affinité. Ce type de
-regroupement augmente le parallélisme entre les noeuds. Les étapes de notre algorithme d’al-
-location sont :
-1. Construction de la Matrice d’Usage des Fragments (MUF) : elle décrit l’utilisation des
-fragments de la table des faits par les requêtes. Les lignes et les colonnes de cette matrice re-
-présentent respectivement les requêtes et les fragments. La valeur de l’élément de la ligne i
-et la colonne j a pour valeur 1 si le fragment j est accédé par la requête i, sinon celle valeur
-est nulle. Cette matrice est complétée par une valeur de fréquence d’accès pour chacune des
-requêtes présentée dans une colonne supplémentaire.
-2. Construction de la Matrice d’Affinité des Fragments (MAF) : elle a N lignes et N colonnes
-correspondant aux fragments de la table des faits. La valeur de l’élément de la ligne i et la
-colonne j reporte les valeurs d’affinité définis entre ces fragments. Cette affinité correspond
-à la somme des fréquences d’accès des requêtes accédant simultanément aux deux fragments.
-Cette matrice est symétrique.
-3. Regroupement des fragments : pour regrouper des fragments, nous générons un graphe com-
-plet et étiqueté, appelé "graphe d’affinité des fragments". Les noeuds de ce graphe représentent
-les fragments. Une arête entre deux fragments représente la valeur d’affinité. Nous parcourons
-ce graphe pour former des cycles, où chacun contient des fragments ayant une faible affinité.
-Chaque cycle devient l’unité d’allocation.
-4. Construction de la Matrice d’Allocation des Fragments (MALF) : elle représente la présence
-des fragments sur les noeuds. Les lignes et les colonnes de cette matrice sont associées aux N
-fragments obtenus par le schéma de fragmentation en cours d’évaluation et les M noeuds.
-L’algorithme ci-dessous remplit la MALF.
-A partir de l’ensemble de cycles C = {C1, ..., Ck}, la procédure d’allocation place les
-cycles d’une manière circulaire sur les noeuds. Chaque fragment appartient à un seul cycle et
-le cycle est alloué à un seul noeud. Notre unité de placement circulaire est le cycle (qui contient
-un ensemble de fragments), contrairement aux travaux existants (Stöhr et al., 2000; Furtado,
-2004), où l’unité de placement est un fragment.
-Une fois la table d’allocation des fragments construite, nous calculons le coût d’exécu-
-tion de la charge Q sur les M noeuds. Nous ne prenons pas en compte le temps CPU et le
-coût de communication que nous supposons négligeables par rapport au temps nécessaire pour
-effectuer les entrées sorties (E/S). En conséquence, notre modèle de coût estime le nombre
-d’E/S nécessaires (exprimé en nombre de pages chargées) pour exécuter la charge de requêtes
-exécutée sur la machine parallèle. Ce coût est donné par :
-n∑
-k=1
-M∑
-j=1
-N∑
-i=1
-MUFki ×MALFij × |Fi| (1)
-2Un fragment vertical est constitue d’un ensemble d’attributs de la table à fragmenter
-S. Benkrid et al.
-Entrée : C = {C1, ..Ck} ensemble de cycles,M
-Sortie : MALF
-indicenode := 0 ;
-pour chaque Ci ∈ C faire
-pour chaque e ∈ F faire
-si e ∈ Ci alors
-MALF [e][indicenode] := 1
-sinon
-MALF [e][indicenode] := 0
-fin
-fin
-indicenoeud := indicenoeud+ 1 ;
-si indicenoeud =M alors
-indicenoeud := 0
-fin
-fin
-Algorithme 1: Algorithme d’allocation des cycles
-Avec n,M,N et |Fi| représentent respectivement le nombre de requêtes, le nombre de noeuds,
-le nombre des fragments et taille du fragment Fi. Ceci revient à minimiser :
-n∑
-k=1
-max(
-M∑
-j=1
-N∑
-i=1
-MUFki ×MALFij × |Fi|) (2)
-5 Traitement des requêtes et équilibrage de charges
-Dans cette section, nous nous intéressons au problème d’équilibrage de charge entre les
-différents noeuds de la machine parallèle. Nous supposons que la fragmentation et l’allocation
-soient établies. Pour exécuter une requête donnée, on doit d’abord identifier les partitions va-
-lides ensuite leurs localisations. L’architecture orchestrant le processus d’exécution de requêtes
-est décrite dans la Figure 4. Cette architecture contient un noeud de soumission, également ap-
-pelé coordinateur dont le rôle est la vérification si la charge de requêtes est distribuée d’une
-manière équitable sur l’ensemble des noeuds. Si c’est le cas, il décompose la requête en sous
-requêtes, et il les envoie sur leurs noeuds d’exécution. Dans le cas contraire, il redistribue la
-charge et il envoie les sous requêtes. Une fois que le traitement s’achève au niveau d’un noeud
-de traitement, ce dernier transmet son résultat au noeud de soumission (le résultat transmis
-représente un résultat partiel pour la requête). Le noeud de soumission s’occupe de la collecte
-des résultats ainsi que leur fusion pour avoir le résultat final de l’exécution de la requête.
-L’équilibrage de charge représente un enjeu important pour atteindre une haute perfor-
-mance d’un entrepôt de données parallèle. Si ce dernier n’est pas équilibré, nous devons redis-
-tribuer les fragments des noeuds surchargés dénotés par NSUR sur les noeuds sous chargés
-dénotés par NSOUS. Cette distribution peut être formalisée comme suit :
-Étant donné la matrice d’allocation des fragmentsMALF , l’ensemble deM noeuds, une ma-
-trice de communication ayant M lignes et M colonnes correspondant aux noeuds. La valeur
-Fragmentation et Allocation dans les Entrepôts de Données
-1. Réécriture de requêtes
-2. Equilibrage de charge 5. Collecte des résultats
-6. Fusion des résultatsMALF
-C
-O
-O
-R
-D
-I
-N
-A
-T
-E
-U
-R
-Réseau d’interconnexion
-Nœuds de Traitement
-NMN2 N3 NM-1N1 NM-2
-3. Envoie
-requêtes 4. Résultats partiels
-Requête Résultat
-FIG. 4 – Traitement de Requêtes et Répartition des Charges
-de l’élément de la ligne i et la colonne j reporte les valeurs le coût de transfert entre les deux
-noeuds. Le problème de la répartition de la charge consiste à offrir un système équilibré as-
-surant un coût de communication minimal. Pour résoudre ce problème, quelques définitions
-s’imposent.
-Définition 1 Un noeud est dit surchargé si son niveau de chargement3 est supérieur à la
-moyenne de chargement 4.
-Définition 2 Un noeud est dit normalement chargé si son niveau de chargement est égal à la
-moyenne de chargement.
-Définition 3 Un noeud est dit sous chargé si son niveau de chargement est inférieur à la
-moyenne de chargement.
-Ces définitions nous permettent de classer les noeuds sur chargés et sous chargés. Une fois
-classés, nous effectuons la migration de fragments de NSUR vers NSOUS à l’aide d’un al-
-gorithme baptisé algo_migration_dynam. Chaque noeud de NSUR Ni est associé à un poids
-PSUR(Ni) représentant le nombre de requêtes qui le rend surchargé. P (Ni) calculée comme
-suit : PSUR(Ni) = niveau de chargement(Ni)- moyenne de chargement. D’une manière iden-
-tique, chaque noeud de NSOUS est associé à poids PSOUS(Nj) représentant le nombre de
-requêtes qu’il peuvent encore recevoir. PSOUS(Nj) calculée comme suit : PSOUS(Ni) =
-moyenne de chargement - niveau de chargement(Nj). Maintenant nous avons tous les ingré-
-dients pour proposer notre algorithme équilibrant les charges des noeuds.
-3Niveau de chargement d’un noeud N = nombre de fragments participants à l’exécution d’une requête Q/ nombre
-de noeuds participants.
-4Moyenne de chargement= nombre de fragments participants / nombre de noeuds de la machine parallèle
-S. Benkrid et al.
-1. Rechercher le noeud Nj ∈ NSUR ayant la plus grande priorité ;
-2. Rechercher le noeud Nk ∈ NSOUS qui minimise le coût de redistribution CT entre Nk et Nj
-3. Transférer le(s) fragment(s) F alloué sur Nj à Nk en mettant à jour la matrice d’allocation des
-fragmentsMALF
-4. Calculer la priorité PSUR(Nj) :
-si PSUR(Nj) = 0 alors
-Supprimer Nj de NSUR et Nk de NSOUS ; aller à 5
-sinon
-Supprimer Nk de NSOUS et aller à 2
-fin
-5. si le système est équilibré5 alors
-aller à fin
-sinon
-aller à 1
-fin
-Algorithme 2: Répartition de charges
-Cet algorithme calcule le coût de transmission (CT) et il l’inclut lors de l’exécution de la
-requête
-CT =
-g1∑
-j=1
-g2∑
-m=1
-g3∑
-l=1
-|Fl| × CC(j,m) (3)
-Avec : g1, g2, g3 et CC représentent respectivement le nombre de noeuds de S, le nombre de
-noeuds de D participants dans l’équilibrage de la charge du noeud j, le nombre de fragments
-alloués sur le noeud j transféré àm et la matrice de transmission.
-6 Étude expérimentale
-Notre programme de simulation a été développé dans un environnement Windows XP en
-Java sur une machine Pentium IV 2.8 GHZ ayant 1 Go de RAM. Nous avons utilisé le banc
-d’essai APB-1 release II (Council, 1998) qui utilise un schéma en étoile contenant quatre tables
-de dimension Prodlevel (9 000 tuples), Custlevel(900 tuples), Timelevel (24 tuples), Chanlevel
-(9 tuples) et une table des faits Actvars (24 786 000 tuples).
-Nous avons considéré 55 requêtes de recherche composées d’un seul bloc (pas de requêtes
-imbriquées) avec 40 prédicats de sélection définis sur 9 attributs (ClassLevel, GroupLevel,
-FamilyLevel, LineLevel, DivisionLevel, YearLevel, MonthLevel, RetailerLevel, AllLevel). Les
-domaines de valeurs de ces attributs sont décomposés en 4, 2, 5, 2, 4, 2, 12, 4, et 5 sous
-domaines. Chaque prédicat possède un facteur de sélectivité calculé sur l’entrepôt réel.
-Nous considérons une machine parallèle Shared Nothing de 12 noeuds. La taille de la
-page système au niveau de chaque noeud est de 65536 Octets. Nous avons utilisé un taux
-de croisement de 80%, un taux de mutation de 20% pour améliorer 20 chromosomes des 10
-générations comme paramètres de l’algorithme générique
-La première expérience que nous avons effectuée étudie l’impact du critère de construc-
-tion de cycle de fragments sur la performance de requêtes. Rappelons que l’unité d’allocation
-de notre procédure de placement est un cycle de fragments. Pour générer un cycle, notre pro-
-cédure choisit aléatoirement un fragment ensuite elle essaye d’enrichir le cycle par l’ajout
-Fragmentation et Allocation dans les Entrepôts de Données
-FIG. 5 – Étude de l’impact du Seuil de Gé-
-nération des Cycles : Variance vs. Moyenne
-FIG. 6 – Cycles avec basse affinité vs. Cycles
-avec haute Affinité
-d’autres fragments. Un nouveau fragment fera partie du cycle initial s’il vérifie un critère d’ac-
-ceptation. Dans notre travail, nous avons utilisé deux critères d’acceptation : la moyenne et la
-variance. Pour accepter un nouveau fragment dans le cycle initial il faut que son affinité soit
-inférieure ou égale à la moyenne (ou la variance) des noeuds formant le cycle initial. Pour
-réaliser cette étude, nous avons fixé le seuil de fragmentation à 200 (W = 200), et nous avons
-varié les noeuds de 1 à 8 et pour chaque valeur nous calculons le nombre d’E/S nécessaire pour
-l’exécution des 55 requêtes.
-Figure 5 montre que les deux critères (moyenne et la variance) donnent pratiquement les
-mêmes résultats, avec un léger avantage à la moyenne. En conséquence, nous utilisons ce
-critère dans la suite des expérimentations.
-Nous avons également étudié l’impact de critères de regroupement des fragments. L’al-
-gorithme de (Navathe et Ra, 1989) que nous avons adapté à notre étude, génère des cycles,
-où chacun contient des attributs ayant une grande affinité. Dans notre cas, nous générons des
-cycles où chacun contient des fragments de faible affinité. Nous avons mené deux expérimen-
-tations pour étudier la qualité de notre approche selon le type d’affinité. Figure 6 présente les
-résultats de cette comparaison où nous avons considéré un seuil de fragmentation de 200. Nous
-avons fait varier le nombre de noeuds de 1 à 7 et pour chaque valeur, nous calculons le nombre
-d’E/S nécessaire pour exécuter les 55 requêtes par chaque algorithme. Nous remarquons que
-l’allocation avec basse affinité est légèrement meilleure que celle avec haute affinité. Cela est
-dû au fait que le regroupement selon les affinités les plus basses augmente le degré du paral-
-lélisme. En conséquence, nous optons pour un regroupement à basse affinité pour le reste des
-expérimentations.
-Figure 7 compare la performance de l’approche itérative et l’approche conjointe. Pour cela,
-nous calculons le facteur de rapidité (speed-up) qui mesure la diminution du temps de réponse
-d’une requête pour une taille d’un entrepôt de données constante et une augmentation des ca-
-pacités de la configuration (nombre de noeuds). Pour un seuil de fragmentation de 200, nous
-avons fait varier le nombre de noeuds de 1 à 12 et pour chaque valeur, nous calculons le
-nombre de speed up pour chaque algorithme. Nous remarquons que l’approche conjointe dé-
-tient un speed up linéaire et l’approche itérative possède un speed up sous linéaire. Ce résultat
-S. Benkrid et al.
- 0
- 2
- 4
- 6
- 8
- 10
- 12
- 14
-1 2 3 4 5 6 7 8 9 10 11 12
-SP
-EE
-D 
-UP
-NOEUDS
-approche iterative
-approche conjointe
-speed up ideal
-FIG. 7 – Comparaison du speed up des ap-
-proches itérative et conjointe
-FIG. 8 – Effet du Seuil de Fragmentation sur
-la Performance
-confirme que l’approche conjointe est plus adaptée à la conception d’un entrepôt de données
-parallèle que l’approche itérative. De plus, le speed up de l’approche combinée n’est pas idéal
-(speed(p)=p) cela est dû à l’absence d’un module d’équilibrage de charge.
-Figure 8 étudie l’effet du seuil de fragmentation sur la performance de notre approche. Pour
-cela, nous fixons le nombre de noeuds à 10 et nous faisons varier le seuil de fragmentation
-W de 50 à 300. Nous remarquons que l’augmentation du seuil de fragmentation améliore
-considérablement la performance des requêtes car en relâchantW , plus d’attributs sont utilisés
-pour fragmenter l’entrepôt. Lorsque W est grand, les domaines sont décomposés en plus de
-partitions et donc chaque partition est moins volumineuse. Cela implique moins de données
-chargées pour exécuter les requêtes utilisant les attributs de fragmentation. En conséquence,
-nous concluons que le nombre de fragments et d’E/S sont proportionnels au nombre d’attributs
-de fragmentation utilisés et le nombre de noeuds de la machine parallèle.
-Figure 9 étudie la charge des noeuds (qui sont 8). Nous supposons que les schémas de
-fragmentation et d’allocation sont générés. Nous remarquons que la charge de travail n’est pas
-distribuée d’une manière équilibrée. Cette expérimentation confirme la nécessité d’un module
-d’équilibrage de charge ; le noeud N4 par exemple est moins chargé que les deux premiers.
-Figure 10 étudie le comportement de notre approche avec la prise en compte du module
-équilibrage de charges. Pour un seuil de fragmentation de 200, nous avons varié le nombre de
-noeuds de 1 à 12 et pour chaque valeur nous calculons le facteur de rapidité (speedup) pour
-exécuter les 55 requêtes après l’ajout d’équilibrage de charges. Nous remarquons que le speed
-up est linéaire pour les deux cas. Le speed up pour l’approche combinée avec équilibrage de
-charge est prés d’être idéale vue que nous négligeons le coût de communication.
-7 Conclusion & perspective
-La taille des entrepôts de données a explosé durant les dernières années. Afin d’accélérer
-les requêtes complexes, le traitement parallèle est devenu une nécessité. La conception d’un
-entrepôt de données parallèle passe par cinq étapes : le choix de l’architecture matérielle, la
-Fragmentation et Allocation dans les Entrepôts de Données
-FIG. 9 – Répartition des Charges
-FIG. 10 – Speedup des Approches Équilibrée
-et non Équilibrée
-fragmentation, l’allocation des données, le traitement des requêtes et la répartition de la charge
-entre les noeuds. La majorité des travaux sur la conception des entrepôts de données parallèles
-traite la fragmentation et l’allocation d’une manière séquentielle. Dans ce papier, nous avons
-montré l’intérêt de traiter ces deux problèmes d’une manière simultanée. Ensuite nous avons
-proposé un algorithme composé de deux procédures, une pour fragmenter l’entrepôt de don-
-nées et l’autre pour allouer les fragments générés. La décision de placement se fait lors de la
-fragmentation. Un algorithme d’équilibrage de charge est présenté. Les algorithmes proposés
-sont validés en utilisant les données du banc d’essai ABP1. Les résultats obtenus sont encou-
-rageants. Pour Une fois le schéma d’allocation et de fragmentation sélectionné, nous avons
-présenté une méthode d’équilibrage de charge pour atteindre la haute performance du système.
-Notons que ce travail est, à notre connaissance, le premier qui propose une solution intégrant
-la fragmentation et l’allocation avec un équilibrage de charge.
-Pour les travaux futurs, il serait intéressant d’adapter les algorithmes que nous avons pro-
-posés dans le contexte dynamique. Une autre piste intéressante à explorer est de formaliser
-notre problème comme un problème d’optimisation multi objectifs, i.e., le premier objectif re-
-présenterait le coût d’exécution de requêtes tandis que le deuxième représenterait l’équilibre
-de la charge.
+La norme XML (eXtensible Markup Language) s'impose comme le nouveau stan-
+dard de transport des données. Son succès est dû à sa capacité de décrire toutes sortes
+de données à travers les concepts de DTD (Document Type Definition) ou de schémas
+XML qui sont de véritables grammaires. Il devient donc essentiel de mettre en place des
+techniques appropriées pour extraire et exploiter les informations contenues dans ces
+documents. La fouille de données dans les documents XML [Garofalakis et al., 1999]
+se divise en fouille sur le contenu (XML Content Mining) et en fouille à partir de
+la structure (XML Structure Mining). La fouille sur le contenu utilise habituellement
+les techniques de text mining. Certains auteurs [Braga et al., 2002] se sont notamment
+intéressés à l'extraction de règles d'association. Néanmoins, ces travaux ont très peu
+pris en compte, voir pas du tout, l'aspect hiérarchique existant entre les balises. L'in-
+térêt de la fouille à partir de la structure des documents XML (structure intra et
+inter-documents) [Nayak et al., 2002] porte sur l'information que véhicule l'organisa-
+tion hiérarchique des balises. Certains travaux [Moh et al., 2000] ont porté sur l'extrac-
+tion d'une DTD à partir d'un ensemble de documents XML de même structure. Ces
+deux approches, jusqu'à présent séparées, sont complémentaires. Il nous paraît donc
+judicieux d'orienter la fouille sur le contenu grâce aux connaissances extraites à partir
+de la structure. Pour cela, nous souhaitons dégager les liens existants entre les balises
+(qu'elles soient ou non imbriquées) et utiliser ces résultats pour étudier leur contenu.
+Dans cet article, nous présentons la première étape de cette démarche, l'extrac-
+tion de règles d'association à partir de la structure d'un ensemble de documents XML.
+Les règles d'association ont prouvé leur efficacité dans la découverte de relations inté-
+ressantes parmi une grande masse de données [Agrawal et al., 1993]. La méthode que
+nous proposons permet non seulement de gérer les aspects hiérarchiques des documents
+Fouille de données à partir de documents XML
+XML mais aussi d'améliorer les mécanismes d'extraction de ces règles. Or, l'extraction
+des règles d'association à partir de documents XML pose des problèmes liés au format
+des données et à la gestion de la hiérarchie entre les balises. Pour palier ces problèmes,
+nous proposons un pré-formatage des données et la création d'une DTD minimale re-
+présentant la hiérarchie de l'ensemble des balises rencontrées. Nous présentons ensuite
+l'algorithme Apriori et l'algorithme classique d'extraction de règles d'association adap-
+tés à nos structures de données. Enfin, nous donnons les résultats obtenus sur un corpus
+de documents XML avec le prototype développé. Ces résultats valident notre approche
+puisque les temps de traitement et la qualité des règles extraites sont améliorés par
+rapport à un système n'utilisant pas de DTD minimale.
+2 Spécificités des documents XML
+Nous constatons un certain nombre de problèmes spécifiques liés aux documents
+XML. Contrairement à un contexte relationnel, le format de ces documents n'est pas
+adapté aux algorithmes "classiques" de recherche d'itemsets fréquents et d'extraction
+de règles d'association. Ainsi, pour pouvoir appliquer ces algorithmes, il faut extraire les
+informations sur les balises et structurer ces informations pour les rendre exploitables.
+Ce format spécifique impose de mettre en place des outils appropriés de gestion de
+la hiérarchie, afin de tirer pleinement profit de l'information supplémentaire contenue
+dans l'organisation hiérarchique des balises.
+D'autre part, une même balise peut être renseignée plusieurs fois dans un même
+document et à des niveaux hiérarchiques différents. Il faut donc gérer ces balises sans
+introduire de redondance dans les traitements et sans perdre d'information sur la struc-
+ture hiérarchique des balises.
+3 Fouille à partir de la structure des documents XML
+Notre démarche consiste à pré-formater les données XML afin de les rendre ex-
+ploitables par les algorithmes classiques de fouille et mettre en place des structures
+adéquates pour la gestion de la hiérarchie entre les balises. Nous appliquons l'algo-
+rithme Apriori adapté à nos strucutres pour la recherche d'itemsets fréquents. Enfin,
+les règles d'association sont extraites et les résultats sont présentés sous forme de do-
+cuments XML.
+3.1 Pré-formatage des données
+La première tâche du pré-formatage consiste à extraire les balises. Ceci est effectué
+à l'aide du parseur événementiel SAX qui déclenche un traitement à chaque début
+ou fin d'un document ou d'un élément (balise). Au début d'un document, le parseur
+collecte des informations sur son nom, son chemin (en local ou sur internet) et le
+nombre de balises qu'il contient. Au début d'un élément, il collecte son nom et son
+nombre d'occurrences dans l'ensemble des documents (une balise est comptabilisée une
+seule fois par document) ainsi que son (ses) parent(s) et son (ses) enfant(s) dans
+l'arbre du document. A la fin du document, il enclenche l'archivage de celui-ci dans
+une liste chaînée. De même, à la fin d'un élément, la balise est archivée dans une autre
+liste chaînée. Si elle existe déjà dans cette liste, ses informations sont alors complétées
+par la nouvelle occurrence. Ainsi, si une balise apparaît plusieurs fois, elle ne sera
+archivée qu'une seule fois mais l'information sur sa hiérarchie est conservée. Soient les
+documents "sampl1.xml" et "sampl2.xml" et les résultats obtenus pour la balise jour
+et le document "sampl2.xml" :
+RNTI - E - 2
+Fouille de données à partir de documents XML A. Duffoux et al.
+<Personne> <Personne>
+<Nom> Dupont </Nom> <Nom> Martin </Nom> Nom Balise = "Jour"
+<Prénom> Marie </Prénom> <Naissance> Nb d'occurences = 2
+<Naissance> <Jour> 29 </Jour> (comptée une fois par document)
+<Jour> 12 </Jour> <Mois> février </Mois> Parents = {Naissance, Décès}
+<Mois> décembre </Mois> <Année> 1970 </Année> Enfants = ensemble vide
+<Année> 1930 </Année> </Naissance>
+</Naissance> <Décès> Nom Document= "Sampl2.xml
+</Personne> <Jour> 4 </Jour> Chemin = "C ://Exemple
+<Mois> mars </Mois> Nombre de balises = 7
+<Année> 2002 </Année>
+</Décès>
+</Personne>
+Lors de l'analyse des documents par le parseur SAX, une matrice booléenne est
+constituée indiquant si une balise est renseignée ou non dans un document. Cette
+matrice permettra d'accéder rapidement aux balises composant un document ou aux
+documents comprenant une balise donnée.
+3.2 Gestion de la hiérarchie
+Afin de gérer les liens hiérarchiques existants entre les balises, nous mettons en place
+des structures de données spécifiques dont la principale est la DTD minimale. Une DTD
+est une grammaire contenant la description de la structure des documents XML qui
+lui sont attachés. Dans notre cas, nous n'avons qu'un sous-ensemble des documents
+XML respectant un même schéma. Nous créons, à partir de ce sous-ensemble, une
+DTD contenant uniquement les balises rencontrées en ne prenant en compte que leurs
+caractéristiques effectives. Ainsi, nous obtenons la DTD minimale pour l'ensemble des
+documents analysés. La construction de cette DTD se fait en plusieurs étapes.
+Nous créons d'abord un arbre de l'ensemble des balises. L'arbre est une repré-
+sentation logique du document XML. Il sert à décrire la hiérarchie de l'ensemble des
+balises lui appartenant. Lors de l'analyse d'un document XML par le parseur, un arbre
+temporaire associé au document est créé selon l'algorithme suivant :
+Création d'une pile vide
+Création d'un arbre contenant uniquement une racine vide
+Tant qu'il reste des balises dans le document faire
+Si Balise ouvrante rencontrée alors
+Si la racine de l'arbre est vide alors ajouter cette balise à la racine
+Sinon ajout de cette balise dans l'arbre sous le noeud représentant
+la balise placée en tête de la pile
+ajout de cette balise au sommet de notre pile
+Fin si
+Sinon ('Balise fermante') suppression du sommet de la pile
+Fin si
+Fin Tant que
+Il sera fusionné dans un arbre général (Fig. 1), où chaque noeud représente une
+balise. La racine correspond à l'élément principal et les feuilles sont les éléments ato-
+miques. Ainsi, une branche de l'arbre représente une imbrication de balises. Notons que
+la liste des balises ne contient qu'une seule occurrence de chaque balise alors que l'arbre
+contient toutes les balises pour assurer une lecture correcte de chaque document.
+Ensuite, nous reconstituons la DTD. L'arbre général représente la structure
+hiérarchique de l'ensemble des balises rencontrées. La DTD indique en plus si une
+balise est conditionnelle, i.e. si elle n'est pas toujours renseignée, ou s'il existe une liste
+de balises. Ces deux conditions sont représentée respectivement par ? et +. Afin de
+reconstituer la DTD minimale, nous allons utiliser l'arbre général et les informations
+RNTI - E - 2
+Fouille de données à partir de documents XML
+Fig. 1  Structure de l'arbre général des documents Sampl1 et Sampl2
+concernant la présence et la fréquence des balises dans chaque document. Notons que
+cette DTD minimale ne contient que des éléments simples, suffisants pour l'utilisation
+qui en est faite. Dans notre exemple, la DTD minimale extraite sera la suivante :
+< ! ELEMENT Personne (Nom, Prénom?, Naissance, Décès ?)>
+< ! ELEMENT Nom(#PCDATA)>
+< ! ELEMENT Prénom(#PCDATA) >
+< ! ELEMENT Naissance (Jour, Mois, Année)>
+< ! ELEMENT Jour(#PCDATA)>
+< ! ELEMENT Mois(#PCDATA)>
+< ! ELEMENT Année(#PCDATA)>
+< ! ELEMENT Décès (Jour, Mois, Année)>
+3.3 Recherche des itemsets fréquents
+En plus de l'adaptation de Apriori à nos structures de données, nous avons ajouté
+des traitements au niveau de la constitution des itemsets candidats afin de prendre en
+compte la structure hiérarchique des documents XML.
+Lors de la constitution des 1-itemsets candidats, nous prenons l'ensemble des ba-
+lises extraites lors de la phase de pré-formatage et nous supprimons celles qui sont
+renseignées dans l'ensemble des documents. Elles n'apportent aucune information sup-
+plémentaire dans notre cas. De plus, on ne sélectionne que les balises qui ne présentent
+pas de redondance par rapport à la hiérarchie grâce à la DTD minimale. Pour l'exemple
+Sampl1 et Sampl2, les balises Jour, Mois et Année sont obligatoirement renseignées si
+Naissance l'est. Elles n'apportent donc aucune information supplémentaire par rapport
+à cette dernière du point de vue de la structure. Nous supprimons donc les balises Jour,
+Mois et Année des 1-itemsets candidats.
+Lors de la constitution de l'ensemble des k-itemsets candidats, nous utilisons égale-
+ment la DTD minimale pour supprimer les redondances. Dans notre exemple, Prénom
+n'est pas forcément renseignée si Personne l'est, elle n'a donc pas été supprimée lors de
+la constitution des 1-itemsets candidats. Or, si un itemset contient à la fois Prénom et
+Personne, il est redondant. Dans ce cas, nous supprimons l'item Personne de l'itemset
+et supprimons, si nécessaire, les doublons.
+3.4 Extraction des règles d'association
+Nous effectuons l'extraction de deux types de règles d'association. Les règles d'as-
+sociation "classiques" sont extraites grâce à l'algorithme "classique" d'extraction
+de règles d'association [Agrawal et al., 1993] adapté à nos structures de données. Les
+règles d'association "hiérarchiques" permettent de représenter la fréquence des
+liens entre des balises directement imbriquées. Chaque balise admettant des balises
+RNTI - E - 2
+Fouille de données à partir de documents XML A. Duffoux et al.
+imbriquées est considérée comme antécédent d'une règle. Toutes les balises imbriquées
+dans celle-ci sont considérées comme conséquence de cette règle. Dans ces deux cas,
+les règles d'association extraites sont présentées sous forme de documents XML.
+En effet, grâce aux fonctionnalités offertes par ce format, il est simple de représenter
+la connaissance extraite. Les résultats en XML respectent la DTD suivante :
+< !ELEMENT Rule(BodyList, HeadList, Support, Confidence)>
+< !ELEMENT BodyList(Body+)>
+< !ELEMENT Body(#PCDATA)>
+< !ELEMENT HeadList(Head)>
+< !ELEMENT Head(#PCDATA)>
+< !ELEMENT Support(#PCDATA)>
+< !ELEMENT Confidence(#PCDATA)>
+4 Expérimentation
+Afin de valider notre méthode, nous avons développé un prototype en Java. Nous
+avons successivement extrait les règles d'association sans et avec utilisation de la DTD
+minimale à partir d'un ensemble de 400 articles du dictionnaire national américain de
+médecine MEDLINE
+r©, distribué en format XML1.
+Lors de la phase d'extraction sans recours à la DTD minimale, pour des valeurs
+de support et de confiance minimum respectivement de 5% et 75%, nous obtenons
+plus de 15 000 règles en 4.234 s (temps CPU). De plus, ces règles présentent de fortes
+redondances par rapport à la hiérarchie. Lors de la phase d'extraction avec recours à la
+DTD minimale, pour les mêmes seuils de support et de confiance, nous obtenons moins
+de 5 000 règles, soit moins du tiers que précédemment. Nous obtenons nos règles en
+2.659 s, soit un gain de temps de 38%.
+Les résultats obtenus sont encourageants puisque lors de l'extraction avec recours
+à la DTD minimale nous n'avons plus de redondances dans les règles extraites. Cette
+suppression a pour conséquence naturelle de diminuer le nombre de ces règles. Ainsi, la
+DTD minimale permet de réduire significativement les temps de traitement. De plus,
+notre méthode sera d'autant plus performante que le nombre de niveaux de hiérarchie
+sera important.
+5 Conclusion et perspectives
+Dans cet article, nous avons présenté une méthode originale d'extraction de règles
+d'association à partir de la structure de documents XML. Cette méthode permet de
+représenter les liens existants entre les balises d'un ensemble de documents XML de
+même structure. Nous avons développé un prototype qui confirme l'apport de notre
+méthode à la tâche d'extraction de règles d'association dans le cadre de la structure
+de documents XML. La DTD minimale permet de réduire de manière significative le
+nombre d'itemsets candidats et d'améliorer le temps de traitement de Apriori. Nous
+obtenons un ensemble restreint de règles pertinentes. Notre travail peut être utile pour
+la mise en place d'une plateforme de gestion des documents XML (réparation et création
+d'une DTD minimale pour des documents n'ayant pas un même schéma).
+Cette extraction constitue une première étape d'une plus large démarche de XML
+Mining. Notre approche va permettre d'orienter la fouille sur le contenu, notamment ce-
+lui des balises ayant un lien entre elles. Enfin, dans une démarche de représentation des
+1
+http ://www.nlm.nih.gov/bsd/licensee/data_elements_doc.html
+RNTI - E - 2
+Fouille de données à partir de documents XML
+données hétérogènes (textes, images, vidéos, sons, ...) dans le format XML[Darmont et al., 2002],
+le recours à cette méthode de fouille s'avère pertinent.
 Références
-Apers, P. M. G. (1988). Data allocation in distributed database systems. ACM Transactions on
-database systems 13(3), 263–304.
-Bellatreche, L. et K. Boukhalfa (2005). La fragmentation dans les entrepôts de données : une
-approche basée sur les algorithmes génétiques. In Entrepôts de Données et Analyse en ligne
-(EDA’05) : Revue des Nouvelles Technologies de l’Information, pp. 141–160.
-Bellatreche, L., K. Boukhalfa, et H. I. Abdalla (2006). Saga : A combination of genetic and
-simulated annealing algorithms for physical data warehouse design. in 23rd British National
-Conference on Databases (BNCOD’06), 212–219.
-S. Benkrid et al.
-Bellatreche, L., K. Boukhalfa, et P. Richard (2008). Data partitioning in data warehouses :
-Hardness study, heuristics and oracle validation. In International Conference on Data Wa-
-rehousing and Knowledge Discovery (DaWaK’2008), pp. 87–96.
-Bouganim, L. (1996). Equilibrage de charges lors de l’exécution de requêtes sur des archi-
-tectures multiprocesseurs hybrides. Phd. thesis, Université de Versailles Saint Quentin en
-Yvelines.
-Boukhalfa, K., L. Bellatreche, et P. Richard (2008). ragmentation primaire et dérivée :
-Étude de complexité, algorithmes de sélection et validation sous oracle10g. Techreport
-http ://www.lisi.ensma.fr/members/bellatreche, LISI/ENSMA.
-Chakravarthy, S., J. Muthuraj, R. Varadarajan, et S. B. Navathe (1994). An objective function
-for vertically partitioning relations in distributed databases and its analysis. in Distributed
-and Parallel Databases Journal 2(2), 183–207.
-Council, O. (1998). Apb-1 olap benchmark, release ii.
-http ://www.olapcouncil.org/research/bmarkly.htm.
-DeWitt, D. J. D., S. Madden, et M. Stonebraker. How to build a high-performance data ware-
-house. http ://db.lcs.mit.edu/madden/high_perf.pdf .
-Furtado, P. (2004). Experimental evidence on partitioning in parallel data warehouses. In
-DOLAP, pp. 23–30.
-Graefe, G. (1994). Volcano - an extensible and parallel query evaluation system. IEEE Tran-
-sactions on Knowledge and Data Engineering (TKDE) 6(1), 120–135.
-Karlapalem, K. et N. M. Pun (1997). Query driven data allocation algorithms for distribu-
-ted database systems. in 8th International Conference on Database and Expert Systems
-Applications (DEXA’97), Toulouse, Lecture Notes in Computer Science 1308, 347–356.
-Lima, A. A. B., C. Furtado, P. Valduriez, et M. Mattoso (2009). Improving parallel olap query
-processing in database clusters with data replication. To appear in Distributed and Parallel
-Database Journal.
-Mahboubi, H. et J. Darmont (2008). Data mining-based fragmentation of xml data warehouses.
-In ACM 11th International Workshop on Data Warehousing and OLAP (DOLAP’08), pp. 9–
-16.
-Mehta, M. et D. J. DeWitt (1997). Data placement in shared-nothing parallel database systems.
-VLDB Journal 6(1), 53–72.
-Menon, S. (2005). Allocating fragments in distributed databases. IEEE Transactions on Pa-
-rallel and Distributed Systems 16(7), 577–585.
-Navathe, S. et M. Ra (1989). Vertical partitioning for database design : a graphical algorithm.
-ACM SIGMOD, 440–450.
-Özsu, M. T. et P. Valduriez (1999). Principles of Distributed Database Systems : Second
-Edition. Prentice Hall.
-Saccà, D. et G. Wiederhold (1985). Database partitioning in a cluster of processors. ACM
-Transactions on Database Systems 10(1), 29–56.
-Stöhr, T., H. Märtens, et E. Rahm (2000). Multi-dimensional database allocation for parallel
-data warehouses. Proceedings of the International Conference on Very Large Databases,
-Fragmentation et Allocation dans les Entrepôts de Données
-273–284.
-Stöhr, T. et E. Rahm (2001). Warlock : A data allocation tool for parallel warehouses. Procee-
-dings of the International Conference on Very Large Databases, 721–722.
+[Agrawal et al., 1993] R. Agrawal, T. Imielinand, et A. Swami. Mining association
+rules between sets of items in large databases. In P. Buneman et S. Jajodia editors,
+editors, SIGMOD93, pages 207216, Washington DC,USA, mai 1993.
+[Braga et al., 2002] D. Braga, A. Campi, M. Klemettinen, et P.L. Lanzi. Mining as-
+sociation rules from xml data. In Data Warehousing and Knowledge Discovery, 4th
+International Conference, DaWaK 2002, volume 2454, pages 2130, Aix-en-Provence,
+France, Septembre 2002. Springer.
+[Darmont et al., 2002] J. Darmont, O. Boussaid, F. Bentayeb, S. Rabaseda, et Y. Zel-
+louf. Multimedia Systems and Applications, volume 22, chapter Web multiform data
+structuring for warehousing, pages 927. Kluwer Academic Publishers, 2002.
+[Garofalakis et al., 1999] M. Garofalakis, Rastogi, S. Seshredi, et K. Shim. Data mining
+and the web :past, present and future. In 2nd International ACM Workshop on Web
+Information and Data Management(WIDM), pages 4347, Kansas city,USA, 1999.
+[Moh et al., 2000] C.H. Moh, E.P. Lim, et W.K. Ng. Dtd-miner : A tool for mining
+dtd from xml documents. In Second International Workshop on Advance Issues
+of E-Commerce and Web-Based Information Systems (WECWIS 2000), page 144,
+Milpitas, California, june 2000.
+[Nayak et al., 2002] R. Nayak, R. Witt, et A. Tonev. Data mining and xml documents.
+In Proceedings of the 2002 International Conference on Internet Computing, Nevada,
+USA, June 2002.
 Summary
-Traditionally, designing a parallel data warehouse consists in first fragmenting its schema
-and then allocating the generated fragments over the nodes of the parallel machine. The main
-drawback of such approach is its ignorance of the interdependency between fragmentation and
-allocation processes. Note that number of fragments is one of the inputs of the allocation prob-
-lem. Both processes optimize the same set of queries defined on the parallel data warehouse.
-In this paper, we propose a new approach for designing parallel relational data warehouses
-supported by a shared nothing architecture, where fragmentation and allocation processes are
-done simultaneously. To ensure a high performance of queries, a load balancing method is pro-
-posed. Finally, a validation of our proposed algorithms using the APB-1 release II benchmark
-is presented.
+XML is created to structure, store and send information. It plays an increasily
+important role in the exchange of data on the Web and elsewhere. A large number of
+software vendors have adopted this standard. Thus, it will be essential for discovering
+new knowledge from many XML documents likely to arise in the next few years. Then,
+there is a great need to apply data mining techniques to retreive and analyse vast
+amount of XML documents.
+Two main and complementary approaches are used to mine XML documents. XML
+content mining and XML strcuture mining. Mining for XML content is especially mi-
+ning for values. Mining for XML strcuture is essentially mining for schema. Since XML
+is semi-structured data, mining for XML strcuture is of interest.
+In this paper, we propose a new method for XML strcuture mining using association
+rules. This approach prensents two main advantages. First, it takes into account the
+hierarchical aspect of the XML documents and secondly, it improves the mechanism of
+rule extracting.
+RNTI - E - 2
