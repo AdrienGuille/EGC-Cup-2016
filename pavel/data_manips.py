@@ -86,10 +86,11 @@ def add_new_columns(df):
             list_affiliations.append(temp)
         df["affiliations"] = list_affiliations
         return df
-
+    df = add_index_column(df)
     df = add_abstract_plus_title(df)
     df = add_affiliations(df)
     df = add_abstract_plus_title_lemmas(df)
+    df = add_citations_column(df)
     df.to_csv("../input/RNTI_articles_export_fixed1347_ids.txt", sep="\t", encoding="utf-8", index=False,
               index_label=False)
 
@@ -184,7 +185,7 @@ def detect_garbage_text(text_path, min_chars=2):
     pass
 
 
-def getfull_pdfs(df):
+def getfull_txts(df):
     # Get pdfs from the interwebz
     download_pdfs(df, what_to_download="full")
 
@@ -211,7 +212,7 @@ def get_doc_emails(doc_id):
     matcho = re.findall(r"@[A-Za-z0-9\._-]+\b", doc_text)
     return matcho
     pass
-def get1page_pdfs(df):
+def get1page_txts(df):
     """
     Get the 1page pdfs for all the papers on df
     :param df:
@@ -238,9 +239,18 @@ def get1page_pdfs(df):
         do_OCR(df, "", 0, list_files=gt)
 
 
-def add_citations_column():
-    migs = GetGScholarInfo()
-    migs.run()
+def add_citations_column(df=None):
+    if df is None:
+        df = get_french_egc_data()
+    migs = GetGScholarInfo(df)
+    return migs.run()
+
+
+def get_french_egc_data(patho="../input/RNTI_articles_export_original.txt"):
+    df = load_data_egc(patho)
+    df = get_EGC_articles(df)
+    df = get_french_articles(df)
+    return df
 
 
 def normalize_affiliations():
@@ -276,18 +286,27 @@ def normalize_affiliations():
               index_label=False)
     return new_affiliations
 
-def main():
-    df = load_data_egc("../input/RNTI_articles_export_original.txt")
+def complete_data_pipeline(datapath="../input/RNTI_articles_export_original.txt", get_pdfs=False):
+    """
+    Gets the pdfs, adds the extra columns to the french egc rows. Saves new df to disk
+    :param datapath: Path of the ORIGINAL (but line 1347 fixed )  file
+    :return:
+    """
+    df = load_data_egc(datapath)
     df = get_EGC_articles(df)
     df = add_lang_column(df)
     df = get_french_articles(df)
-    add_index_column(df)
+    if get_pdfs:
+        get1page_txts(df)
+        getfull_txts(df)
     df = add_new_columns(df)
     normalize_affiliations()
-    get1page_pdfs(df)
-    getfull_pdfs(df)
-    # df = get_EGC_articles(df)
 
+
+def main():
+    pass
+    # df = get_EGC_articles(df)
+    complete_data_pipeline(get_pdfs=True)
 
 if __name__ == "__main__":
     main()
