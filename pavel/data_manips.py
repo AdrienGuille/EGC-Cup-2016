@@ -51,7 +51,7 @@ def download_pdfs(df, what_to_download="1page"):
             logging.info("Downloaded {}".format((f[1]['title']).encode('utf8')))
         except:
             logging.warning('Could not download {0}:{1}'.format(f[1]["id"], (f[1]['title']).encode('utf8')))
-            filo = open("../input/pdfs/1page/{}_URL_INVALID.error".format(f[1]["id"]), "w")
+            filo = open("../input/pdfs/{0}/{1}_URL_INVALID.error".format(what_to_download, f[1]["id"]), "w")
             filo.close()
             #
             # if what_to_download == "full":
@@ -289,24 +289,24 @@ def normalize_affiliations():
 def complete_data_pipeline(datapath="../input/RNTI_articles_export_original.txt", get_pdfs=False):
     """
     Gets the pdfs, adds the extra columns to the french egc rows. Saves new df to disk
-    :param datapath: Path of the ORIGINAL (but line 1347 fixed )  file
+    :param datapath: Path of the ORIGINAL (but line 1347 fixed and "EGC" != " EGC ")  file
     :return:
     """
     df = load_data_egc(datapath)
     df = get_EGC_articles(df)
     df = add_lang_column(df)
     df = get_french_articles(df)
+    df = add_new_columns(df)
+    normalize_affiliations()
     if get_pdfs:
         get1page_txts(df)
         getfull_txts(df)
-    df = add_new_columns(df)
-    normalize_affiliations()
 
 
 def main():
     pass
     # df = get_EGC_articles(df)
-    complete_data_pipeline(get_pdfs=True)
+    complete_data_pipeline(get_pdfs=False)
 
 if __name__ == "__main__":
     main()
