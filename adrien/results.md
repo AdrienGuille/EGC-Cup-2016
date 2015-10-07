@@ -1,166 +1,78 @@
-/Users/adrien/anaconda/bin/python /Users/adrien/GitHub/EGC-Cup-2016/adrien/egc.py
+# coding: utf-8
+import utils
+import networkx as nx
+from scipy import stats
+import numpy as np
 
-#EGC 2016 Cup : results
+__author__ = "Adrien Guille"
+__email__ = "adrien.guille@univ-lyon2.fr"
 
-##Overview of the data
-corpus size: 817
-vocabulary size: 1739
-number of topics: 15
+print'\n#EGC 2016 Cup : results'
 
-###Most relevant words for each topic -> LaTeX table
-topic 0 & réseau, social, communauté, détection, méthode, analyse, interaction, lien\\  
-topic 1 & ontologie, alignement, sémantique, annotation, concept, domaine, owl, entre\\  
-topic 2 & règle, association, extraction, mesure, base, extraire, confiance, indice\\  
-topic 3 & séquence, temporel, événement, série, modèle, évènement, vidéo, spatio\\  
-topic 4 & motif, séquentiel, extraction, contrainte, fréquent, extraire, découverte, donnée\\  
-topic 5 & document, xml, annotation, recherche, information, structure, requête, mots\\  
-topic 6 & utilisateur, web, information, site, système, page, sémantique, comportement\\  
-topic 7 & connaissance, gestion, expert, agent, système, compétence, modélisation, métier\\  
-topic 8 & variable, classification, superviser, méthode, non, classe, apprentissage, sélection\\  
-topic 9 & image, afc, segmentation, recherche, région, objet, classification, satellite\\  
-topic 10 & graphe, voisinage, représentation, interrogation, fouille, sous, visualisation, structure\\  
-topic 11 & donnée, flux, base, requête, cube, fouille, visualisation, entrepôt\\  
-topic 12 & algorithme, arbre, svm, ensemble, décision, nouveau, grand, résultat\\  
-topic 13 & carte, topologique, auto, organisatrice, som, cognitif, probabiliste, contrainte\\  
-topic 14 & texte, corpus, automatique, textuel, partir, méthode, opinion, clr\\  
+print'\n##Overview of the data'
 
-###Overall frequency of each topic -> Pgfplot table
-0	0.036720  
-1	0.068543  
-2	0.067319  
-3	0.057528  
-4	0.055080  
-5	0.051408  
-6	0.104039  
-7	0.067319  
-8	0.088127  
-9	0.036720  
-10	0.045288  
-11	0.138311  
-12	0.074663  
-13	0.039168  
-14	0.069767  
+# Load the topic model : NMF (k=15)
+topic_model = utils.load_topic_model('nmf_15topics_egc.pickle')
+print 'corpus size: %i' % topic_model.corpus.size
+print 'vocabulary size: %i' % len(topic_model.corpus.vocabulary)
+print 'number of topics: %i' % topic_model.nb_topics
 
-##Fading topic: topic #2 (association rule mining)
+print '\n###Most relevant words for each topic -> LaTeX table'
+for topic_id in range(topic_model.nb_topics):
+    word_list = []
+    for weighted_word in topic_model.top_words(topic_id, 8):
+        word_list.append(weighted_word[0])
+    print 'topic %i & %s\\\\  ' % (topic_id, ', '.join(word_list))
 
-###Frequency vs. year -> Pgfplot table
-2004	0.103448  
-2005	0.094595  
-2006	0.118421  
-2007	0.088889  
-2008	0.043478  
-2009	0.053571  
-2010	0.051282  
-2011	0.075758  
-2012	0.080000  
-2013	0.039216  
-2014	0.012821  
-2015	0.041667  
+print '\n###Overall frequency of each topic -> Pgfplot table'
+frequency = topic_model.topics_frequency()
+for topic_id in range(topic_model.nb_topics):
+    print '%i\t%f  ' % (topic_id, frequency[topic_id])
 
-##Emerging topic: topic #0 (social network analysis and mining)
+topic_associations = topic_model.documents_per_topic()
 
-###Frequency vs. year -> Pgfplot table
-2004	0.000000  
-2005	0.013514  
-2006	0.026316  
-2007	0.022222  
-2008	0.010870  
-2009	0.035714  
-2010	0.012821  
-2011	0.030303  
-2012	0.060000  
-2013	0.117647  
-2014	0.089744  
-2015	0.062500  
+print '\n##Fading topic: topic #2 (association rule mining)'
 
-##Mostly industrial topic: topic #8 (variable and model selection)
+print '\n###Frequency vs. year -> Pgfplot table'
+for i in range(2004, 2016):
+    print '%i\t%f  ' % (i, topic_model.topic_frequency(2, date=i))
 
-###Articles per institution -> Pgfplot table
-@orange-ftgroup.com	8  
-@univ-paris13.fr	6  
-@univ-orleans.fr	5  
-@orange.com	4  
-@inria.fr	4  
-@u-cergy.fr	3  
-@univ-lyon2.fr	3  
-@ceremade.dauphine.fr	2  
-@orange-ft.com	2  
-@univ-nantes.fr	2  
-@isg.rnu.tn	2  
-@gfi.fr	1  
-@irisa.fr	1  
-@univ-bpclermont.fr	1  
-@lirmm.fr	1  
-@univ-lille1.fr	1  
-@fst.rnu.tn	1  
-@stochastik.rwth-aachen.de	1  
-@insa-lyon.fr	1  
-@inist.fr	1  
-@uclouvain.be	1  
-@univ-nc.nc	1  
-@cin.ufpe.br	1  
-@telecom-bretagne.eu	1  
-@supelec.fr	1  
-@univ-lr.fr	1  
-@fundp.ac.be	1  
-@cnam.fr	1  
-@ensi.rnu.tn	1  
-@riadi.rnu.tn	1  
-@groupama.com	1  
-@ensta-bretagne.fr	1  
-@univ-reunion.fr	1  
-@agroparistech.fr	1  
-@loria.fr	1  
-@uniroma1.it	1  
-@stat.uga.edu	1  
-@enit.rnu.tn	1  
-@lifo.univ	1  
-@chu-rennes.fr	1  
-@univ-lorraine.fr	1  
-@lip6.fr	1  
-@lri.fr	1  
-@utc.fr	1  
-@univ-tours.fr	1  
-@fep.up.pt	1  
-@univ-paris1.fr	1  
-@cs.umb.edu	1  
-@univ-rennes1.fr	1  
-@univ-metz.fr	1  
-@math.u-bordeaux1.fr	1  
-@sfr.fr	1  
-@francetelecom.com	1  
+print '\n##Emerging topic: topic #0 (social network analysis and mining)'
 
-###Titles of the articles related to topic #8 and involving Orange
-Sélection d'une méthode de classification multi-label pour un système interactif   
-Un Critère d'évaluation pour la construction de variables à base d'itemsets pour l'apprentissage supervisé multi-tables   
-Vers une Automatisation de la Construction de Variables pour la Classification Supervisée   
-Clustering hiérarchique non paramétrique de données fonctionnelles   
-Prétraitement Supervisé des Variables Numériques pour la Fouille de Données Multi-Tables   
-Sélection Bayésienne de Modèles avec Prior Dépendant des Données   
-Optimisation directe des poids de modèles dans un prédicteur Bayésien naïf moyenné   
-Sélection des variables informatives pour l'apprentissage supervisé multi-tables   
-Classification supervisée pour de grands nombres de classes à prédire : une approche par co-partitionnement des variables explicatives et à expliquer   
-Exploration des corrélations dans un classifieur Application au placement d'offres commerciales   
-Une méthode de classification supervisée sans paramètre pour l'apprentissage sur les grandes bases de données   
-Une approche non paramétrique Bayésienne pour l'estimation de densité conditionnelle sur les rangs   
+print '\n###Frequency vs. year -> Pgfplot table'
+for i in range(2004, 2016):
+    print '%i\t%f  ' % (i, topic_model.topic_frequency(0, date=i))
 
-##Highly collaborative topic: topic #4 (pattern mining)
+print '\n##Mostly industrial topic: topic #8 (variable and model selection)'
 
-###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table
-0	0.108108  
-1	0.081633  
-2	0.129310  
-3	0.067308  
-4	0.744186  
-5	0.115385  
-6	0.144860  
-7	0.140625  
-8	0.085938  
-9	0.113924  
-10	0.083333  
-11	0.083665  
-12	0.091603  
-13	0.392857  
-14	0.161538  
+print '\n###Articles per institution -> Pgfplot table'
+for institution, nb_articles in topic_model.affiliation_repartition(8):
+    print '%s\t%i  ' % (institution, nb_articles)
 
-Process finished with exit code 0
+print '\n###Titles of the articles related to topic #8 and involving Orange'
+for doc_id in topic_associations[8]:
+    affiliations = topic_model.corpus.affiliations(doc_id)
+    if '@orange.com' in affiliations or '@orange-ftgroup.com' in affiliations or '@orange.com' in affiliations:
+        print topic_model.corpus.short_content(doc_id), '  '
+
+print '\n##Highly collaborative topic: topic #4 (pattern mining)'
+
+normalized_sizes = []
+print '\n###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table'
+for topic_id in range(topic_model.nb_topics):
+    graph = topic_model.corpus.collaboration_network(topic_associations[topic_id], nx_format=True)
+    graph_order = len(nx.nodes(graph))
+    connected_components = sorted(nx.connected_component_subgraphs(graph), key=len, reverse=True)
+    largest_connected_component = connected_components[0]
+    largest_connected_component_norm_size = float(len(nx.nodes(largest_connected_component)))/float(graph_order)
+    normalized_sizes.append(largest_connected_component_norm_size)
+    print '%i\t%f  ' % (topic_id, largest_connected_component_norm_size)
+
+# Remove the normalized size of the largest connected component for topic 4
+normalized_size_topic4 = normalized_sizes.pop(4)
+
+print '\nAre these values drawn from a normal distribution (Shapiro-Wilk)? W=%f, p-value=%f  ' % stats.shapiro(normalized_sizes)
+
+# Fit a normal distribution to these values
+mu, std = stats.norm.fit(normalized_sizes)
+s = np.random.normal(mu, std)

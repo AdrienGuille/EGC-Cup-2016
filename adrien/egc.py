@@ -1,7 +1,8 @@
 # coding: utf-8
 import utils
 import networkx as nx
-from networkx.readwrite import json_graph
+from scipy import stats
+import numpy as np
 
 __author__ = "Adrien Guille"
 __email__ = "adrien.guille@univ-lyon2.fr"
@@ -56,6 +57,7 @@ for doc_id in topic_associations[8]:
 
 print '\n##Highly collaborative topic: topic #4 (pattern mining)'
 
+normalized_sizes = []
 print '\n###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table'
 for topic_id in range(topic_model.nb_topics):
     graph = topic_model.corpus.collaboration_network(topic_associations[topic_id], nx_format=True)
@@ -63,4 +65,14 @@ for topic_id in range(topic_model.nb_topics):
     connected_components = sorted(nx.connected_component_subgraphs(graph), key=len, reverse=True)
     largest_connected_component = connected_components[0]
     largest_connected_component_norm_size = float(len(nx.nodes(largest_connected_component)))/float(graph_order)
+    normalized_sizes.append(largest_connected_component_norm_size)
     print '%i\t%f  ' % (topic_id, largest_connected_component_norm_size)
+
+# Remove the normalized size of the largest connected component for topic 4
+normalized_size_topic4 = normalized_sizes.pop(4)
+
+print '\nAre these values drawn from a normal distribution (Shapiro-Wilk)? W=%f, p-value=%f  ' % stats.shapiro(normalized_sizes)
+
+# Fit a normal distribution to these values
+mu, std = stats.norm.fit(normalized_sizes)
+s = np.random.normal(mu, std)
