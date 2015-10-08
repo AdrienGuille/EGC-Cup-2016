@@ -84,60 +84,61 @@ year	topic_frequency
 ##Mostly industrial topic: topic #8 (variable and model selection)
 
 ###Articles per institution -> Pgfplot table
-institution	nb_articles  
-@orange-ftgroup.com	8  
-@univ-paris13.fr	6  
-@univ-orleans.fr	5  
-@orange.com	4  
-@inria.fr	4  
-@u-cergy.fr	3  
-@univ-lyon2.fr	3  
-@ceremade.dauphine.fr	2  
-@orange-ft.com	2  
-@univ-nantes.fr	2  
-@isg.rnu.tn	2  
-@gfi.fr	1  
-@irisa.fr	1  
-@univ-bpclermont.fr	1  
-@lirmm.fr	1  
-@univ-lille1.fr	1  
-@fst.rnu.tn	1  
-@stochastik.rwth-aachen.de	1  
-@insa-lyon.fr	1  
-@inist.fr	1  
-@uclouvain.be	1  
-@univ-nc.nc	1  
-@cin.ufpe.br	1  
-@telecom-bretagne.eu	1  
-@supelec.fr	1  
-@univ-lr.fr	1  
-@fundp.ac.be	1  
-@cnam.fr	1  
-@ensi.rnu.tn	1  
-@riadi.rnu.tn	1  
-@groupama.com	1  
-@ensta-bretagne.fr	1  
-@univ-reunion.fr	1  
-@agroparistech.fr	1  
-@loria.fr	1  
-@uniroma1.it	1  
-@stat.uga.edu	1  
-@enit.rnu.tn	1  
-@lifo.univ	1  
-@chu-rennes.fr	1  
-@univ-lorraine.fr	1  
-@lip6.fr	1  
-@lri.fr	1  
-@utc.fr	1  
-@univ-tours.fr	1  
-@fep.up.pt	1  
-@univ-paris1.fr	1  
-@cs.umb.edu	1  
-@univ-rennes1.fr	1  
-@univ-metz.fr	1  
-@math.u-bordeaux1.fr	1  
-@sfr.fr	1  
-@francetelecom.com	1  
+institution_name	institution_id	nb_articles  
+@orange-ftgroup.com	0	8  
+@univ-paris13.fr	1	6  
+@univ-orleans.fr	2	5  
+@orange.com	3	4  
+@inria.fr	4	4  
+@u-cergy.fr	5	3  
+@univ-lyon2.fr	6	3  
+@ceremade.dauphine.fr	7	2  
+@orange-ft.com	8	2  
+@univ-nantes.fr	9	2  
+@isg.rnu.tn	10	2  
+@gfi.fr	11	1  
+@irisa.fr	12	1  
+@univ-bpclermont.fr	13	1  
+@lirmm.fr	14	1  
+@univ-lille1.fr	15	1  
+@fst.rnu.tn	16	1  
+@stochastik.rwth-aachen.de	17	1  
+@insa-lyon.fr	18	1  
+@inist.fr	19	1  
+@uclouvain.be	20	1  
+@univ-nc.nc	21	1  
+@cin.ufpe.br	22	1  
+@telecom-bretagne.eu	23	1  
+@supelec.fr	24	1  
+@univ-lr.fr	25	1  
+@fundp.ac.be	26	1  
+@cnam.fr	27	1  
+@ensi.rnu.tn	28	1  
+@riadi.rnu.tn	29	1  
+@groupama.com	30	1  
+@ensta-bretagne.fr	31	1  
+@univ-reunion.fr	32	1  
+@agroparistech.fr	33	1  
+@loria.fr	34	1  
+@uniroma1.it	35	1  
+@stat.uga.edu	36	1  
+@enit.rnu.tn	37	1  
+@lifo.univ	38	1  
+@chu-rennes.fr	39	1  
+@univ-lorraine.fr	40	1  
+@lip6.fr	41	1  
+@lri.fr	42	1  
+@utc.fr	43	1  
+@univ-tours.fr	44	1  
+@fep.up.pt	45	1  
+@univ-paris1.fr	46	1  
+@cs.umb.edu	47	1  
+@univ-rennes1.fr	48	1  
+@univ-metz.fr	49	1  
+@math.u-bordeaux1.fr	50	1  
+@sfr.fr	51	1  
+@francetelecom.com	52	1  
+labels: @orange-ftgroup.com,@univ-paris13.fr,@univ-orleans.fr,@orange.com,@inria.fr,@u-cergy.fr,@univ-lyon2.fr,@ceremade.dauphine.fr,@orange-ft.com,@univ-nantes.fr,@isg.rnu.tn,@gfi.fr,@irisa.fr,@univ-bpclermont.fr,@lirmm.fr,@univ-lille1.fr,@fst.rnu.tn,@stochastik.rwth-aachen.de,@insa-lyon.fr,@inist.fr,@uclouvain.be,@univ-nc.nc,@cin.ufpe.br,@telecom-bretagne.eu,@supelec.fr,@univ-lr.fr,@fundp.ac.be,@cnam.fr,@ensi.rnu.tn,@riadi.rnu.tn,@groupama.com,@ensta-bretagne.fr,@univ-reunion.fr,@agroparistech.fr,@loria.fr,@uniroma1.it,@stat.uga.edu,@enit.rnu.tn,@lifo.univ,@chu-rennes.fr,@univ-lorraine.fr,@lip6.fr,@lri.fr,@utc.fr,@univ-tours.fr,@fep.up.pt,@univ-paris1.fr,@cs.umb.edu,@univ-rennes1.fr,@univ-metz.fr,@math.u-bordeaux1.fr,@sfr.fr,@francetelecom.com  
 
 ###Titles of the articles related to topic #8 and involving Orange
 0	Sélection d'une méthode de classification multi-label pour un système interactif  
@@ -154,6 +155,24 @@ institution	nb_articles
 11	Une approche non paramétrique Bayésienne pour l'estimation de densité conditionnelle sur les rangs  
 
 ##Highly collaborative topic: topic #4 (pattern mining)
+
+###Order of the collaboration network and size of the largest component per topic -> Pgfplot table
+topic_id	network_order	largest_connected_component  
+0	74	8  
+1	147	12  
+2	116	15  
+3	104	7  
+4	86	64  
+5	104	12  
+6	214	31  
+7	128	18  
+8	128	11  
+9	79	9  
+10	96	8  
+11	251	21  
+12	131	12  
+13	56	22  
+14	130	21  
 
 ###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table
 topic_id	normalized_size  
@@ -172,24 +191,6 @@ topic_id	normalized_size
 12	0.091603  
 13	0.392857  
 14	0.161538  
-
-###Z-score(Normalized size of the largest component in the collaboration network per topic) -> Pgfplot table
-topic_id	z_score  
-0	-0.359524  
-1	-0.514272  
-2	-0.235598  
-3	-0.598001  
-4	3.358325  
-5	-0.316993  
-6	-0.144712  
-7	-0.169464  
-8	-0.489110  
-9	-0.325530  
-10	-0.504331  
-11	-0.502391  
-12	-0.455995  
-13	1.304822  
-14	-0.047226  
 
 #Collaborative structure of the EGC society
 

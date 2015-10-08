@@ -53,9 +53,12 @@ for i in range(2004, 2016):
 print '\n##Mostly industrial topic: topic #8 (variable and model selection)'
 
 print '\n###Articles per institution -> Pgfplot table'
-print 'institution\tnb_articles  '
+print 'institution_name\tinstitution_id\tnb_articles  '
+id_to_name = []
 for institution, nb_articles in topic_model.affiliation_repartition(8):
-    print '%s\t%i  ' % (institution, nb_articles)
+    print '%s\t%i\t%i  ' % (institution, len(id_to_name), nb_articles)
+    id_to_name.append(institution)
+print 'labels: %s  ' % ','.join(id_to_name)
 
 print '\n###Titles of the articles related to topic #8 and involving Orange'
 count = 0
@@ -66,6 +69,16 @@ for doc_id in topic_associations[8]:
         count += 1
 
 print '\n##Highly collaborative topic: topic #4 (pattern mining)'
+
+print '\n###Order of the collaboration network and size of the largest component per topic -> Pgfplot table'
+print 'topic_id\tnetwork_order\tlargest_connected_component  '
+for topic_id in range(topic_model.nb_topics):
+    graph = topic_model.corpus.collaboration_network(topic_associations[topic_id], nx_format=True)
+    graph_order = len(nx.nodes(graph))
+    connected_components = sorted(nx.connected_component_subgraphs(graph), key=len, reverse=True)
+    largest_connected_component = connected_components[0]
+    largest_connected_component_size = len(nx.nodes(largest_connected_component))
+    print '%i\t%i\t%i  ' % (topic_id, graph_order, largest_connected_component_size)
 
 normalized_size = []
 print '\n###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table'
@@ -78,12 +91,6 @@ for topic_id in range(topic_model.nb_topics):
     largest_connected_component_norm_size = float(len(nx.nodes(largest_connected_component)))/float(graph_order)
     normalized_size.append(largest_connected_component_norm_size)
     print '%i\t%f  ' % (topic_id, largest_connected_component_norm_size)
-
-print '\n###Z-score(Normalized size of the largest component in the collaboration network per topic) -> Pgfplot table'
-z_score = stats.zscore(normalized_size)
-print 'topic_id\tz_score  '
-for topic_id in range(topic_model.nb_topics):
-    print '%i\t%f  ' % (topic_id, z_score[topic_id])
 
 print'\n#Collaborative structure of the EGC society'
 
