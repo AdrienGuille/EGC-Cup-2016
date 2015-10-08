@@ -1,11 +1,16 @@
 /Users/adrien/anaconda/bin/python /Users/adrien/GitHub/EGC-Cup-2016/adrien/egc.py
 
-#EGC 2016 Cup : results
+#EGC 2016 Cup
 
-##Overview of the data
-corpus size: 817
-vocabulary size: 1739
-number of topics: 15
+#Topical structure of the EGC society
+
+##Corpus and topic model
+corpus size: 817  
+vocabulary size: 1739  
+Topic model: NMF  
+number of topics: 15  
+
+##Topics
 
 ###Most relevant words for each topic -> LaTeX table
 topic 0 & réseau, social, communauté, détection, méthode, analyse, interaction, lien\\  
@@ -25,6 +30,7 @@ topic 13 & carte, topologique, auto, organisatrice, som, cognitif, probabiliste,
 topic 14 & texte, corpus, automatique, textuel, partir, méthode, opinion, clr\\  
 
 ###Overall frequency of each topic -> Pgfplot table
+topic_id	overall_frequency  
 0	0.036720  
 1	0.068543  
 2	0.067319  
@@ -44,6 +50,7 @@ topic 14 & texte, corpus, automatique, textuel, partir, méthode, opinion, clr\\
 ##Fading topic: topic #2 (association rule mining)
 
 ###Frequency vs. year -> Pgfplot table
+year	topic_frequency  
 2004	0.103448  
 2005	0.094595  
 2006	0.118421  
@@ -60,6 +67,7 @@ topic 14 & texte, corpus, automatique, textuel, partir, méthode, opinion, clr\\
 ##Emerging topic: topic #0 (social network analysis and mining)
 
 ###Frequency vs. year -> Pgfplot table
+year	topic_frequency  
 2004	0.000000  
 2005	0.013514  
 2006	0.026316  
@@ -76,6 +84,7 @@ topic 14 & texte, corpus, automatique, textuel, partir, méthode, opinion, clr\\
 ##Mostly industrial topic: topic #8 (variable and model selection)
 
 ###Articles per institution -> Pgfplot table
+institution	nb_articles  
 @orange-ftgroup.com	8  
 @univ-paris13.fr	6  
 @univ-orleans.fr	5  
@@ -131,22 +140,23 @@ topic 14 & texte, corpus, automatique, textuel, partir, méthode, opinion, clr\\
 @francetelecom.com	1  
 
 ###Titles of the articles related to topic #8 and involving Orange
-Sélection d'une méthode de classification multi-label pour un système interactif   
-Un Critère d'évaluation pour la construction de variables à base d'itemsets pour l'apprentissage supervisé multi-tables   
-Vers une Automatisation de la Construction de Variables pour la Classification Supervisée   
-Clustering hiérarchique non paramétrique de données fonctionnelles   
-Prétraitement Supervisé des Variables Numériques pour la Fouille de Données Multi-Tables   
-Sélection Bayésienne de Modèles avec Prior Dépendant des Données   
-Optimisation directe des poids de modèles dans un prédicteur Bayésien naïf moyenné   
-Sélection des variables informatives pour l'apprentissage supervisé multi-tables   
-Classification supervisée pour de grands nombres de classes à prédire : une approche par co-partitionnement des variables explicatives et à expliquer   
-Exploration des corrélations dans un classifieur Application au placement d'offres commerciales   
-Une méthode de classification supervisée sans paramètre pour l'apprentissage sur les grandes bases de données   
-Une approche non paramétrique Bayésienne pour l'estimation de densité conditionnelle sur les rangs   
+0	Sélection d'une méthode de classification multi-label pour un système interactif  
+1	Un Critère d'évaluation pour la construction de variables à base d'itemsets pour l'apprentissage supervisé multi-tables  
+2	Vers une Automatisation de la Construction de Variables pour la Classification Supervisée  
+3	Clustering hiérarchique non paramétrique de données fonctionnelles  
+4	Prétraitement Supervisé des Variables Numériques pour la Fouille de Données Multi-Tables  
+5	Sélection Bayésienne de Modèles avec Prior Dépendant des Données  
+6	Optimisation directe des poids de modèles dans un prédicteur Bayésien naïf moyenné  
+7	Sélection des variables informatives pour l'apprentissage supervisé multi-tables  
+8	Classification supervisée pour de grands nombres de classes à prédire : une approche par co-partitionnement des variables explicatives et à expliquer  
+9	Exploration des corrélations dans un classifieur Application au placement d'offres commerciales  
+10	Une méthode de classification supervisée sans paramètre pour l'apprentissage sur les grandes bases de données  
+11	Une approche non paramétrique Bayésienne pour l'estimation de densité conditionnelle sur les rangs  
 
 ##Highly collaborative topic: topic #4 (pattern mining)
 
 ###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table
+topic_id	normalized_size  
 0	0.108108  
 1	0.081633  
 2	0.129310  
@@ -163,6 +173,54 @@ Une approche non paramétrique Bayésienne pour l'estimation de densité conditi
 13	0.392857  
 14	0.161538  
 
-Are these values drawn from a normal distribution (Shapiro-Wilk)? W=0.620225, p-value=0.000062  
+###Z-score(Normalized size of the largest component in the collaboration network per topic) -> Pgfplot table
+topic_id	z_score  
+0	-0.359524  
+1	-0.514272  
+2	-0.235598  
+3	-0.598001  
+4	3.358325  
+5	-0.316993  
+6	-0.144712  
+7	-0.169464  
+8	-0.489110  
+9	-0.325530  
+10	-0.504331  
+11	-0.502391  
+12	-0.455995  
+13	1.304822  
+14	-0.047226  
+
+#Collaborative structure of the EGC society
+
+##Evolution of the density of the collaboration network
+year	year_density	cumulative_density  
+2004	0.016438	0.016438  
+2005	0.012310	0.008806  
+2006	0.013780	0.006939  
+2007	0.011000	0.005411  
+2008	0.011432	0.004477  
+2009	0.017381	0.004087  
+2010	0.012873	0.003571  
+2011	0.015368	0.003349  
+2012	0.019571	0.003205  
+2013	0.019554	0.003006  
+2014	0.013099	0.002782  
+2015	0.018892	0.002628  
+
+##Evolution of the average clustering coefficient of the collaboration network
+year	year_clust_coeff	cumulative_clust_coeff  
+2004	0.751924	0.751924  
+2005	0.683988	0.704545  
+2006	0.656927	0.687971  
+2007	0.698964	0.678432  
+2008	0.711735	0.678143  
+2009	0.752582	0.679420  
+2010	0.777737	0.684606  
+2011	0.792193	0.681818  
+2012	0.804520	0.683244  
+2013	0.826731	0.688406  
+2014	0.821196	0.693921  
+2015	0.822952	0.695448  
 
 Process finished with exit code 0
