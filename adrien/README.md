@@ -192,6 +192,8 @@ topic_id	normalized_size
 13	0.392857  
 14	0.161538  
 
+Mean normalized size: 0.169618
+
 #Collaborative structure of the EGC society
 
 ##Evolution of the density of the collaboration network

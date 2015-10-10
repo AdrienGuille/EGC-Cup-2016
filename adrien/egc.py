@@ -81,16 +81,25 @@ for topic_id in range(topic_model.nb_topics):
     print '%i\t%i\t%i  ' % (topic_id, graph_order, largest_connected_component_size)
 
 normalized_size = []
+cc_density = []
 print '\n###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table'
-print 'topic_id\tnormalized_size  '
+print 'topic_id\tnormalized_size\tcc_density  '
 for topic_id in range(topic_model.nb_topics):
     graph = topic_model.corpus.collaboration_network(topic_associations[topic_id], nx_format=True)
     graph_order = len(nx.nodes(graph))
     connected_components = sorted(nx.connected_component_subgraphs(graph), key=len, reverse=True)
     largest_connected_component = connected_components[0]
     largest_connected_component_norm_size = float(len(nx.nodes(largest_connected_component)))/float(graph_order)
+    nx.write_gexf(graph, 'gexf/'+str(topic_id)+'.gexf')
     normalized_size.append(largest_connected_component_norm_size)
-    print '%i\t%f  ' % (topic_id, largest_connected_component_norm_size)
+    cc_density.append(nx.density(largest_connected_component))
+    print '%i\t%f\t%f  ' % (topic_id, largest_connected_component_norm_size, nx.density(largest_connected_component))
+
+mean_norm_size = np.array(normalized_size).mean(axis=0)
+print '\nMean normalized size: %f' % mean_norm_size
+mean_density = np.array(cc_density).mean(axis=0)
+print '\nMean connected component density: %f' % mean_density
+
 
 print'\n#Collaborative structure of the EGC society'
 
