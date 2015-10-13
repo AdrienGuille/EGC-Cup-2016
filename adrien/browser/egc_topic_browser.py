@@ -4,7 +4,6 @@ from structure.corpus import Corpus
 from structure.author_topic_graph import AuthorTopicGraph
 from flask import Flask, render_template
 import utils
-import itertools
 from flask.ext.frozen import Freezer
 import shutil
 import os
@@ -14,7 +13,7 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 
 # Flask Web server
 app = Flask(__name__)
-freeze_browser = True
+freeze_browser = False
 
 # Parameters
 max_tf = 0.8
@@ -23,10 +22,9 @@ lemmatizer = None
 num_topics = 15
 vectorization = 'tfidf'
 
-
-# Load corpus
 '''
-corpus = Corpus(source_file_path='../input/egc_lemmatized.csv',
+# Load corpus
+corpus = Corpus(source_file_path='../input/input_for_topic_modeling.csv',
                 language='french',
                 vectorization=vectorization,
                 max_relative_frequency=max_tf,
@@ -42,6 +40,7 @@ utils.save_topic_model(topic_model, '../nmf_15topics_egc.pickle')
 topic_model.print_topics(num_words=10)
 '''
 topic_model = utils.load_topic_model('../nmf_15topics_egc.pickle')
+topic_model.print_topics()
 
 # Clean the data directory
 if os.path.exists('static/data'):
@@ -72,6 +71,12 @@ for word_id in range(len(topic_model.corpus.vocabulary)):
     utils.save_topic_distribution(topic_model.topic_distribution_for_word(word_id),
                                   'static/data/topic_distribution_w'+str(word_id)+'.tsv')
 
+# Export details about authors
+author_list = topic_model.corpus.all_authors()
+for author_id in range(len(author_list)):
+    utils.save_topic_distribution(topic_model.topic_distribution_for_author(author_list[author_id]),
+                                  'static/data/topic_distribution_a'+str(author_id)+'.tsv')
+
 # Associate documents with topics
 topic_associations = topic_model.documents_per_topic()
 
@@ -79,11 +84,6 @@ topic_associations = topic_model.documents_per_topic()
 for topic_id in range(topic_model.nb_topics):
     utils.save_json_object(topic_model.corpus.collaboration_network(topic_associations[topic_id]),
                            'static/data/author_network'+str(topic_id)+'.json')
-
-# Export bipartite author-topic graph
-author_topic_graph = AuthorTopicGraph(topic_model)
-utils.save_json_object(author_topic_graph.json_graph,
-                       'static/data/author_topic_graph.json')
 
 print 'Topic/corpus browser ready'
 
@@ -129,11 +129,20 @@ def vocabulary():
                            vocabulary_size=len(word_list))
 
 
-@app.route('/author_topic_graph.html')
-def author_topic_graph():
-    return render_template('author_topic_graph.html',
+@app.route('/author_index.html')
+def authors():
+    splitted_author_list = []
+    authors_per_column = int(len(author_list)/5)
+    for j in range(5):
+        sub_list = []
+        for l in range(j*authors_per_column, (j+1)*authors_per_column):
+            sub_list.append((l, author_list[l]))
+        splitted_author_list.append(sub_list)
+    return render_template('all_authors.html',
                            topic_ids=range(topic_model.nb_topics),
-                           doc_ids=range(topic_model.corpus.size))
+                           doc_ids=range(topic_model.corpus.size),
+                           splitted_author_list=splitted_author_list,
+                           number_of_authors=len(author_list))
 
 
 @app.route('/topic/<tid>.html')
@@ -142,7 +151,7 @@ def topic_details(tid):
     documents = []
     for document_id in ids:
         documents.append((topic_model.corpus.short_content(document_id).capitalize(),
-                          ', '.join(topic_model.corpus.authors(document_id)),
+                          topic_model.corpus.authors(document_id),
                           topic_model.corpus.date(document_id), document_id))
     return render_template('topic.html',
                            topic_id=tid,
@@ -161,12 +170,10 @@ def document_details(did):
     word_list.sort(key=lambda x: x[1])
     word_list.reverse()
     nb_words = 20
-    if [w[1] for w in word_list].index(0.0) < nb_words:
-        nb_word = [w[1] for w in word_list].index(0.0)
     documents = []
     for another_doc in topic_model.corpus.similar_documents(int(did), 5):
         documents.append((topic_model.corpus.short_content(another_doc[0]).capitalize(),
-                          ', '.join(topic_model.corpus.authors(another_doc[0])),
+                          topic_model.corpus.authors(another_doc[0]),
                           topic_model.corpus.date(another_doc[0]), another_doc[0], round(another_doc[1], 3)))
     return render_template('document.html',
                            doc_id=did,
@@ -185,11 +192,28 @@ def word_details(wid):
     documents = []
     for document_id in topic_model.corpus.docs_for_word(int(wid)):
         documents.append((topic_model.corpus.short_content(document_id).capitalize(),
-                          ', '.join(topic_model.corpus.authors(document_id)),
+                          topic_model.corpus.authors(document_id),
                           topic_model.corpus.date(document_id), document_id))
     return render_template('word.html',
                            word_id=wid,
                            word=topic_model.corpus.word_for_id(int(wid)),
+                           topic_ids=range(topic_model.nb_topics),
+                           doc_ids=range(topic_model.corpus.size),
+                           documents=documents)
+
+
+@app.route('/author/<an>.html')
+def author_details(an):
+    author_name = an.replace('%20', ' ')
+    documents = []
+    for document_id in topic_model.corpus.documents_by_author(an):
+        documents.append((topic_model.corpus.short_content(document_id).capitalize(),
+                          topic_model.corpus.authors(document_id),
+                          topic_model.corpus.date(document_id), document_id))
+    return render_template('author.html',
+                           author_name=author_name,
+                           author_id=str(author_list.index(author_name)),
+                           affiliations='',
                            topic_ids=range(topic_model.nb_topics),
                            doc_ids=range(topic_model.corpus.size),
                            documents=documents)
@@ -212,6 +236,10 @@ if __name__ == '__main__':
         def word_details():
             for word_id in range(len(topic_model.corpus.vocabulary)):
                 yield {'wid': word_id}
+        @freezer.register_generator
+        def author_details():
+            for author_name in author_list:
+                yield {'an': author_name.replace(' ', '%20')}
         freezer.freeze()
     else:
         # Load corpus

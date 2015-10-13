@@ -2,9 +2,20 @@
 
 #EGC 2016 Cup
 
+##Data
+
+###Data provided by the organizers
+Number of articles presented at the EGC conference: 1041
+Number of articles without abstract: 145
+
+###Cleaned up data
+Number of well-formatted articles: 1041  
+Number of articles per year: Counter({'2010': 115, '2006': 103, '2008': 103, '2011': 100, '2007': 92, '2005': 90, '2014': 87, '2004': 82, '2009': 81, '2015': 67, '2012': 65, '2013': 56})   
+Number of articles per language detected from the abstract: Counter({'fr': 817, '': 145, 'en': 79})   
+
 #Topical structure of the EGC society
 
-##Corpus and topic model
+##Prepared corpus and topic model
 corpus size: 817  
 vocabulary size: 1739  
 Topic model: NMF  
@@ -157,42 +168,45 @@ labels: @orange-ftgroup.com,@univ-paris13.fr,@univ-orleans.fr,@orange.com,@inria
 ##Highly collaborative topic: topic #4 (pattern mining)
 
 ###Order of the collaboration network and size of the largest component per topic -> Pgfplot table
-topic_id	network_order	largest_connected_component  
-0	74	8  
-1	147	12  
-2	116	15  
-3	104	7  
-4	86	64  
-5	104	12  
-6	214	31  
-7	128	18  
-8	128	11  
-9	79	9  
-10	96	8  
-11	251	21  
-12	131	12  
-13	56	22  
-14	130	21  
+topic_id	network_order	largest_cc_size	average_cc_size  
+0	74	8	3.363636  
+1	147	12	4.083333  
+2	116	15	3.314286  
+3	104	7	3.354839  
+4	86	64	9.555556  
+5	104	12	3.354839  
+6	214	31	3.689655  
+7	128	18	3.555556  
+8	128	11	3.657143  
+9	79	9	3.950000  
+10	96	8	3.096774  
+11	251	21	4.114754  
+12	131	12	3.638889  
+13	56	22	4.666667  
+14	130	21	4.193548  
 
 ###Normalized size of the largest component in the collaboration network per topic -> Pgfplot table
-topic_id	normalized_size  
-0	0.108108  
-1	0.081633  
-2	0.129310  
-3	0.067308  
-4	0.744186  
-5	0.115385  
-6	0.144860  
-7	0.140625  
-8	0.085938  
-9	0.113924  
-10	0.083333  
-11	0.083665  
-12	0.091603  
-13	0.392857  
-14	0.161538  
+topic_id	normalized_size	cc_density  
+0	0.108108	0.642857  
+1	0.081633	0.424242  
+2	0.129310	0.266667  
+3	0.067308	0.571429  
+4	0.744186	0.078869  
+5	0.115385	0.393939  
+6	0.144860	0.144086  
+7	0.140625	0.261438  
+8	0.085938	0.345455  
+9	0.113924	0.416667  
+10	0.083333	0.642857  
+11	0.083665	0.209524  
+12	0.091603	0.303030  
+13	0.392857	0.181818  
+14	0.161538	0.204762  
 
-Mean normalized size: 0.169618
+Mean largest c.c. size: 18.066667, mean normalized size: 0.169618, mean largest c.c. density: 0.339176
+
+###Global collaboration graph
+order: 1307, largest connected component: 605  
 
 #Collaborative structure of the EGC society
 
