@@ -2,6 +2,7 @@
 import utils
 import networkx as nx
 import numpy as np
+from scipy import stats as st
 import csv
 import collections
 
@@ -36,20 +37,24 @@ with open('input/RNTI_articles_export_prepared.csv', 'rb') as csv_file:
     reader = csv.reader(csv_file, delimiter='\t')
     nb_articles = 0
     lang_abs = []
-    lang_title = []
     year = []
-    missing_abstract = 0
+    aff_and_lang = 0
+    french_and_aff = 0
     next(reader)
     for row in reader:
-        if len(row[4]) < 4:
-            missing_abstract += 1
+        if row[10] != '' and len(row[11]) > 4:
+            aff_and_lang += 1
+            if row[10] == 'fr':
+                french_and_aff += 1
         year.append(row[2])
         lang_abs.append(row[10])
-        lang_title.append(row[9])
         nb_articles += 1
-    print 'Number of well-formatted articles: %i  ' % nb_articles
-    print 'Number of articles per year:', collections.Counter(year), '  '
     print 'Number of articles per language detected from the abstract:', collections.Counter(lang_abs), '  '
+    print 'Number of articles for which both the language of the abstract and the authors\' ' \
+          'affiliations are available: %i  ' % aff_and_lang
+    print 'Number of articles for which have a French asbtract and for which the authors\' ' \
+          'affiliations are available: %i  ' % french_and_aff
+    print 'Number of articles per year:', collections.Counter(year), '  '
 
 print'\n#Topical structure of the EGC society'
 
@@ -143,10 +148,28 @@ for topic_id in range(topic_model.nb_topics):
     cc_density.append(nx.density(largest_connected_component))
     print '%i\t%f\t%f  ' % (topic_id, largest_connected_component_norm_size, nx.density(largest_connected_component))
 
-mean_size = np.array(size).mean(axis=0)
-mean_norm_size = np.array(normalized_size).mean(axis=0)
-mean_density = np.array(cc_density).mean(axis=0)
-print '\nMean largest c.c. size: %f, mean normalized size: %f, mean largest c.c. density: %f' % (mean_size, mean_norm_size, mean_density)
+mean_size = float(np.array(size).mean(axis=0))
+mean_norm_size = float(np.array(normalized_size).mean(axis=0))
+mean_density = float(np.array(cc_density).mean(axis=0))
+print '\nMean largest c.c. size: %f, mean normalized size: %f, mean largest c.c. density: %f' % (mean_size,
+                                                                                                 mean_norm_size,
+                                                                                                 mean_density)
+
+print '\n###Authors (with a least 5 papers) sorted by skweness of their topic repartition -> TSV'
+author_indicator = []
+for author in topic_model.corpus.all_authors():
+    nb_papers = len(topic_model.corpus.documents_by_author(author))
+    if nb_papers >= 5:
+        repartition = np.array(topic_model.topic_distribution_for_author(author))
+        normalized_repartition = repartition/repartition.max(axis=0)
+        standard_deviation = float(normalized_repartition.std(axis=0))
+        skewness = float(st.skew(normalized_repartition, axis=0))
+        kurtosis = float(st.kurtosis(normalized_repartition, axis=0))
+        author_indicator.append((author, standard_deviation, skewness, kurtosis))
+author_indicator.sort(key=lambda x: x[2], reverse=False)
+print 'author\tstd\tskewness\tkurtosis  '
+for indicators in author_indicator:
+    print '%s\t%f\t%f\t%f  ' % indicators
 
 print '\n###Global collaboration graph'
 global_graph = topic_model.corpus.collaboration_network(range(topic_model.corpus.size), nx_format=True)
@@ -155,29 +178,3 @@ connected_components = sorted(nx.connected_component_subgraphs(global_graph), ke
 largest_connected_component = connected_components[0]
 largest_connected_component_size = len(nx.nodes(largest_connected_component))
 print 'order: %i, largest connected component: %i  ' % (global_graph_order, largest_connected_component_size)
-
-print'\n#Collaborative structure of the EGC society'
-
-print'\n##Evolution of the density of the collaboration network'
-
-cumulative_graph = nx.Graph()
-print 'year\tyear_density\tcumulative_density  '
-for year in range(2004, 2016):
-    year_graph = topic_model.corpus.collaboration_network(topic_model.corpus.doc_ids(year), nx_format=True)
-    cumulative_graph.add_nodes_from(nx.nodes(year_graph))
-    cumulative_graph.add_edges_from(nx.edges(year_graph))
-    year_density = nx.density(year_graph)
-    cumulative_density = nx.density(cumulative_graph)
-    print '%i\t%f\t%f  ' % (year, year_density, cumulative_density)
-
-print'\n##Evolution of the average clustering coefficient of the collaboration network'
-
-cumulative_graph = nx.Graph()
-print 'year\tyear_clust_coeff\tcumulative_clust_coeff  '
-for year in range(2004, 2016):
-    year_graph = topic_model.corpus.collaboration_network(topic_model.corpus.doc_ids(year), nx_format=True)
-    cumulative_graph.add_nodes_from(nx.nodes(year_graph))
-    cumulative_graph.add_edges_from(nx.edges(year_graph))
-    year_clust_coeff = nx.average_clustering(year_graph)
-    cumulative_clust_coeff = nx.average_clustering(cumulative_graph)
-    print '%i\t%f\t%f  ' % (year, year_clust_coeff, cumulative_clust_coeff)
