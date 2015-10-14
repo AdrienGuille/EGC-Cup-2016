@@ -21,15 +21,21 @@ class DiscoverAssociations(BaseExperimenter):
 
     def __init__(self):
         self.one_pages = load_text_data("../../input/pdfs/1page/", "txt")
-        # self.load_computed_topics()
-        self.dict_topic_top_words, self.dict_doc_top_topics, self.dict_topic_top_docs = nmf_clustering(self.one_pages)
+        self.load_computed_topics()
+        # self.dict_topic_top_words, self.dict_doc_top_topics, self.dict_topic_top_docs = nmf_clustering(self.one_pages)
+        feature_names = zip(*sorted(self.topic_model.corpus.vocabulary.items(), key=lambda a: a[0]))[1]
+        self.dict_topic_top_words, self.dict_doc_top_topics, self.dict_topic_top_docs = nmf_clustering(data=None,
+                                                                                                       doc_topic_mat=self.topic_model.document_topic_matrix,
+                                                                                                       topic_token_mat=self.topic_model.topic_word_matrix,
+                                                                                                       feature_names=feature_names)
         # return dict_topic_top_words, dict_doc_top_topics, dict_topic_top_docs
         self.load_data()
 
     def load_computed_topics(self):
         import pickle
-        topic_model = pickle.load(open("../input/nmf_15topics_egc.pickle", "rb"))
-        pass
+        import sys
+        sys.path.append("/media/stuff/Pavel/Documents/Eclipse/workspace/TOM/")
+        self.topic_model = pickle.load(open("../input/nmf_15topics_egc.pickle", "rb"))
 
 
     def find_proper_authors(self, n_publications=5):
@@ -204,7 +210,7 @@ class DiscoverAssociations(BaseExperimenter):
             print stringo
 
     def run(self):
-        self.theta = 0.55
+        self.theta = 0.75
         self.find_proper_authors(n_publications=5)
         self.link_authors_papers_topics()
 
@@ -231,7 +237,7 @@ class DiscoverAssociations(BaseExperimenter):
         combined_similarity = self.combine_similarity_matrices(
             [self.author_topic_similarity, self.author_year_similarity])
         similarity_matrix = combined_similarity
-        similarity_matrix = self.author_year_similarity
+        # similarity_matrix = self.author_year_similarity
         self.find_frequent_2itemsets(similarity_matrix)
         self.create_induced_graph(similarity_matrix)
         self.find_frequent_kitemsets(similarity_matrix)
