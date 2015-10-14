@@ -21,9 +21,16 @@ class DiscoverAssociations(BaseExperimenter):
 
     def __init__(self):
         self.one_pages = load_text_data("../../input/pdfs/1page/", "txt")
+        # self.load_computed_topics()
         self.dict_topic_top_words, self.dict_doc_top_topics, self.dict_topic_top_docs = nmf_clustering(self.one_pages)
         # return dict_topic_top_words, dict_doc_top_topics, dict_topic_top_docs
         self.load_data()
+
+    def load_computed_topics(self):
+        import pickle
+        topic_model = pickle.load(open("../input/nmf_15topics_egc.pickle", "rb"))
+        pass
+
 
     def find_proper_authors(self, n_publications=5):
         """
@@ -105,85 +112,70 @@ class DiscoverAssociations(BaseExperimenter):
 
         self.author_topic_incidence = self.author_topic_incidence
 
-    def vertex_degree_diagonal_matrix(self):
-        if not hasattr(self, "incidence_mat"):
-            raise Exception("You need first to run create_topic_author_matrix. No incidence"
-                            "matrix available")
-        self.Dv = np.diag(self.author_topic_incidence.sum(axis=1))
+    def vertex_degree_diagonal_matrix(self, incidence_matrix):
+        return np.diag(incidence_matrix.sum(axis=1))
 
-    def edge_degree_diagonal_matrix(self):
-        if not hasattr(self, "incidence_mat"):
-            raise Exception("You need first to run create_topic_author_matrix. No incidence"
-                            "matrix available")
-        self.De = np.diag(self.author_topic_incidence.sum(axis=0))
-        return self.De
+    def edge_degree_diagonal_matrix(self, incidence_matrix):
+        return np.diag(incidence_matrix.sum(axis=0))
 
-    def create_laplacian_pseudo_inverse(self):
+    def create_laplacian_pseudo_inverse(self, incidence_matrix, Dv, De):
         """
         Based on the forumula used by the author : L = Dv - HWDe^-1H'
 
 
         :return:
         """
-        if not hasattr(self, "incidence_mat") or not hasattr(self, "De") or not hasattr(self, "Dv"):
-            raise Exception("You need first to run the othre funtions that create Dv, De, and H.")
-        I = np.eye(self.Dv.shape[0])
-        A = np.dot(self.author_topic_incidence, self.author_topic_incidence.transpose()) - self.Dv
-        Dvsqrt = sqrtm(self.Dv)
+        I = np.eye(Dv.shape[0])
+        A = np.dot(incidence_matrix, incidence_matrix.transpose()) - Dv
+        Dvsqrt = sqrtm(Dv)
 
         # self.L = self.Dv - np.dot(np.dot(self.incidence_mat, inv(self.De)), self.incidence_mat.transpose())
-        self.L = 0.5 * (I - np.dot(np.dot(Dvsqrt, A), Dvsqrt))
+        L = 0.5 * (I - np.dot(np.dot(Dvsqrt, A), Dvsqrt))
 
-        self.Lpinv = pinv(self.L)
-        return self.Lpinv
+        Lpinv = pinv(L)
+        return Lpinv
 
-    def find_frequent_2itemsets(self):
-        ij_indices = np.where((np.triu(self.sim_ct, 1) > self.theta) & (np.triu(self.sim_ct, 1) < 1.))
+    def find_frequent_2itemsets(self, similarity_matrix):
+
+        ij_indices = np.where((np.triu(similarity_matrix, 1) > self.theta) & (np.triu(similarity_matrix, 1) < 1.))
         self.itemsets2 = []
         print "The are {0} 2-itemsets found. They are: ".format(len(ij_indices[0]))
         for i, j in zip(ij_indices[0], ij_indices[1]):
-            n_cooccurrences = len(np.intersect1d(np.where(self.author_topic_incidence[i, :] > 0),
-                                                 np.where(self.author_topic_incidence[j, :] > 0)))
-
-            author_i = self.author_topics_weighted.keys()[i].encode("utf-8")
-            author_j = self.author_topics_weighted.keys()[j].encode("utf-8")
-            self.itemsets2.append(([i, j], self.sim_ct[i, j]))
-            # print "{0}:{1} <----> {2}:{3}".format(author_i, i, author_j, j)
-            # if not n_cooccurrences:
-            # print "\t\tThey did not occurred in the dataset."
+            self.itemsets2.append(([i, j], similarity_matrix[i, j]))
 
         return self.itemsets2
 
-    def create_similarity_ct(self):
+    def create_similarity_ct(self, Lpinv, Dv):
         """
         Create the commute time similarity matrix: n(i,j) = VG(l_ii + l_jj -2l_ij)
         VG = tr(Dv)
         :return:
         """
-        trace_L = self.Lpinv.diagonal()
+        trace_L = Lpinv.diagonal()
         l_jj, l_ii = np.meshgrid(trace_L, trace_L)
 
-        vol_Dv = self.Dv.trace()
+        vol_Dv = Dv.trace()
 
-        self.dist_ct = vol_Dv * (l_ii + l_jj - (2 * self.Lpinv))
-        self.sim_ct = 1. - (self.dist_ct / np.max(self.dist_ct, axis=1)[:, None])
-        pass
+        dist_ct = vol_Dv * (l_ii + l_jj - (2 * Lpinv))
+        sim_ct = 1. - (dist_ct / np.max(dist_ct, axis=1)[:, None])
 
-    def create_induced_graph(self):
+        return sim_ct
+
+    def create_induced_graph(self, similarity_matrix):
         g = nx.Graph()
         # g.add_nodes_from(range(self.incidence_mat.shape[0]))
 
-        n = self.sim_ct.shape[0]
+        n = similarity_matrix.shape[0]
         for i in range(n - 1):
             for j in range(i + 1, n):
                 shared_hyperedges = np.intersect1d(np.where(self.author_topic_incidence[i, :] > 0),
                                                    np.where(self.author_topic_incidence[j, :] > 0))
-                if len(shared_hyperedges) > 0 and self.sim_ct[i, j] > self.theta:
+                if len(shared_hyperedges) > 0 and similarity_matrix[i, j] > self.theta:
                     g.add_edge(i, j)
         self.induced_g = g
         return self.induced_g
 
-    def find_frequent_kitemsets(self):
+    def find_frequent_kitemsets(self, similarity_matrix):
         if not hasattr(self, "induced_g"):
             raise Exception("No induced graph available. Aborting")
 
@@ -197,7 +189,7 @@ class DiscoverAssociations(BaseExperimenter):
             authors = [self.author_topics_weighted.keys()[i] for i in sub]
             for i_i in range(len(sub) - 1):
                 for j_j in range(i_i + 1, len(sub)):
-                    itemsets_sum.append(self.sim_ct[sub[i_i], sub[j_j]])
+                    itemsets_sum.append(similarity_matrix[sub[i_i], sub[j_j]])
             weighted_itemsets.append((authors, np.mean(itemsets_sum)))
         # weighted_itemsets = list(set(weighted_itemsets))
         weighted_itemsets.sort(key=lambda a: a[1], reverse=True)
@@ -212,24 +204,43 @@ class DiscoverAssociations(BaseExperimenter):
             print stringo
 
     def run(self):
-        self.theta = 0.7
+        self.theta = 0.55
         self.find_proper_authors(n_publications=5)
         self.link_authors_papers_topics()
 
-        self.create_author_topic_matrix(n_topics_per_author=5)
+        self.create_author_topic_matrix(n_topics_per_author=4)
         self.create_author_year_matrix()
 
-        self.vertex_degree_diagonal_matrix()
-        self.edge_degree_diagonal_matrix()
+        self.author_topic_Dv = self.vertex_degree_diagonal_matrix(self.author_topic_incidence)
+        self.author_topic_De = self.edge_degree_diagonal_matrix(self.author_topic_incidence)
 
-        self.create_laplacian_pseudo_inverse()
-        self.create_similarity_ct()
+        self.author_year_Dv = self.vertex_degree_diagonal_matrix(self.author_year_incidence)
+        self.author_year_De = self.edge_degree_diagonal_matrix(self.author_year_incidence)
 
-        self.find_frequent_2itemsets()
-        self.create_induced_graph()
-        self.find_frequent_kitemsets()
+        self.author_topic_Lpinv = self.create_laplacian_pseudo_inverse(self.author_topic_incidence,
+                                                                       self.author_topic_Dv,
+                                                                       self.author_topic_De)
+
+        self.author_year_Lpinv = self.create_laplacian_pseudo_inverse(self.author_year_incidence,
+                                                                      self.author_year_Dv,
+                                                                      self.author_year_De)
+
+        self.author_topic_similarity = self.create_similarity_ct(self.author_topic_Lpinv, self.author_topic_Dv)
+        self.author_year_similarity = self.create_similarity_ct(self.author_year_Lpinv, self.author_year_Dv)
+
+        combined_similarity = self.combine_similarity_matrices(
+            [self.author_topic_similarity, self.author_year_similarity])
+        similarity_matrix = combined_similarity
+        similarity_matrix = self.author_year_similarity
+        self.find_frequent_2itemsets(similarity_matrix)
+        self.create_induced_graph(similarity_matrix)
+        self.find_frequent_kitemsets(similarity_matrix)
 
         self.print_frequent_kitemsets()
+
+    def combine_similarity_matrices(self, similarities_matrices):
+        sum_matrix = reduce(np.add, similarities_matrices)
+        return sum_matrix / len(similarities_matrices)
 
 
 def main():
