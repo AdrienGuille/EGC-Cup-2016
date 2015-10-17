@@ -17,7 +17,7 @@ class DiscoverAssociations(BaseExperimenter):
     Based on Discoverting Semantically associated itemsets with hypergraphs from Liu.
     """
 
-    def __init__(self, theta, min_n_papers_per_author, n_topics_per_author):
+    def __init__(self, theta, min_n_papers_per_author, n_topics_per_author, topic_topic=False):
         self.load_computed_topics()
         # self.dict_topic_top_words, self.dict_doc_top_topics, self.dict_topic_top_docs = nmf_clustering(self.one_pages)
         feature_names = zip(*sorted(self.topic_model.corpus.vocabulary.items(), key=lambda a: a[0]))[1]
@@ -32,7 +32,7 @@ class DiscoverAssociations(BaseExperimenter):
         self.theta = theta
         self.min_publications_per_author = min_n_papers_per_author
         self.n_topics_per_author = n_topics_per_author
-
+        self.topic_topic_recomms = topic_topic
     def load_computed_topics(self):
         import pickle
         import sys
@@ -102,7 +102,12 @@ class DiscoverAssociations(BaseExperimenter):
                     if author_i in authors:
                         self.author_year_incidence[i, j] += 1
 
-        pass
+    def create_topic_year_matrix(self):
+        years = self.df.year.unique()
+        topics_per_year = [np.array(self.topic_model.topics_frequency(y)) for y in years]
+        self.topic_year_incidence = np.vstack(topics_per_year).transpose()
+
+
 
     def create_author_topic_matrix(self):
         """
@@ -121,6 +126,9 @@ class DiscoverAssociations(BaseExperimenter):
         for i_x, (author, tw) in enumerate(self.author_topics_weighted.iteritems()):
             for t, _ in tw[:self.n_topics_per_author]:
                 self.author_topic_incidence[i_x, t] = 1
+
+        if self.topic_topic_recomms:
+            self.author_topic_incidence = self.author_topic_incidence.transpose()
 
         self.author_topic_incidence = self.author_topic_incidence
 
@@ -151,7 +159,7 @@ class DiscoverAssociations(BaseExperimenter):
     def find_frequent_2itemsets(self, similarity_matrix):
 
         ij_indices = np.where((np.triu(similarity_matrix, 1) > self.theta))
-        self.logger.info("The are {0} 2-itemsets found. They are: ".format(len(ij_indices[0])))
+        self.logger.info("The are {0} 2-itemsets found.".format(len(ij_indices[0])))
         k2itemsets = zip(ij_indices[0], ij_indices[1])
         # for i, j in zip(ij_indices[0], ij_indices[1]):
         #     self.itemsets2.append(([i, j], similarity_matrix[i, j]))
@@ -160,13 +168,16 @@ class DiscoverAssociations(BaseExperimenter):
         weighted_itemsets = []
         for sub in k2itemsets:
             itemsets_sum = []
-            authors = [self.author_topics_weighted.keys()[i] for i in sub]
-            # authors = [self.author_topics_weighted.keys()[i] + ":" + unicode(i) for i in sub]
+            if self.topic_topic_recomms:
+                node_data = sub
+
+            else:
+                node_data = [self.author_topics_weighted.keys()[i] for i in sub]
 
             for i_i in range(len(sub) - 1):
                 for j_j in range(i_i + 1, len(sub)):
                     itemsets_sum.append(similarity_matrix[sub[i_i], sub[j_j]])
-            weighted_itemsets.append((authors, np.mean(itemsets_sum)))
+            weighted_itemsets.append((node_data, np.mean(itemsets_sum)))
         weighted_itemsets.sort(key=lambda a: a[1], reverse=True)
         self.sorted_2itemsets = weighted_itemsets
         return self.sorted_2itemsets
@@ -231,7 +242,7 @@ class DiscoverAssociations(BaseExperimenter):
         for itemset, w in sorted_itemsets:
             stringo = ""
             for a in itemset:
-                stringo += a.encode("utf-8") + ", "
+                stringo += str(a).encode("utf-8") + ", "
             stringo = stringo[:-2] + ": " + str(w)
             print stringo
 
@@ -242,12 +253,22 @@ class DiscoverAssociations(BaseExperimenter):
 
         self.create_author_topic_matrix()
         self.create_author_year_matrix()
+        self.create_topic_year_matrix()
 
+
+        # author-topic
         self.author_topic_Dv = self.vertex_degree_diagonal_matrix(self.author_topic_incidence)
+
         self.author_topic_De = self.edge_degree_diagonal_matrix(self.author_topic_incidence)
 
+        #author-year
         self.author_year_Dv = self.vertex_degree_diagonal_matrix(self.author_year_incidence)
         self.author_year_De = self.edge_degree_diagonal_matrix(self.author_year_incidence)
+
+        # topic-year
+        self.topic_year_Dv = self.vertex_degree_diagonal_matrix(self.topic_year_incidence)
+        self.topic_year_De = self.edge_degree_diagonal_matrix(self.topic_year_incidence)
+
 
         self.author_topic_Lpinv = self.create_laplacian_pseudo_inverse(self.author_topic_incidence,
                                                                        self.author_topic_Dv,
@@ -257,12 +278,21 @@ class DiscoverAssociations(BaseExperimenter):
                                                                       self.author_year_Dv,
                                                                       self.author_year_De)
 
+        self.topic_year_Lpinv = self.create_laplacian_pseudo_inverse(self.topic_year_incidence,
+                                                                     self.topic_year_Dv,
+                                                                     self.topic_year_De)
+
         self.author_topic_similarity = self.create_similarity_ct(self.author_topic_Lpinv, self.author_topic_Dv)
         self.author_year_similarity = self.create_similarity_ct(self.author_year_Lpinv, self.author_year_Dv)
+        self.topic_year_similarity = self.create_similarity_ct(self.topic_year_Lpinv, self.topic_year_Dv)
 
+        # combined_similarity = self.combine_similarity_matrices(
+        #     [self.author_topic_similarity, self.author_year_similarity])
         combined_similarity = self.combine_similarity_matrices(
-            [self.author_topic_similarity, self.author_year_similarity])
+            [self.author_topic_similarity, self.topic_year_similarity * 2])
         similarity_matrix = combined_similarity
+
+
         similarity_matrix = self.author_topic_similarity
         # similarity_matrix = self.author_year_similarity
 
@@ -324,8 +354,8 @@ class DiscoverAssociations(BaseExperimenter):
 def main():
     # my code here
     # DiscoverAssociations.run_grid_search()
-    #
-    assoc_discover = DiscoverAssociations(theta=0.6, min_n_papers_per_author=8, n_topics_per_author=2)
+
+    assoc_discover = DiscoverAssociations(theta=0.65, min_n_papers_per_author=8, n_topics_per_author=5, topic_topic=True)
     assoc_discover.run()
 
 
