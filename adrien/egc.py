@@ -38,10 +38,13 @@ with open('input/RNTI_articles_export_prepared.csv', 'rb') as csv_file:
     nb_articles = 0
     lang_abs = []
     year = []
+    aff = 0
     aff_and_lang = 0
     french_and_aff = 0
     next(reader)
     for row in reader:
+        if len(row[11]) > 4:
+            aff += 1
         if row[10] != '' and len(row[11]) > 4:
             aff_and_lang += 1
             if row[10] == 'fr':
@@ -50,6 +53,7 @@ with open('input/RNTI_articles_export_prepared.csv', 'rb') as csv_file:
         lang_abs.append(row[10])
         nb_articles += 1
     print 'Number of articles per language detected from the abstract:', collections.Counter(lang_abs), '  '
+    print 'Number of articles for which affiliations are known', aff, '  '
     print 'Number of articles for which both the language of the abstract and the authors\' ' \
           'affiliations are available: %i  ' % aff_and_lang
     print 'Number of articles for which have a French asbtract and for which the authors\' ' \
@@ -167,9 +171,15 @@ for author in topic_model.corpus.all_authors():
         kurtosis = float(st.kurtosis(normalized_repartition, axis=0))
         author_indicator.append((author, standard_deviation, skewness, kurtosis))
 author_indicator.sort(key=lambda x: x[2], reverse=False)
+skewness = []
 print 'author\tstd\tskewness\tkurtosis  '
 for indicators in author_indicator:
+    skewness.append(indicators[2])
     print '%s\t%f\t%f\t%f  ' % indicators
+print '\nskewness  '
+for skew in skewness:
+    print skew, '  '
+print '\nSkewness histogram: ', np.histogram(skewness, bins=10)
 
 print '\n###Global collaboration graph'
 global_graph = topic_model.corpus.collaboration_network(range(topic_model.corpus.size), nx_format=True)

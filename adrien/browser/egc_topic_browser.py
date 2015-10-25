@@ -2,6 +2,8 @@
 from nlp.topic_model import LatentDirichletAllocation, NonNegativeMatrixFactorization
 from structure.corpus import Corpus
 from structure.author_topic_graph import AuthorTopicGraph
+import numpy as np
+from scipy import stats as st
 from flask import Flask, render_template
 import utils
 from flask.ext.frozen import Freezer
@@ -13,15 +15,17 @@ __email__ = "adrien.guille@univ-lyon2.fr"
 
 # Flask Web server
 app = Flask(__name__)
-freeze_browser = False
+freeze_browser = True
 
 # Parameters
+update_data = False
 max_tf = 0.8
 min_tf = 4
 lemmatizer = None
 num_topics = 15
 vectorization = 'tfidf'
 
+# Fit a new topic model
 '''
 # Load corpus
 corpus = Corpus(source_file_path='../input/input_for_topic_modeling.csv',
@@ -39,51 +43,49 @@ topic_model.infer_topics(num_topics=num_topics)
 utils.save_topic_model(topic_model, '../nmf_15topics_egc.pickle')
 topic_model.print_topics(num_words=10)
 '''
+
+# Load an existing topic model
 topic_model = utils.load_topic_model('../nmf_15topics_egc.pickle')
 topic_model.print_topics()
 
-# Clean the data directory
-if os.path.exists('static/data'):
-    shutil.rmtree('static/data')
-os.makedirs('static/data')
-
-# Export topic cloud
-utils.save_topic_cloud(topic_model, 'static/data/topic_cloud.json')
-
-# Export details about topics
-for topic_id in range(topic_model.nb_topics):
-    utils.save_word_distribution(topic_model.top_words(topic_id, 20),
-                                 'static/data/word_distribution'+str(topic_id)+'.tsv')
-    utils.save_affiliation_repartition(topic_model.affiliation_repartition(topic_id),
-                                       'static/data/affiliation_repartition'+str(topic_id)+'.tsv')
-    evolution = []
-    for i in range(2004, 2016):
-        evolution.append((i, topic_model.topic_frequency(topic_id, date=i)))
-    utils.save_topic_evolution(evolution, 'static/data/frequency'+str(topic_id)+'.tsv')
-
-# Export details about documents
-for doc_id in range(topic_model.corpus.size):
-    utils.save_topic_distribution(topic_model.topic_distribution_for_document(doc_id),
-                                  'static/data/topic_distribution_d'+str(doc_id)+'.tsv')
-
-# Export details about words
-for word_id in range(len(topic_model.corpus.vocabulary)):
-    utils.save_topic_distribution(topic_model.topic_distribution_for_word(word_id),
-                                  'static/data/topic_distribution_w'+str(word_id)+'.tsv')
-
-# Export details about authors
-author_list = topic_model.corpus.all_authors()
-for author_id in range(len(author_list)):
-    utils.save_topic_distribution(topic_model.topic_distribution_for_author(author_list[author_id]),
-                                  'static/data/topic_distribution_a'+str(author_id)+'.tsv')
-
 # Associate documents with topics
 topic_associations = topic_model.documents_per_topic()
+# Extract the list of authors
+author_list = topic_model.corpus.all_authors()
 
-# Export per-topic author network
-for topic_id in range(topic_model.nb_topics):
-    utils.save_json_object(topic_model.corpus.collaboration_network(topic_associations[topic_id]),
-                           'static/data/author_network'+str(topic_id)+'.json')
+if update_data:
+    # Clean the data directory
+    if os.path.exists('static/data'):
+        shutil.rmtree('static/data')
+    os.makedirs('static/data')
+    # Export topic cloud
+    utils.save_topic_cloud(topic_model, 'static/data/topic_cloud.json')
+    # Export details about topics
+    for topic_id in range(topic_model.nb_topics):
+        utils.save_word_distribution(topic_model.top_words(topic_id, 20),
+                                     'static/data/word_distribution'+str(topic_id)+'.tsv')
+        utils.save_affiliation_repartition(topic_model.affiliation_repartition(topic_id),
+                                           'static/data/affiliation_repartition'+str(topic_id)+'.tsv')
+        evolution = []
+        for i in range(2004, 2016):
+            evolution.append((i, topic_model.topic_frequency(topic_id, date=i)))
+        utils.save_topic_evolution(evolution, 'static/data/frequency'+str(topic_id)+'.tsv')
+    # Export details about documents
+    for doc_id in range(topic_model.corpus.size):
+        utils.save_topic_distribution(topic_model.topic_distribution_for_document(doc_id),
+                                      'static/data/topic_distribution_d'+str(doc_id)+'.tsv')
+    # Export details about words
+    for word_id in range(len(topic_model.corpus.vocabulary)):
+        utils.save_topic_distribution(topic_model.topic_distribution_for_word(word_id),
+                                      'static/data/topic_distribution_w'+str(word_id)+'.tsv')
+    # Export details about authors
+    for author_id in range(len(author_list)):
+        utils.save_topic_distribution(topic_model.topic_distribution_for_author(author_list[author_id]),
+                                      'static/data/topic_distribution_a'+str(author_id)+'.tsv')
+    # Export per-topic author network
+    for topic_id in range(topic_model.nb_topics):
+        utils.save_json_object(topic_model.corpus.collaboration_network(topic_associations[topic_id]),
+                               'static/data/author_network'+str(topic_id)+'.json')
 
 print 'Topic/corpus browser ready'
 
@@ -150,8 +152,11 @@ def topic_details(tid):
     ids = topic_associations[int(tid)]
     documents = []
     for document_id in ids:
+        document_author_id = []
+        for author_name in topic_model.corpus.authors(document_id):
+            document_author_id.append((author_list.index(author_name), author_name))
         documents.append((topic_model.corpus.short_content(document_id).capitalize(),
-                          topic_model.corpus.authors(document_id),
+                          document_author_id,
                           topic_model.corpus.date(document_id), document_id))
     return render_template('topic.html',
                            topic_id=tid,
@@ -172,8 +177,11 @@ def document_details(did):
     nb_words = 20
     documents = []
     for another_doc in topic_model.corpus.similar_documents(int(did), 5):
+        document_author_id = []
+        for author_name in topic_model.corpus.authors(another_doc[0]):
+            document_author_id.append((author_list.index(author_name), author_name))
         documents.append((topic_model.corpus.short_content(another_doc[0]).capitalize(),
-                          topic_model.corpus.authors(another_doc[0]),
+                          document_author_id,
                           topic_model.corpus.date(another_doc[0]), another_doc[0], round(another_doc[1], 3)))
     return render_template('document.html',
                            doc_id=did,
@@ -191,8 +199,11 @@ def document_details(did):
 def word_details(wid):
     documents = []
     for document_id in topic_model.corpus.docs_for_word(int(wid)):
+        document_author_id = []
+        for author_name in topic_model.corpus.authors(document_id):
+            document_author_id.append((author_list.index(author_name), author_name))
         documents.append((topic_model.corpus.short_content(document_id).capitalize(),
-                          topic_model.corpus.authors(document_id),
+                          document_author_id,
                           topic_model.corpus.date(document_id), document_id))
     return render_template('word.html',
                            word_id=wid,
@@ -202,21 +213,26 @@ def word_details(wid):
                            documents=documents)
 
 
-@app.route('/author/<an>.html')
-def author_details(an):
-    author_name = an.replace('%20', ' ')
+@app.route('/author/<aid>.html')
+def author_details(aid):
     documents = []
-    for document_id in topic_model.corpus.documents_by_author(an):
+    for document_id in topic_model.corpus.documents_by_author(author_list[int(aid)]):
+        document_author_id = []
+        for author_name in topic_model.corpus.authors(document_id):
+            document_author_id.append((author_list.index(author_name), author_name))
         documents.append((topic_model.corpus.short_content(document_id).capitalize(),
-                          topic_model.corpus.authors(document_id),
+                          document_author_id,
                           topic_model.corpus.date(document_id), document_id))
+    repartition = np.array(topic_model.topic_distribution_for_author(author_list[int(aid)]))
+    skewness = float(st.skew(repartition, axis=0))
     return render_template('author.html',
-                           author_name=author_name,
-                           author_id=str(author_list.index(author_name)),
+                           author_name=author_list[int(aid)],
+                           author_id=str(int(aid)),
                            affiliations='',
                            topic_ids=range(topic_model.nb_topics),
                            doc_ids=range(topic_model.corpus.size),
-                           documents=documents)
+                           documents=documents,
+                           skewness=round(skewness, 3))
 
 if __name__ == '__main__':
     if freeze_browser:
@@ -238,8 +254,8 @@ if __name__ == '__main__':
                 yield {'wid': word_id}
         @freezer.register_generator
         def author_details():
-            for author_name in author_list:
-                yield {'an': author_name.replace(' ', '%20')}
+            for author_id in range(len(author_list)):
+                yield {'aid': author_id}
         freezer.freeze()
     else:
         # Load corpus
